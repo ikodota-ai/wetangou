@@ -25,6 +25,7 @@ import com.ruoyi.common.utils.ip.IpUtils;
 import com.ruoyi.framework.manager.AsyncManager;
 import com.ruoyi.framework.manager.factory.AsyncFactory;
 import com.ruoyi.framework.security.context.AuthenticationContextHolder;
+import com.ruoyi.framework.tenant.TenantIdentityResolver;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.ISysUserService;
 
@@ -50,6 +51,9 @@ public class SysLoginService
 
     @Autowired
     private ISysConfigService configService;
+
+    @Autowired
+    private TenantIdentityResolver tenantIdentityResolver;
 
     /**
      * 登录验证
@@ -95,6 +99,8 @@ public class SysLoginService
         AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
         recordLoginInfo(loginUser.getUserId());
+        // 身份回填：从 biz_merchant_user 反查 userType/agentId/merchantId，写入 LoginUser
+        tenantIdentityResolver.resolveAndApply(loginUser);
         // 生成token
         return tokenService.createToken(loginUser);
     }
