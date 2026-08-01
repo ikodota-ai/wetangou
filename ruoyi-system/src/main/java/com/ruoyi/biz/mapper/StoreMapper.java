@@ -2,6 +2,7 @@ package com.ruoyi.biz.mapper;
 
 import java.util.List;
 import com.ruoyi.biz.domain.Store;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 门店Mapper接口
@@ -57,5 +58,18 @@ public interface StoreMapper
      * @param storeIds 需要删除的数据主键集合
      * @return 结果
      */
+    /**
+     * 按经纬度查询最近的 N 个门店
+     *
+     * <p>使用 MySQL Haversine 公式计算球面距离（米），
+     * 返回结果按距离升序。租户过滤由 TenantSqlInterceptor 自动追加。</p>
+     *
+     * @param longitude 用户经度
+     * @param latitude 用户纬度
+     * @param limit 返回数量
+     * @return 门店集合，含 distance 字段
+     */
+    public List<Store> selectNearestStoreList(@Param("longitude") Double longitude, @Param("latitude") Double latitude, @Param("limit") int limit);
+
     public int deleteStoreByStoreIds(Long[] storeIds);
 }

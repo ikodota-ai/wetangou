@@ -156,3 +156,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 </mapper>
+    <!--
+        按经纬度查询最近的 N 个门店
+        使用 Haversine 公式（球面距离，单位：米），结果按距离升序
+        tenant 过滤由 TenantSqlInterceptor 自动追加 merchant_id = ?，无需写死
+    -->
+    <select id="selectNearestStoreList" resultMap="StoreResult">
+        SELECT
+            s.store_id, s.store_name, s.logo, s.province, s.city, s.district, s.address,
+            s.longitude, s.latitude, s.phone, s.service_phone, s.service_qrcode,
+            s.business_hours, s.intro, s.services, s.sort, s.status, s.del_flag,
+            s.create_by, s.create_time, s.update_by, s.update_time, s.remark, s.merchant_id,
+            (
+                6371000 * ACOS(
+                    COS(RADIANS(#{latitude})) * COS(RADIANS(s.latitude)) *
+                    COS(RADIANS(s.longitude) - RADIANS(#{longitude})) +
+                    SIN(RADIANS(#{latitude})) * SIN(RADIANS(s.latitude))
+                )
+            ) AS distance
+        FROM biz_store s
+        WHERE s.status = '0' AND s.del_flag = '0'
+          AND s.longitude IS NOT NULL AND s.latitude IS NOT NULL
+        ORDER BY distance ASC
+        LIMIT #{limit}
+    </select>

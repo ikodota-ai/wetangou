@@ -311,4 +311,11 @@ public class Store extends BaseEntity
             .append("remark", getRemark())
             .toString();
     }
+
+    /** 距离（米）— 仅供 /api/store/nearest 运行时计算用，不入库 */
+    @com.ruoyi.common.annotation.Excel(name = "距离(米)")
+    private java.math.BigDecimal distance;
+
+    public java.math.BigDecimal getDistance() { return distance; }
+    public void setDistance(java.math.BigDecimal distance) { this.distance = distance; }
 }

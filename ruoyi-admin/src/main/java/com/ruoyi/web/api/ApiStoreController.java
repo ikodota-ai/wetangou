@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
@@ -39,12 +40,32 @@ public class ApiStoreController
     private static final String DICT_STORE_SERVICE = "biz_store_service";
 
     /**
+     * 距离用户最近的 N 个门店（默认 10 个，最多 50）
+     *
+     * <p>小程序首页进入时由前端用 wx.getLocation 拿经纬度，传入 longitude/latitude。
+     * 后端用 Haversine 公式按球面距离排序，返回当前 X-App-Id 解析到的商户下
+     * status=0 / del_flag=0 / 经纬度非空的门店。</p>
+     *
+     * <p>不带经纬度时退化为按 store_id 倒序取前 N 个，确保至少有一个默认门店可显示。</p>
+     */
+    @GetMapping("/nearest")
+    public AjaxResult nearest(
+            @RequestParam(value = "longitude", required = false) Double longitude,
+            @RequestParam(value = "latitude", required = false) Double latitude,
+            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit)
+    {
+        List<Store> list = storeService.selectNearestStoreList(longitude, latitude, limit);
+        return AjaxResult.success(list);
+    }
+
+    /**
      * 门店列表（仅正常状态）
      */
     @GetMapping("/list")
     public AjaxResult list(Store query)
     {
         query.setStatus("0");
+        query.setDelFlag("0");
         List<Store> list = storeService.selectStoreList(query);
         return AjaxResult.success(list);
     }

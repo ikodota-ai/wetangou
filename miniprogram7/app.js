@@ -54,21 +54,51 @@ App({
     });
   },
 
-  // 加载门店列表（带 mock 兜底）
-  loadStores() {
+  // 加载门店列表
+  // 优先按用户经纬度调 /api/store/nearest 做「最近门店」定位；
+  // 没有经纬度时退到 /api/store/list 全列表；
+  // 接口通但空数据时不再回退 mock（mock 已被全局禁用，且会让示例门店混入真实商户）。
+  loadStores(longitude, latitude) {
     return new Promise((resolve) => {
       if (this.globalData.stores.length) return resolve(this.globalData.stores);
-      const applyMock = (reason) => {
-        console.warn('[stores] use mock:', reason);
-        this.globalData.stores = mock.stores.map((s) => ({
-          ...s,
-          logo: s.logo || '',
-          cover: s.cover || '',
-          distance: s.distance || '未知'
-        }));
+      const normalize = (s) => ({
+        storeId: s.storeId || s.id,
+        name: s.storeName || s.name,
+        storeName: s.storeName || s.name,
+        subName: s.subName || '',
+        hours: s.businessHours || s.hours || '',
+        businessHours: s.businessHours || s.hours || '',
+        address: s.address || '',
+        phone: s.phone || '',
+        servicePhone: s.servicePhone || s.phone || '',
+        serviceQrcode: s.serviceQrcode ? toFullUrl(s.serviceQrcode) : '',
+        logo: s.logo ? toFullUrl(s.logo) : '',
+        intro: s.intro || '',
+        services: s.services || '',
+        latitude: s.latitude ? parseFloat(s.latitude) : 23.405,
+        longitude: s.longitude ? parseFloat(s.longitude) : 113.227,
+        distance: s.distance != null ? s.distance : null
+      });
+      const apply = (rows) => {
+        this.globalData.stores = rows.map(normalize);
         resolve(this.globalData.stores);
       };
-      api.storeList().then((res) => {
+      const useList = () => api.storeList().then((res) => {
+        const rows = (res && (res.rows || res.data || res)) || [];
+        if (Array.isArray(rows) && rows.length) apply(rows);
+        else { console.warn('[stores] empty from server'); this.globalData.stores = []; resolve(this.globalData.stores); }
+      });
+      if (longitude != null && latitude != null) {
+        api.storeNearest({ longitude, latitude, limit: 10 }).then((res) => {
+          const rows = (res && (res.rows || res.data || res)) || [];
+          if (Array.isArray(rows) && rows.length) apply(rows);
+          else useList();
+        }).catch(() => useList());
+      } else {
+        useList();
+      }
+    });
+  }
         const rows = (res && (res.rows || res.data || res)) || [];
         if (Array.isArray(rows) && rows.length) {
           // 接口有数据就以后端为准，服务端字段名与小程序展示字段做一次映射
@@ -134,33 +164,35 @@ App({
     });
   },
 
-  // 选最近门店
+  // 选最近门店（先用 wx.getLocation 拿坐标，再调 /api/store/nearest 走服务端排序）
   pickNearestStore(callback) {
-    this.loadStores().then((stores) => {
-      wx.getLocation({
-        type: 'gcj02',
-        success: (res) => {
-          this.globalData.location = { latitude: res.latitude, longitude: res.longitude };
-          let nearest = stores[0];
-          let minD = Infinity;
-          stores.forEach((s) => {
-            if (s.latitude && s.longitude) {
-              const d = this.getDistance(res.latitude, res.longitude, s.latitude, s.longitude);
-              s.distance = d + 'km';
-              if (d < minD) { minD = d; nearest = s; }
-            }
-          });
-          if (!nearest.distance || nearest.distance === '未知') nearest.distance = minD !== Infinity ? (minD + 'km') : '未知';
+    wx.getLocation({
+      type: 'gcj02',
+      success: (res) => {
+        this.globalData.location = { latitude: res.latitude, longitude: res.longitude };
+        this.loadStores(res.longitude, res.latitude).then((stores) => {
+          if (!stores.length) { this.globalData.store = null; return callback && callback(null); }
+          const nearest = stores[0];
+          if (nearest.distance != null) {
+            // 服务端返回的是米，转成 km 字符串
+            nearest.distance = (Math.round(nearest.distance / 100) / 10).toFixed(1) + 'km';
+          } else {
+            nearest.distance = '未知';
+          }
           this.globalData.store = nearest;
           this.loadGoods(nearest.storeId).then(() => callback && callback(nearest));
-        },
-        fail: () => {
-          const s = stores[0] || {};
+        });
+      },
+      fail: () => {
+        // 没有定位权限时退到全列表，按 store_id 倒序取第一个
+        this.loadStores().then((stores) => {
+          if (!stores.length) { this.globalData.store = null; return callback && callback(null); }
+          const s = stores[0];
           s.distance = s.distance || '未知';
           this.globalData.store = s;
           this.loadGoods(s.storeId).then(() => callback && callback(s));
-        }
-      });
+        });
+      }
     });
   },
 

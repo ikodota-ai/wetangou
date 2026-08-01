@@ -90,6 +90,7 @@ const api = {
   uploadAvatar: (p) => uploadFile('/api/member/avatar', p, 'avatarfile'),
   // 门店
   storeList: (params) => request('/api/store/list', { data: params }),
+  storeNearest: (params) => request('/api/store/nearest', { data: params }),
   storeDetail: (id) => request(`/api/store/${id}`),
   storeAlbum: (id) => request(`/api/store/${id}/album`),
   storeServices: (id) => request(`/api/store/${id}/services`),

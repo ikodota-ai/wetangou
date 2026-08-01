@@ -143,4 +143,35 @@ public class StoreServiceImpl implements IStoreService
     {
         return storeMapper.deleteStoreByStoreId(storeId);
     }
+    /**
+     * 按经纬度查询最近的 N 个门店（球面距离）
+     */
+    @Override
+    public List<Store> selectNearestStoreList(Double longitude, Double latitude, int limit)
+    {
+        if (longitude == null || latitude == null)
+        {
+            // 无坐标时退化为按 store_id 倒序取前 N 个（让小程序至少有默认门店可显示）
+            Store fallback = new Store();
+            fallback.setStatus("0");
+            return storeMapper.selectStoreList(fallback);
+        }
+        int max = limit <= 0 ? 10 : Math.min(limit, 50);
+        List<Store> list = storeMapper.selectNearestStoreList(longitude, latitude, max);
+        // 数据隔离保护：即便拦截器漏过滤，再按当前租户 merchant_id 二次过滤
+        com.ruoyi.common.core.domain.model.TenantContext ctx = com.ruoyi.common.utils.TenantContextHolder.get();
+        if (ctx != null && !ctx.isPlatform() && ctx.getMerchantId() != null)
+        {
+            Long mid = ctx.getMerchantId();
+            java.util.Iterator<Store> it = list.iterator();
+            while (it.hasNext())
+            {
+                if (!mid.equals(it.next().getMerchantId()))
+                {
+                    it.remove();
+                }
+            }
+        }
+        return list;
+    }
 }
