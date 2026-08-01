@@ -48,13 +48,25 @@ Page({
     });
   },
   // 首页轮播复用门店相册，门店没配图时保留内置兜底图
+  // 优先拉后端 banner，门店没配时再回退到 storeAlbum
   loadBanners(storeId) {
-    api.storeAlbum(storeId).then((res) => {
+    api.bannerList({ position: 'home', merchantId: 0 }).then((res) => {
       const rows = (res && (res.data || res.rows || res)) || [];
       const banners = (Array.isArray(rows) ? rows : [])
-        .filter((a) => a.imgUrl)
-        .map((a, i) => ({ id: a.albumId || 'a' + i, src: toFullUrl(a.imgUrl) }));
-      if (banners.length) this.setData({ banners });
+        .filter((b) => b.imageUrl)
+        .map((b) => ({ id: b.bannerId, src: toFullUrl(b.imageUrl), link: b.linkUrl || '' }));
+      if (banners.length) {
+        this.setData({ banners });
+        return;
+      }
+      // 回退：复用门店相册
+      return api.storeAlbum(storeId).then((res2) => {
+        const rows2 = (res2 && (res2.data || res2.rows || res2)) || [];
+        const fb = (Array.isArray(rows2) ? rows2 : [])
+          .filter((a) => a.imgUrl)
+          .map((a, i) => ({ id: a.albumId || 'a' + i, src: toFullUrl(a.imgUrl) }));
+        if (fb.length) this.setData({ banners: fb });
+      }).catch(() => {});
     }).catch(() => {});
   },
   // 设施标签由后端翻译字典，前端不再硬编码中文
@@ -65,8 +77,19 @@ Page({
     }).catch(() => {});
   },
   onBannerChange() {},
-  onBannerTap() {
-    // 轮播图来源是门店相册，点击后进入贴图页看全部
+  onBannerTap(e) {
+    // 平台 banner 带 linkUrl 时优先跳；门店相册兜底时跳贴图页
+    const item = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const link = item.link;
+    if (link && /^https?:\/\//.test(link)) {
+      // 外链
+      wx.setClipboardData({ data: link });
+      return;
+    }
+    if (link) {
+      wx.navigateTo({ url: link, fail: () => { wx.switchTab({ url: '/pages/album/index' }); } });
+      return;
+    }
     wx.switchTab({ url: '/pages/album/index' });
   },
   switchTab(e) { this.setData({ tab: e.currentTarget.dataset.t }); },

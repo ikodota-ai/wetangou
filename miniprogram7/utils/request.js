@@ -88,6 +88,8 @@ const api = {
   storeDetail: (id) => request(`/api/store/${id}`),
   storeAlbum: (id) => request(`/api/store/${id}/album`),
   storeServices: (id) => request(`/api/store/${id}/services`),
+  // 首页 Banner
+  bannerList: (params) => request('/api/banner/list', { data: params }),
   // 商品
   productList: (params) => request('/api/product/list', { data: params }),
   productDetail: (id) => request(`/api/product/${id}`),

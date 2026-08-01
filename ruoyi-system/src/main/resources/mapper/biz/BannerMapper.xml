@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.BannerMapper">
+
+    <resultMap type="Banner" id="BannerResult">
+        <result property="bannerId"    column="banner_id"    />
+        <result property="merchantId"  column="merchant_id"  />
+        <result property="title"       column="title"        />
+        <result property="imageUrl"    column="image_url"    />
+        <result property="linkUrl"     column="link_url"     />
+        <result property="position"    column="position"     />
+        <result property="status"      column="status"       />
+        <result property="sort"        column="sort"         />
+        <result property="activeFrom"  column="active_from"  />
+        <result property="activeTo"    column="active_to"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+    </resultMap>
+
+    <sql id="selectBannerVo">
+        select banner_id, merchant_id, title, image_url, link_url, position, status, sort,
+               active_from, active_to, create_by, create_time, update_by, update_time
+        from biz_banner
+    </sql>
+
+    <select id="selectBannerList" parameterType="Banner" resultMap="BannerResult">
+        <include refid="selectBannerVo"/>
+        <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="title != null  and title != ''"> and title like concat('%', #{title}, '%')</if>
+            <if test="position != null  and position != ''"> and position = #{position}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+        order by sort asc, banner_id desc
+    </select>
+
+    <select id="selectActiveBanners" parameterType="Banner" resultMap="BannerResult">
+        <include refid="selectBannerVo"/>
+        <where>
+            status = '0'
+            <if test="position != null and position != ''"> and position = #{position}</if>
+            <if test="merchantId != null"> and (merchant_id = #{merchantId} or merchant_id = 0)</if>
+            <if test="merchantId == null"> and merchant_id = 0</if>
+            <if test="activeFrom != null"> and (active_from is null or active_from &lt;= now())</if>
+            <if test="activeTo != null"> and (active_to is null or active_to &gt;= now())</if>
+        </where>
+        order by merchant_id desc, sort asc
+    </select>
+
+    <select id="selectBannerByBannerId" parameterType="Long" resultMap="BannerResult">
+        <include refid="selectBannerVo"/>
+        where banner_id = #{bannerId}
+    </select>
+
+    <insert id="insertBanner" parameterType="Banner" useGeneratedKeys="true" keyProperty="bannerId">
+        insert into biz_banner
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="title != null and title != ''">title,</if>
+            <if test="imageUrl != null and imageUrl != ''">image_url,</if>
+            <if test="linkUrl != null">link_url,</if>
+            <if test="position != null">position,</if>
+            <if test="status != null">status,</if>
+            <if test="sort != null">sort,</if>
+            <if test="activeFrom != null">active_from,</if>
+            <if test="activeTo != null">active_to,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="title != null and title != ''">#{title},</if>
+            <if test="imageUrl != null and imageUrl != ''">#{imageUrl},</if>
+            <if test="linkUrl != null">#{linkUrl},</if>
+            <if test="position != null">#{position},</if>
+            <if test="status != null">#{status},</if>
+            <if test="sort != null">#{sort},</if>
+            <if test="activeFrom != null">#{activeFrom},</if>
+            <if test="activeTo != null">#{activeTo},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateBanner" parameterType="Banner">
+        update biz_banner
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id = #{merchantId},</if>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="imageUrl != null and imageUrl != ''">image_url = #{imageUrl},</if>
+            <if test="linkUrl != null">link_url = #{linkUrl},</if>
+            <if test="position != null">position = #{position},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="activeFrom != null">active_from = #{activeFrom},</if>
+            <if test="activeTo != null">active_to = #{activeTo},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where banner_id = #{bannerId}
+    </update>
+
+    <delete id="deleteBannerByBannerId" parameterType="Long">
+        delete from biz_banner where banner_id = #{bannerId}
+    </delete>
+
+    <delete id="deleteBannerByBannerIds" parameterType="String">
+        delete from biz_banner where banner_id in
+        <foreach item="bannerId" collection="array" open="(" separator="," close=")">
+            #{bannerId}
+        </foreach>
+    </delete>
+</mapper>
