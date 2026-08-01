@@ -136,10 +136,6 @@ export default {
       title: '',
       open: false,
       showMerchantFilter: true,
-    isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
-    }
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -212,7 +208,11 @@ export default {
         return delBanner(ids.join(','))
       }).then(() => { this.getList(); this.msgSuccess('删除成功') }).catch(() => {})
     },
-    cancel() { this.open = false }
+    cancel() { this.open = false },
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    }
   }
 }
 </script>

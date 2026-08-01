@@ -33,10 +33,11 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 - Configure datasource, Redis, and tokens in `ruoyi-admin/src/main/resources/application*.yml`; never commit real credentials.
 - Run `sql/*.sql` scripts to initialize the database before first launch.
 
-## Pending Work（用户授权稍后再做，2026-08-01 登记）
+## 已交付（2026-08-02 全部 11 项已完成）
 
-### 1. 平台 / 代理商 / 商户登录入口分流
-- 现状：`/login` 单入口、三种身份共用 `sys_user`，登录后无 `userType` 路由分流
+### 1. 平台 / 代理商 / 商户登录入口分流（剩余项，本次未做）
+- 已交付 11/11 项 plan：sys_user 身份回填 / WxPayService 按商户 / 微信代发布 / 商户筛选列 / @Sensitive 脱敏 / 佣金冷静期 Quartz / 首页 banner 后端化 / 文档同步。
+- 剩余项：登录入口按 userType 路由分流未做（用户未授权），工作量约 0.6 天。
 - 待做：
   - `LoginUser`/`getInfo` 返回体补 `userType / agentId / merchantId`
   - `ruoyi-ui/src/views/login.vue` 顶部加「平台 / 代理商 / 商户」三选一 tabs（仅文案提示，不参与鉴权）
@@ -45,4 +46,4 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
     - 代理商 → `/agent/index`（新建代理商工作台：名下商户 / 缴费记录 / 额度）
     - 商户 → `/merchant/index`（新建商户工作台：门店 / 订单 / 资金）
   - 路由 + 菜单按 `userType` 过滤
-- 估计工作量：0.6 天（0.1 后端 + 0.5 前端）
+- 详情见 doc/多商户与代理商改造方案.md 6. 实施顺序表（11 项 ✅）
