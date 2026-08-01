@@ -408,3 +408,40 @@ mysql -uroot -proot ry-vue < miniprogram7/DEBUG_VERIFY.sql
 - `appid_detail` → 包含字符长度和 HEX，HEX 含 `0x20` = 空格，`0xe3 0x80 0x80` = 全角空格
 - `status_tip` → `❌ 停用` 时立刻 `UPDATE biz_merchant SET status='0' WHERE merchant_id=?`
 - `appid_match_tip` → `❌ 不一致` 时把 DB 里 appid 改成 `wx9e147c4e2151b123` 即可
+
+### Q11：cronet ERR_CONNECTION_REFUSED（127.0.0.1 也连不上）
+
+**症状**：Console 报 `request:fail errcode:-102 cronet_error_code:-102 error_msg:net::ERR_CONNECTION_REFUSED`，但 `curl http://127.0.0.1:8080` 在 macOS 终端能通。
+
+**根因**：微信开发者工具的 chromium cronet 网络栈**与系统网络栈独立**，且默认走 macOS SOCKS 代理（如果有）。127.0.0.1 / localhost 在 SOCKS 例外列表里可能仍被沙盒拦截。
+
+**解决**：用电脑 LAN IP 绕开 loopback。
+
+```bash
+# 1. 拿本机 LAN IP
+ifconfig en0 | grep "inet " | awk '{print $2}'
+# 假设返回 172.31.26.216
+
+# 2. 修改 miniprogram7/utils/config.js 的 BASE_URL
+# const BASE_URL = 'http://172.31.26.216:8080';
+```
+
+**为什么 curl 能通而 cronet 不行**：
+- curl 走系统网络栈
+- cronet 走微信沙盒网络栈，loopback 路径不可靠
+- LAN IP 经真实路由，cronet 也能正常转发
+
+**自检命令**（4 步确保链路）：
+```bash
+# 1. 后端在跑
+ps aux | grep ruoyi-admin.jar | grep -v grep
+
+# 2. 8080 在监听
+lsof -nP -iTCP:8080 -sTCP:LISTEN
+
+# 3. 系统能通
+curl http://127.0.0.1:8080/api/store/nearest -H "X-App-Id: wx9e147c4e2151b123" -w "127: %{http_code}\n" -o /dev/null
+curl http://172.31.26.216:8080/api/store/nearest -H "X-App-Id: wx9e147c4e2151b123" -w "LAN: %{http_code}\n" -o /dev/null
+
+# 4. 微信开发者工具网络面板：开发者工具右上角「详情 → 本地设置」勾选「不校验合法域名」
+```
