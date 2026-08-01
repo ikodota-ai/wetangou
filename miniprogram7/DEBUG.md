@@ -385,3 +385,26 @@ SELECT merchant_id, merchant_name, appid, status FROM biz_merchant WHERE merchan
 **说明**：`DEFAULT_MERCHANT_ID=1` 不能去掉，否则匿名接口会因租户上下文为空而走 `ISOLATED_TABLES` 全表扫，对多商户体系是跨商户泄露。保留 fallback 是为了「单商户小程序在未配置 appid 时还能用」的兼容性。
 
 > **自动诊断脚本**：`miniprogram7/DEBUG_DIAGNOSE.sql` —— 把这 5 步查询和 2 个修复 UPDATE 都列好了，MySQL 客户端一行行跑就能定位是 appid 没填、还是 store 200 挂错商户、还是 Redis 缓存污染。
+
+### Q10：appid 在商户里配了，但小程序还是看不到数据
+
+**症状**：后台「商户管理 → 微信配置」里 `appid = wx9e147c4e2151b123`，保存成功，但小程序请求依然 fallback。
+
+**90% 的根因**：`biz_merchant.status = '1'`（停用）。
+后端 `MemberAuthInterceptor.resolveTenantByAppid` 校验 `merchant.status == '0'` 才用，status=1 直接 fallback 到默认商户 1。
+
+**其余 10%**：
+- appid 复制时带不可见字符（空格 / 全角空格 / BOM）
+- 配在了 merchant_id=A 的商户，但 store_id=200 实际挂在 merchant_id=B
+- 小程序真机调试 / 预览模式拿到的 appid 与 project.config.json 不一致
+
+**一键验证**（MySQL 跑这个，结果集自带诊断）：
+
+```bash
+mysql -uroot -proot ry-vue < miniprogram7/DEBUG_VERIFY.sql
+```
+
+输出列含义：
+- `appid_detail` → 包含字符长度和 HEX，HEX 含 `0x20` = 空格，`0xe3 0x80 0x80` = 全角空格
+- `status_tip` → `❌ 停用` 时立刻 `UPDATE biz_merchant SET status='0' WHERE merchant_id=?`
+- `appid_match_tip` → `❌ 不一致` 时把 DB 里 appid 改成 `wx9e147c4e2151b123` 即可
