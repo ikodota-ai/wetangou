@@ -155,7 +155,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{storeId}
         </foreach>
     </delete>
-</mapper>
     <!--
         按经纬度查询最近的 N 个门店
         使用 Haversine 公式（球面距离，单位：米），结果按距离升序
@@ -180,3 +179,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ORDER BY distance ASC
         LIMIT #{limit}
     </select>
+</mapper>
