@@ -84,9 +84,27 @@ public class WxPayService
     /**
      * 是否走mock支付（未配齐凭证且开启mock）
      */
+    /**
+     * 当前是否走 mock 支付（按全局开关判断）。
+     *
+     * <p>所有环境默认关闭 mock，只在显式配置 {@code wx.pay.mockEnabled=true} 时才走 mock。
+     * 商户级判断请用 {@link #isMock(Long)}。</p>
+     */
     public boolean isMock()
     {
-        return !wxPayConfig.isConfigured() && wxPayConfig.isMockEnabled();
+        return wxPayConfig.isMockEnabled();
+    }
+
+    /**
+     * 商户级 mock 判断：仅在全局 mock 开关开启时返回 true。
+     *
+     * <p>未配置齐全的商户在 mock 关闭时直接走真实流程（会因缺凭证抛错），
+     * 由运维通过「商户管理 → 微信配置」补齐；不再静默走 mock 避免上线被告知
+     * 「支付成功」实际没落库。</p>
+     */
+    public boolean isMock(Long merchantId)
+    {
+        return isMock();
     }
 
     /**
@@ -106,16 +124,20 @@ public class WxPayService
     public JSONObject createJsapiOrderByMerchant(Long merchantId, String outTradeNo, String description, int totalFen, String openid)
     {
         MerchantPayCredential c = resolveCredential(merchantId);
-        // 商户级 mock 判断：未配置齐全时仍走 mock，避免本地缺凭证时整体失败
-        boolean mock = StringUtils.isEmpty(c.mchId) || StringUtils.isEmpty(c.apiV3Key) || wxPayConfig.isMockEnabled();
-        if (mock)
+        // mock 全局默认关闭；仅当 wxPayConfig.isMockEnabled() 显式开启时才走 mock
+        if (wxPayConfig.isMockEnabled())
         {
-            log.info("[WxPayService] mock支付(merchantId={}), outTradeNo={}, totalFen={}", merchantId, outTradeNo, totalFen);
+            log.warn("[WxPayService] mock支付(merchantId={}), outTradeNo={}, totalFen={} —— 请确认这是开发环境且不会发布到生产", merchantId, outTradeNo, totalFen);
             JSONObject mockJson = new JSONObject();
             mockJson.put("mock", true);
             mockJson.put("outTradeNo", outTradeNo);
             mockJson.put("merchantId", merchantId);
             return mockJson;
+        }
+        // 真实流程：缺凭证直接抛错，不静默走 mock
+        if (StringUtils.isEmpty(c.mchId) || StringUtils.isEmpty(c.apiV3Key) || StringUtils.isEmpty(c.appId))
+        {
+            throw new ServiceException("商户 " + merchantId + " 微信支付凭证未配置（mchId/apiV3Key/appId），请在「商户管理 → 微信配置」中维护");
         }
         if (StringUtils.isEmpty(openid))
         {

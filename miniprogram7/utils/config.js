@@ -2,13 +2,11 @@
 // 说明：
 // 1) BASE_URL 默认为本地开发地址；真机调试改成电脑本机 IP；上线改为 HTTPS 域名。
 // 2) APPID 由小程序自带 api 取「当前运行环境」appid，多商户通过 ext.json 注入。
-// 3) ENV: dev=本地开发，prod=线上生产，mock=关闭后端纯 mock 调试。
-// 4) MOCK_ENABLED 是 dev 环境的开关：
-//    - dev+mock=true：后端挂了能回退到 mock 数据，前端可独立预览
-//    - dev+mock=false：后端必须可达；不达就显式报错
-//    - prod：强制关闭 mock 兜底与「失败也提示成功」的伪造，
-//      避免线上用户看到假数据或被告知操作成功实际没落库
-// 5) 真实生产打包前务必把 MOCK_ENABLED 设为 false（或在 CI 中按 env 替换此常量）。
+// 3) 全部环境（含 dev / prod）一律关闭前端 mock 兜底。
+//    之前 dev 环境允许「接口失败时回退到本地 mock 数据」，会导致用户被告知
+//    「操作成功」但实际没落库；现已永久关闭，由后端真实接口承担。
+// 4) MOCK_ENABLED 常量保留仅为向后兼容，恒为 false。
+// 5) 若后端不可达，前端须显式报错，禁止静默回退 mock。
 
 const BASE_URL = 'http://localhost:8080';
 
@@ -22,10 +20,10 @@ const APPID = (function () {
   return '';
 })();
 
-const ENV = 'dev'; // dev | prod | mock
+const ENV = 'prod'; // 强制按线上行为：禁 mock
 
-// 线上环境强制关闭 mock 兜底；本地可通过此开关控制是否在接口失败时回退 mock
-const MOCK_ENABLED = ENV !== 'prod';
+// 全部环境强制关闭 mock 兜底（保留常量仅为兼容）
+const MOCK_ENABLED = false;
 
 module.exports = {
   BASE_URL,

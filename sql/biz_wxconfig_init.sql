@@ -11,4 +11,4 @@ values
 ('微信支付私钥路径',       'wx.pay.privateKeyPath',    '',                              'N', 'admin', sysdate(), '微信配置'),
 ('微信支付APIv3密钥',      'wx.pay.apiV3Key',          '',                              'N', 'admin', sysdate(), '微信配置'),
 ('微信支付回调地址',       'wx.pay.notifyUrl',         'https://your-domain.com/api/pay/notify', 'N', 'admin', sysdate(), '微信配置'),
-('微信支付mock开关',       'wx.pay.mockEnabled',       'true',                          'N', 'admin', sysdate(), '微信配置');
+('微信支付mock开关',       'wx.pay.mockEnabled',       'false',                          'N', 'admin', sysdate(), '微信配置');

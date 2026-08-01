@@ -73,13 +73,17 @@ public class WxPayConfig
     }
 
     /**
-     * 无真实凭证时开启mock支付，便于本地联调
+     * 是否开启mock支付。
+     *
+     * <p>所有环境（含 dev/prod）默认关闭；只有显式配置 {@code wx.pay.mockEnabled=true} 时才开启，
+     * 避免本地缺凭证时支付流程误走 mock 被告知「支付成功」实际没落库。
+     * 本地联调请按需临时打开，并确认不会发布到生产环境。</p>
      */
     public boolean isMockEnabled()
     {
         String value = sysConfigService.selectConfigByKey(KEY_MOCK_ENABLED);
-        // 未配置时默认开启mock，避免本地缺凭证时支付流程直接失败
-        return StringUtils.isEmpty(value) || "true".equalsIgnoreCase(value.trim());
+        // 未配置时默认关闭 mock；只接受显式 true（兼容历史 true/false 大小写）
+        return "true".equalsIgnoreCase(StringUtils.trimToEmpty(value));
     }
 
     /**

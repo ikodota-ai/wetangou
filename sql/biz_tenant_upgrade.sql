@@ -147,7 +147,7 @@ select 1, 'MC000001', '洞天团购（默认商户）', 1, 901, '平台运营',
   ifnull((select config_value from sys_config where config_key = 'wx.pay.privateKeyPath'), ''),
   ifnull((select config_value from sys_config where config_key = 'wx.pay.apiV3Key'), ''),
   ifnull((select config_value from sys_config where config_key = 'wx.pay.notifyUrl'), ''),
-  case when ifnull((select config_value from sys_config where config_key = 'wx.pay.mockEnabled'), 'true') = 'true'
+  case when ifnull((select config_value from sys_config where config_key = 'wx.pay.mockEnabled'), 'false') = 'true'
        then '0' else '1' end,
   '0', 'admin', sysdate()
 where not exists (select 1 from biz_merchant m where m.merchant_id = 1);
