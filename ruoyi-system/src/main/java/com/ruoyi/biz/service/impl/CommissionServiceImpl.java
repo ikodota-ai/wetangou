@@ -70,6 +70,18 @@ public class CommissionServiceImpl implements ICommissionService
     }
 
     /**
+     * 结算冷静期到期的佣金
+     */
+    @Override
+    public int settleExpiredCommissions(int settleDays)
+    {
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("settleDays", settleDays);
+        params.put("now", DateUtils.getNowDate());
+        return commissionMapper.settleExpiredCommissions(params);
+    }
+
+    /**
      * 批量删除佣金明细
      * 
      * @param commissionIds 需要删除的佣金明细主键

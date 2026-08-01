@@ -90,6 +90,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where commission_id = #{commissionId}
     </update>
 
+    <update id="settleExpiredCommissions" parameterType="map">
+        update biz_commission
+        <set>
+            status = '1',
+            settle_time = #{now}
+        </set>
+        where status = '0'
+          and create_time is not null
+          and date_add(create_time, interval #{settleDays} day) &lt;= #{now}
+    </update>
+
     <delete id="deleteCommissionByCommissionId" parameterType="Long">
         delete from biz_commission where commission_id = #{commissionId}
     </delete>

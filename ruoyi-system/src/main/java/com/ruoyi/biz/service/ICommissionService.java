@@ -44,6 +44,15 @@ public interface ICommissionService
     public int updateCommission(Commission commission);
 
     /**
+     * 结算冷静期到期的佣金（status=0 且 create_time + settleDays天 <= now）
+     * 把 status 置为 1、settle_time = now
+     *
+     * @param settleDays 冷静期（天）
+     * @return 结算条数
+     */
+    public int settleExpiredCommissions(int settleDays);
+
+    /**
      * 批量删除佣金明细
      * 
      * @param commissionIds 需要删除的佣金明细主键集合

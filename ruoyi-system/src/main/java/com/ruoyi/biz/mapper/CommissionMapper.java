@@ -44,6 +44,14 @@ public interface CommissionMapper
     public int updateCommission(Commission commission);
 
     /**
+     * 结算冷静期到期的佣金记录（status=0 且 create_time + #{settleDays}天 <= NOW）
+     *
+     * @param params settleDays(冷静期天数)、now(当前时间)
+     * @return 影响行数
+     */
+    public int settleExpiredCommissions(java.util.Map<String, Object> params);
+
+    /**
      * 删除佣金明细
      * 
      * @param commissionId 佣金明细主键

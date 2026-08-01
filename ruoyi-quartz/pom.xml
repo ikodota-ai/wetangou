@@ -29,6 +29,12 @@
             <artifactId>ruoyi-common</artifactId>
         </dependency>
 
+        <!-- 业务模块（佣金冷静期结算等） -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-system</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>
