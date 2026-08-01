@@ -1,0 +1,44 @@
+<view class="page" wx:if="{{order}}">
+  <view class="status-bar card">
+    <text class="st-text">{{statusText}}</text>
+    <text class="st-tip" wx:if="{{order.status === '1'}}">请到店出示核销码</text>
+    <text class="st-tip" wx:elif="{{order.status === '0'}}">订单待支付</text>
+  </view>
+
+  <view class="code card" wx:if="{{order.status === '1' && order.verifyCode}}">
+    <text class="code-lab">核销码</text>
+    <text class="code-val">{{order.verifyCode}}</text>
+    <view class="code-btn" bindtap="copyCode">复制</view>
+    <text class="code-exp" wx:if="{{order.expireTime}}">有效期至 {{order.expireTime}}</text>
+  </view>
+
+  <view class="goods card">
+    <image class="g-img" src="{{order.cover}}" mode="aspectFill"></image>
+    <view class="g-info">
+      <text class="g-name">{{order.productName}}</text>
+      <text class="g-shop">{{order.storeName}}</text>
+    </view>
+    <view class="g-right">
+      <text class="g-price">¥{{order.price}}</text>
+      <text class="g-qty">x{{order.num}}</text>
+    </view>
+  </view>
+
+  <view class="sum card">
+    <view class="row"><text class="lab">商品总价</text><text class="val">¥{{order.totalAmount}}</text></view>
+    <view class="row"><text class="lab">优惠抵扣</text><text class="val">-¥{{order.discountAmount}}</text></view>
+    <view class="row"><text class="lab">实付金额</text><text class="val pay">¥{{order.payAmount}}</text></view>
+  </view>
+
+  <view class="info card">
+    <view class="row" bindtap="copyNo">
+      <text class="lab">订单编号</text>
+      <text class="val">{{order.orderNo}} 复制</text>
+    </view>
+    <view class="row"><text class="lab">下单时间</text><text class="val">{{order.createTime}}</text></view>
+    <view class="row" wx:if="{{order.payTime}}"><text class="lab">支付时间</text><text class="val">{{order.payTime}}</text></view>
+  </view>
+</view>
+<view class="empty" wx:elif="{{!loading}}">
+  <text class="empty-text">订单不存在</text>
+</view>

@@ -1,0 +1,9 @@
+.page { min-height: 100vh; background: #F2F2F7; padding: 48rpx 32rpx; }
+.box { padding: 40rpx 32rpx; display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
+.cover { width: 100%; height: 480rpx; border-radius: 16rpx; }
+.name { display: block; font-size: 32rpx; font-weight: 600; color: #1A1A1A; }
+.price { display: flex; gap: 12rpx; align-items: baseline; }
+.now { font-size: 40rpx; font-weight: 700; color: var(--color-orange); }
+.qr { width: 240rpx; height: 240rpx; border-radius: 12rpx; background: radial-gradient(#000 0 30%, transparent 30% 60%, #000 60% 80%, transparent 80%); }
+.qr-c { width: 100%; height: 100%; }
+.tip { font-size: 24rpx; color: #999; }

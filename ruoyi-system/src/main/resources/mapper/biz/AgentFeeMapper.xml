@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.AgentFeeMapper">
+
+    <resultMap type="AgentFee" id="AgentFeeResult">
+        <result property="feeId"    column="fee_id"    />
+        <result property="feeNo"    column="fee_no"    />
+        <result property="agentId"    column="agent_id"    />
+        <result property="agentName"    column="agent_name"    />
+        <result property="feeType"    column="fee_type"    />
+        <result property="amount"    column="amount"    />
+        <result property="quotaAdd"    column="quota_add"    />
+        <result property="months"    column="months"    />
+        <result property="payChannel"    column="pay_channel"    />
+        <result property="payVoucher"    column="pay_voucher"    />
+        <result property="payTime"    column="pay_time"    />
+        <result property="status"    column="status"    />
+        <result property="auditBy"    column="audit_by"    />
+        <result property="auditTime"    column="audit_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectAgentFeeVo">
+        select f.fee_id, f.fee_no, f.agent_id, a.agent_name, f.fee_type, f.amount, f.quota_add, f.months,
+               f.pay_channel, f.pay_voucher, f.pay_time, f.status, f.audit_by, f.audit_time,
+               f.create_by, f.create_time, f.update_by, f.update_time, f.remark
+        from biz_agent_fee f
+        left join biz_agent a on a.agent_id = f.agent_id
+    </sql>
+
+    <select id="selectAgentFeeList" parameterType="AgentFee" resultMap="AgentFeeResult">
+        <include refid="selectAgentFeeVo"/>
+        <where>
+            <if test="feeNo != null  and feeNo != ''"> and f.fee_no like concat('%', #{feeNo}, '%')</if>
+            <if test="agentId != null "> and f.agent_id = #{agentId}</if>
+            <if test="agentName != null  and agentName != ''"> and a.agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="feeType != null  and feeType != ''"> and f.fee_type = #{feeType}</if>
+            <if test="payChannel != null  and payChannel != ''"> and f.pay_channel = #{payChannel}</if>
+            <if test="status != null  and status != ''"> and f.status = #{status}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and date_format(f.create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and date_format(f.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        order by f.fee_id desc
+    </select>
+
+    <select id="selectAgentFeeByFeeId" parameterType="Long" resultMap="AgentFeeResult">
+        <include refid="selectAgentFeeVo"/>
+        where f.fee_id = #{feeId}
+    </select>
+
+    <insert id="insertAgentFee" parameterType="AgentFee" useGeneratedKeys="true" keyProperty="feeId">
+        insert into biz_agent_fee
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="feeNo != null and feeNo != ''">fee_no,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="feeType != null">fee_type,</if>
+            <if test="amount != null">amount,</if>
+            <if test="quotaAdd != null">quota_add,</if>
+            <if test="months != null">months,</if>
+            <if test="payChannel != null">pay_channel,</if>
+            <if test="payVoucher != null">pay_voucher,</if>
+            <if test="payTime != null">pay_time,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="feeNo != null and feeNo != ''">#{feeNo},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="feeType != null">#{feeType},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="quotaAdd != null">#{quotaAdd},</if>
+            <if test="months != null">#{months},</if>
+            <if test="payChannel != null">#{payChannel},</if>
+            <if test="payVoucher != null">#{payVoucher},</if>
+            <if test="payTime != null">#{payTime},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="updateAgentFee" parameterType="AgentFee">
+        update biz_agent_fee
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="feeType != null">fee_type = #{feeType},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="quotaAdd != null">quota_add = #{quotaAdd},</if>
+            <if test="months != null">months = #{months},</if>
+            <if test="payChannel != null">pay_channel = #{payChannel},</if>
+            <if test="payVoucher != null">pay_voucher = #{payVoucher},</if>
+            <if test="payTime != null">pay_time = #{payTime},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="auditBy != null">audit_by = #{auditBy},</if>
+            <if test="auditTime != null">audit_time = #{auditTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where fee_id = #{feeId}
+    </update>
+
+    <delete id="deleteAgentFeeByFeeIds" parameterType="String">
+        delete from biz_agent_fee where fee_id in
+        <foreach item="feeId" collection="array" open="(" separator="," close=")">
+            #{feeId}
+        </foreach>
+    </delete>
+
+</mapper>

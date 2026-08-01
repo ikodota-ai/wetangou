@@ -15,7 +15,11 @@ const user = {
     nickName: '',
     avatar: '',
     roles: [],
-    permissions: []
+    permissions: [],
+    // 登录身份：0 平台 1 代理商 2 商户（与后端 TenantConstants 对齐）
+    userType: '',
+    agentId: null,
+    merchantId: null
   },
 
   mutations: {
@@ -39,6 +43,15 @@ const user = {
     },
     SET_PERMISSIONS: (state, permissions) => {
       state.permissions = permissions
+    },
+    SET_USER_TYPE: (state, userType) => {
+      state.userType = userType
+    },
+    SET_AGENT_ID: (state, agentId) => {
+      state.agentId = agentId
+    },
+    SET_MERCHANT_ID: (state, merchantId) => {
+      state.merchantId = merchantId
     }
   },
 
@@ -80,6 +93,9 @@ const user = {
           commit('SET_NAME', user.userName)
           commit('SET_NICK_NAME', user.nickName)
           commit('SET_AVATAR', avatar)
+          commit('SET_USER_TYPE', res.userType || '')
+          commit('SET_AGENT_ID', res.agentId || null)
+          commit('SET_MERCHANT_ID', res.merchantId || null)
           cache.session.set('pwrChrtype', res.pwdChrtype)
           /* 初始密码提示 */
           if(res.isDefaultModifyPwd) {

@@ -75,6 +75,34 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/agent',
+    component: Layout,
+    hidden: true,
+    redirect: '/agent/index',
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/agent/index'),
+        name: 'AgentIndex',
+        meta: { title: '代理商工作台', icon: 'peoples', affix: true }
+      }
+    ]
+  },
+  {
+    path: '/merchant',
+    component: Layout,
+    hidden: true,
+    redirect: '/merchant/index',
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/merchant/index'),
+        name: 'MerchantIndex',
+        meta: { title: '商户工作台', icon: 'shopping', affix: true }
+      }
+    ]
+  },
+  {
     path: '/lock',
     component: () => import('@/views/lock'),
     hidden: true,

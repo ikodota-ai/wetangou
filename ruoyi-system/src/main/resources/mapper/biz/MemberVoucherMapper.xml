@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.MemberVoucherMapper">
+    
+    <resultMap type="MemberVoucher" id="MemberVoucherResult">
+        <result property="id"    column="id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="voucherId"    column="voucher_id"    />
+        <result property="memberId"    column="member_id"    />
+        <result property="faceValue"    column="face_value"    />
+        <result property="threshold"    column="threshold"    />
+        <result property="status"    column="status"    />
+        <result property="useOrderId"    column="use_order_id"    />
+        <result property="expireTime"    column="expire_time"    />
+        <result property="getTime"    column="get_time"    />
+        <result property="useTime"    column="use_time"    />
+    </resultMap>
+
+    <sql id="selectMemberVoucherVo">
+        select id, voucher_id, member_id, face_value, threshold, status, use_order_id, expire_time, get_time, use_time, merchant_id from biz_member_voucher
+    </sql>
+
+    <select id="selectMemberVoucherList" parameterType="MemberVoucher" resultMap="MemberVoucherResult">
+        <include refid="selectMemberVoucherVo"/>
+        <where>  
+            <if test="voucherId != null "> and voucher_id = #{voucherId}</if>
+            <if test="memberId != null "> and member_id = #{memberId}</if>
+            <if test="faceValue != null "> and face_value = #{faceValue}</if>
+            <if test="threshold != null "> and threshold = #{threshold}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="useOrderId != null "> and use_order_id = #{useOrderId}</if>
+            <if test="expireTime != null "> and expire_time = #{expireTime}</if>
+            <if test="getTime != null "> and get_time = #{getTime}</if>
+            <if test="useTime != null "> and use_time = #{useTime}</if>
+        </where>
+    </select>
+    
+    <select id="selectMemberVoucherById" parameterType="Long" resultMap="MemberVoucherResult">
+        <include refid="selectMemberVoucherVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertMemberVoucher" parameterType="MemberVoucher" useGeneratedKeys="true" keyProperty="id">
+        insert into biz_member_voucher
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="voucherId != null">voucher_id,</if>
+            <if test="memberId != null">member_id,</if>
+            <if test="faceValue != null">face_value,</if>
+            <if test="threshold != null">threshold,</if>
+            <if test="status != null">status,</if>
+            <if test="useOrderId != null">use_order_id,</if>
+            <if test="expireTime != null">expire_time,</if>
+            <if test="getTime != null">get_time,</if>
+            <if test="useTime != null">use_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="voucherId != null">#{voucherId},</if>
+            <if test="memberId != null">#{memberId},</if>
+            <if test="faceValue != null">#{faceValue},</if>
+            <if test="threshold != null">#{threshold},</if>
+            <if test="status != null">#{status},</if>
+            <if test="useOrderId != null">#{useOrderId},</if>
+            <if test="expireTime != null">#{expireTime},</if>
+            <if test="getTime != null">#{getTime},</if>
+            <if test="useTime != null">#{useTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMemberVoucher" parameterType="MemberVoucher">
+        update biz_member_voucher
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="voucherId != null">voucher_id = #{voucherId},</if>
+            <if test="memberId != null">member_id = #{memberId},</if>
+            <if test="faceValue != null">face_value = #{faceValue},</if>
+            <if test="threshold != null">threshold = #{threshold},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="useOrderId != null">use_order_id = #{useOrderId},</if>
+            <if test="expireTime != null">expire_time = #{expireTime},</if>
+            <if test="getTime != null">get_time = #{getTime},</if>
+            <if test="useTime != null">use_time = #{useTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteMemberVoucherById" parameterType="Long">
+        delete from biz_member_voucher where id = #{id}
+    </delete>
+
+    <delete id="deleteMemberVoucherByIds" parameterType="String">
+        delete from biz_member_voucher where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

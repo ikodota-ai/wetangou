@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.CommissionRuleMapper">
+    
+    <resultMap type="CommissionRule" id="CommissionRuleResult">
+        <result property="ruleId"    column="rule_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="ruleName"    column="rule_name"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="categoryName"    column="category_name"    />
+        <result property="productName"    column="product_name"    />
+        <result property="categoryId"    column="category_id"    />
+        <result property="productId"    column="product_id"    />
+        <result property="level"    column="level"    />
+        <result property="rate"    column="rate"    />
+        <result property="settleDays"    column="settle_days"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCommissionRuleVo">
+        select r.rule_id, r.rule_name, r.store_id, s.store_name, r.category_id, c.category_name,
+               r.product_id, p.product_name, r.level, r.rate, r.settle_days, r.status,
+               r.create_by, r.create_time, r.update_by, r.update_time, r.merchant_id
+        from biz_commission_rule r
+        left join biz_store s on s.store_id = r.store_id
+        left join biz_category c on c.category_id = r.category_id
+        left join biz_product p on p.product_id = r.product_id
+    </sql>
+
+    <select id="selectCommissionRuleList" parameterType="CommissionRule" resultMap="CommissionRuleResult">
+        <include refid="selectCommissionRuleVo"/>
+        <where>
+            <if test="ruleName != null  and ruleName != ''"> and r.rule_name like concat('%', #{ruleName}, '%')</if>
+            <if test="storeId != null "> and r.store_id = #{storeId}</if>
+            <if test="categoryId != null "> and r.category_id = #{categoryId}</if>
+            <if test="productId != null "> and r.product_id = #{productId}</if>
+            <if test="level != null "> and r.level = #{level}</if>
+            <if test="status != null  and status != ''"> and r.status = #{status}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(r.store_id, #{params.storeIds})</if>
+            <if test="params != null and params.productIds != null and params.productIds != ''"> and find_in_set(r.product_id, #{params.productIds})</if>
+        </where>
+        order by r.rule_id desc
+    </select>
+    
+    <select id="selectCommissionRuleByRuleId" parameterType="Long" resultMap="CommissionRuleResult">
+        <include refid="selectCommissionRuleVo"/>
+        where r.rule_id = #{ruleId}
+    </select>
+
+    <insert id="insertCommissionRule" parameterType="CommissionRule" useGeneratedKeys="true" keyProperty="ruleId">
+        insert into biz_commission_rule
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="ruleName != null and ruleName != ''">rule_name,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="categoryId != null">category_id,</if>
+            <if test="productId != null">product_id,</if>
+            <if test="level != null">level,</if>
+            <if test="rate != null">rate,</if>
+            <if test="settleDays != null">settle_days,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="ruleName != null and ruleName != ''">#{ruleName},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="categoryId != null">#{categoryId},</if>
+            <if test="productId != null">#{productId},</if>
+            <if test="level != null">#{level},</if>
+            <if test="rate != null">#{rate},</if>
+            <if test="settleDays != null">#{settleDays},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateCommissionRule" parameterType="CommissionRule">
+        update biz_commission_rule
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ruleName != null and ruleName != ''">rule_name = #{ruleName},</if>
+            <if test="storeId != null">store_id = #{storeId},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="productId != null">product_id = #{productId},</if>
+            <if test="level != null">level = #{level},</if>
+            <if test="rate != null">rate = #{rate},</if>
+            <if test="settleDays != null">settle_days = #{settleDays},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where rule_id = #{ruleId}
+    </update>
+
+    <delete id="deleteCommissionRuleByRuleId" parameterType="Long">
+        delete from biz_commission_rule where rule_id = #{ruleId}
+    </delete>
+
+    <delete id="deleteCommissionRuleByRuleIds" parameterType="String">
+        delete from biz_commission_rule where rule_id in 
+        <foreach item="ruleId" collection="array" open="(" separator="," close=")">
+            #{ruleId}
+        </foreach>
+    </delete>
+</mapper>

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.CommissionMapper">
+    
+    <resultMap type="Commission" id="CommissionResult">
+        <result property="commissionId"    column="commission_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="distributorId"    column="distributor_id"    />
+        <result property="orderId"    column="order_id"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="memberName"    column="member_name"    />
+        <result property="orderNo"    column="order_no"    />
+        <result property="amount"    column="amount"    />
+        <result property="rate"    column="rate"    />
+        <result property="status"    column="status"    />
+        <result property="settleTime"    column="settle_time"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectCommissionVo">
+        select c.commission_id, c.distributor_id, c.order_id, o.order_no, c.store_id, s.store_name,
+               m.nickname as member_name, c.amount, c.rate, c.status, c.settle_time, c.create_time, c.merchant_id
+        from biz_commission c
+        left join biz_store s on s.store_id = c.store_id
+        left join biz_order o on o.order_id = c.order_id
+        left join biz_distributor d on d.distributor_id = c.distributor_id
+        left join biz_member m on m.member_id = d.member_id
+    </sql>
+
+    <select id="selectCommissionList" parameterType="Commission" resultMap="CommissionResult">
+        <include refid="selectCommissionVo"/>
+        <where>
+            <if test="distributorId != null "> and c.distributor_id = #{distributorId}</if>
+            <if test="orderId != null "> and c.order_id = #{orderId}</if>
+            <if test="storeId != null "> and c.store_id = #{storeId}</if>
+            <if test="status != null  and status != ''"> and c.status = #{status}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(c.store_id, #{params.storeIds})</if>
+            <if test="params != null and params.distributorIds != null and params.distributorIds != ''"> and find_in_set(c.distributor_id, #{params.distributorIds})</if>
+        </where>
+        order by c.commission_id desc
+    </select>
+    
+    <select id="selectCommissionByCommissionId" parameterType="Long" resultMap="CommissionResult">
+        <include refid="selectCommissionVo"/>
+        where c.commission_id = #{commissionId}
+    </select>
+
+    <insert id="insertCommission" parameterType="Commission" useGeneratedKeys="true" keyProperty="commissionId">
+        insert into biz_commission
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="distributorId != null">distributor_id,</if>
+            <if test="orderId != null">order_id,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="amount != null">amount,</if>
+            <if test="rate != null">rate,</if>
+            <if test="status != null">status,</if>
+            <if test="settleTime != null">settle_time,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="distributorId != null">#{distributorId},</if>
+            <if test="orderId != null">#{orderId},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="rate != null">#{rate},</if>
+            <if test="status != null">#{status},</if>
+            <if test="settleTime != null">#{settleTime},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateCommission" parameterType="Commission">
+        update biz_commission
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="distributorId != null">distributor_id = #{distributorId},</if>
+            <if test="orderId != null">order_id = #{orderId},</if>
+            <if test="storeId != null">store_id = #{storeId},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="rate != null">rate = #{rate},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="settleTime != null">settle_time = #{settleTime},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+        </trim>
+        where commission_id = #{commissionId}
+    </update>
+
+    <delete id="deleteCommissionByCommissionId" parameterType="Long">
+        delete from biz_commission where commission_id = #{commissionId}
+    </delete>
+
+    <delete id="deleteCommissionByCommissionIds" parameterType="String">
+        delete from biz_commission where commission_id in 
+        <foreach item="commissionId" collection="array" open="(" separator="," close=")">
+            #{commissionId}
+        </foreach>
+    </delete>
+</mapper>

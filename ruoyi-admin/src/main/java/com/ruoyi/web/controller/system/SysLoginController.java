@@ -14,6 +14,7 @@ import com.ruoyi.common.core.domain.entity.SysMenu;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.domain.model.LoginBody;
 import com.ruoyi.common.core.domain.model.LoginUser;
+import com.ruoyi.common.core.domain.model.TenantContext;
 import com.ruoyi.common.core.text.Convert;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -85,6 +86,14 @@ public class SysLoginController
         }
         AjaxResult ajax = AjaxResult.success();
         ajax.put("user", user);
+        // 暴露身份信息给前端，便于登录后按 平台/代理商/商户 三身份路由分流
+        TenantContext tenantContext = loginUser.getTenantContext();
+        if (tenantContext != null)
+        {
+            ajax.put("userType", tenantContext.getUserType());
+            ajax.put("agentId", tenantContext.getAgentId());
+            ajax.put("merchantId", tenantContext.getMerchantId());
+        }
         ajax.put("roles", roles);
         ajax.put("permissions", permissions);
         ajax.put("pwdChrtype", getSysAccountChrtype());

@@ -1,0 +1,108 @@
+<view class="page">
+  <view class="card">
+    <text class="s-name">{{store.name || '门店加载中'}}</text>
+    <text class="s-hours" wx:if="{{store.hours}}">营业时间：{{store.hours}}</text>
+    <view class="s-addr">
+      <view class="addr-txt">
+        <text class="a1">{{store.address || '-'}}</text>
+        <text class="a2" wx:if="{{distance}}">距您{{distance}}</text>
+      </view>
+      <view class="ops">
+        <view class="op" bindtap="goLocation">
+          <view class="op-ic ic-nav"></view>
+          <text>导航</text>
+        </view>
+        <view class="op" bindtap="callService">
+          <view class="op-ic ic-tel"></view>
+          <text>联系商家</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="block-title">预约信息</text>
+    <text class="sub">预约项目</text>
+    <view class="pickup-box on">
+      <text class="pk-t">堂食预约</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="block-title">预约时间</text>
+    <scroll-view scroll-x class="date-row" enhanced show-scrollbar="{{false}}">
+      <view class="date-item {{idx === dateIdx ? 'on' : ''}}" wx:for="{{days}}" wx:key="date" data-idx="{{idx}}" bindtap="pickDate">
+        <text class="dt">{{item.label}}</text>
+        <view class="dt-bar"></view>
+      </view>
+      <view class="date-item more" bindtap="openCalendar">
+        <text class="dt">更多日期 ></text>
+      </view>
+    </scroll-view>
+
+    <view class="period-row">
+      <view class="period {{period==='day'?'on':''}}" data-p="day" bindtap="switchPeriod">
+        <text>白天 {{dayRange || '--'}}</text>
+      </view>
+      <view class="period-line"></view>
+      <view class="period {{period==='night'?'on':''}}" data-p="night" bindtap="switchPeriod">
+        <text>晚上 {{nightRange || '--'}}</text>
+      </view>
+    </view>
+
+    <view class="slot-row" wx:if="{{currentSlots.length}}">
+      <view class="slot {{item.time===slot?'on':''}} {{item.available?'':'off'}}"
+            wx:for="{{currentSlots}}" wx:key="time"
+            data-s="{{item.time}}" data-available="{{item.available}}" data-expired="{{item.expired}}"
+            bindtap="pickSlot">
+        <text>{{item.time}}</text>
+        <text class="slot-tip" wx:if="{{item.expired}}">已过</text>
+        <text class="slot-tip" wx:elif="{{item.full}}">已满</text>
+        <text class="slot-tip" wx:elif="{{item.remain <= 3}}">剩{{item.remain}}</text>
+      </view>
+    </view>
+    <text class="slot-empty" wx:else>{{loadingSlots ? '时段加载中…' : '该时间段暂无可预约时段'}}</text>
+  </view>
+
+  <view class="card">
+    <text class="block-title">预约人信息</text>
+    <view class="f-row">
+      <text class="f-lab">联系人</text>
+      <input class="f-in" type="text" maxlength="20" value="{{contact}}" bindinput="onContact" placeholder="选填" />
+    </view>
+    <view class="f-row">
+      <text class="f-lab required">预留手机号</text>
+      <input class="f-in" type="number" maxlength="11" value="{{phone}}" bindinput="onPhone" placeholder="请输入手机号" />
+    </view>
+    <view class="f-row">
+      <text class="f-lab">用餐人数</text>
+      <view class="stepper">
+        <view class="st-btn" bindtap="minusPeople">-</view>
+        <text class="st-val">{{people}}</text>
+        <view class="st-btn" bindtap="plusPeople">+</view>
+      </view>
+    </view>
+    <view class="f-row">
+      <text class="f-lab">备注</text>
+      <input class="f-in" type="text" maxlength="20" value="{{remark}}" bindinput="onRemark" placeholder="选填，最多 20 字" />
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="block-title">预约说明</text>
+    <text class="explain">本店全周午晚市开放预约<block wx:if="{{slotLimit}}">，单时段限 {{slotLimit}} 人</block>，座位保留 15 分钟，超时自动作废；用餐前 2 小时可免费取消；可备注包间、用餐需求，到店出示预约码核验入座。</text>
+  </view>
+
+  <view class="bottom-bar">
+    <view class="pay-btn {{submitting?'disabled':''}}" bindtap="onSubmit">{{submitting ? '提交中…' : '立即预约'}}</view>
+  </view>
+
+  <!-- 预约成功弹窗 -->
+  <view class="modal-mask" wx:if="{{showSuccess}}" catchtap="closeSuccess">
+    <view class="ok-box" catchtap="noop">
+      <view class="ok-title">预约成功</view>
+      <view class="ok-desc">您的预约已提交，请等待商家确认</view>
+      <view class="ok-btn" bindtap="goList">我知道了</view>
+    </view>
+  </view>
+</view>

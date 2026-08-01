@@ -45,3 +45,29 @@ nbdist/
 !*/build/*.java
 !*/build/*.html
 !*/build/*.xml
+
+# 业务约定：以下目录/文件不入库
+# 1. macOS 资源分支
+.DS_Store
+*/.DS_Store
+
+# 2. 微信开发者工具备份/旧版本
+miniprogram6.zip
+miniprogram6/
+miniprogram7.zip
+
+# 3. 设计稿与中间产物（PRD 已纳入 doc/，原始 zip 不入库）
+doc/html-pixso设计文件.zip
+doc/html-完整设计文件.zip
+doc/prod_img.zip
+doc/prod_img/
+doc/html/
+doc/preview/
+doc/.DS_Store
+
+# 4. logs 目录
+logs/
+*.log
+
+# 5. build 产物
+/bin/

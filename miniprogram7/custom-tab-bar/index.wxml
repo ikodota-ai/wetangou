@@ -1,0 +1,6 @@
+<view class="tab-bar">
+  <view class="tab-item {{selected === index ? 'on' : ''}}" wx:for="{{list}}" wx:key="pagePath" data-index="{{index}}" bindtap="onTap">
+    <view class="ic"><view class="ic-home {{selected === index ? 'ic-home-on' : ''}}" wx:if="{{index === 0}}"></view><view class="ic-image {{selected === index ? 'ic-image-on' : ''}}" wx:elif="{{index === 1}}"></view><view class="ic-cal {{selected === index ? 'ic-cal-on' : ''}}" wx:elif="{{index === 2}}"></view><view class="ic-user {{selected === index ? 'ic-user-on' : ''}}" wx:elif="{{index === 3}}"></view></view>
+    <text class="txt">{{item.text}}</text>
+  </view>
+</view>

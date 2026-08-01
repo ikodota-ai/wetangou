@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.CategoryMapper">
+    
+    <resultMap type="Category" id="CategoryResult">
+        <result property="categoryId"    column="category_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="categoryName"    column="category_name"    />
+        <result property="icon"    column="icon"    />
+        <result property="sort"    column="sort"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectCategoryVo">
+        select c.category_id, c.store_id, s.store_name, c.category_name, c.icon, c.sort, c.status,
+               c.create_by, c.create_time, c.update_by, c.update_time, c.merchant_id
+        from biz_category c
+        left join biz_store s on s.store_id = c.store_id
+    </sql>
+
+    <select id="selectCategoryList" parameterType="Category" resultMap="CategoryResult">
+        <include refid="selectCategoryVo"/>
+        <where>
+            <if test="storeId != null "> and c.store_id = #{storeId}</if>
+            <if test="categoryName != null  and categoryName != ''"> and c.category_name like concat('%', #{categoryName}, '%')</if>
+            <if test="status != null  and status != ''"> and c.status = #{status}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(c.store_id, #{params.storeIds})</if>
+        </where>
+        order by c.sort asc, c.category_id asc
+    </select>
+    
+    <select id="selectCategoryByCategoryId" parameterType="Long" resultMap="CategoryResult">
+        <include refid="selectCategoryVo"/>
+        where c.category_id = #{categoryId}
+    </select>
+
+    <insert id="insertCategory" parameterType="Category" useGeneratedKeys="true" keyProperty="categoryId">
+        insert into biz_category
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="categoryName != null and categoryName != ''">category_name,</if>
+            <if test="icon != null">icon,</if>
+            <if test="sort != null">sort,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="categoryName != null and categoryName != ''">#{categoryName},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="sort != null">#{sort},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateCategory" parameterType="Category">
+        update biz_category
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="storeId != null">store_id = #{storeId},</if>
+            <if test="categoryName != null and categoryName != ''">category_name = #{categoryName},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where category_id = #{categoryId}
+    </update>
+
+    <delete id="deleteCategoryByCategoryId" parameterType="Long">
+        delete from biz_category where category_id = #{categoryId}
+    </delete>
+
+    <delete id="deleteCategoryByCategoryIds" parameterType="String">
+        delete from biz_category where category_id in 
+        <foreach item="categoryId" collection="array" open="(" separator="," close=")">
+            #{categoryId}
+        </foreach>
+    </delete>
+</mapper>

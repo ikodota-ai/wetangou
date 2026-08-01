@@ -7,7 +7,7 @@ ruoyi:
   # 版权年份
   copyrightYear: 2026
   # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
-  profile: D:/ruoyi/uploadPath
+  profile: /Users/mac/ruoyi/uploadPath
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -17,6 +17,8 @@ ruoyi:
 server:
   # 服务器的HTTP端口，默认为8080
   port: 8080
+  # 同时监听 IPv4 + IPv6，避免 localhost 在 Node.js / curl 不同栈下被 RST
+  address: 0.0.0.0
   servlet:
     # 应用的访问路径
     context-path: /
@@ -61,8 +63,14 @@ spring:
       # 设置总上传的文件大小
       max-request-size: 20MB
   jackson:
+    # 时间字段统一按 yyyy-MM-dd HH:mm:ss 输出（java.util.Date）
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
+    # LocalDateTime 走字符串（Jackson 3 默认行为，配合 @JsonFormat 统一格式）
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
   # 服务模块
   devtools:
     restart:
@@ -100,6 +108,8 @@ token:
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期（默认30分钟）
   expireTime: 30
+  # 会员令牌有效期（分钟，默认7天）
+  memberExpireTime: 10080
 
 # MyBatis配置
 mybatis:
@@ -145,3 +155,5 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+# 微信小程序/支付配置已迁移至后台"系统管理 → 微信配置"页面（存储于 sys_config），此处不再维护

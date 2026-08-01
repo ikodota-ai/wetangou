@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.MerchantFeeMapper">
+
+    <resultMap type="MerchantFee" id="MerchantFeeResult">
+        <result property="feeId"    column="fee_id"    />
+        <result property="feeNo"    column="fee_no"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="merchantName"    column="merchant_name"    />
+        <result property="agentId"    column="agent_id"    />
+        <result property="agentName"    column="agent_name"    />
+        <result property="feeType"    column="fee_type"    />
+        <result property="amount"    column="amount"    />
+        <result property="months"    column="months"    />
+        <result property="beginTime"    column="begin_time"    />
+        <result property="endTime"    column="end_time"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectMerchantFeeVo">
+        select f.fee_id, f.fee_no, f.merchant_id, m.merchant_name, f.agent_id, a.agent_name,
+               f.fee_type, f.amount, f.months, f.begin_time, f.end_time, f.status,
+               f.create_by, f.create_time, f.update_by, f.update_time, f.remark
+        from biz_merchant_fee f
+        left join biz_merchant m on m.merchant_id = f.merchant_id
+        left join biz_agent a on a.agent_id = f.agent_id
+    </sql>
+
+    <select id="selectMerchantFeeList" parameterType="MerchantFee" resultMap="MerchantFeeResult">
+        <include refid="selectMerchantFeeVo"/>
+        <where>
+            <if test="feeNo != null  and feeNo != ''"> and f.fee_no like concat('%', #{feeNo}, '%')</if>
+            <if test="merchantId != null "> and f.merchant_id = #{merchantId}</if>
+            <if test="merchantName != null  and merchantName != ''"> and m.merchant_name like concat('%', #{merchantName}, '%')</if>
+            <if test="agentId != null "> and f.agent_id = #{agentId}</if>
+            <if test="feeType != null  and feeType != ''"> and f.fee_type = #{feeType}</if>
+            <if test="status != null  and status != ''"> and f.status = #{status}</if>
+            <if test="params.agentIdEq != null "> and f.agent_id = #{params.agentIdEq}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and date_format(f.create_time,'%y%m%d') &gt;= date_format(#{params.beginTime},'%y%m%d')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and date_format(f.create_time,'%y%m%d') &lt;= date_format(#{params.endTime},'%y%m%d')
+            </if>
+        </where>
+        order by f.fee_id desc
+    </select>
+
+    <select id="selectMerchantFeeByFeeId" parameterType="Long" resultMap="MerchantFeeResult">
+        <include refid="selectMerchantFeeVo"/>
+        where f.fee_id = #{feeId}
+    </select>
+
+    <insert id="insertMerchantFee" parameterType="MerchantFee" useGeneratedKeys="true" keyProperty="feeId">
+        insert into biz_merchant_fee
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="feeNo != null and feeNo != ''">fee_no,</if>
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="feeType != null">fee_type,</if>
+            <if test="amount != null">amount,</if>
+            <if test="months != null">months,</if>
+            <if test="beginTime != null">begin_time,</if>
+            <if test="endTime != null">end_time,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="feeNo != null and feeNo != ''">#{feeNo},</if>
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="feeType != null">#{feeType},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="months != null">#{months},</if>
+            <if test="beginTime != null">#{beginTime},</if>
+            <if test="endTime != null">#{endTime},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="updateMerchantFee" parameterType="MerchantFee">
+        update biz_merchant_fee
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id = #{merchantId},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="feeType != null">fee_type = #{feeType},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="months != null">months = #{months},</if>
+            <if test="beginTime != null">begin_time = #{beginTime},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where fee_id = #{feeId}
+    </update>
+
+    <delete id="deleteMerchantFeeByFeeIds" parameterType="String">
+        delete from biz_merchant_fee where fee_id in
+        <foreach item="feeId" collection="array" open="(" separator="," close=")">
+            #{feeId}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -1,0 +1,26 @@
+.page { min-height: 100vh; background: var(--color-bg); padding-bottom: 60rpx; }
+.tabs { display: flex; background: #FFFFFF; padding: 0 24rpx; position: sticky; top: 0; z-index: 5; }
+.tab { position: relative; padding: 24rpx 16rpx; margin-right: 16rpx; }
+.tab text { font-size: 28rpx; color: #1A1A1A; }
+.tab.on text { font-weight: 600; }
+.tab-bar { position: absolute; left: 50%; bottom: 4rpx; transform: translateX(-50%); width: 40rpx; height: 6rpx; border-radius: 3rpx; background: transparent; }
+.tab.on .tab-bar { background: var(--color-primary); }
+
+.empty { padding: 240rpx 32rpx; text-align: center; }
+.empty-text { color: var(--color-text-4); font-size: 28rpx; }
+.list { padding: 24rpx 32rpx; display: flex; flex-direction: column; gap: 24rpx; }
+.item { padding: 24rpx 32rpx; }
+.row1 { display: flex; justify-content: space-between; align-items: center; }
+.shop { font-size: 26rpx; color: #999; }
+.status { font-size: 26rpx; color: var(--color-primary); font-weight: 600; }
+.goods { display: flex; gap: 20rpx; padding: 20rpx 0; align-items: center; }
+.g-img { width: 160rpx; height: 160rpx; border-radius: 12rpx; flex-shrink: 0; }
+.g-info { flex: 1; display: flex; flex-direction: column; gap: 8rpx; }
+.g-name { font-size: 28rpx; color: #1A1A1A; }
+.g-time { font-size: 24rpx; color: #999; }
+.g-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8rpx; }
+.g-price { font-size: 28rpx; color: #1A1A1A; }
+.g-qty { font-size: 24rpx; color: #999; }
+.row2 { display: flex; justify-content: flex-end; align-items: baseline; gap: 8rpx; padding-top: 16rpx; border-top: 1rpx solid #F0F0F0; }
+.total { font-size: 24rpx; color: #999; }
+.total-num { font-size: 32rpx; font-weight: 700; color: var(--color-primary); }

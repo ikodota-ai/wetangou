@@ -1,0 +1,163 @@
+<view class="page" wx:if="{{product}}">
+  <!-- 顶部大图 -->
+  <view class="hero">
+    <image class="hero-img" src="{{product.images[0] || product.cover}}" mode="aspectFill"></image>
+    <view class="hero-page" wx:if="{{product.images.length > 1}}">{{imgIdx + 1}}/{{product.images.length}}</view>
+  </view>
+
+  <!-- 价格条 -->
+  <view class="price-bar">
+    <view class="price-l">
+      <text class="now">¥{{product.price}}</text>
+      <text class="old">¥{{product.price}}</text>
+    </view>
+    <view class="price-tag">10.0 折热销中</view>
+    <view class="price-sold">已售 {{product.sold || 0}}</view>
+  </view>
+
+  <!-- 标题 + 须知 -->
+  <view class="info card">
+    <text class="info-name">{{product.name}}</text>
+    <view class="info-row"><text class="lab">须知</text><text class="val">指定时间可用</text></view>
+    <view class="info-row"><text class="lab">服务</text><text class="val">免预约</text></view>
+    <view class="info-row"><text class="lab">门店</text><text class="val">全部门店适用</text></view>
+  </view>
+
+  <!-- 套餐详情 -->
+  <view class="card">
+    <text class="block-title">套餐详情</text>
+    <view class="pkg-line"><text class="dot">·</text><text class="pkg-name">{{product.name}}</text></view>
+    <view class="pkg-row" wx:for="{{product.packages}}" wx:key="name">
+      <text class="pkg-name">{{item.name}}</text>
+      <view class="pkg-right">
+        <text class="pkg-qty">({{item.qty}}份)</text>
+        <text class="pkg-price">¥{{item.price}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 购买须知 -->
+  <view class="card">
+    <text class="block-title">购买须知</text>
+    <view class="nl-line"><text class="dot">·</text>可用日期</view>
+    <view class="nl-sub">有效期：购买后{{product.validDays || 365}}天内有效</view>
+    <view class="nl-line"><text class="dot">·</text>不可用日期</view>
+    <view class="nl-line"><text class="dot">·</text>可用时间</view>
+    <view class="nl-sub">{{product.availableTime || '10:30至21:00'}}</view>
+    <view class="nl-line"><text class="dot">·</text>购买限制</view>
+    <view class="nl-sub">{{product.purchaseLimit || '不限制购买数量'}}</view>
+    <view class="nl-line"><text class="dot">·</text>预约规则</view>
+    <view class="nl-sub">{{product.bookingRule || '到店消费：无需预约，高峰期可能需要排队'}}</view>
+    <view class="nl-line"><text class="dot">·</text>使用规则</view>
+    <view class="nl-sub">{{product.usageRule || '不与店内优惠同享'}}</view>
+    <view class="nl-line"><text class="dot">·</text>使用张数限制</view>
+    <view class="nl-sub">{{product.voucherLimit || '每人最多使用1张'}}</view>
+    <view class="nl-line"><text class="dot">·</text>使用人数限制</view>
+    <view class="nl-sub">{{product.peopleLimit || '不限制人数'}}</view>
+  </view>
+
+  <!-- 适用门店 -->
+  <view class="card">
+    <view class="store-head">
+      <text class="block-title">适用门店（1家）</text>
+      <text class="more">1家店通用 ></text>
+    </view>
+    <view class="store-row">
+      <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>
+      <view class="store-info">
+        <text class="store-name">{{product.storeName || '菌鑫来餐饮'}}</text>
+        <view class="store-rating">
+          <view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view>
+          <text class="rating-t">暂无评分</text>
+        </view>
+        <text class="store-hours">营业时间：{{product.storeHours || '周一至周日 09:00-22:30'}}</text>
+      </view>
+      <view class="store-call">
+        <view class="call-ic"></view>
+        <text>联系商家</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 更多商品 -->
+  <view class="card" wx:if="{{product.moreGoods && product.moreGoods.length}}">
+    <view class="store-head">
+      <text class="block-title">本店更多商品（3）</text>
+      <text class="more">查看更多 ></text>
+    </view>
+    <scroll-view scroll-x class="more-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="more-cell" wx:for="{{product.moreGoods}}" wx:key="productId" data-id="{{item.productId}}" bindtap="goDetail">
+        <image class="more-img" src="{{item.cover}}" mode="aspectFill"></image>
+        <text class="more-name">{{item.name}}</text>
+        <view class="more-prices"><text class="mp-now">¥{{item.price}}</text><text class="mp-old">¥{{item.price}}</text></view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="bottom-pad"></view>
+
+  <!-- 底部操作 -->
+  <view class="bottom-bar">
+    <view class="bb-item" bindtap="goStore">
+      <view class="bb-ic ic-shop"></view>
+      <text>商家</text>
+    </view>
+    <view class="bb-item" bindtap="openShare">
+      <view class="bb-ic ic-share"></view>
+      <text>分享</text>
+    </view>
+    <view class="bb-item" bindtap="goOrderList">
+      <view class="bb-ic ic-order"></view>
+      <text>订单</text>
+    </view>
+    <view class="buy-btn" bindtap="onBuy">立即购买 ¥{{product.price}}</view>
+  </view>
+
+  <!-- 分享卡弹窗 -->
+  <view class="modal-mask" wx:if="{{showShare}}" catchtap="closeShare">
+    <view class="share-box" catchtap="noop">
+      <view class="share-close" bindtap="closeShare"></view>
+      <view class="share-user">
+        <view class="share-avatar"><image src="{{user.avatarUrl || '/assets/avatar/default.png'}}"></image></view>
+        <view class="share-meta">
+          <text class="share-name">{{user.nickName || '好吃嘴'}}</text>
+          <text class="share-sub">给你分享了商品</text>
+        </view>
+      </view>
+      <image class="share-cover" src="/assets/img/RestaurantImg.png" mode="aspectFill"></image>
+      <text class="share-name2">{{product.name}}</text>
+      <view class="share-price"><text class="sp-now">¥{{product.price}}</text><text class="sp-old">¥{{product.price}}</text></view>
+      <view class="qr"><view class="qr-circle"></view><text class="qr-tip">扫码或长按小程序码</text></view>
+      <view class="share-ops">
+        <view class="so"><view class="so-ic so-friend"></view><text>发送给朋友</text></view>
+        <view class="so"><view class="so-ic so-fav"></view><text>收藏</text></view>
+        <view class="so"><view class="so-ic so-save"></view><text>保存图片</text></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 授权手机号弹窗 -->
+  <view class="modal-mask" wx:if="{{showAuthPhone}}" catchtap="closeAuthPhone">
+    <view class="auth-box" catchtap="noop">
+      <view class="auth-title">授权手机号</view>
+      <view class="auth-desc">购买该商品需要您的手机号，请点击下方按钮授权后继续下单。</view>
+      <button class="btn-primary btn-full" open-type="getPhoneNumber" bindgetphonenumber="onGotPhone" hover-class="none">授权手机号</button>
+      <view class="auth-cancel" bindtap="closeAuthPhone">暂不授权</view>
+    </view>
+  </view>
+
+  <!-- 错误弹窗 -->
+  <view class="modal-mask" wx:if="{{showError}}" catchtap="closeError">
+    <view class="err-box" catchtap="noop">
+      <view class="err-title">错误详情</view>
+      <view class="err-desc">{{errorMsg}}</view>
+      <view class="err-row">
+        <view class="err-btn" bindtap="closeError">关闭</view>
+        <view class="err-btn primary" bindtap="copyError">复制</view>
+      </view>
+    </view>
+  </view>
+</view>
+<view class="empty" wx:else>
+  <text class="empty-text">商品不存在或已下架</text>
+</view>

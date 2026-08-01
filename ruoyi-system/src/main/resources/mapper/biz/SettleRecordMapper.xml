@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.SettleRecordMapper">
+    
+    <resultMap type="SettleRecord" id="SettleRecordResult">
+        <result property="recordId"    column="record_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="orderId"    column="order_id"    />
+        <result property="outOrderNo"    column="out_order_no"    />
+        <result property="receiverAccount"    column="receiver_account"    />
+        <result property="amount"    column="amount"    />
+        <result property="status"    column="status"    />
+        <result property="finishTime"    column="finish_time"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectSettleRecordVo">
+        select record_id, order_id, out_order_no, receiver_account, amount, status, finish_time, create_time, merchant_id from biz_settle_record
+    </sql>
+
+    <select id="selectSettleRecordList" parameterType="SettleRecord" resultMap="SettleRecordResult">
+        <include refid="selectSettleRecordVo"/>
+        <where>  
+            <if test="orderId != null "> and order_id = #{orderId}</if>
+            <if test="outOrderNo != null  and outOrderNo != ''"> and out_order_no = #{outOrderNo}</if>
+            <if test="receiverAccount != null  and receiverAccount != ''"> and receiver_account = #{receiverAccount}</if>
+            <if test="amount != null "> and amount = #{amount}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="finishTime != null "> and finish_time = #{finishTime}</if>
+        </where>
+    </select>
+    
+    <select id="selectSettleRecordByRecordId" parameterType="Long" resultMap="SettleRecordResult">
+        <include refid="selectSettleRecordVo"/>
+        where record_id = #{recordId}
+    </select>
+
+    <insert id="insertSettleRecord" parameterType="SettleRecord" useGeneratedKeys="true" keyProperty="recordId">
+        insert into biz_settle_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="orderId != null">order_id,</if>
+            <if test="outOrderNo != null">out_order_no,</if>
+            <if test="receiverAccount != null">receiver_account,</if>
+            <if test="amount != null">amount,</if>
+            <if test="status != null">status,</if>
+            <if test="finishTime != null">finish_time,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="orderId != null">#{orderId},</if>
+            <if test="outOrderNo != null">#{outOrderNo},</if>
+            <if test="receiverAccount != null">#{receiverAccount},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="status != null">#{status},</if>
+            <if test="finishTime != null">#{finishTime},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSettleRecord" parameterType="SettleRecord">
+        update biz_settle_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="orderId != null">order_id = #{orderId},</if>
+            <if test="outOrderNo != null">out_order_no = #{outOrderNo},</if>
+            <if test="receiverAccount != null">receiver_account = #{receiverAccount},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="finishTime != null">finish_time = #{finishTime},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <delete id="deleteSettleRecordByRecordId" parameterType="Long">
+        delete from biz_settle_record where record_id = #{recordId}
+    </delete>
+
+    <delete id="deleteSettleRecordByRecordIds" parameterType="String">
+        delete from biz_settle_record where record_id in 
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </delete>
+</mapper>

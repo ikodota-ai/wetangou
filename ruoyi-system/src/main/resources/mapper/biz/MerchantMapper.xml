@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.MerchantMapper">
+
+    <resultMap type="Merchant" id="MerchantResult">
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="merchantNo"    column="merchant_no"    />
+        <result property="merchantName"    column="merchant_name"    />
+        <result property="agentId"    column="agent_id"    />
+        <result property="agentName"    column="agent_name"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="logo"    column="logo"    />
+        <result property="contact"    column="contact"    />
+        <result property="phone"    column="phone"    />
+        <result property="licenseNo"    column="license_no"    />
+        <result property="licenseImg"    column="license_img"    />
+        <result property="appid"    column="appid"    />
+        <result property="appSecret"    column="app_secret"    />
+        <result property="mpAuthMode"    column="mp_auth_mode"    />
+        <result property="payMode"    column="pay_mode"    />
+        <result property="payMchId"    column="pay_mch_id"    />
+        <result property="payAppid"    column="pay_appid"    />
+        <result property="payCertSerial"    column="pay_cert_serial"    />
+        <result property="payKeyPath"    column="pay_key_path"    />
+        <result property="payApiV3Key"    column="pay_api_v3_key"    />
+        <result property="payNotifyUrl"    column="pay_notify_url"    />
+        <result property="mockEnabled"    column="mock_enabled"    />
+        <result property="serviceExpire"    column="service_expire"    />
+        <result property="status"    column="status"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectMerchantVo">
+        select m.merchant_id, m.merchant_no, m.merchant_name, m.agent_id, a.agent_name, m.dept_id,
+               m.logo, m.contact, m.phone, m.license_no, m.license_img,
+               m.appid, m.app_secret, m.mp_auth_mode,
+               m.pay_mode, m.pay_mch_id, m.pay_appid, m.pay_cert_serial, m.pay_key_path,
+               m.pay_api_v3_key, m.pay_notify_url, m.mock_enabled, m.service_expire,
+               m.status, m.del_flag, m.create_by, m.create_time, m.update_by, m.update_time, m.remark
+        from biz_merchant m
+        left join biz_agent a on a.agent_id = m.agent_id
+    </sql>
+
+    <select id="selectMerchantList" parameterType="Merchant" resultMap="MerchantResult">
+        <include refid="selectMerchantVo"/>
+        <where>
+            m.del_flag = '0'
+            <if test="merchantNo != null  and merchantNo != ''"> and m.merchant_no like concat('%', #{merchantNo}, '%')</if>
+            <if test="merchantName != null  and merchantName != ''"> and m.merchant_name like concat('%', #{merchantName}, '%')</if>
+            <if test="agentId != null "> and m.agent_id = #{agentId}</if>
+            <if test="appid != null  and appid != ''"> and m.appid = #{appid}</if>
+            <if test="phone != null  and phone != ''"> and m.phone like concat('%', #{phone}, '%')</if>
+            <if test="status != null  and status != ''"> and m.status = #{status}</if>
+            <if test="params != null and params.merchantIds != null and params.merchantIds != ''"> and find_in_set(m.merchant_id, #{params.merchantIds})</if>
+        </where>
+        order by m.merchant_id desc
+    </select>
+
+    <select id="selectMerchantByMerchantId" parameterType="Long" resultMap="MerchantResult">
+        <include refid="selectMerchantVo"/>
+        where m.merchant_id = #{merchantId} and m.del_flag = '0'
+    </select>
+
+    <select id="selectMerchantByAppid" parameterType="String" resultMap="MerchantResult">
+        <include refid="selectMerchantVo"/>
+        where m.appid = #{appid} and m.del_flag = '0'
+    </select>
+
+    <select id="selectMerchantIdsByAgentId" parameterType="Long" resultType="Long">
+        select merchant_id from biz_merchant where agent_id = #{agentId} and del_flag = '0'
+    </select>
+
+    <insert id="insertMerchant" parameterType="Merchant" useGeneratedKeys="true" keyProperty="merchantId">
+        insert into biz_merchant
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantNo != null and merchantNo != ''">merchant_no,</if>
+            <if test="merchantName != null and merchantName != ''">merchant_name,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="deptId != null">dept_id,</if>
+            <if test="logo != null">logo,</if>
+            <if test="contact != null">contact,</if>
+            <if test="phone != null">phone,</if>
+            <if test="licenseNo != null">license_no,</if>
+            <if test="licenseImg != null">license_img,</if>
+            <if test="appid != null">appid,</if>
+            <if test="appSecret != null">app_secret,</if>
+            <if test="mpAuthMode != null">mp_auth_mode,</if>
+            <if test="payMode != null">pay_mode,</if>
+            <if test="payMchId != null">pay_mch_id,</if>
+            <if test="payAppid != null">pay_appid,</if>
+            <if test="payCertSerial != null">pay_cert_serial,</if>
+            <if test="payKeyPath != null">pay_key_path,</if>
+            <if test="payApiV3Key != null">pay_api_v3_key,</if>
+            <if test="payNotifyUrl != null">pay_notify_url,</if>
+            <if test="mockEnabled != null">mock_enabled,</if>
+            <if test="serviceExpire != null">service_expire,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantNo != null and merchantNo != ''">#{merchantNo},</if>
+            <if test="merchantName != null and merchantName != ''">#{merchantName},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="deptId != null">#{deptId},</if>
+            <if test="logo != null">#{logo},</if>
+            <if test="contact != null">#{contact},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="licenseNo != null">#{licenseNo},</if>
+            <if test="licenseImg != null">#{licenseImg},</if>
+            <if test="appid != null">#{appid},</if>
+            <if test="appSecret != null">#{appSecret},</if>
+            <if test="mpAuthMode != null">#{mpAuthMode},</if>
+            <if test="payMode != null">#{payMode},</if>
+            <if test="payMchId != null">#{payMchId},</if>
+            <if test="payAppid != null">#{payAppid},</if>
+            <if test="payCertSerial != null">#{payCertSerial},</if>
+            <if test="payKeyPath != null">#{payKeyPath},</if>
+            <if test="payApiV3Key != null">#{payApiV3Key},</if>
+            <if test="payNotifyUrl != null">#{payNotifyUrl},</if>
+            <if test="mockEnabled != null">#{mockEnabled},</if>
+            <if test="serviceExpire != null">#{serviceExpire},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="updateMerchant" parameterType="Merchant">
+        update biz_merchant
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="merchantName != null and merchantName != ''">merchant_name = #{merchantName},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="logo != null">logo = #{logo},</if>
+            <if test="contact != null">contact = #{contact},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="licenseNo != null">license_no = #{licenseNo},</if>
+            <if test="licenseImg != null">license_img = #{licenseImg},</if>
+            <if test="appid != null">appid = #{appid},</if>
+            <if test="appSecret != null">app_secret = #{appSecret},</if>
+            <if test="mpAuthMode != null">mp_auth_mode = #{mpAuthMode},</if>
+            <if test="payMode != null">pay_mode = #{payMode},</if>
+            <if test="payMchId != null">pay_mch_id = #{payMchId},</if>
+            <if test="payAppid != null">pay_appid = #{payAppid},</if>
+            <if test="payCertSerial != null">pay_cert_serial = #{payCertSerial},</if>
+            <if test="payKeyPath != null">pay_key_path = #{payKeyPath},</if>
+            <if test="payApiV3Key != null">pay_api_v3_key = #{payApiV3Key},</if>
+            <if test="payNotifyUrl != null">pay_notify_url = #{payNotifyUrl},</if>
+            <if test="mockEnabled != null">mock_enabled = #{mockEnabled},</if>
+            <if test="serviceExpire != null">service_expire = #{serviceExpire},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where merchant_id = #{merchantId}
+    </update>
+
+    <update id="deleteMerchantByMerchantIds" parameterType="String">
+        update biz_merchant set del_flag = '2' where merchant_id in
+        <foreach item="merchantId" collection="array" open="(" separator="," close=")">
+            #{merchantId}
+        </foreach>
+    </update>
+
+</mapper>

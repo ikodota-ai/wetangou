@@ -14,6 +14,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.MessageUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.service.ISysUserService;
+import com.ruoyi.biz.service.ITenantService;
 
 /**
  * 用户验证处理
@@ -33,6 +34,9 @@ public class UserDetailsServiceImpl implements UserDetailsService
 
     @Autowired
     private SysPermissionService permissionService;
+
+    @Autowired
+    private ITenantService tenantService;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
@@ -61,6 +65,10 @@ public class UserDetailsServiceImpl implements UserDetailsService
 
     public UserDetails createLoginUser(SysUser user)
     {
-        return new LoginUser(user.getUserId(), user.getDeptId(), user, permissionService.getMenuPermission(user));
+        LoginUser loginUser = new LoginUser(user.getUserId(), user.getDeptId(), user,
+                permissionService.getMenuPermission(user));
+        // 绑定租户上下文，登录后随token缓存，供业务SQL自动过滤使用
+        loginUser.setTenantContext(tenantService.buildContextByUserId(user.getUserId()));
+        return loginUser;
     }
 }

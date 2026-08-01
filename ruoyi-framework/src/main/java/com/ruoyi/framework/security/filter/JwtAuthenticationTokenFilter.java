@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.ruoyi.common.core.domain.model.LoginUser;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.TenantContextHolder;
 import com.ruoyi.framework.web.service.TokenService;
 
 /**
@@ -39,6 +40,18 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
         }
-        chain.doFilter(request, response);
+        try
+        {
+            // 写入租户上下文，供 MyBatis 租户拦截器过滤业务数据
+            if (StringUtils.isNotNull(loginUser) && loginUser.getTenantContext() != null)
+            {
+                TenantContextHolder.set(loginUser.getTenantContext());
+            }
+            chain.doFilter(request, response);
+        }
+        finally
+        {
+            TenantContextHolder.remove();
+        }
     }
 }

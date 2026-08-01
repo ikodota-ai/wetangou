@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.VoucherMapper">
+    
+    <resultMap type="Voucher" id="VoucherResult">
+        <result property="voucherId"    column="voucher_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="voucherName"    column="voucher_name"    />
+        <result property="faceValue"    column="face_value"    />
+        <result property="threshold"    column="threshold"    />
+        <result property="total"    column="total"    />
+        <result property="received"    column="received"    />
+        <result property="validFrom"    column="valid_from"    />
+        <result property="validTo"    column="valid_to"    />
+        <result property="validDays"    column="valid_days"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectVoucherVo">
+        select v.voucher_id, v.store_id, s.store_name, v.voucher_name, v.face_value, v.threshold, v.total,
+               v.received, v.valid_from, v.valid_to, v.valid_days, v.status, v.create_by, v.create_time,
+               v.update_by, v.update_time, v.merchant_id
+        from biz_voucher v
+        left join biz_store s on s.store_id = v.store_id
+    </sql>
+
+    <select id="selectVoucherList" parameterType="Voucher" resultMap="VoucherResult">
+        <include refid="selectVoucherVo"/>
+        <where>
+            <if test="storeId != null "> and v.store_id = #{storeId}</if>
+            <if test="voucherName != null  and voucherName != ''"> and v.voucher_name like concat('%', #{voucherName}, '%')</if>
+            <if test="status != null  and status != ''"> and v.status = #{status}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(v.store_id, #{params.storeIds})</if>
+        </where>
+        order by v.voucher_id desc
+    </select>
+    
+    <select id="selectVoucherByVoucherId" parameterType="Long" resultMap="VoucherResult">
+        <include refid="selectVoucherVo"/>
+        where v.voucher_id = #{voucherId}
+    </select>
+
+    <insert id="insertVoucher" parameterType="Voucher" useGeneratedKeys="true" keyProperty="voucherId">
+        insert into biz_voucher
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="voucherName != null and voucherName != ''">voucher_name,</if>
+            <if test="faceValue != null">face_value,</if>
+            <if test="threshold != null">threshold,</if>
+            <if test="total != null">total,</if>
+            <if test="received != null">received,</if>
+            <if test="validFrom != null">valid_from,</if>
+            <if test="validTo != null">valid_to,</if>
+            <if test="validDays != null">valid_days,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="voucherName != null and voucherName != ''">#{voucherName},</if>
+            <if test="faceValue != null">#{faceValue},</if>
+            <if test="threshold != null">#{threshold},</if>
+            <if test="total != null">#{total},</if>
+            <if test="received != null">#{received},</if>
+            <if test="validFrom != null">#{validFrom},</if>
+            <if test="validTo != null">#{validTo},</if>
+            <if test="validDays != null">#{validDays},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateVoucher" parameterType="Voucher">
+        update biz_voucher
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="storeId != null">store_id = #{storeId},</if>
+            <if test="voucherName != null and voucherName != ''">voucher_name = #{voucherName},</if>
+            <if test="faceValue != null">face_value = #{faceValue},</if>
+            <if test="threshold != null">threshold = #{threshold},</if>
+            <if test="total != null">total = #{total},</if>
+            <if test="received != null">received = #{received},</if>
+            <if test="validFrom != null">valid_from = #{validFrom},</if>
+            <if test="validTo != null">valid_to = #{validTo},</if>
+            <if test="validDays != null">valid_days = #{validDays},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where voucher_id = #{voucherId}
+    </update>
+
+    <delete id="deleteVoucherByVoucherId" parameterType="Long">
+        delete from biz_voucher where voucher_id = #{voucherId}
+    </delete>
+
+    <delete id="deleteVoucherByVoucherIds" parameterType="String">
+        delete from biz_voucher where voucher_id in 
+        <foreach item="voucherId" collection="array" open="(" separator="," close=")">
+            #{voucherId}
+        </foreach>
+    </delete>
+</mapper>

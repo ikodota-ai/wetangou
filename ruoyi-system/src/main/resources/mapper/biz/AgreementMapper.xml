@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.AgreementMapper">
+    
+    <resultMap type="Agreement" id="AgreementResult">
+        <result property="agreementId"    column="agreement_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="agreementType"    column="agreement_type"    />
+        <result property="title"    column="title"    />
+        <result property="content"    column="content"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectAgreementVo">
+        select a.agreement_id, a.agreement_type, a.title, a.content, a.store_id, s.store_name, a.status,
+               a.create_by, a.create_time, a.update_by, a.update_time, a.merchant_id
+        from biz_agreement a
+        left join biz_store s on s.store_id = a.store_id
+    </sql>
+
+    <select id="selectAgreementList" parameterType="Agreement" resultMap="AgreementResult">
+        <include refid="selectAgreementVo"/>
+        <where>
+            <if test="agreementType != null  and agreementType != ''"> and a.agreement_type = #{agreementType}</if>
+            <if test="title != null  and title != ''"> and a.title like concat('%', #{title}, '%')</if>
+            <if test="storeId != null "> and a.store_id = #{storeId}</if>
+            <if test="status != null  and status != ''"> and a.status = #{status}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(a.store_id, #{params.storeIds})</if>
+        </where>
+        order by a.agreement_id desc
+    </select>
+    
+    <select id="selectAgreementByAgreementId" parameterType="Long" resultMap="AgreementResult">
+        <include refid="selectAgreementVo"/>
+        where a.agreement_id = #{agreementId}
+    </select>
+
+    <insert id="insertAgreement" parameterType="Agreement" useGeneratedKeys="true" keyProperty="agreementId">
+        insert into biz_agreement
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="agreementType != null and agreementType != ''">agreement_type,</if>
+            <if test="title != null">title,</if>
+            <if test="content != null">content,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="agreementType != null and agreementType != ''">#{agreementType},</if>
+            <if test="title != null">#{title},</if>
+            <if test="content != null">#{content},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAgreement" parameterType="Agreement">
+        update biz_agreement
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agreementType != null and agreementType != ''">agreement_type = #{agreementType},</if>
+            <if test="title != null">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="storeId != null">store_id = #{storeId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where agreement_id = #{agreementId}
+    </update>
+
+    <delete id="deleteAgreementByAgreementId" parameterType="Long">
+        delete from biz_agreement where agreement_id = #{agreementId}
+    </delete>
+
+    <delete id="deleteAgreementByAgreementIds" parameterType="String">
+        delete from biz_agreement where agreement_id in 
+        <foreach item="agreementId" collection="array" open="(" separator="," close=")">
+            #{agreementId}
+        </foreach>
+    </delete>
+</mapper>

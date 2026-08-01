@@ -62,5 +62,11 @@ module.exports = {
   /**
    * 底部版权文本内容
    */
-  footerContent: 'Copyright © 2018-2026 RuoYi. All Rights Reserved.'
+  footerContent: 'Copyright © 2018-2026 RuoYi. All Rights Reserved.',
+
+  /**
+   * 腾讯地图 JavaScript API key（在 https://lbs.qq.com 控制台申请，需启用 WebServiceAPI 才能地址解析）
+   * 请替换为你自己的 key
+   */
+  tencentMapKey: process.env.VUE_APP_TENCENT_MAP_KEY || 'RKKBZ-SLSLP-JFND2-VCCT6-6IET2-XHFGS'
 }

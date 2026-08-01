@@ -23,6 +23,8 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.util.ClassUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.framework.tenant.TenantInsertInterceptor;
+import com.ruoyi.framework.tenant.TenantSqlInterceptor;
 
 /**
  * Mybatis支持*匹配扫描包
@@ -127,6 +129,8 @@ public class MyBatisConfig
         sessionFactory.setTypeAliasesPackage(typeAliasesPackage);
         sessionFactory.setMapperLocations(resolveMapperLocations(StringUtils.split(mapperLocations, ",")));
         sessionFactory.setConfigLocation(new DefaultResourceLoader().getResource(configLocation));
+        // 多商户租户插件：查询自动追加 merchant_id 条件，新增自动补齐 merchant_id
+        sessionFactory.setPlugins(new TenantSqlInterceptor(), new TenantInsertInterceptor());
         return sessionFactory.getObject();
     }
 }

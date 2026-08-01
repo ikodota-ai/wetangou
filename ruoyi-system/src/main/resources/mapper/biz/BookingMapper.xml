@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.BookingMapper">
+
+    <resultMap type="Booking" id="BookingResult">
+        <result property="bookingId"    column="booking_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="bookingNo"    column="booking_no"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="productId"    column="product_id"    />
+        <result property="serviceName"    column="service_name"    />
+        <result property="bookingDate"    column="booking_date"    />
+        <result property="timeSlot"    column="time_slot"    />
+        <result property="status"    column="status"    />
+        <result property="signupCount"    column="signup_count"    />
+        <result property="signupPeople"    column="signup_people"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectBookingVo">
+        select b.booking_id, b.booking_no, b.store_id, s.store_name, b.product_id, b.service_name,
+               b.booking_date, b.time_slot, b.status, b.remark,
+               b.create_by, b.create_time, b.update_by, b.update_time,
+               (select count(1) from biz_booking_member bm where bm.booking_id = b.booking_id and bm.status = '0') as signup_count,
+               (select ifnull(sum(bm.people),0) from biz_booking_member bm where bm.booking_id = b.booking_id and bm.status = '0') as signup_people, b.merchant_id
+        from biz_booking b
+        left join biz_store s on s.store_id = b.store_id
+    </sql>
+
+    <select id="selectBookingList" parameterType="Booking" resultMap="BookingResult">
+        <include refid="selectBookingVo"/>
+        <where>
+            <if test="bookingNo != null  and bookingNo != ''"> and b.booking_no like concat('%', #{bookingNo}, '%')</if>
+            <if test="storeId != null "> and b.store_id = #{storeId}</if>
+            <if test="productId != null "> and b.product_id = #{productId}</if>
+            <if test="serviceName != null  and serviceName != ''"> and b.service_name like concat('%', #{serviceName}, '%')</if>
+            <if test="bookingDate != null "> and b.booking_date = #{bookingDate}</if>
+            <if test="timeSlot != null  and timeSlot != ''"> and b.time_slot = #{timeSlot}</if>
+            <if test="status != null  and status != ''"> and b.status = #{status}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(b.store_id, #{params.storeIds})</if>
+        </where>
+        order by b.booking_date desc, b.booking_id desc
+    </select>
+
+    <select id="selectBookingByBookingId" parameterType="Long" resultMap="BookingResult">
+        <include refid="selectBookingVo"/>
+        where b.booking_id = #{bookingId}
+    </select>
+
+    <insert id="insertBooking" parameterType="Booking" useGeneratedKeys="true" keyProperty="bookingId">
+        insert into biz_booking
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="bookingNo != null and bookingNo != ''">booking_no,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="productId != null">product_id,</if>
+            <if test="serviceName != null">service_name,</if>
+            <if test="bookingDate != null">booking_date,</if>
+            <if test="timeSlot != null">time_slot,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="bookingNo != null and bookingNo != ''">#{bookingNo},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="productId != null">#{productId},</if>
+            <if test="serviceName != null">#{serviceName},</if>
+            <if test="bookingDate != null">#{bookingDate},</if>
+            <if test="timeSlot != null">#{timeSlot},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateBooking" parameterType="Booking">
+        update biz_booking
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="bookingNo != null and bookingNo != ''">booking_no = #{bookingNo},</if>
+            <if test="storeId != null">store_id = #{storeId},</if>
+            <if test="productId != null">product_id = #{productId},</if>
+            <if test="serviceName != null">service_name = #{serviceName},</if>
+            <if test="bookingDate != null">booking_date = #{bookingDate},</if>
+            <if test="timeSlot != null">time_slot = #{timeSlot},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where booking_id = #{bookingId}
+    </update>
+
+    <delete id="deleteBookingByBookingId" parameterType="Long">
+        delete from biz_booking where booking_id = #{bookingId}
+    </delete>
+
+    <delete id="deleteBookingByBookingIds" parameterType="String">
+        delete from biz_booking where booking_id in
+        <foreach item="bookingId" collection="array" open="(" separator="," close=")">
+            #{bookingId}
+        </foreach>
+    </delete>
+</mapper>

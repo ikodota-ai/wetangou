@@ -75,6 +75,11 @@ public class LoginUser implements UserDetails
      */
     private SysUser user;
 
+    /**
+     * 租户上下文（多商户隔离：平台/代理商/商户）
+     */
+    private TenantContext tenantContext;
+
     public LoginUser()
     {
     }
@@ -101,6 +106,16 @@ public class LoginUser implements UserDetails
     public void setUserId(Long userId)
     {
         this.userId = userId;
+    }
+
+    public TenantContext getTenantContext()
+    {
+        return tenantContext;
+    }
+
+    public void setTenantContext(TenantContext tenantContext)
+    {
+        this.tenantContext = tenantContext;
     }
 
     public Long getDeptId()

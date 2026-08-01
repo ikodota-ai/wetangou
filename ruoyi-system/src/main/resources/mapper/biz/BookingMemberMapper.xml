@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.BookingMemberMapper">
+
+    <resultMap type="BookingMember" id="BookingMemberResult">
+        <result property="id"    column="id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="bookingId"    column="booking_id"    />
+        <result property="memberId"    column="member_id"    />
+        <result property="memberName"    column="member_name"    />
+        <result property="serviceName"    column="service_name"    />
+        <result property="bookingDate"    column="booking_date"    />
+        <result property="timeSlot"    column="time_slot"    />
+        <result property="storeId"    column="store_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="storeAddress"    column="store_address"    />
+        <result property="storePhone"    column="store_phone"    />
+        <result property="storeLongitude"    column="store_longitude"    />
+        <result property="storeLatitude"    column="store_latitude"    />
+        <result property="bookingStatus"    column="booking_status"    />
+        <result property="bookingNo"    column="booking_no"    />
+        <result property="contact"    column="contact"    />
+        <result property="phone"    column="phone"    />
+        <result property="people"    column="people"    />
+        <result property="status"    column="status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectBookingMemberVo">
+        select bm.id, bm.booking_id, bm.member_id, m.nickname as member_name, bm.contact, bm.phone,
+               bm.people, bm.status, bm.remark, bm.create_time, bm.update_time,
+               b.service_name, b.booking_date, b.time_slot, b.store_id, s.store_name,
+               s.address as store_address, ifnull(nullif(s.service_phone,''), s.phone) as store_phone,
+               s.longitude as store_longitude, s.latitude as store_latitude,
+               b.status as booking_status, b.booking_no, bm.merchant_id
+        from biz_booking_member bm
+        left join biz_member m on m.member_id = bm.member_id
+        left join biz_booking b on b.booking_id = bm.booking_id
+        left join biz_store s on s.store_id = b.store_id
+    </sql>
+
+    <select id="selectBookingMemberList" parameterType="BookingMember" resultMap="BookingMemberResult">
+        <include refid="selectBookingMemberVo"/>
+        <where>
+            <if test="bookingId != null "> and bm.booking_id = #{bookingId}</if>
+            <if test="memberId != null "> and bm.member_id = #{memberId}</if>
+            <if test="contact != null  and contact != ''"> and bm.contact like concat('%', #{contact}, '%')</if>
+            <if test="phone != null  and phone != ''"> and bm.phone like concat('%', #{phone}, '%')</if>
+            <if test="status != null  and status != ''"> and bm.status = #{status}</if>
+            <if test="storeId != null "> and b.store_id = #{storeId}</if>
+            <if test="serviceName != null  and serviceName != ''"> and b.service_name like concat('%', #{serviceName}, '%')</if>
+            <if test="bookingDate != null  and bookingDate != ''"> and b.booking_date = #{bookingDate}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(b.store_id, #{params.storeIds})</if>
+            <if test="params != null and params.memberIds != null and params.memberIds != ''"> and find_in_set(bm.member_id, #{params.memberIds})</if>
+        </where>
+        order by bm.create_time desc
+    </select>
+
+    <select id="selectBookingMemberById" parameterType="Long" resultMap="BookingMemberResult">
+        <include refid="selectBookingMemberVo"/>
+        where bm.id = #{id}
+    </select>
+
+    <select id="countByBookingId" parameterType="Long" resultType="int">
+        select count(1) from biz_booking_member where booking_id = #{bookingId} and status = '0'
+    </select>
+
+    <select id="sumPeopleByBookingId" parameterType="Long" resultType="java.lang.Integer">
+        select ifnull(sum(people),0) from biz_booking_member where booking_id = #{bookingId} and status = '0'
+    </select>
+
+    <insert id="insertBookingMember" parameterType="BookingMember" useGeneratedKeys="true" keyProperty="id">
+        insert into biz_booking_member
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="bookingId != null">booking_id,</if>
+            <if test="memberId != null">member_id,</if>
+            <if test="contact != null">contact,</if>
+            <if test="phone != null">phone,</if>
+            <if test="people != null">people,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="bookingId != null">#{bookingId},</if>
+            <if test="memberId != null">#{memberId},</if>
+            <if test="contact != null">#{contact},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="people != null">#{people},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateBookingMember" parameterType="BookingMember">
+        update biz_booking_member
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="contact != null">contact = #{contact},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="people != null">people = #{people},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteBookingMemberById" parameterType="Long">
+        delete from biz_booking_member where id = #{id}
+    </delete>
+
+    <delete id="deleteBookingMemberByBookingIds" parameterType="String">
+        delete from biz_booking_member where booking_id in
+        <foreach item="bookingId" collection="array" open="(" separator="," close=")">
+            #{bookingId}
+        </foreach>
+    </delete>
+</mapper>

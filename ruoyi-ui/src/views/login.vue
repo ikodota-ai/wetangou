@@ -2,6 +2,12 @@
   <div class="login">
     <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
       <h3 class="title">{{title}}</h3>
+      <el-tabs v-model="activeEntry" class="login-entry-tabs" stretch>
+        <el-tab-pane label="平台" name="platform" />
+        <el-tab-pane label="代理商" name="agent" />
+        <el-tab-pane label="商户" name="merchant" />
+      </el-tabs>
+      <p class="login-entry-tip">{{ entryTip }}</p>
       <el-form-item prop="username">
         <el-input
           v-model="loginForm.username"
@@ -95,7 +101,19 @@ export default {
       captchaEnabled: true,
       // 注册开关
       register: false,
-      redirect: undefined
+      redirect: undefined,
+      // 登录入口：仅文案提示，不参与鉴权
+      activeEntry: "platform",
+      entryTips: {
+        platform: "平台账号：拥有后台完整管理权限",
+        agent: "代理商账号：管理名下商户、缴费记录与额度",
+        merchant: "商户账号：管理门店、订单与资金"
+      }
+    }
+  },
+  computed: {
+    entryTip() {
+      return this.entryTips[this.activeEntry] || ""
     }
   },
   watch: {
@@ -130,6 +148,13 @@ export default {
         rememberMe: rememberMe === undefined ? false : Boolean(rememberMe)
       }
     },
+    resolveEntryPath() {
+      // 按身份路由分流：0 平台 → /index；1 代理商 → /agent/index；2 商户 → /merchant/index
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || '0'
+      if (userType === '1') return '/agent/index'
+      if (userType === '2') return '/merchant/index'
+      return '/index'
+    },
     handleLogin() {
       this.$refs.loginForm.validate(valid => {
         if (valid) {
@@ -144,7 +169,9 @@ export default {
             Cookies.remove('rememberMe')
           }
           this.$store.dispatch("Login", this.loginForm).then(() => {
-            this.$router.push({ path: this.redirect || "/" }).catch(()=>{})
+            return this.$store.dispatch("GetInfo")
+          }).then(() => {
+            this.$router.push({ path: this.redirect || this.resolveEntryPath() }).catch(()=>{})
           }).catch(() => {
             this.loading = false
             if (this.captchaEnabled) {
@@ -171,6 +198,20 @@ export default {
   margin: 0px auto 30px auto;
   text-align: center;
   color: #707070;
+}
+.login-entry-tabs {
+  margin: 0 0 12px 0;
+}
+.login-entry-tabs ::v-deep .el-tabs__item {
+  font-size: 14px;
+  height: 36px;
+  line-height: 36px;
+}
+.login-entry-tip {
+  margin: 0 0 16px 0;
+  text-align: center;
+  color: #909399;
+  font-size: 12px;
 }
 
 .login-form {

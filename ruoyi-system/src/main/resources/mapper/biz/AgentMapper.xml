@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.AgentMapper">
+
+    <resultMap type="Agent" id="AgentResult">
+        <result property="agentId"    column="agent_id"    />
+        <result property="agentNo"    column="agent_no"    />
+        <result property="agentName"    column="agent_name"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="contact"    column="contact"    />
+        <result property="phone"    column="phone"    />
+        <result property="email"    column="email"    />
+        <result property="region"    column="region"    />
+        <result property="merchantQuota"    column="merchant_quota"    />
+        <result property="usedQuota"    column="used_quota"    />
+        <result property="paidAmount"    column="paid_amount"    />
+        <result property="expireTime"    column="expire_time"    />
+        <result property="status"    column="status"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectAgentVo">
+        select agent_id, agent_no, agent_name, dept_id, contact, phone, email, region,
+               merchant_quota, used_quota, paid_amount, expire_time, status, del_flag,
+               create_by, create_time, update_by, update_time, remark
+        from biz_agent
+    </sql>
+
+    <select id="selectAgentList" parameterType="Agent" resultMap="AgentResult">
+        <include refid="selectAgentVo"/>
+        <where>
+            del_flag = '0'
+            <if test="agentNo != null  and agentNo != ''"> and agent_no like concat('%', #{agentNo}, '%')</if>
+            <if test="agentName != null  and agentName != ''"> and agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="contact != null  and contact != ''"> and contact like concat('%', #{contact}, '%')</if>
+            <if test="phone != null  and phone != ''"> and phone like concat('%', #{phone}, '%')</if>
+            <if test="region != null  and region != ''"> and region like concat('%', #{region}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="agentId != null "> and agent_id = #{agentId}</if>
+        </where>
+        order by agent_id desc
+    </select>
+
+    <select id="selectAgentByAgentId" parameterType="Long" resultMap="AgentResult">
+        <include refid="selectAgentVo"/>
+        where agent_id = #{agentId} and del_flag = '0'
+    </select>
+
+    <insert id="insertAgent" parameterType="Agent" useGeneratedKeys="true" keyProperty="agentId">
+        insert into biz_agent
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="agentNo != null and agentNo != ''">agent_no,</if>
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="deptId != null">dept_id,</if>
+            <if test="contact != null">contact,</if>
+            <if test="phone != null">phone,</if>
+            <if test="email != null">email,</if>
+            <if test="region != null">region,</if>
+            <if test="merchantQuota != null">merchant_quota,</if>
+            <if test="usedQuota != null">used_quota,</if>
+            <if test="paidAmount != null">paid_amount,</if>
+            <if test="expireTime != null">expire_time,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="remark != null">remark,</if>
+            create_time,
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="agentNo != null and agentNo != ''">#{agentNo},</if>
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="deptId != null">#{deptId},</if>
+            <if test="contact != null">#{contact},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="email != null">#{email},</if>
+            <if test="region != null">#{region},</if>
+            <if test="merchantQuota != null">#{merchantQuota},</if>
+            <if test="usedQuota != null">#{usedQuota},</if>
+            <if test="paidAmount != null">#{paidAmount},</if>
+            <if test="expireTime != null">#{expireTime},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="remark != null">#{remark},</if>
+            sysdate(),
+        </trim>
+    </insert>
+
+    <update id="updateAgent" parameterType="Agent">
+        update biz_agent
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">agent_name = #{agentName},</if>
+            <if test="deptId != null">dept_id = #{deptId},</if>
+            <if test="contact != null">contact = #{contact},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="region != null">region = #{region},</if>
+            <if test="merchantQuota != null">merchant_quota = #{merchantQuota},</if>
+            <if test="usedQuota != null">used_quota = #{usedQuota},</if>
+            <if test="paidAmount != null">paid_amount = #{paidAmount},</if>
+            <if test="expireTime != null">expire_time = #{expireTime},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate(),
+        </trim>
+        where agent_id = #{agentId}
+    </update>
+
+    <update id="deleteAgentByAgentIds" parameterType="String">
+        update biz_agent set del_flag = '2' where agent_id in
+        <foreach item="agentId" collection="array" open="(" separator="," close=")">
+            #{agentId}
+        </foreach>
+    </update>
+
+    <update id="increaseUsedQuota" parameterType="Long">
+        update biz_agent set used_quota = ifnull(used_quota, 0) + 1, update_time = sysdate()
+        where agent_id = #{agentId}
+    </update>
+
+    <update id="applyFee">
+        update biz_agent
+        set merchant_quota = ifnull(merchant_quota, 0) + ifnull(#{quotaAdd}, 0),
+            paid_amount = ifnull(paid_amount, 0) + ifnull(#{amount}, 0),
+            <!-- 到期时间为空视为从当前时间开始计算，避免续费月数丢失 -->
+            expire_time = case when ifnull(#{months}, 0) &gt; 0
+                then date_add(if(expire_time is null or expire_time &lt; sysdate(), sysdate(), expire_time),
+                              interval #{months} month)
+                else expire_time end,
+            update_time = sysdate()
+        where agent_id = #{agentId}
+    </update>
+
+</mapper>

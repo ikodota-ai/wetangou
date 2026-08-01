@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.StoreMapper">
+    
+    <resultMap type="Store" id="StoreResult">
+        <result property="storeId"    column="store_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="storeName"    column="store_name"    />
+        <result property="logo"    column="logo"    />
+        <result property="province"    column="province"    />
+        <result property="city"    column="city"    />
+        <result property="district"    column="district"    />
+        <result property="address"    column="address"    />
+        <result property="longitude"    column="longitude"    />
+        <result property="latitude"    column="latitude"    />
+        <result property="phone"    column="phone"    />
+        <result property="servicePhone"    column="service_phone"    />
+        <result property="serviceQrcode"    column="service_qrcode"    />
+        <result property="businessHours"    column="business_hours"    />
+        <result property="intro"    column="intro"    />
+        <result property="services"    column="services"    />
+        <result property="sort"    column="sort"    />
+        <result property="status"    column="status"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectStoreVo">
+        select store_id, store_name, logo, province, city, district, address, longitude, latitude, phone, service_phone, service_qrcode, business_hours, intro, services, sort, status, del_flag, create_by, create_time, update_by, update_time, remark, merchant_id from biz_store
+    </sql>
+
+    <select id="selectStoreList" parameterType="Store" resultMap="StoreResult">
+        <include refid="selectStoreVo"/>
+        <where>  
+            <if test="storeName != null  and storeName != ''"> and store_name like concat('%', #{storeName}, '%')</if>
+            <if test="logo != null  and logo != ''"> and logo = #{logo}</if>
+            <if test="province != null  and province != ''"> and province = #{province}</if>
+            <if test="city != null  and city != ''"> and city = #{city}</if>
+            <if test="district != null  and district != ''"> and district = #{district}</if>
+            <if test="address != null  and address != ''"> and address = #{address}</if>
+            <if test="longitude != null "> and longitude = #{longitude}</if>
+            <if test="latitude != null "> and latitude = #{latitude}</if>
+            <if test="phone != null  and phone != ''"> and phone = #{phone}</if>
+            <if test="servicePhone != null  and servicePhone != ''"> and service_phone = #{servicePhone}</if>
+            <if test="serviceQrcode != null  and serviceQrcode != ''"> and service_qrcode = #{serviceQrcode}</if>
+            <if test="businessHours != null  and businessHours != ''"> and business_hours = #{businessHours}</if>
+            <if test="intro != null  and intro != ''"> and intro = #{intro}</if>
+            <if test="sort != null "> and sort = #{sort}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+    
+    <select id="selectStoreByStoreId" parameterType="Long" resultMap="StoreResult">
+        <include refid="selectStoreVo"/>
+        where store_id = #{storeId}
+    </select>
+
+    <insert id="insertStore" parameterType="Store" useGeneratedKeys="true" keyProperty="storeId">
+        insert into biz_store
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="storeName != null and storeName != ''">store_name,</if>
+            <if test="logo != null">logo,</if>
+            <if test="province != null">province,</if>
+            <if test="city != null">city,</if>
+            <if test="district != null">district,</if>
+            <if test="address != null">address,</if>
+            <if test="longitude != null">longitude,</if>
+            <if test="latitude != null">latitude,</if>
+            <if test="phone != null">phone,</if>
+            <if test="servicePhone != null">service_phone,</if>
+            <if test="serviceQrcode != null">service_qrcode,</if>
+            <if test="businessHours != null">business_hours,</if>
+            <if test="intro != null">intro,</if>
+            <if test="services != null">services,</if>
+            <if test="sort != null">sort,</if>
+            <if test="status != null">status,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="storeName != null and storeName != ''">#{storeName},</if>
+            <if test="logo != null">#{logo},</if>
+            <if test="province != null">#{province},</if>
+            <if test="city != null">#{city},</if>
+            <if test="district != null">#{district},</if>
+            <if test="address != null">#{address},</if>
+            <if test="longitude != null">#{longitude},</if>
+            <if test="latitude != null">#{latitude},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="servicePhone != null">#{servicePhone},</if>
+            <if test="serviceQrcode != null">#{serviceQrcode},</if>
+            <if test="businessHours != null">#{businessHours},</if>
+            <if test="intro != null">#{intro},</if>
+            <if test="services != null">#{services},</if>
+            <if test="sort != null">#{sort},</if>
+            <if test="status != null">#{status},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateStore" parameterType="Store">
+        update biz_store
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="storeName != null and storeName != ''">store_name = #{storeName},</if>
+            <if test="logo != null">logo = #{logo},</if>
+            <if test="province != null">province = #{province},</if>
+            <if test="city != null">city = #{city},</if>
+            <if test="district != null">district = #{district},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="longitude != null">longitude = #{longitude},</if>
+            <if test="latitude != null">latitude = #{latitude},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="servicePhone != null">service_phone = #{servicePhone},</if>
+            <if test="serviceQrcode != null">service_qrcode = #{serviceQrcode},</if>
+            <if test="businessHours != null">business_hours = #{businessHours},</if>
+            <if test="intro != null">intro = #{intro},</if>
+            <if test="services != null">services = #{services},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where store_id = #{storeId}
+    </update>
+
+    <delete id="deleteStoreByStoreId" parameterType="Long">
+        delete from biz_store where store_id = #{storeId}
+    </delete>
+
+    <delete id="deleteStoreByStoreIds" parameterType="String">
+        delete from biz_store where store_id in 
+        <foreach item="storeId" collection="array" open="(" separator="," close=")">
+            #{storeId}
+        </foreach>
+    </delete>
+</mapper>

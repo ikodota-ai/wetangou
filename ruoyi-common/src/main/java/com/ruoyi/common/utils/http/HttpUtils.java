@@ -290,4 +290,58 @@ public class HttpUtils
             return true;
         }
     }
+
+    /**
+     * 向指定 URL 发送 POST 请求，接收原始字节流（适用于下载图片 / 二进制）
+     *
+     * @param url 目标地址
+     * @param param 请求体（JSON 字符串）
+     * @param contentType 请求体 Content-Type
+     * @return 响应字节流，失败时返回空数组
+     */
+    public static byte[] sendPostBytes(String url, String param, String contentType)
+    {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        java.io.InputStream in = null;
+        try
+        {
+            log.info("sendPostBytes - {}", url);
+            java.net.URL realUrl = new java.net.URL(url);
+            java.net.URLConnection conn = realUrl.openConnection();
+            conn.setRequestProperty("accept", "*/*");
+            conn.setRequestProperty("connection", "Keep-Alive");
+            conn.setRequestProperty("user-agent", "Mozilla/5.0");
+            conn.setRequestProperty("Content-Type", contentType);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(10000);
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+            try (java.io.OutputStream os = conn.getOutputStream())
+            {
+                os.write(param.getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+            in = conn.getInputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) != -1)
+            {
+                out.write(buf, 0, n);
+            }
+            log.info("sendPostBytes recv bytes={}", out.size());
+        }
+        catch (Exception e)
+        {
+            log.error("调用HttpUtils.sendPostBytes Exception, url=" + url, e);
+        }
+        finally
+        {
+            if (in != null)
+            {
+                try { in.close(); } catch (IOException ignored) { }
+            }
+        }
+        return out.toByteArray();
+    }
+
 }

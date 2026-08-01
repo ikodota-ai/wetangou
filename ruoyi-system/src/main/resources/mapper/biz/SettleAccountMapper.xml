@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.SettleAccountMapper">
+    
+    <resultMap type="SettleAccount" id="SettleAccountResult">
+        <result property="accountId"    column="account_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="ownerType"    column="owner_type"    />
+        <result property="ownerId"    column="owner_id"    />
+        <result property="receiverType"    column="receiver_type"    />
+        <result property="receiverAccount"    column="receiver_account"    />
+        <result property="receiverName"    column="receiver_name"    />
+        <result property="rate"    column="rate"    />
+        <result property="status"    column="status"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectSettleAccountVo">
+        select account_id, owner_type, owner_id, receiver_type, receiver_account, receiver_name, rate, status, create_time, update_time, merchant_id from biz_settle_account
+    </sql>
+
+    <select id="selectSettleAccountList" parameterType="SettleAccount" resultMap="SettleAccountResult">
+        <include refid="selectSettleAccountVo"/>
+        <where>  
+            <if test="ownerType != null  and ownerType != ''"> and owner_type = #{ownerType}</if>
+            <if test="ownerId != null "> and owner_id = #{ownerId}</if>
+            <if test="receiverType != null  and receiverType != ''"> and receiver_type = #{receiverType}</if>
+            <if test="receiverAccount != null  and receiverAccount != ''"> and receiver_account = #{receiverAccount}</if>
+            <if test="receiverName != null  and receiverName != ''"> and receiver_name like concat('%', #{receiverName}, '%')</if>
+            <if test="rate != null "> and rate = #{rate}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+    
+    <select id="selectSettleAccountByAccountId" parameterType="Long" resultMap="SettleAccountResult">
+        <include refid="selectSettleAccountVo"/>
+        where account_id = #{accountId}
+    </select>
+
+    <insert id="insertSettleAccount" parameterType="SettleAccount" useGeneratedKeys="true" keyProperty="accountId">
+        insert into biz_settle_account
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="ownerType != null">owner_type,</if>
+            <if test="ownerId != null">owner_id,</if>
+            <if test="receiverType != null">receiver_type,</if>
+            <if test="receiverAccount != null">receiver_account,</if>
+            <if test="receiverName != null">receiver_name,</if>
+            <if test="rate != null">rate,</if>
+            <if test="status != null">status,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="ownerType != null">#{ownerType},</if>
+            <if test="ownerId != null">#{ownerId},</if>
+            <if test="receiverType != null">#{receiverType},</if>
+            <if test="receiverAccount != null">#{receiverAccount},</if>
+            <if test="receiverName != null">#{receiverName},</if>
+            <if test="rate != null">#{rate},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateSettleAccount" parameterType="SettleAccount">
+        update biz_settle_account
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="ownerType != null">owner_type = #{ownerType},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="receiverType != null">receiver_type = #{receiverType},</if>
+            <if test="receiverAccount != null">receiver_account = #{receiverAccount},</if>
+            <if test="receiverName != null">receiver_name = #{receiverName},</if>
+            <if test="rate != null">rate = #{rate},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where account_id = #{accountId}
+    </update>
+
+    <delete id="deleteSettleAccountByAccountId" parameterType="Long">
+        delete from biz_settle_account where account_id = #{accountId}
+    </delete>
+
+    <delete id="deleteSettleAccountByAccountIds" parameterType="String">
+        delete from biz_settle_account where account_id in 
+        <foreach item="accountId" collection="array" open="(" separator="," close=")">
+            #{accountId}
+        </foreach>
+    </delete>
+</mapper>

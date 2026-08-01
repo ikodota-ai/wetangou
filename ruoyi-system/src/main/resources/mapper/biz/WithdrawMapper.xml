@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.WithdrawMapper">
+    
+    <resultMap type="Withdraw" id="WithdrawResult">
+        <result property="withdrawId"    column="withdraw_id"    />
+        <result property="merchantId"    column="merchant_id"    />
+        <result property="withdrawNo"    column="withdraw_no"    />
+        <result property="distributorId"    column="distributor_id"    />
+        <result property="memberName"    column="member_name"    />
+        <result property="amount"    column="amount"    />
+        <result property="withdrawType"    column="withdraw_type"    />
+        <result property="account"    column="account"    />
+        <result property="accountName"    column="account_name"    />
+        <result property="status"    column="status"    />
+        <result property="applyTime"    column="apply_time"    />
+        <result property="finishTime"    column="finish_time"    />
+        <result property="failReason"    column="fail_reason"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectWithdrawVo">
+        select w.withdraw_id, w.withdraw_no, w.distributor_id, m.nickname as member_name, w.amount, w.withdraw_type,
+               w.account, w.account_name, w.status, w.apply_time, w.finish_time, w.fail_reason, w.create_time, w.merchant_id
+        from biz_withdraw w
+        left join biz_distributor d on d.distributor_id = w.distributor_id
+        left join biz_member m on m.member_id = d.member_id
+    </sql>
+
+    <select id="selectWithdrawList" parameterType="Withdraw" resultMap="WithdrawResult">
+        <include refid="selectWithdrawVo"/>
+        <where>
+            <if test="withdrawNo != null  and withdrawNo != ''"> and w.withdraw_no like concat('%', #{withdrawNo}, '%')</if>
+            <if test="distributorId != null "> and w.distributor_id = #{distributorId}</if>
+            <if test="withdrawType != null  and withdrawType != ''"> and w.withdraw_type = #{withdrawType}</if>
+            <if test="accountName != null  and accountName != ''"> and w.account_name like concat('%', #{accountName}, '%')</if>
+            <if test="status != null  and status != ''"> and w.status = #{status}</if>
+            <if test="params != null and params.distributorIds != null and params.distributorIds != ''"> and find_in_set(w.distributor_id, #{params.distributorIds})</if>
+        </where>
+        order by w.withdraw_id desc
+    </select>
+    
+    <select id="selectWithdrawByWithdrawId" parameterType="Long" resultMap="WithdrawResult">
+        <include refid="selectWithdrawVo"/>
+        where w.withdraw_id = #{withdrawId}
+    </select>
+
+    <insert id="insertWithdraw" parameterType="Withdraw" useGeneratedKeys="true" keyProperty="withdrawId">
+        insert into biz_withdraw
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="withdrawNo != null and withdrawNo != ''">withdraw_no,</if>
+            <if test="distributorId != null">distributor_id,</if>
+            <if test="amount != null">amount,</if>
+            <if test="withdrawType != null">withdraw_type,</if>
+            <if test="account != null">account,</if>
+            <if test="accountName != null">account_name,</if>
+            <if test="status != null">status,</if>
+            <if test="applyTime != null">apply_time,</if>
+            <if test="finishTime != null">finish_time,</if>
+            <if test="failReason != null">fail_reason,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="withdrawNo != null and withdrawNo != ''">#{withdrawNo},</if>
+            <if test="distributorId != null">#{distributorId},</if>
+            <if test="amount != null">#{amount},</if>
+            <if test="withdrawType != null">#{withdrawType},</if>
+            <if test="account != null">#{account},</if>
+            <if test="accountName != null">#{accountName},</if>
+            <if test="status != null">#{status},</if>
+            <if test="applyTime != null">#{applyTime},</if>
+            <if test="finishTime != null">#{finishTime},</if>
+            <if test="failReason != null">#{failReason},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateWithdraw" parameterType="Withdraw">
+        update biz_withdraw
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="withdrawNo != null and withdrawNo != ''">withdraw_no = #{withdrawNo},</if>
+            <if test="distributorId != null">distributor_id = #{distributorId},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="withdrawType != null">withdraw_type = #{withdrawType},</if>
+            <if test="account != null">account = #{account},</if>
+            <if test="accountName != null">account_name = #{accountName},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="applyTime != null">apply_time = #{applyTime},</if>
+            <if test="finishTime != null">finish_time = #{finishTime},</if>
+            <if test="failReason != null">fail_reason = #{failReason},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+        </trim>
+        where withdraw_id = #{withdrawId}
+    </update>
+
+    <delete id="deleteWithdrawByWithdrawId" parameterType="Long">
+        delete from biz_withdraw where withdraw_id = #{withdrawId}
+    </delete>
+
+    <delete id="deleteWithdrawByWithdrawIds" parameterType="String">
+        delete from biz_withdraw where withdraw_id in 
+        <foreach item="withdrawId" collection="array" open="(" separator="," close=")">
+            #{withdrawId}
+        </foreach>
+    </delete>
+</mapper>

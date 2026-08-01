@@ -1,0 +1,75 @@
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #E8F2E8 0%, #F2F2F7 100%);
+  padding-bottom: 40rpx;
+}
+.top {
+  height: 60rpx;
+}
+.title {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #1A1A1A;
+  padding: 40rpx 56rpx 56rpx;
+}
+.card {
+  margin: 0 32rpx 40rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 40rpx 32rpx 32rpx;
+}
+.brand {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+.divider {
+  height: 1rpx;
+  background: #F0F0F0;
+  margin: 32rpx 0;
+}
+.perm-title {
+  font-size: 28rpx;
+  color: #1A1A1A;
+  margin-bottom: 16rpx;
+  display: block;
+}
+.perm-main {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1A1A1A;
+  display: block;
+}
+.btns {
+  padding: 0 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+.agree {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 60rpx 32rpx 0;
+  gap: 8rpx;
+}
+.checkbox {
+  width: 28rpx;
+  height: 28rpx;
+  border: 2rpx solid #C8D5C8;
+  border-radius: 4rpx;
+  background: #FFFFFF;
+}
+.checkbox.on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.agree-text {
+  font-size: 24rpx;
+  color: #666;
+}
+.link {
+  font-size: 24rpx;
+  color: #3A6B35;
+}
