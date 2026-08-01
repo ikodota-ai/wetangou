@@ -133,6 +133,15 @@ insert into biz_agent (agent_id, agent_no, agent_name, dept_id, contact, phone, 
 select 1, 'AG000001', '平台直营', 900, '平台运营', '', '全国', 9999, 1, '0', 'admin', sysdate()
 where not exists (select 1 from biz_agent a where a.agent_id = 1);
 
+-- 4.2.5 把 sys_config 缺失的微信配置补齐（项目硬编码默认 appid，匹配 miniprogram7/project.config.json）
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+select '微信小程序AppId', 'wx.miniapp.appId', 'wx9e147c4e2151b123', 'N', 'admin', sysdate(), '升级脚本兜底：与 miniprogram7/project.config.json 保持一致'
+where not exists (select 1 from sys_config c where c.config_key = 'wx.miniapp.appId');
+
+insert into sys_config (config_name, config_key, config_value, config_type, create_by, create_time, remark)
+select '微信小程序密钥', 'wx.miniapp.secret', '', 'N', 'admin', sysdate(), '升级脚本兜底'
+where not exists (select 1 from sys_config c where c.config_key = 'wx.miniapp.secret');
+
 -- 4.3 默认商户，appid/支付凭证从 sys_config 现有全局配置迁移过来
 insert into biz_merchant (merchant_id, merchant_no, merchant_name, agent_id, dept_id, contact,
   appid, app_secret, mp_auth_mode, pay_mode, pay_mch_id, pay_appid, pay_cert_serial,
@@ -151,6 +160,12 @@ select 1, 'MC000001', '洞天团购（默认商户）', 1, 901, '平台运营',
        then '0' else '1' end,
   '0', 'admin', sysdate()
 where not exists (select 1 from biz_merchant m where m.merchant_id = 1);
+
+-- 4.3.1 兜底：即使 sys_config 被外部清空，也保证默认商户 appid 不为空
+update biz_merchant
+   set appid = 'wx9e147c4e2151b123'
+ where merchant_id = 1
+   and (appid is null or appid = '');
 
 -- 4.4 admin 归属平台账号
 insert into biz_merchant_user (user_id, user_type, agent_id, merchant_id, create_by, create_time)

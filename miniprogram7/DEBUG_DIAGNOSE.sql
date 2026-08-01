@@ -44,3 +44,17 @@ SELECT merchant_id, merchant_name, appid, status
 
 -- 方案 B：把 store_id=200 改挂到默认商户
 -- UPDATE biz_store SET merchant_id = 1 WHERE store_id = 200;
+
+-- =====================================================================
+-- 一键自愈（如果第 1 步 appid 是空，第 2/3 步还不对就跑这个）
+-- =====================================================================
+
+-- 1. 把默认商户 1 的 appid 强制改成 miniprogram7/project.config.json 里的 appid
+UPDATE biz_merchant SET appid = 'wx9e147c4e2151b123' WHERE merchant_id = 1 AND (appid IS NULL OR appid = '');
+
+-- 2. 把所有 store 强制挂到默认商户 1（演示用，不影响生产语义；生产环境按实际业务挂载）
+-- UPDATE biz_store SET merchant_id = 1 WHERE merchant_id <> 1;
+
+-- 3. 重启后端，让 Redis 缓存重建
+--    pkill -f ruoyi-admin.jar
+--    ./ry.sh start
