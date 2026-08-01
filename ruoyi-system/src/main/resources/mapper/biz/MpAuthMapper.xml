@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.MpAuthMapper">
+
+    <resultMap type="MpAuth" id="MpAuthResult">
+        <result property="authId"     column="auth_id"     />
+        <result property="merchantId" column="merchant_id" />
+        <result property="appid"      column="appid"       />
+        <result property="nickName"   column="nick_name"   />
+        <result property="headImg"    column="head_img"    />
+        <result property="principalName" column="principal_name" />
+        <result property="verifyType" column="verify_type" />
+        <result property="refreshToken" column="refresh_token" />
+        <result property="funcInfo"   column="func_info"   />
+        <result property="authStatus" column="auth_status" />
+        <result property="authTime"   column="auth_time"   />
+        <result property="createTime" column="create_time" />
+        <result property="updateTime" column="update_time" />
+    </resultMap>
+
+    <sql id="selectMpAuthVo">
+        select a.auth_id, a.merchant_id, m.merchant_name, a.appid, a.nick_name, a.head_img,
+               a.principal_name, a.verify_type, a.refresh_token, a.func_info,
+               a.auth_status, a.auth_time, a.create_time, a.update_time
+        from biz_mp_auth a
+        left join biz_merchant m on m.merchant_id = a.merchant_id
+    </sql>
+
+    <select id="selectMpAuthList" parameterType="MpAuth" resultMap="MpAuthResult">
+        <include refid="selectMpAuthVo"/>
+        <where>
+            <if test="merchantId != null "> and a.merchant_id = #{merchantId}</if>
+            <if test="appid != null  and appid != ''"> and a.appid = #{appid}</if>
+            <if test="nickName != null  and nickName != ''"> and a.nick_name like concat('%', #{nickName}, '%')</if>
+            <if test="authStatus != null  and authStatus != ''"> and a.auth_status = #{authStatus}</if>
+        </where>
+        order by a.auth_id desc
+    </select>
+
+    <select id="selectMpAuthByAuthId" parameterType="Long" resultMap="MpAuthResult">
+        <include refid="selectMpAuthVo"/>
+        where a.auth_id = #{authId}
+    </select>
+
+    <select id="selectMpAuthByAppid" parameterType="String" resultMap="MpAuthResult">
+        <include refid="selectMpAuthVo"/>
+        where a.appid = #{appid}
+    </select>
+
+    <insert id="insertMpAuth" parameterType="MpAuth" useGeneratedKeys="true" keyProperty="authId">
+        insert into biz_mp_auth
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="appid != null and appid != ''">appid,</if>
+            <if test="nickName != null">nick_name,</if>
+            <if test="headImg != null">head_img,</if>
+            <if test="principalName != null">principal_name,</if>
+            <if test="verifyType != null">verify_type,</if>
+            <if test="refreshToken != null">refresh_token,</if>
+            <if test="funcInfo != null">func_info,</if>
+            <if test="authStatus != null">auth_status,</if>
+            <if test="authTime != null">auth_time,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="appid != null and appid != ''">#{appid},</if>
+            <if test="nickName != null">#{nickName},</if>
+            <if test="headImg != null">#{headImg},</if>
+            <if test="principalName != null">#{principalName},</if>
+            <if test="verifyType != null">#{verifyType},</if>
+            <if test="refreshToken != null">#{refreshToken},</if>
+            <if test="funcInfo != null">#{funcInfo},</if>
+            <if test="authStatus != null">#{authStatus},</if>
+            <if test="authTime != null">#{authTime},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMpAuth" parameterType="MpAuth">
+        update biz_mp_auth
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id = #{merchantId},</if>
+            <if test="appid != null and appid != ''">appid = #{appid},</if>
+            <if test="nickName != null">nick_name = #{nickName},</if>
+            <if test="headImg != null">head_img = #{headImg},</if>
+            <if test="principalName != null">principal_name = #{principalName},</if>
+            <if test="verifyType != null">verify_type = #{verifyType},</if>
+            <if test="refreshToken != null">refresh_token = #{refreshToken},</if>
+            <if test="funcInfo != null">func_info = #{funcInfo},</if>
+            <if test="authStatus != null">auth_status = #{authStatus},</if>
+            <if test="authTime != null">auth_time = #{authTime},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where auth_id = #{authId}
+    </update>
+
+    <delete id="deleteMpAuthByAuthId" parameterType="Long">
+        delete from biz_mp_auth where auth_id = #{authId}
+    </delete>
+
+    <delete id="deleteMpAuthByAuthIds" parameterType="String">
+        delete from biz_mp_auth where auth_id in
+        <foreach item="authId" collection="array" open="(" separator="," close=")">
+            #{authId}
+        </foreach>
+    </delete>
+</mapper>

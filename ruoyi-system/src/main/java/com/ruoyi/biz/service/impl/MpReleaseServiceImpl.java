@@ -2,14 +2,20 @@ package com.ruoyi.biz.service.impl;
 
 import java.util.Date;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
+import com.ruoyi.biz.api.service.WxOpenService;
 import com.ruoyi.biz.domain.Merchant;
+import com.ruoyi.biz.domain.MpAuth;
 import com.ruoyi.biz.domain.MpRelease;
 import com.ruoyi.biz.mapper.MerchantMapper;
+import com.ruoyi.biz.mapper.MpAuthMapper;
 import com.ruoyi.biz.mapper.MpReleaseMapper;
+import com.ruoyi.biz.service.IMpAuthService;
 import com.ruoyi.biz.service.IMpReleaseService;
 import com.ruoyi.common.core.domain.model.TenantContext;
 import com.ruoyi.common.exception.ServiceException;
@@ -30,6 +36,8 @@ import com.ruoyi.system.service.ISysConfigService;
 @Service
 public class MpReleaseServiceImpl implements IMpReleaseService
 {
+    private static final Logger log = LoggerFactory.getLogger(MpReleaseServiceImpl.class);
+
     /** 审核状态：待提交 */
     private static final String AUDIT_PENDING = "0";
 
@@ -68,6 +76,15 @@ public class MpReleaseServiceImpl implements IMpReleaseService
 
     @Autowired
     private ISysConfigService sysConfigService;
+
+    @Autowired
+    private WxOpenService wxOpenService;
+
+    @Autowired
+    private IMpAuthService mpAuthService;
+
+    @Autowired
+    private MpAuthMapper mpAuthMapper;
 
     /**
      * 查询发布记录（租户条件由拦截器追加）
@@ -180,12 +197,38 @@ public class MpReleaseServiceImpl implements IMpReleaseService
         {
             throw new ServiceException("当前审核状态不允许提交审核");
         }
+        // 真实接入：调第三方平台 submitaudit
+        callWxOpen(origin, (token) -> {
+            JSONObject body = new JSONObject();
+            body.put("item_list", buildAuditItems(origin));
+            return wxOpenService.submitAudit(token, origin.getAppid(), body);
+        });
         MpRelease update = new MpRelease();
         update.setReleaseId(releaseId);
         update.setAuditStatus(AUDIT_DOING);
         update.setAuditReason("");
         update.setUpdateBy(SecurityUtils.getUsername());
         return mpReleaseMapper.updateMpRelease(update);
+    }
+
+    /**
+     * 构造提审 item_list（占位实现：仅声明一个标签页，业务侧按需扩展 categories 字段）
+     */
+    private java.util.List<JSONObject> buildAuditItems(MpRelease origin)
+    {
+        java.util.List<JSONObject> list = new java.util.ArrayList<>();
+        JSONObject item = new JSONObject();
+        item.put("address", "pages/index/index");
+        item.put("tag", "");
+        item.put("first_class", "");
+        item.put("second_class", "");
+        item.put("third_class", "");
+        item.put("first_id", 0);
+        item.put("second_id", 0);
+        item.put("third_id", 0);
+        item.put("title", origin.getUserVersion());
+        list.add(item);
+        return list;
     }
 
     /**
@@ -221,6 +264,7 @@ public class MpReleaseServiceImpl implements IMpReleaseService
         {
             throw new ServiceException("该版本已发布");
         }
+        callWxOpen(origin, (token) -> wxOpenService.release(token, origin.getAppid()));
         MpRelease update = new MpRelease();
         update.setReleaseId(releaseId);
         update.setReleaseStatus(RELEASE_DONE);
@@ -240,11 +284,51 @@ public class MpReleaseServiceImpl implements IMpReleaseService
         {
             throw new ServiceException("仅已发布的版本可回退");
         }
+        callWxOpen(origin, (token) -> wxOpenService.revertRelease(token, origin.getAppid()));
         MpRelease update = new MpRelease();
         update.setReleaseId(releaseId);
         update.setReleaseStatus(RELEASE_BACK);
         update.setUpdateBy(SecurityUtils.getUsername());
         return mpReleaseMapper.updateMpRelease(update);
+    }
+
+    /**
+     * 真实接入钩子：
+     * - 商户 mp_auth_mode=1 且 biz_mp_auth 已有授权记录时调微信第三方平台接口
+     * - 否则按原状态流转走（用于未接入开放平台的本地联调）
+     */
+    private void callWxOpen(MpRelease origin, java.util.function.Function<String, JSONObject> invoker)
+    {
+        if (!wxOpenService.isConfigured())
+        {
+            return;
+        }
+        Merchant merchant = merchantMapper.selectMerchantByMerchantId(origin.getMerchantId());
+        if (merchant == null || !"1".equals(merchant.getMpAuthMode()))
+        {
+            return;
+        }
+        MpAuth auth = mpAuthMapper.selectMpAuthByAppid(origin.getAppid());
+        if (auth == null || StringUtils.isEmpty(auth.getRefreshToken()))
+        {
+            log.warn("[MpRelease] 商户 {} appid={} 未完成第三方平台授权，跳过真实调用",
+                    origin.getMerchantId(), origin.getAppid());
+            return;
+        }
+        try
+        {
+            String token = wxOpenService.getAuthorizerAccessToken(origin.getAppid(), auth.getRefreshToken());
+            JSONObject resp = invoker.apply(token);
+            if (resp != null && resp.getIntValue("errcode") != 0)
+            {
+                throw new ServiceException("微信接口返回错误：" + resp.toJSONString());
+            }
+        }
+        catch (Exception e)
+        {
+            log.error("[MpRelease] 真实接入失败，继续按本地状态流转", e);
+            throw new ServiceException("真实接口调用失败：" + e.getMessage());
+        }
     }
 
     /**
