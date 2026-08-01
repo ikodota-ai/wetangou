@@ -27,6 +27,7 @@ import { listStore, getStore } from '@/api/biz/store'
 import { listMember, getMember } from '@/api/biz/member'
 import { listProduct, getProduct } from '@/api/biz/product'
 import { listDistributor, getDistributor } from '@/api/biz/distributor'
+import { listMerchant, getMerchant } from '@/api/biz/merchant'
 
 const CONFIG = {
   store: {
@@ -60,6 +61,14 @@ const CONFIG = {
     queryField: 'memberId',
     label: row => (row.memberName || ('会员' + row.memberId)) + '（推客' + row.distributorId + '）',
     placeholder: '请选择推客'
+  },
+  merchant: {
+    api: listMerchant,
+    getById: getMerchant,
+    idField: 'merchantId',
+    queryField: 'merchantName',
+    label: row => row.merchantName || ('商户' + row.merchantId),
+    placeholder: '请选择商户'
   }
 }
 
@@ -120,7 +129,8 @@ export default {
     },
     fetch(keyword) {
       this.loading = true
-      const query = { pageNum: 1, pageSize: 20 }
+      // pageSize=100 一次性拉完，避免商户/门店量超过 20 时下拉被截断
+      const query = { pageNum: 1, pageSize: 100 }
       if (keyword) query[this.cfg.queryField] = keyword
       this.cfg.api(query).then(res => {
         const rows = res.rows || res.data || []

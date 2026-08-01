@@ -10,6 +10,10 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
+
       <el-form-item label="门店状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 120px">
           <el-option label="营业中" value="0" />
@@ -268,11 +272,13 @@ export default {
       open: false,
       queryParams: {
         pageNum: 1,
+        merchantId: null,
         pageSize: 10,
         storeName: null,
         status: null,
         city: null
       },
+      showMerchantFilter: this.isShowMerchantFilter(),
       form: {},
       rules: {
         storeName: [
@@ -296,6 +302,10 @@ export default {
     this.getList();
   },
   methods: {
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
     // 服务字典值转标签
     serviceLabel(value) {
       const dict = this.dict.type.biz_store_service || [];
@@ -357,6 +367,7 @@ export default {
     resetQuery() {
       this.reset();
       this.queryParams = {
+        merchantId: null,
         pageNum: 1,
         pageSize: 10,
         storeName: null,

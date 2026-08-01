@@ -13,6 +13,9 @@
       <el-form-item label="商品" prop="productIds">
         <biz-select v-model="queryParams.productIds" type="product" multiple width="220px" />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
       <el-form-item label="订单状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择状态" clearable style="width: 140px">
           <el-option label="待付款" value="0" />
@@ -138,11 +141,14 @@ export default {
         pageNum: 1,
         pageSize: 10,
         orderNo: null,
+        merchantId: null,
         storeIds: [],
         memberIds: [],
         productIds: [],
         status: null
       },
+      // 商户筛选：平台/代理商账号显示；商户账号自动隐藏（自带 merchantId 上下文）
+      showMerchantFilter: this.isShowMerchantFilter(),
       form: {}
     }
   },
@@ -161,6 +167,7 @@ export default {
         pageNum: this.queryParams.pageNum,
         pageSize: this.queryParams.pageSize,
         orderNo: this.queryParams.orderNo,
+        merchantId: this.queryParams.merchantId,
         status: this.queryParams.status,
         params: {
           storeIds: this.queryParams.storeIds,
@@ -192,6 +199,7 @@ export default {
         pageNum: 1,
         pageSize: 10,
         orderNo: null,
+        merchantId: null,
         storeIds: [],
         memberIds: [],
         productIds: [],
@@ -223,6 +231,11 @@ export default {
       this.download('biz/order/export', {
         ...this.buildParams()
       }, `order_${new Date().getTime()}.xlsx`)
+    },
+    isShowMerchantFilter() {
+      // 商户账号自带 merchantId 上下文，前端再筛无意义
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
     }
   }
 }

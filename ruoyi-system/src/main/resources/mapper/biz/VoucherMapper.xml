@@ -35,6 +35,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectVoucherList" parameterType="Voucher" resultMap="VoucherResult">
         <include refid="selectVoucherVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="storeId != null "> and v.store_id = #{storeId}</if>
             <if test="voucherName != null  and voucherName != ''"> and v.voucher_name like concat('%', #{voucherName}, '%')</if>
             <if test="status != null  and status != ''"> and v.status = #{status}</if>

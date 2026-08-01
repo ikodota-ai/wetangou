@@ -22,7 +22,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSettleRecordList" parameterType="SettleRecord" resultMap="SettleRecordResult">
         <include refid="selectSettleRecordVo"/>
-        <where>  
+        <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>  
             <if test="orderId != null "> and order_id = #{orderId}</if>
             <if test="outOrderNo != null  and outOrderNo != ''"> and out_order_no = #{outOrderNo}</if>
             <if test="receiverAccount != null  and receiverAccount != ''"> and receiver_account = #{receiverAccount}</if>

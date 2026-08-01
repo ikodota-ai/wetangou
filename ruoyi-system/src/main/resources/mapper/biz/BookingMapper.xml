@@ -37,6 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectBookingList" parameterType="Booking" resultMap="BookingResult">
         <include refid="selectBookingVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="bookingNo != null  and bookingNo != ''"> and b.booking_no like concat('%', #{bookingNo}, '%')</if>
             <if test="storeId != null "> and b.store_id = #{storeId}</if>
             <if test="productId != null "> and b.product_id = #{productId}</if>

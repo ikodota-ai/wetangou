@@ -50,6 +50,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectProductList" parameterType="Product" resultMap="ProductResult">
         <include refid="selectProductVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="storeId != null "> and (p.store_id = #{storeId} or find_in_set(#{storeId}, p.store_ids))</if>
             <if test="categoryId != null "> and p.category_id = #{categoryId}</if>
             <if test="productName != null  and productName != ''"> and p.product_name like concat('%', #{productName}, '%')</if>

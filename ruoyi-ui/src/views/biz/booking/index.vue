@@ -10,6 +10,10 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
+
       <el-form-item label="门店" prop="storeId">
         <biz-select v-model="queryParams.storeId" type="store" width="200px" />
       </el-form-item>
@@ -180,6 +184,7 @@ export default {
       memberList: [],
       queryParams: {
         pageNum: 1,
+        merchantId: null,
         pageSize: 10,
         bookingNo: null,
         storeId: null,
@@ -188,6 +193,7 @@ export default {
         bookingDate: null,
         status: null
       },
+      showMerchantFilter: this.isShowMerchantFilter(),
       form: {},
       rules: {
         storeId: [
@@ -203,6 +209,10 @@ export default {
     this.getList()
   },
   methods: {
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
     statusText(status) {
       return { '0': '开放中', '1': '已确认', '2': '已完成', '3': '已关闭' }[status] || status
     },

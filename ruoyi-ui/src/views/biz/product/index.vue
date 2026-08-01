@@ -4,6 +4,10 @@
       <el-form-item label="适用门店" prop="storeIds">
         <biz-select v-model="queryParams.storeIds" type="store" multiple width="220px" />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
+
       <el-form-item label="商品名称" prop="productName">
         <el-input
           v-model="queryParams.productName"
@@ -233,11 +237,13 @@ export default {
       open: false,
       queryParams: {
         pageNum: 1,
+        merchantId: null,
         pageSize: 10,
         storeIds: [],
         productName: null,
         status: null
       },
+      showMerchantFilter: this.isShowMerchantFilter(),
       form: {},
       rules: {
         storeIdList: [
@@ -256,6 +262,10 @@ export default {
     this.getList();
   },
   methods: {
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
     buildParams() {
       const params = {
         pageNum: this.queryParams.pageNum,
@@ -315,6 +325,7 @@ export default {
     resetQuery() {
       this.reset();
       this.queryParams = {
+        merchantId: null,
         pageNum: 1,
         pageSize: 10,
         storeIds: [],

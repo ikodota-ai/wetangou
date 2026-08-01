@@ -42,10 +42,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                o.product_id, o.product_name, o.product_cover, o.order_type, o.price, o.num, o.total_amount,
                o.discount_amount, o.pay_amount, o.member_voucher_id, o.distributor_id, o.status, o.verify_code,
                o.verify_time, o.verify_user, o.pay_time, o.pay_no, o.expire_time, o.create_by, o.create_time,
-               o.update_by, o.update_time, o.remark, o.merchant_id
+               o.update_by, o.update_time, o.remark, o.merchant_id, mch.merchant_name as merchant_name
         from biz_order o
         left join biz_store s on s.store_id = o.store_id
         left join biz_member m on m.member_id = o.member_id
+        left join biz_merchant mch on mch.merchant_id = o.merchant_id
     </sql>
 
     <select id="selectOrderByOrderNo" parameterType="String" resultMap="OrderResult">
@@ -56,6 +57,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectOrderList" parameterType="Order" resultMap="OrderResult">
         <include refid="selectOrderVo"/>
         <where>
+            <if test="merchantId != null "> and o.merchant_id = #{merchantId}</if>
             <if test="orderNo != null  and orderNo != ''"> and o.order_no like concat('%', #{orderNo}, '%')</if>
             <if test="storeId != null "> and o.store_id = #{storeId}</if>
             <if test="memberId != null "> and o.member_id = #{memberId}</if>

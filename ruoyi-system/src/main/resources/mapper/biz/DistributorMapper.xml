@@ -30,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectDistributorList" parameterType="Distributor" resultMap="DistributorResult">
         <include refid="selectDistributorVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="memberId != null "> and d.member_id = #{memberId}</if>
             <if test="level != null "> and d.level = #{level}</if>
             <if test="status != null  and status != ''"> and d.status = #{status}</if>

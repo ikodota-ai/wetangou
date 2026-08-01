@@ -29,6 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectCategoryList" parameterType="Category" resultMap="CategoryResult">
         <include refid="selectCategoryVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="storeId != null "> and c.store_id = #{storeId}</if>
             <if test="categoryName != null  and categoryName != ''"> and c.category_name like concat('%', #{categoryName}, '%')</if>
             <if test="status != null  and status != ''"> and c.status = #{status}</if>

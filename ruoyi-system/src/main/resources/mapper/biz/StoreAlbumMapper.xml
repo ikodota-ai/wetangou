@@ -28,6 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectStoreAlbumList" parameterType="StoreAlbum" resultMap="StoreAlbumResult">
         <include refid="selectStoreAlbumVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="storeId != null "> and a.store_id = #{storeId}</if>
             <if test="albumType != null  and albumType != ''"> and a.album_type = #{albumType}</if>
             <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(a.store_id, #{params.storeIds})</if>

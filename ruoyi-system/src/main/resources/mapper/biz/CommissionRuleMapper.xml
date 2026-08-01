@@ -37,6 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectCommissionRuleList" parameterType="CommissionRule" resultMap="CommissionRuleResult">
         <include refid="selectCommissionRuleVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="ruleName != null  and ruleName != ''"> and r.rule_name like concat('%', #{ruleName}, '%')</if>
             <if test="storeId != null "> and r.store_id = #{storeId}</if>
             <if test="categoryId != null "> and r.category_id = #{categoryId}</if>

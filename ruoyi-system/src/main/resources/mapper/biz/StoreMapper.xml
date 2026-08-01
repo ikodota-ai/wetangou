@@ -37,7 +37,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectStoreList" parameterType="Store" resultMap="StoreResult">
         <include refid="selectStoreVo"/>
-        <where>  
+        <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>  
             <if test="storeName != null  and storeName != ''"> and store_name like concat('%', #{storeName}, '%')</if>
             <if test="logo != null  and logo != ''"> and logo = #{logo}</if>
             <if test="province != null  and province != ''"> and province = #{province}</if>

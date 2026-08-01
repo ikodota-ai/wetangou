@@ -33,6 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectCommissionList" parameterType="Commission" resultMap="CommissionResult">
         <include refid="selectCommissionVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="distributorId != null "> and c.distributor_id = #{distributorId}</if>
             <if test="orderId != null "> and c.order_id = #{orderId}</if>
             <if test="storeId != null "> and c.store_id = #{storeId}</if>

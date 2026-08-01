@@ -4,6 +4,10 @@
       <el-form-item label="门店" prop="storeIds">
         <biz-select v-model="queryParams.storeIds" type="store" multiple width="220px" />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
+
       <el-form-item label="分类名称" prop="categoryName">
         <el-input
           v-model="queryParams.categoryName"
@@ -189,11 +193,13 @@ export default {
       // 查询参数
       queryParams: {
         pageNum: 1,
+        merchantId: null,
         pageSize: 10,
         storeIds: [],
         categoryName: null,
         status: null
       },
+      showMerchantFilter: this.isShowMerchantFilter(),
       // 表单参数
       form: {},
       // 表单校验
@@ -208,6 +214,10 @@ export default {
     this.getList()
   },
   methods: {
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
     /** 查询商品分类列表 */
     buildParams() {
       return {

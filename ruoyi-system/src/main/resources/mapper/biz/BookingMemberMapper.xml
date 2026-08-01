@@ -46,6 +46,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectBookingMemberList" parameterType="BookingMember" resultMap="BookingMemberResult">
         <include refid="selectBookingMemberVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="bookingId != null "> and bm.booking_id = #{bookingId}</if>
             <if test="memberId != null "> and bm.member_id = #{memberId}</if>
             <if test="contact != null  and contact != ''"> and bm.contact like concat('%', #{contact}, '%')</if>

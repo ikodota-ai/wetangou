@@ -41,6 +41,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectPayBillList" parameterType="PayBill" resultMap="PayBillResult">
         <include refid="selectPayBillVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="billNo != null  and billNo != ''"> and b.bill_no like concat('%', #{billNo}, '%')</if>
             <if test="orderId != null "> and b.order_id = #{orderId}</if>
             <if test="storeId != null "> and b.store_id = #{storeId}</if>

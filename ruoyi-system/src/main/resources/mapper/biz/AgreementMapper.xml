@@ -29,6 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectAgreementList" parameterType="Agreement" resultMap="AgreementResult">
         <include refid="selectAgreementVo"/>
         <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
             <if test="agreementType != null  and agreementType != ''"> and a.agreement_type = #{agreementType}</if>
             <if test="title != null  and title != ''"> and a.title like concat('%', #{title}, '%')</if>
             <if test="storeId != null "> and a.store_id = #{storeId}</if>

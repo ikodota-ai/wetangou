@@ -9,6 +9,10 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
+
       <el-form-item label="分账单号" prop="outOrderNo">
         <el-input
           v-model="queryParams.outOrderNo"
@@ -206,6 +210,7 @@ export default {
       // 查询参数
       queryParams: {
         pageNum: 1,
+        merchantId: null,
         pageSize: 10,
         orderId: null,
         outOrderNo: null,
@@ -214,6 +219,7 @@ export default {
         status: null,
         finishTime: null,
       },
+      showMerchantFilter: this.isShowMerchantFilter(),
       // 表单参数
       form: {},
       // 表单校验
@@ -228,6 +234,10 @@ export default {
     this.getList()
   },
   methods: {
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
     /** 查询分账明细列表 */
     getList() {
       this.loading = true

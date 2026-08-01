@@ -10,6 +10,10 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
+        <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
+      </el-form-item>
+
       <el-form-item label="手机号" prop="phone">
         <el-input
           v-model="queryParams.phone"
@@ -184,12 +188,14 @@ export default {
       dateRange: [],
       queryParams: {
         pageNum: 1,
+        merchantId: null,
         pageSize: 10,
         nickname: null,
         phone: null,
         status: null,
         createTime: null
       },
+      showMerchantFilter: this.isShowMerchantFilter(),
       form: {},
       rules: {
         nickname: [
@@ -202,6 +208,10 @@ export default {
     this.getList();
   },
   methods: {
+    isShowMerchantFilter() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
     getList() {
       // 处理日期范围
       if (this.dateRange && this.dateRange.length === 2) {
@@ -246,6 +256,7 @@ export default {
       this.reset();
       this.dateRange = [];
       this.queryParams = {
+        merchantId: null,
         pageNum: 1,
         pageSize: 10,
         nickname: null,

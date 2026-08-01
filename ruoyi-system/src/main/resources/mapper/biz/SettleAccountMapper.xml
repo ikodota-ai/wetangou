@@ -24,7 +24,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSettleAccountList" parameterType="SettleAccount" resultMap="SettleAccountResult">
         <include refid="selectSettleAccountVo"/>
-        <where>  
+        <where>
+            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>  
             <if test="ownerType != null  and ownerType != ''"> and owner_type = #{ownerType}</if>
             <if test="ownerId != null "> and owner_id = #{ownerId}</if>
             <if test="receiverType != null  and receiverType != ''"> and receiver_type = #{receiverType}</if>
