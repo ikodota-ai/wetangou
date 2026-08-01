@@ -98,38 +98,6 @@ App({
         useList();
       }
     });
-  }
-        const rows = (res && (res.rows || res.data || res)) || [];
-        if (Array.isArray(rows) && rows.length) {
-          // 接口有数据就以后端为准，服务端字段名与小程序展示字段做一次映射
-          this.globalData.stores = rows.map((s) => ({
-            storeId: s.storeId || s.id,
-            name: s.storeName || s.name,
-            storeName: s.storeName || s.name,
-            subName: s.subName || '',
-            hours: s.businessHours || s.hours || '',
-            businessHours: s.businessHours || s.hours || '',
-            address: s.address || '',
-            phone: s.phone || '',
-            // 客服电话优先，缺失时回落门店电话，避免拨号按钮无号可用
-            servicePhone: s.servicePhone || s.phone || '',
-            serviceQrcode: s.serviceQrcode ? toFullUrl(s.serviceQrcode) : '',
-            logo: s.logo ? toFullUrl(s.logo) : '',
-            intro: s.intro || '',
-            services: s.services || '',
-            latitude: s.latitude ? parseFloat(s.latitude) : 23.405,
-            longitude: s.longitude ? parseFloat(s.longitude) : 113.227
-          }));
-          resolve(this.globalData.stores);
-        } else {
-          // 接口通但无数据 → 说明该商户确实还没配门店，不能回退 mock，
-          // 否则会把示例门店当成商户自己的门店展示出去
-          console.warn('[stores] empty from server');
-          this.globalData.stores = [];
-          resolve(this.globalData.stores);
-        }
-      }).catch((e) => applyMock('error: ' + (e && e.errMsg || e)));
-    });
   },
 
   // 加载商品
