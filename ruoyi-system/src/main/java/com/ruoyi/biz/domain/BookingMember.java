@@ -3,6 +3,8 @@ package com.ruoyi.biz.domain;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
+import com.ruoyi.common.annotation.Sensitive;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
@@ -54,6 +56,7 @@ public class BookingMember extends BaseEntity
     private String storeAddress;
 
     /** 场次-门店客服电话（展示用，非表字段） */
+    @Sensitive(desensitizedType = DesensitizedType.PHONE)
     private String storePhone;
 
     /** 场次-门店经度（展示用，非表字段） */
@@ -73,6 +76,7 @@ public class BookingMember extends BaseEntity
     private String contact;
 
     /** 联系电话 */
+    @Sensitive(desensitizedType = DesensitizedType.PHONE)
     @Excel(name = "联系电话")
     private String phone;
 

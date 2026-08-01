@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
+import com.ruoyi.common.annotation.Sensitive;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
@@ -38,6 +40,7 @@ public class Agent extends BaseEntity
     private String contact;
 
     /** 联系电话 */
+    @Sensitive(desensitizedType = DesensitizedType.PHONE)
     @Excel(name = "联系电话")
     private String phone;
 

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
+import com.ruoyi.common.annotation.Sensitive;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
@@ -55,10 +57,12 @@ public class Store extends BaseEntity
     private BigDecimal latitude;
 
     /** 门店电话 */
+    @Sensitive(desensitizedType = DesensitizedType.PHONE)
     @Excel(name = "门店电话")
     private String phone;
 
     /** 客服电话 */
+    @Sensitive(desensitizedType = DesensitizedType.PHONE)
     @Excel(name = "客服电话")
     private String servicePhone;
 
