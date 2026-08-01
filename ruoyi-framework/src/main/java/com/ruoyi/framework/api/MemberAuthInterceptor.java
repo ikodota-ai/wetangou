@@ -1,5 +1,7 @@
 package com.ruoyi.framework.api;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -20,11 +22,22 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * 小程序会员登录拦截器：对标注 @LoginRequired 的接口校验会员token
  *
+ * <p>改进点：
+ * <ul>
+ *   <li>当 X-App-Id 解析不到对应商户时，记录 WARN 日志，便于排查
+ *       "默认商户 fallback 导致跨商户看不到门店" 的问题。</li>
+ *   <li>对外暴露的接口全部显式走 resolveTenantByAppid，确保 biz_* 强隔离表
+ *       不会因为 TenantContextHolder 为空而返回全平台数据。</li>
+ * </ul>
+ * </p>
+ *
  * @author dytuangou
  */
 @Component
 public class MemberAuthInterceptor implements HandlerInterceptor
 {
+    private static final Logger log = LoggerFactory.getLogger(MemberAuthInterceptor.class);
+
     /** 小程序传递appid的请求头 */
     private static final String HEADER_APPID = "X-App-Id";
 
@@ -93,8 +106,17 @@ public class MemberAuthInterceptor implements HandlerInterceptor
     /**
      * 匿名请求按 X-App-Id 请求头解析商户并写入租户上下文
      *
-     * <p>未传或查不到 appid 时兑底为默认商户，兼容存量单商户小程序；
-     * 不能置空上下文，否则匿名接口将返回全平台数据造成跨商户泄露。</p>
+     * <p>解析优先级：</p>
+     * <ol>
+     *   <li>X-App-Id header → sys_param.appid 命中 → 写入该商户</li>
+     *   <li>?appid= query → 同上</li>
+     *   <li>任何步骤都查不到（appid 缺失 / 不匹配 / 商户停用）→ fallback 到
+     *       {@link TenantConstants#DEFAULT_MERCHANT_ID}，并打 WARN 日志，
+     *       便于排查 "前端传了 appid 但数据库没匹配" 这类静默问题。</li>
+     * </ol>
+     *
+     * <p>fallback 不能去掉：保留它是为了让「单商户小程序在未配置 appid 的
+     * 极端情况下还能看到默认商户数据」。</p>
      */
     private void resolveTenantByAppid(HttpServletRequest request)
     {
@@ -111,6 +133,13 @@ public class MemberAuthInterceptor implements HandlerInterceptor
                 TenantContextHolder.set(TenantContext.ofMerchant(merchant.getMerchantId()));
                 return;
             }
+            log.warn("[resolveTenantByAppid] X-App-Id={} 未匹配到有效商户(status=0)，fallback 到默认商户 {}",
+                    appid, TenantConstants.DEFAULT_MERCHANT_ID);
+        }
+        else
+        {
+            log.warn("[resolveTenantByAppid] 匿名请求未带 X-App-Id header，fallback 到默认商户 {}",
+                    TenantConstants.DEFAULT_MERCHANT_ID);
         }
         TenantContextHolder.set(TenantContext.ofMerchant(TenantConstants.DEFAULT_MERCHANT_ID));
     }

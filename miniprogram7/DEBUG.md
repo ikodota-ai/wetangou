@@ -351,3 +351,35 @@ tail -f ruoyi-admin/logs/wetangou.log
 微信开发者工具 → 工具 → 清除缓存
 ```
 
+
+### Q9：门店列表为空，store_id=200 看不到
+
+**症状**：后台 `biz_store` 里有 `store_id=200`、`status=0`，但小程序首页门店列表返回空。
+
+**根因链路**：
+1. 小程序请求带 `X-App-Id` header
+2. 后端 `MemberAuthInterceptor.resolveTenantByAppid` 用该 appid 查 `biz_merchant.appid`
+3. 命中 → 写入 `TenantContextHolder.ofMerchant(merchant_id)`，后续 SQL 自动追加 `WHERE merchant_id = ?`
+4. **不命中**（appid 缺失 / 不匹配 / 商户停用）→ **fallback 到 `DEFAULT_MERCHANT_ID=1`**（已在 `ruoyi-common/.../constant/TenantConstants.java` 写死）
+5. 如果 store_id=200 属于 `merchant_id ≠ 1` 的商户，就被租户拦截器过滤掉 → 列表为空
+
+**排查**：
+```sql
+-- 1. 确认 store 200 属于哪个商户
+SELECT store_id, store_name, merchant_id, status, del_flag FROM biz_store WHERE store_id=200;
+
+-- 2. 确认默认商户 1 的 appid 与小程序编译期 appid 是否一致
+SELECT merchant_id, merchant_name, appid, status FROM biz_merchant WHERE merchant_id=1;
+-- 期望 appid = miniprogram7/project.config.json 里的 appid
+```
+
+**修复（按优先级）**：
+- 改 store 200 的 `merchant_id = 1`（最简单，但有数据归属语义风险）
+- 改 `miniprogram7/project.config.json` 的 `appid` = store 200 所属商户的 appid（仅限多商户调试）
+- 后端日志会打 `[resolveTenantByAppid] X-App-Id=xxx 未匹配到有效商户`，照日志里实际 appid 排查
+
+**辅助工具**：
+- 小程序启动会在 Console 打印 `[miniprogram] APPID => wx... | BUILD_IN_APPID => wx...`，一眼看出当前生效的是哪个 appid
+- 调试期想强制覆盖 appid：在「微信开发者工具 → Console」执行 `wx.setStorageSync('manualAppId','wx...')` 再刷新
+
+**说明**：`DEFAULT_MERCHANT_ID=1` 不能去掉，否则匿名接口会因租户上下文为空而走 `ISOLATED_TABLES` 全表扫，对多商户体系是跨商户泄露。保留 fallback 是为了「单商户小程序在未配置 appid 时还能用」的兼容性。

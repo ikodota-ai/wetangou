@@ -1,5 +1,10 @@
 // utils/request.js 网络请求封装
-const { BASE_URL, MOCK_ENABLED, APPID } = require('./config.js');
+const { BASE_URL, MOCK_ENABLED, APPID, BUILD_IN_APPID } = require('./config.js');
+
+// 启动期一次性打印当前生效的 APPID 与构建期 APPID，便于在开发者工具 Console 排查租户解析问题
+try {
+  console.log('[miniprogram] APPID =>', APPID, '| BUILD_IN_APPID =>', BUILD_IN_APPID, '| BASE_URL =>', BASE_URL);
+} catch (e) {}
 
 // 把后端返回的相对地址补全
 function toFullUrl(url) {
@@ -140,6 +145,7 @@ module.exports = {
   uploadFile,
   api,
   BASE_URL,
+  APPID,
   toFullUrl,
   fixRichText,
   mockEnabled: MOCK_ENABLED
