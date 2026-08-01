@@ -383,3 +383,5 @@ SELECT merchant_id, merchant_name, appid, status FROM biz_merchant WHERE merchan
 - 调试期想强制覆盖 appid：在「微信开发者工具 → Console」执行 `wx.setStorageSync('manualAppId','wx...')` 再刷新
 
 **说明**：`DEFAULT_MERCHANT_ID=1` 不能去掉，否则匿名接口会因租户上下文为空而走 `ISOLATED_TABLES` 全表扫，对多商户体系是跨商户泄露。保留 fallback 是为了「单商户小程序在未配置 appid 时还能用」的兼容性。
+
+> **自动诊断脚本**：`miniprogram7/DEBUG_DIAGNOSE.sql` —— 把这 5 步查询和 2 个修复 UPDATE 都列好了，MySQL 客户端一行行跑就能定位是 appid 没填、还是 store 200 挂错商户、还是 Redis 缓存污染。
