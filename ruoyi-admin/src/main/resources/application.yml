@@ -66,11 +66,8 @@ spring:
     # 时间字段统一按 yyyy-MM-dd HH:mm:ss 输出（java.util.Date）
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
-    # LocalDateTime 走字符串（Jackson 3 默认行为，配合 @JsonFormat 统一格式）
-    serialization:
-      write-dates-as-timestamps: false
-    deserialization:
-      fail-on-unknown-properties: false
+    # Jackson 3 默认行为：LocalDateTime 走字符串、date 不写 timestamp
+    # 不再使用 spring.jackson.serialization.*（Jackson 3 枚举名已变，spring 自动配置忽略该 key）
   # 服务模块
   devtools:
     restart:

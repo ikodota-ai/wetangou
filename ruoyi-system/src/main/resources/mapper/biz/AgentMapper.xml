@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="region"    column="region"    />
         <result property="merchantQuota"    column="merchant_quota"    />
         <result property="usedQuota"    column="used_quota"    />
+        <result property="storeQuota"    column="store_quota"    />
         <result property="paidAmount"    column="paid_amount"    />
         <result property="expireTime"    column="expire_time"    />
         <result property="status"    column="status"    />
@@ -28,7 +29,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectAgentVo">
         select agent_id, agent_no, agent_name, dept_id, contact, phone, email, region,
-               merchant_quota, used_quota, paid_amount, expire_time, status, del_flag,
+               merchant_quota, used_quota, store_quota, paid_amount, expire_time, status, del_flag,
                create_by, create_time, update_by, update_time, remark
         from biz_agent
     </sql>
@@ -123,6 +124,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update biz_agent set used_quota = ifnull(used_quota, 0) + 1, update_time = sysdate()
         where agent_id = #{agentId}
     </update>
+
+    <update id="decreaseUsedQuota" parameterType="Long">
+        update biz_agent set used_quota = ifnull(used_quota, 0) - 1, update_time = sysdate()
+        where agent_id = #{agentId} and ifnull(used_quota, 0) > 0
+    </update>
+
+    <!-- 统计代理商名下所有商户的门店数（不含逻辑删除） -->
+    <select id="countStoresByAgentId" parameterType="Long" resultType="int">
+        select count(*) from biz_store s
+        inner join biz_merchant m on s.merchant_id = m.merchant_id
+        where m.agent_id = #{agentId} and s.del_flag = '0'
+    </select>
 
     <update id="applyFee">
         update biz_agent

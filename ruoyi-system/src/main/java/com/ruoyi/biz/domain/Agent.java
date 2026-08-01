@@ -59,6 +59,11 @@ public class Agent extends BaseEntity
     @Excel(name = "已用额度")
     private Integer usedQuota;
 
+    /** 可开门店额度（0=不限）；名下所有商户的门店总数不得超过此值 */
+    @Excel(name = "门店额度")
+    private Integer storeQuota;
+
+    /** 当前已用门店数（不存库，由 AgentService 实时计算后塞入） */
     /** 累计缴费金额 */
     private BigDecimal paidAmount;
 
@@ -172,6 +177,15 @@ public class Agent extends BaseEntity
     {
         this.usedQuota = usedQuota;
     }
+
+    public Integer getStoreQuota() { return storeQuota; }
+    public void setStoreQuota(Integer storeQuota) { this.storeQuota = storeQuota; }
+
+    /** 当前已用门店数（不存库，由 AgentService 实时计算后塞入） */
+    private Integer usedStoreCount;
+
+    public Integer getUsedStoreCount() { return usedStoreCount; }
+    public void setUsedStoreCount(Integer usedStoreCount) { this.usedStoreCount = usedStoreCount; }
 
     public BigDecimal getPaidAmount()
     {

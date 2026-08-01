@@ -48,6 +48,9 @@ public class SysUserController extends BaseController
     private ISysRoleService roleService;
 
     @Autowired
+    private com.ruoyi.biz.mapper.MerchantUserMapper merchantUserMapper;
+
+    @Autowired
     private ISysDeptService deptService;
 
     @Autowired

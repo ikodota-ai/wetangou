@@ -100,6 +100,13 @@
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="门店额度" align="center" width="120">
+        <template slot-scope="scope">
+          <el-tag :type="storeQuotaTagType(scope.row)" size="mini">
+            {{ scope.row.usedStoreCount || 0 }} / {{ scope.row.storeQuota || '不限' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="累计缴费" align="center" prop="paidAmount" width="110">
         <template slot-scope="scope">
           <span>￥{{ scope.row.paidAmount || 0 }}</span>
@@ -178,6 +185,9 @@
           <el-col :span="12">
             <el-form-item label="商户额度" prop="merchantQuota">
               <el-input-number v-model="form.merchantQuota" :min="0" :precision="0" controls-position="right" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="门店额度" prop="storeQuota">
+              <el-input-number v-model="form.storeQuota" :min="0" :precision="0" controls-position="right" placeholder="0 表示不限" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -269,6 +279,13 @@ export default {
       }
       return used / (quota || 1) > 0.8 ? "warning" : "success";
     },
+    storeQuotaTagType(row) {
+      const quota = row.storeQuota || 0;
+      if (quota === 0) return 'info';
+      const used = row.usedStoreCount || 0;
+      if (used >= quota) return 'danger';
+      return used / quota > 0.8 ? 'warning' : 'success';
+    },
     isExpired(time) {
       return time ? new Date(time.replace(/-/g, "/")).getTime() < Date.now() : false;
     },
@@ -295,6 +312,7 @@ export default {
         email: null,
         region: null,
         merchantQuota: 0,
+        storeQuota: 0,
         expireTime: null,
         status: "0",
         remark: null

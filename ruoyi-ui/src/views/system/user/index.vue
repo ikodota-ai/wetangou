@@ -147,8 +147,18 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="角色">
-              <el-select v-model="form.roleIds" multiple placeholder="请选择角色">
+              <el-select v-model="form.roleIds" multiple placeholder="请选择角色" @change="onRoleChange">
                 <el-option v-for="item in roleOptions" :key="item.roleId" :label="item.roleName" :value="item.roleId" :disabled="item.status == 1"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item v-if="showAgentField" label="所属代理商" prop="tenantAgentId">
+              <el-select v-model="form.tenantAgentId" placeholder="请选择代理商" filterable clearable style="width:100%">
+                <el-option v-for="a in agentOptions" :key="a.agentId" :label="a.agentName" :value="a.agentId" />
+              </el-select>
+            </el-form-item>
+            <el-form-item v-if="showMerchantField" label="所属商户" prop="tenantMerchantId">
+              <el-select v-model="form.tenantMerchantId" placeholder="请选择商户" filterable clearable style="width:100%">
+                <el-option v-for="m in merchantOptions" :key="m.merchantId" :label="m.merchantName" :value="m.merchantId" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -176,6 +186,8 @@
 
 <script>
 import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus, deptTreeSelect } from "@/api/system/user"
+import { listAgent } from "@/api/biz/agent"
+import { listMerchant } from "@/api/biz/merchant"
 import Treeselect from "@riophae/vue-treeselect"
 import "@riophae/vue-treeselect/dist/vue-treeselect.css"
 import TreePanel from "@/components/TreePanel"
@@ -220,6 +232,9 @@ export default {
       postOptions: [],
       // 角色选项
       roleOptions: [],
+      // 代理商/商户选项（按角色动态决定）
+      agentOptions: [],
+      merchantOptions: [],
       // 表单参数
       form: {},
       // 查询参数
@@ -274,7 +289,46 @@ export default {
       this.initPassword = response.msg
     })
   },
+  computed: {
+    showAgentField() {
+      return this.hasRoleKey('agent')
+    },
+    showMerchantField() {
+      return this.hasRoleKey('merchant')
+    }
+  },
   methods: {
+    hasRoleKey(key) {
+      if (!this.roleOptions || !this.form.roleIds) return false
+      const map = this.form.roleIds
+        .map(rid => this.roleOptions.find(r => r.roleId === rid))
+        .filter(Boolean)
+      return map.some(r => r.roleKey && r.roleKey.toLowerCase() === key)
+    },
+    /** 角色变化时按需刷新代理商/商户下拉并自动写入 userType */
+    onRoleChange() {
+      if (this.showAgentField) {
+        this.form.tenantUserType = '1'
+        if (this.agentOptions.length === 0) this.loadAgents()
+      } else if (this.showMerchantField) {
+        this.form.tenantUserType = '2'
+        if (this.merchantOptions.length === 0) this.loadMerchants()
+      } else {
+        this.form.tenantUserType = '0'
+        this.form.tenantAgentId = null
+        this.form.tenantMerchantId = null
+      }
+    },
+    loadAgents() {
+      listAgent({ pageNum: 1, pageSize: 100 }).then(res => {
+        this.agentOptions = res.rows || []
+      })
+    },
+    loadMerchants() {
+      listMerchant({ pageNum: 1, pageSize: 100 }).then(res => {
+        this.merchantOptions = res.rows || []
+      })
+    },
     /** 查询用户列表 */
     getList() {
       this.loading = true
@@ -395,6 +449,13 @@ export default {
         this.roleOptions = response.roles
         this.$set(this.form, "postIds", response.postIds)
         this.$set(this.form, "roleIds", response.roleIds)
+        // 回显租户身份
+        this.$set(this.form, 'tenantUserType', response.tenantUserType || '')
+        this.$set(this.form, 'tenantAgentId', response.tenantAgentId || null)
+        this.$set(this.form, 'tenantMerchantId', response.tenantMerchantId || null)
+        // 按需预加载代理商/商户下拉
+        if (this.showAgentField) this.loadAgents()
+        if (this.showMerchantField) this.loadMerchants()
         this.open = true
         this.title = "修改用户"
         this.form.password = ""

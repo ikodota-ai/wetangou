@@ -31,7 +31,12 @@ public class AgentServiceImpl implements IAgentService
     public Agent selectAgentByAgentId(Long agentId)
     {
         checkAgentDataScope(agentId);
-        return agentMapper.selectAgentByAgentId(agentId);
+        Agent a = agentMapper.selectAgentByAgentId(agentId);
+        if (a != null)
+        {
+            a.setUsedStoreCount(agentMapper.countStoresByAgentId(agentId));
+        }
+        return a;
     }
 
     /**
@@ -49,8 +54,19 @@ public class AgentServiceImpl implements IAgentService
         {
             throw new ServiceException("没有权限访问代理商数据");
         }
-        return agentMapper.selectAgentList(agent);
+        List<Agent> list = agentMapper.selectAgentList(agent);
+        // 列表场景下为每个代理商计算当前已用门店数
+        if (list != null)
+        {
+            for (Agent a : list)
+            {
+                a.setUsedStoreCount(agentMapper.countStoresByAgentId(a.getAgentId()));
+            }
+        }
+        return list;
     }
+
+
 
     /**
      * 新增代理商（仅平台账号）

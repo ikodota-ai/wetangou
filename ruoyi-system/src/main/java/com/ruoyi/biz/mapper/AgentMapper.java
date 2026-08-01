@@ -64,6 +64,10 @@ public interface AgentMapper
      */
     public int increaseUsedQuota(Long agentId);
 
+    public int decreaseUsedQuota(Long agentId);
+
+    public int countStoresByAgentId(Long agentId);
+
     /**
      * 缴费确认后累加额度、延长有效期与累计缴费金额
      *

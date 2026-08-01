@@ -66,6 +66,15 @@ public class SysUserServiceImpl implements ISysUserService
     @Autowired
     protected Validator validator;
 
+    @Autowired
+    private com.ruoyi.biz.mapper.MerchantUserMapper merchantUserMapper;
+
+    @Autowired
+    private com.ruoyi.biz.service.IMerchantService merchantService;
+
+    @Autowired
+    private com.ruoyi.biz.service.IAgentService agentService;
+
     /**
      * 根据条件分页查询用户列表
      * 
@@ -267,6 +276,8 @@ public class SysUserServiceImpl implements ISysUserService
         insertUserPost(user);
         // 新增用户与角色管理
         insertUserRole(user);
+        // 同步租户身份到 biz_merchant_user（避免账号登录后兜底为平台）
+        syncMerchantUser(user);
         return rows;
     }
 
@@ -301,7 +312,10 @@ public class SysUserServiceImpl implements ISysUserService
         userPostMapper.deleteUserPostByUserId(userId);
         // 新增用户与岗位管理
         insertUserPost(user);
-        return userMapper.updateUser(user);
+        int rows = userMapper.updateUser(user);
+        // 同步租户身份
+        syncMerchantUser(user);
+        return rows;
     }
 
     /**
@@ -316,7 +330,100 @@ public class SysUserServiceImpl implements ISysUserService
     {
         userRoleMapper.deleteUserRoleByUserId(userId);
         insertUserRole(userId, roleIds);
+        // 角色变更后若未传 tenantUserType，尝试按新角色自动判定身份
+        com.ruoyi.common.core.domain.entity.SysUser stub = new com.ruoyi.common.core.domain.entity.SysUser();
+        stub.setUserId(userId);
+        stub.setRoleIds(roleIds);
+        syncMerchantUser(stub);
     }
+    /**
+     * 把 SysUser 的租户身份同步到 biz_merchant_user 表
+     *
+     * <p>若 SysUser.tenantUserType 为空则按当前角色自动判定（agent → 1，merchant → 2，其他 → 0）。
+     * 已有记录覆盖更新；不存在则插入；身份变化（平台↔代理商↔商户）会替换旧记录。</p>
+     */
+    private void syncMerchantUser(com.ruoyi.common.core.domain.entity.SysUser user)
+    {
+        if (user == null || user.getUserId() == null)
+        {
+            return;
+        }
+        // 1) 解析目标 userType
+        String targetType = user.getTenantUserType();
+        if (targetType == null || targetType.isEmpty())
+        {
+            // 按当前传入的角色推断；未传角色时无法判定身份，保留原记录不动
+            Long[] roleIds = user.getRoleIds();
+            if (roleIds == null || roleIds.length == 0)
+            {
+                return;
+            }
+            targetType = resolveUserTypeByRoleIds(roleIds);
+        }
+
+        // 2) 平台账号也要在 biz_merchant_user 留痕（userType=0, agent_id=0, merchant_id=0）
+        //    否则后续 TenantServiceImpl.buildContextByUserId 查不到记录会兜底为平台，反而符合预期；
+        //    但显式记录更稳定。
+        Long agentId = "1".equals(targetType) ? user.getTenantAgentId() : null;
+        Long merchantId = "2".equals(targetType) ? user.getTenantMerchantId() : null;
+
+        // 3) 若为代理商身份但未传 agentId，拒绝（防越权）
+        if ("1".equals(targetType) && (agentId == null || agentId <= 0))
+        {
+            throw new ServiceException("代理商账号必须指定所属代理商");
+        }
+        // 若为商户身份但未传 merchantId，拒绝
+        if ("2".equals(targetType) && (merchantId == null || merchantId <= 0))
+        {
+            throw new ServiceException("商户账号必须指定所属商户");
+        }
+
+        // 4) upsert biz_merchant_user
+        com.ruoyi.biz.domain.MerchantUser exist = merchantUserMapper.selectMerchantUserByUserId(user.getUserId());
+        com.ruoyi.biz.domain.MerchantUser mu = exist == null ? new com.ruoyi.biz.domain.MerchantUser() : exist;
+        mu.setUserId(user.getUserId());
+        mu.setUserType(targetType);
+        mu.setAgentId(agentId);
+        mu.setMerchantId(merchantId);
+        if (exist == null)
+        {
+            merchantUserMapper.insertMerchantUser(mu);
+        }
+        else
+        {
+            merchantUserMapper.updateMerchantUser(mu);
+        }
+    }
+
+    /**
+     * 按角色 ID 列表推断 userType（agent / merchant / 平台）
+     */
+    private String resolveUserTypeByRoleIds(Long[] roleIds)
+    {
+        if (roleIds == null)
+        {
+            return "0";
+        }
+        for (Long roleId : roleIds)
+        {
+            SysRole role = roleMapper.selectRoleById(roleId);
+            if (role == null || role.getRoleKey() == null)
+            {
+                continue;
+            }
+            String key = role.getRoleKey();
+            if ("agent".equalsIgnoreCase(key))
+            {
+                return "1";
+            }
+            if ("merchant".equalsIgnoreCase(key))
+            {
+                return "2";
+            }
+        }
+        return "0";
+    }
+
 
     /**
      * 修改用户状态
@@ -463,6 +570,8 @@ public class SysUserServiceImpl implements ISysUserService
         userRoleMapper.deleteUserRoleByUserId(userId);
         // 删除用户与岗位表
         userPostMapper.deleteUserPostByUserId(userId);
+        // 同步删除租户身份记录
+        merchantUserMapper.deleteMerchantUserByUserId(userId);
         return userMapper.deleteUserById(userId);
     }
 
@@ -485,6 +594,11 @@ public class SysUserServiceImpl implements ISysUserService
         userRoleMapper.deleteUserRole(userIds);
         // 删除用户与岗位关联
         userPostMapper.deleteUserPost(userIds);
+        // 同步删除租户身份记录
+        for (Long userId : userIds)
+        {
+            merchantUserMapper.deleteMerchantUserByUserId(userId);
+        }
         return userMapper.deleteUserByIds(userIds);
     }
 

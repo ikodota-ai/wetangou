@@ -1,5 +1,7 @@
 package com.ruoyi.common.core.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.Date;
 import java.util.List;
 import jakarta.validation.constraints.*;
@@ -23,6 +25,15 @@ import com.ruoyi.common.xss.Xss;
 public class SysUser extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
+    /** 租户身份（0平台 1代理商 2商户），不入库，由 Controller 临时携带；插入/更新时由 Service 解析后写入 biz_merchant_user */
+    @JsonIgnore
+    private String tenantUserType;
+    /** 代理商ID（仅当 tenantUserType=1 时有效） */
+    @JsonIgnore
+    private Long tenantAgentId;
+    /** 商户ID（仅当 tenantUserType=2 时有效） */
+    @JsonIgnore
+    private Long tenantMerchantId;
 
     /** 用户ID */
     @Excel(name = "用户序号", type = Type.EXPORT, cellType = ColumnType.NUMERIC, prompt = "用户编号")
@@ -115,6 +126,13 @@ public class SysUser extends BaseEntity
     {
         this.userId = userId;
     }
+
+    public String getTenantUserType() { return tenantUserType; }
+    public void setTenantUserType(String tenantUserType) { this.tenantUserType = tenantUserType; }
+    public Long getTenantAgentId() { return tenantAgentId; }
+    public void setTenantAgentId(Long tenantAgentId) { this.tenantAgentId = tenantAgentId; }
+    public Long getTenantMerchantId() { return tenantMerchantId; }
+    public void setTenantMerchantId(Long tenantMerchantId) { this.tenantMerchantId = tenantMerchantId; }
 
     public boolean isAdmin()
     {
