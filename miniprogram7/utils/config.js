@@ -7,7 +7,10 @@
 // 4) MOCK_ENABLED 常量保留仅为向后兼容，恒为 false。
 // 5) 若后端不可达，前端须显式报错，禁止静默回退 mock。
 
-const BASE_URL = 'http://localhost:8080';
+// 微信开发者工具模拟器对 'localhost' 解析有时返回沙盒地址导致 ERR_CONNECTION_REFUSED
+// 用 127.0.0.1 强制走 loopback；真机调试改成电脑 LAN IP（如 http://192.168.1.100:8080）
+// 上线改成 HTTPS 域名。
+const BASE_URL = 'http://127.0.0.1:8080';
 
 /** 编译期 project.config.json.appid（开发者工具里能直接读到） */
 const BUILD_IN_APPID = 'wx9e147c4e2151b123';

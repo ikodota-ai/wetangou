@@ -52,7 +52,10 @@ function request(url, options = {}) {
           reject(res);
         }
       },
-      fail: (err) => reject(err)
+      fail: (err) => {
+        console.error('[request] FAIL', BASE_URL + url, 'X-App-Id=', APPID, 'err=', err);
+        reject(err);
+      }
     });
   });
 }
