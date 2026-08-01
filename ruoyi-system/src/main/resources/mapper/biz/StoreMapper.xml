@@ -55,6 +55,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="sort != null "> and sort = #{sort}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
+        order by sort asc, store_id desc
     </select>
     
     <select id="selectStoreByStoreId" parameterType="Long" resultMap="StoreResult">

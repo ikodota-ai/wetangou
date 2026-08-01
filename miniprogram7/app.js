@@ -70,7 +70,11 @@ App({
   // 接口通但空数据时不再回退 mock（mock 已被全局禁用，且会让示例门店混入真实商户）。
   loadStores(longitude, latitude) {
     return new Promise((resolve) => {
-      if (this.globalData.stores.length) return resolve(this.globalData.stores);
+      if (this.globalData.stores.length) {
+        console.log('[loadStores] cache hit, count=' + this.globalData.stores.length);
+        return resolve(this.globalData.stores);
+      }
+      console.log('[loadStores] fetching, lng=' + longitude + ' lat=' + latitude);
       const normalize = (s) => ({
         storeId: s.storeId || s.id,
         name: s.storeName || s.name,
@@ -147,10 +151,13 @@ App({
     wx.getLocation({
       type: 'gcj02',
       success: (res) => {
+        console.log('[pickNearestStore] getLocation ok', res.longitude, res.latitude);
         this.globalData.location = { latitude: res.latitude, longitude: res.longitude };
         this.loadStores(res.longitude, res.latitude).then((stores) => {
+          console.log('[pickNearestStore] loadStores ok, count=' + stores.length, stores.map(s => s.storeId));
           if (!stores.length) { this.globalData.store = null; return callback && callback(null); }
           const nearest = stores[0];
+          console.log('[pickNearestStore] nearest=', nearest.storeId, nearest.storeName, 'distance=', nearest.distance);
           if (nearest.distance != null) {
             // 服务端返回的是米，转成 km 字符串
             nearest.distance = (Math.round(nearest.distance / 100) / 10).toFixed(1) + 'km';
@@ -161,7 +168,8 @@ App({
           this.loadGoods(nearest.storeId).then(() => callback && callback(nearest));
         });
       },
-      fail: () => {
+      fail: (e) => {
+        console.warn('[pickNearestStore] getLocation FAIL, fallback to useList. err=', e && e.errMsg);
         // 没有定位权限时退到全列表，按 store_id 倒序取第一个
         this.loadStores().then((stores) => {
           if (!stores.length) { this.globalData.store = null; return callback && callback(null); }

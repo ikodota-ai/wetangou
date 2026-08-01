@@ -35,6 +35,7 @@ Page({
   },
   loadData() {
     app.pickNearestStore((store) => {
+      console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300));
       this.setData({
         store: store || {},
         goods: app.globalData.goods,
@@ -44,6 +45,8 @@ Page({
       if (store && store.storeId) {
         this.loadBanners(store.storeId);
         this.loadFacilities(store.storeId);
+      } else {
+        console.warn('[home] store is null, skip banners/facilities');
       }
     });
   },
