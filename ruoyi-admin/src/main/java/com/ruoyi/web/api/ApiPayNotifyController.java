@@ -49,12 +49,28 @@ public class ApiPayNotifyController
     private IMemberVoucherService memberVoucherService;
 
     /**
-     * 微信支付结果通知：解密后按 out_trade_no 前缀分发到订单/买单。
-     * 订单编号以 D 开头，买单编号以 P 开头。
+     * 多商户版支付结果通知：
+     * - URL 形如 /api/pay/notify/{merchantId} 时直接按该 merchantId 解密（推荐）
+     * - 旧版 /api/pay/notify 入站时根据 out_trade_no 查订单/买单得到 merchantId 再解密
+     */
+    @PostMapping("/notify/{merchantId}")
+    @Transactional
+    public JSONObject notifyWithMerchant(@org.springframework.web.bind.annotation.PathVariable Long merchantId, HttpServletRequest request)
+    {
+        return doNotify(request, merchantId);
+    }
+
+    /**
+     * 旧版单一回调入口：按 out_trade_no 反查所属商户再解密
      */
     @PostMapping("/notify")
     @Transactional
     public JSONObject notify(HttpServletRequest request)
+    {
+        return doNotify(request, null);
+    }
+
+    private JSONObject doNotify(HttpServletRequest request, Long merchantIdHint)
     {
         JSONObject result = new JSONObject();
         try
@@ -68,10 +84,26 @@ public class ApiPayNotifyController
                 result.put("message", "缺少resource");
                 return result;
             }
-            String plain = wxPayService.decryptNotify(
-                    resource.getString("associated_data"),
-                    resource.getString("nonce"),
-                    resource.getString("ciphertext"));
+            String plain;
+            if (merchantIdHint != null)
+            {
+                plain = wxPayService.decryptNotifyByMerchant(
+                        merchantIdHint,
+                        resource.getString("associated_data"),
+                        resource.getString("nonce"),
+                        resource.getString("ciphertext"));
+            }
+            else
+            {
+                // 旧版入口：先按 out_trade_no 反查所属商户再解密
+                String tmpOutTradeNo = notifyJson.getString("out_trade_no");
+                Long tmpMerchantId = resolveMerchantIdByOutTradeNo(tmpOutTradeNo);
+                plain = wxPayService.decryptNotifyByMerchant(
+                        tmpMerchantId,
+                        resource.getString("associated_data"),
+                        resource.getString("nonce"),
+                        resource.getString("ciphertext"));
+            }
             JSONObject data = JSONObject.parseObject(plain);
 
             String tradeState = data.getString("trade_state");
@@ -104,6 +136,38 @@ public class ApiPayNotifyController
             result.put("message", e.getMessage());
             return result;
         }
+    }
+
+    /**
+     * 按 out_trade_no 反查所属 merchantId：
+     * - 订单（biz_order）通过 selectOrderByOrderNo 拿 merchantId
+     * - 买单（biz_pay_bill）通过 selectPayBillByBillNo 拿 merchantId
+     * - 都拿不到时回退默认商户（兜底，避免重复通知导致漏单）
+     */
+    private Long resolveMerchantIdByOutTradeNo(String outTradeNo)
+    {
+        if (outTradeNo == null)
+        {
+            return 1L;
+        }
+        if (outTradeNo.startsWith("P"))
+        {
+            com.ruoyi.biz.domain.PayBill bill = payBillService.selectPayBillByBillNo(outTradeNo);
+            if (bill != null && bill.getMerchantId() != null)
+            {
+                return bill.getMerchantId();
+            }
+        }
+        else
+        {
+            com.ruoyi.biz.domain.Order order = orderService.selectOrderByOrderNo(outTradeNo);
+            if (order != null && order.getMerchantId() != null)
+            {
+                return order.getMerchantId();
+            }
+        }
+        log.warn("[WxPayNotify] 无法定位 {} 所属商户，回退默认商户=1", outTradeNo);
+        return 1L;
     }
 
     private void handleOrder(String orderNo, String transactionId)
