@@ -46,6 +46,12 @@ module.exports = {
       '^/v3/api-docs/(.*)': {
         target: baseUrl,
         changeOrigin: true
+      },
+      // 本地上传文件代理：前端 dev server :80 收到 /profile/... 后转发到后端 :8080
+      // （后端 ResourcesConfig 已把 /profile/** 映射到 file:ruoyi.profile/）
+      '^/profile/(.*)': {
+        target: baseUrl,
+        changeOrigin: true
       }
     },
     disableHostCheck: true
