@@ -1,13 +1,5 @@
 {
   "pages": [
-    "pages/staff/login/index",
-    "pages/staff/home/index",
-    "pages/staff/verify/index",
-    "pages/staff/bill/index",
-    "pages/staff/booking/index",
-    "pages/staff/order/index",
-    "pages/staff/me/index",
-    "pages/staff/history/index",
     "pages/home/index",
     "pages/album/index",
     "pages/booking/index",
@@ -31,7 +23,15 @@
     "pages/promoter/records/index",
     "pages/promoter/poster/index",
     "pages/agreement/user/index",
-    "pages/agreement/privacy/index"
+    "pages/agreement/privacy/index",
+    "pages/staff/login/index",
+    "pages/staff/home/index",
+    "pages/staff/verify/index",
+    "pages/staff/bill/index",
+    "pages/staff/booking/index",
+    "pages/staff/order/index",
+    "pages/staff/me/index",
+    "pages/staff/history/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#3A6B35",
