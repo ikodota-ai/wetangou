@@ -9,7 +9,7 @@ Page({
     showShare: false,
     showAuthPhone: false,
     // 三个互斥状态：loading / loadError / 空
-    loading: true,
+    loading: false,
     loadError: false,
     errorMsg: '',
     user: { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
@@ -21,25 +21,43 @@ Page({
   onUserUpdate(user) { this.setData({ user }); },
   // 完全走后端，不做 mock 兜底；接口报错直接把错暴露给用户，便于排查
   loadProduct(id) {
+    console.log('[goods/detail] loadProduct start, id=', id);
     if (!id) {
       this.setData({ loading: false, loadError: true, errorMsg: '商品ID缺失' });
       return;
     }
     this.setData({ loading: true, loadError: false, errorMsg: '' });
+    // 5s 兜底：loading 状态被 setData 吞掉时强制结束，避免一直转圈
+    this._loadTimer = setTimeout(() => {
+      if (this.data.loading && !this.data.product) {
+        console.warn('[goods/detail] loadProduct timeout, force clear loading');
+        this.setData({ loading: false, loadError: true, errorMsg: '请求超时，请检查网络或后端' });
+      }
+    }, 5000);
     api.productDetail(id)
       .then((res) => {
+        clearTimeout(this._loadTimer);
+        console.log('[goods/detail] productDetail response =>', JSON.stringify(res).slice(0, 500));
         // 兼容后端两层封装：{ code, data: {product} } → res.data.product
         const d = (res && res.data) || res || null;
         const p = (d && (d.data || d)) || null;
-        console.log('[goods/detail] productDetail =>', JSON.stringify({ id, hasProduct: !!(p && p.productId), keys: p ? Object.keys(p) : null }));
         if (p && p.productId) {
-          this.setData({ product: this.normalize(p), loading: false, loadError: false });
+          let normalized;
+          try {
+            normalized = this.normalize(p);
+          } catch (e) {
+            console.error('[goods/detail] normalize FAIL', e, p);
+            this.setData({ loading: false, loadError: true, errorMsg: '数据规范化失败: ' + e.message });
+            return;
+          }
+          this.setData({ product: normalized, loading: false, loadError: false });
         } else {
-          // 后端返回了 200 但 payload 没有 productId（理论上不该发生）
+          // 后端返回 200 但 payload 没有 productId
           this.setData({ loading: false, loadError: true, errorMsg: '后端返回数据缺少 productId' });
         }
       })
       .catch((err) => {
+        clearTimeout(this._loadTimer);
         const msg = (err && (err.errMsg || err.msg)) || (err && err.message) || '网络请求失败';
         console.error('[goods/detail] productDetail FAIL', id, err);
         this.setData({ loading: false, loadError: true, errorMsg: msg });
@@ -83,7 +101,6 @@ Page({
       const phone = e.detail.phoneNumber || '';
       app.globalData.user.phone = phone;
       this.setData({ showAuthPhone: false, user: app.globalData.user });
-      // 后端走新版 getPhoneNumber 流程：回传 code 由后端换号
       api.updatePhone({ code: e.detail.code }).then((res) => {
         const real = res && (res.phone || (res.data && res.data.phone));
         if (real) {
