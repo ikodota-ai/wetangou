@@ -40,7 +40,15 @@ const permission = {
           const rewriteRoutes = filterAsyncRouter(rdata, false, true)
           const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
           rewriteRoutes.push({ path: '*', redirect: '/404', hidden: true })
-          router.addRoutes(asyncRoutes)
+          // 把后端返回的完整路由树（rewriteRoutes）注册到 vue-router，
+          // 这样 login.vue 走完 Login→GetInfo→GenerateRoutes 链后，业务路由就已可用，
+          // 点菜单不会因为 router 找不到路径而白屏（permission.js beforeEach 在刷新时
+          // 也会调 addRoutes，但 login 流里没有 — 这里补齐）
+          router.addRoutes(rewriteRoutes)
+          // utility hidden routes（用户授权/字典数据等）也一起加
+          if (asyncRoutes && asyncRoutes.length) {
+            router.addRoutes(asyncRoutes)
+          }
           commit('SET_ROUTES', rewriteRoutes)
           commit('SET_SIDEBAR_ROUTERS', constantRoutes.concat(sidebarRoutes))
           commit('SET_DEFAULT_ROUTES', sidebarRoutes)
