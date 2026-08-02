@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.service.IProductService;
+import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -43,7 +44,7 @@ public class ProductController extends BaseController
     {
         startPage();
         List<Product> list = productService.selectProductList(product);
-        return getDataTable(list);
+        return getDataTable(fillImageUrls(list));
     }
 
     /**
@@ -66,7 +67,13 @@ public class ProductController extends BaseController
     @GetMapping(value = "/{productId}")
     public AjaxResult getInfo(@PathVariable("productId") Long productId)
     {
-        return success(productService.selectProductByProductId(productId));
+        Product p = productService.selectProductByProductId(productId);
+        if (p != null)
+        {
+            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+        }
+        return success(p);
     }
 
     /**
@@ -100,5 +107,23 @@ public class ProductController extends BaseController
     public AjaxResult remove(@PathVariable Long[] productIds)
     {
         return toAjax(productService.deleteProductByProductIds(productIds));
+    }
+
+    /**
+     * 把列表里所有图片字段（cover/images）转成绝对 URL，
+     * 避免前端 &lt;el-image&gt; 走原生 src 时因相对路径访问到错误端口。
+     */
+    private List<Product> fillImageUrls(List<Product> list)
+    {
+        if (list == null)
+        {
+            return null;
+        }
+        for (Product p : list)
+        {
+            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+        }
+        return list;
     }
 }

@@ -18,12 +18,13 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Store;
 import com.ruoyi.biz.service.IStoreService;
+import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
  * 门店Controller
- * 
+ *
  * @author dytuangou
  * @date 2026-07-24
  */
@@ -43,7 +44,7 @@ public class StoreController extends BaseController
     {
         startPage();
         List<Store> list = storeService.selectStoreList(store);
-        return getDataTable(list);
+        return getDataTable(fillImageUrls(list));
     }
 
     /**
@@ -66,7 +67,12 @@ public class StoreController extends BaseController
     @GetMapping(value = "/{storeId}")
     public AjaxResult getInfo(@PathVariable("storeId") Long storeId)
     {
-        return success(storeService.selectStoreByStoreId(storeId));
+        Store s = storeService.selectStoreByStoreId(storeId);
+        if (s != null)
+        {
+            s.setLogo(ImageUrlUtils.toAbsolute(s.getLogo()));
+        }
+        return success(s);
     }
 
     /**
@@ -96,9 +102,26 @@ public class StoreController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('biz:store:remove')")
     @Log(title = "门店", businessType = BusinessType.DELETE)
-	@DeleteMapping("/{storeIds}")
+    @DeleteMapping("/{storeIds}")
     public AjaxResult remove(@PathVariable Long[] storeIds)
     {
         return toAjax(storeService.deleteStoreByStoreIds(storeIds));
+    }
+
+    /**
+     * 把列表里所有图片字段（logo/cover/photos）转成绝对 URL，
+     * 避免前端 &lt;el-image&gt; 走原生 src 时因相对路径访问到错误端口。
+     */
+    private List<Store> fillImageUrls(List<Store> list)
+    {
+        if (list == null)
+        {
+            return null;
+        }
+        for (Store s : list)
+        {
+            s.setLogo(ImageUrlUtils.toAbsolute(s.getLogo()));
+        }
+        return list;
     }
 }

@@ -13,6 +13,7 @@ import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.domain.Category;
 import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.ICategoryService;
+import com.ruoyi.common.utils.image.ImageUrlUtils;
 
 /**
  * 小程序-商品
@@ -44,7 +45,7 @@ public class ApiProductController
         query.setCategoryId(categoryId);
         query.setProductType(productType);
         List<Product> list = productService.selectProductList(query);
-        return AjaxResult.success(list);
+        return AjaxResult.success(fillImageUrls(list));
     }
 
     /**
@@ -53,7 +54,13 @@ public class ApiProductController
     @GetMapping("/{productId}")
     public AjaxResult detail(@PathVariable Long productId)
     {
-        return AjaxResult.success(productService.selectProductByProductId(productId));
+        Product p = productService.selectProductByProductId(productId);
+        if (p != null)
+        {
+            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+        }
+        return AjaxResult.success(p);
     }
 
     /**
@@ -67,5 +74,23 @@ public class ApiProductController
         query.setStoreId(storeId);
         List<Category> list = categoryService.selectCategoryList(query);
         return AjaxResult.success(list);
+    }
+
+    /**
+     * 把商品列表的图片字段（cover/images）转成绝对 URL，
+     * 避免小程序 webview / &lt;image src&gt; 走原生加载时 404。
+     */
+    private List<Product> fillImageUrls(List<Product> list)
+    {
+        if (list == null)
+        {
+            return null;
+        }
+        for (Product p : list)
+        {
+            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+        }
+        return list;
     }
 }

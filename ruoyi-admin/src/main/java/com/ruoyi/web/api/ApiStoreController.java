@@ -16,6 +16,7 @@ import com.ruoyi.biz.domain.Store;
 import com.ruoyi.biz.domain.StoreAlbum;
 import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.biz.service.IStoreAlbumService;
+import com.ruoyi.common.utils.image.ImageUrlUtils;
 
 /**
  * 小程序-门店
@@ -55,7 +56,7 @@ public class ApiStoreController
             @RequestParam(value = "limit", required = false, defaultValue = "10") int limit)
     {
         List<Store> list = storeService.selectNearestStoreList(longitude, latitude, limit);
-        return AjaxResult.success(list);
+        return AjaxResult.success(fillImageUrls(list));
     }
 
     /**
@@ -67,7 +68,7 @@ public class ApiStoreController
         query.setStatus("0");
         query.setDelFlag("0");
         List<Store> list = storeService.selectStoreList(query);
-        return AjaxResult.success(list);
+        return AjaxResult.success(fillImageUrls(list));
     }
 
     /**
@@ -76,7 +77,12 @@ public class ApiStoreController
     @GetMapping("/{storeId}")
     public AjaxResult detail(@PathVariable Long storeId)
     {
-        return AjaxResult.success(storeService.selectStoreByStoreId(storeId));
+        Store s = storeService.selectStoreByStoreId(storeId);
+        if (s != null)
+        {
+            s.setLogo(ImageUrlUtils.toAbsolute(s.getLogo()));
+        }
+        return AjaxResult.success(s);
     }
 
     /**
@@ -111,5 +117,22 @@ public class ApiStoreController
         query.setStoreId(storeId);
         List<StoreAlbum> list = storeAlbumService.selectStoreAlbumList(query);
         return AjaxResult.success(list);
+    }
+
+    /**
+     * 把门店列表的 logo 转成绝对 URL，
+     * 避免小程序 webview / &lt;image src&gt; 走原生加载时 404。
+     */
+    private List<Store> fillImageUrls(List<Store> list)
+    {
+        if (list == null)
+        {
+            return null;
+        }
+        for (Store s : list)
+        {
+            s.setLogo(ImageUrlUtils.toAbsolute(s.getLogo()));
+        }
+        return list;
     }
 }
