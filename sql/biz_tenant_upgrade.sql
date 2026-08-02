@@ -232,9 +232,17 @@ update biz_store_user su
 set su.merchant_id = s.merchant_id
 where su.merchant_id = 0;
 
+-- 步骤 5.5：代理商门店配额（agent.store_quota）
+-- 业务规则：代理商名下所有商户的门店总数 ≤ agent.store_quota。
+-- store_quota=0 表示不限制（兼容平台直营/历史数据）。
+CALL biz_add_column('biz_agent', 'store_quota',
+  "store_quota int(11) default 0 comment '可开门店额度（0=不限）' after merchant_quota");
+CALL biz_add_index('biz_agent', 'idx_store_quota', 'key idx_store_quota (store_quota)');
+
 -- ----------------------------
 -- 清理临时过程
 -- ----------------------------
+
 drop procedure if exists biz_add_column;
 drop procedure if exists biz_add_index;
 drop procedure if exists biz_drop_index;
