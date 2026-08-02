@@ -1,4 +1,5 @@
 const app = getApp()
+const { api } = require('../../utils/request.js')
 
 Page({
   data: {
@@ -32,51 +33,30 @@ Page({
 
         // 调后端登录（只传 code，不强制头像昵称）
         app.globalData.user.wxCode = res.code
-        
-        wx.request({
-          url: app.globalData.baseUrl + '/api/auth/login',
-          method: 'POST',
-          // 多商户：带上 appid，后端据此确定会员所属商户
-          data: { code: res.code, appid: require('../../utils/config.js').APPID },
-          success: (resp) => {
+
+        // 走统一的 api.login()，BASE_URL / X-App-Id 都在 utils/request.js 里集中管理
+        api.login({ code: res.code, appid: require('../../utils/config.js').APPID })
+          .then((data) => {
             wx.hideLoading()
-            if (resp.data.code === 200) {
-              const data = resp.data.data || resp.data
-              wx.setStorageSync('token', data.token)
-              app.globalData.user = {
-                ...app.globalData.user,
-                memberId: data.memberId,
-                openid: data.openid,
-                nickName: data.nickName || '',
-                avatarUrl: data.avatarUrl || '',
-                phone: data.phone || '',
-                logged: true
-              }
-              app.notifyUserUpdate()
-              wx.showToast({ title: '登录成功', icon: 'success' })
-              setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 600)
-            } else {
-              wx.showToast({ title: resp.data.msg || '登录失败', icon: 'none' })
-            }
-          },
-          fail: (err) => {
-            wx.hideLoading()
-            // mock 兜底
-            wx.setStorageSync('token', 'mock-' + Date.now())
+            wx.setStorageSync('token', data.token)
             app.globalData.user = {
               ...app.globalData.user,
-              memberId: 10001,
-              openid: '',
-              nickName: '',
-              avatarUrl: '',
-              phone: '',
+              memberId: data.memberId,
+              openid: data.openid,
+              nickName: data.nickName || '',
+              avatarUrl: data.avatarUrl || '',
+              phone: data.phone || '',
               logged: true
             }
-            app.notifyUserUpdate()
+            app.notifyUserUpdate && app.notifyUserUpdate()
             wx.showToast({ title: '登录成功', icon: 'success' })
             setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 600)
-          }
-        })
+          })
+          .catch((err) => {
+            wx.hideLoading()
+            const msg = (err && (err.msg || err.errMsg || err.message)) || '登录失败'
+            wx.showToast({ title: msg, icon: 'none' })
+          })
       },
       fail: () => {
         wx.hideLoading()
