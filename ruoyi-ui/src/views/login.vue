@@ -171,6 +171,11 @@ export default {
           this.$store.dispatch("Login", this.loginForm).then(() => {
             return this.$store.dispatch("GetInfo")
           }).then(() => {
+            // 登录后主动拉一次路由表，确保 sidebar 菜单立即渲染
+            // （permission.js 的 beforeEach 在 GetInfo 之后会因 roles 非空而走 next()，
+            //   跳过 GenerateRoutes，导致首次进入页面时菜单空白）
+            return this.$store.dispatch("GenerateRoutes")
+          }).then(() => {
             this.$router.push({ path: this.redirect || this.resolveEntryPath() }).catch(()=>{})
           }).catch(() => {
             this.loading = false

@@ -46,6 +46,14 @@ const permission = {
           commit('SET_DEFAULT_ROUTES', sidebarRoutes)
           commit('SET_TOPBAR_ROUTES', sidebarRoutes)
           resolve(rewriteRoutes)
+        }).catch(err => {
+          console.error('[GenerateRoutes] getRouters 失败', err)
+          // 失败时给空路由，至少不卡死登录流程
+          commit('SET_ROUTES', [])
+          commit('SET_SIDEBAR_ROUTERS', constantRoutes)
+          commit('SET_DEFAULT_ROUTES', [])
+          commit('SET_TOPBAR_ROUTES', [])
+          resolve([])
         })
       })
     }
