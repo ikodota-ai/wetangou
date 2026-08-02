@@ -49,15 +49,19 @@ App({
    * 选择最近门店（小程序入口会调用）
    * 流程：wx.getLocation 拿经纬度 → 调 /api/store/nearest 由服务端按距离排序
    * 如果用户拒绝授权位置，则默认选该商户第一个门店
+   * 选出门店后顺手加载该门店的商品（保持与旧版本一致，避免首页商品列表为空）
    */
   pickNearestStore(callback) {
-    const finish = (s) => {
-      if (s) {
-        this.globalData.store = s;
-        this.globalData.stores = [s];
-        this.globalData.location = { lat: s.latitude, lng: s.longitude };
+    const useStore = (s) => {
+      if (!s) {
+        callback && callback(null);
+        return;
       }
-      callback && callback(s);
+      this.globalData.store = s;
+      this.globalData.stores = [s];
+      this.globalData.location = { lat: s.latitude, lng: s.longitude };
+      // 顺手把该门店的商品加载到 globalData，供首页 / 商品详情复用
+      this.loadGoods(s.storeId).finally(() => callback && callback(s));
     };
     wx.getLocation({
       type: 'gcj02',
@@ -67,20 +71,20 @@ App({
         api.storeNearest({ lat: latitude, lng: longitude, limit: 5 }).then((res) => {
           const rows = (res && (res.rows || res.data || res)) || [];
           const nearest = Array.isArray(rows) && rows.length ? rows[0] : null;
-          if (nearest) return finish(nearest);
-          // 没有按坐标找到，就退回到该商户第一个门店
+          if (nearest) return useStore(nearest);
+          // 没按坐标找到，回退到该商户第一个门店
           api.storeList({ page: 1, pageSize: 1 }).then((res2) => {
             const r2 = (res2 && (res2.rows || res2.data || res2)) || [];
-            finish(Array.isArray(r2) && r2.length ? r2[0] : null);
-          }).catch(() => finish(null));
-        }).catch(() => finish(null));
+            useStore(Array.isArray(r2) && r2.length ? r2[0] : null);
+          }).catch(() => useStore(null));
+        }).catch(() => useStore(null));
       },
       fail: () => {
         // 拒绝授权位置：直接取第一个门店
         api.storeList({ page: 1, pageSize: 1 }).then((res) => {
           const rows = (res && (res.rows || res.data || res)) || [];
-          finish(Array.isArray(rows) && rows.length ? rows[0] : null);
-        }).catch(() => finish(null));
+          useStore(Array.isArray(rows) && rows.length ? rows[0] : null);
+        }).catch(() => useStore(null));
       }
     });
   },
@@ -103,7 +107,7 @@ App({
           }));
           resolve(this.globalData.goods);
         } else {
-          // 商户未配商品时返回空数组，不回退到 mock 数据
+          // 商户未配商品时返回空数组，不回退到 mock
           console.warn('[goods] empty from server');
           this.globalData.goods = [];
           resolve(this.globalData.goods);
@@ -114,5 +118,5 @@ App({
         reject(e);
       });
     });
-  },
+  }
 });

@@ -36,11 +36,17 @@ Page({
   loadData() {
     app.pickNearestStore((store) => {
       console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300));
+      // 后端字段是 storeName / businessHours，WXML 用了 name / hours，这里做一次兼容
+      const viewStore = store ? Object.assign({}, store, {
+        name: store.storeName || store.name || '',
+        hours: store.businessHours || store.hours || '',
+        logo: store.logo ? toFullUrl(store.logo) : ''
+      }) : {};
       this.setData({
-        store: store || {},
+        store: viewStore,
         goods: app.globalData.goods,
         phone: (store && (store.servicePhone || store.phone)) || '',
-        qrcode: (store && store.serviceQrcode) || ''
+        qrcode: (store && store.serviceQrcode) ? toFullUrl(store.serviceQrcode) : ''
       });
       if (store && store.storeId) {
         this.loadBanners(store.storeId);
@@ -50,6 +56,7 @@ Page({
       }
     });
   },
+
   // 首页轮播复用门店相册，门店没配图时保留内置兜底图
   // 优先拉后端 banner，门店没配时再回退到 storeAlbum
   loadBanners(storeId) {
