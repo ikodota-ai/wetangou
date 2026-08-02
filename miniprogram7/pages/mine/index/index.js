@@ -51,10 +51,10 @@ Page({
   },
 
   goStaffLogin() {
-    // 已登录员工：直接进工作台；否则进登录页
+    // 已登录员工：直接进工作台首页；否则进登录页
     const staff = wx.getStorageSync('staffUser') || {}
     if (staff && staff.userType === 'store' && wx.getStorageSync('token')) {
-      wx.navigateTo({ url: '/pages/staff/verify/index' })
+      wx.reLaunch({ url: '/pages/staff/home/index' })
     } else {
       wx.navigateTo({ url: '/pages/staff/login/index' })
     }

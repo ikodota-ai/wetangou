@@ -55,7 +55,7 @@ Page({
         })
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => {
-          wx.redirectTo({ url: '/pages/staff/verify/index' })
+          wx.reLaunch({ url: '/pages/staff/home/index' })
         }, 600)
       })
       .catch((err) => {

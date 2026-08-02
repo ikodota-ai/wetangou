@@ -1,7 +1,12 @@
 {
   "pages": [
     "pages/staff/login/index",
+    "pages/staff/home/index",
     "pages/staff/verify/index",
+    "pages/staff/bill/index",
+    "pages/staff/booking/index",
+    "pages/staff/order/index",
+    "pages/staff/me/index",
     "pages/staff/history/index",
     "pages/home/index",
     "pages/album/index",

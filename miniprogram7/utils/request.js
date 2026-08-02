@@ -110,6 +110,14 @@ const api = {
   orderList: (params) => request('/api/order/list', { data: params }),
   orderDetail: (id) => request(`/api/order/${id}`),
   verifyOrder: (data) => request('/api/order/verify', { method: 'POST', data }),
+  // 员工工作台
+  staffMe: () => request('/api/store/staff/me'),
+  staffLogout: () => request('/api/store/staff/logout', { method: 'POST' }),
+  staffHome: () => request('/api/store/staff/home'),
+  staffTodayOrders: () => request('/api/store/staff/today/orders'),
+  staffTodayBills: () => request('/api/store/staff/today/bills'),
+  staffTodayBookings: () => request('/api/store/staff/today/bookings'),
+  staffBookingSignupList: () => request('/api/store/staff/booking/signup/list'),
   // 预约
   bookingSlots: (params) => request('/api/booking/slots', { data: params }),
   createBooking: (data) => request('/api/booking', { method: 'POST', data }),

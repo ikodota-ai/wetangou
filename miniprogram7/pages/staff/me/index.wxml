@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="head card">
+    <image class="avatar" src="{{avatar || '/assets/avatar/default.png'}}" mode="aspectFill"></image>
+    <view class="info">
+      <text class="name">{{realName || userName || '员工'}}</text>
+      <text class="badge">员工工作台</text>
+    </view>
+  </view>
+  <view class="row card">
+    <text class="lab">所属门店</text>
+    <text class="val">{{storeName}}</text>
+  </view>
+  <view class="row card">
+    <text class="lab">账号</text>
+    <text class="val">{{userName}}</text>
+  </view>
+  <view class="row card">
+    <text class="lab">用户 ID</text>
+    <text class="val">{{userId}}</text>
+  </view>
+
+  <view class="actions">
+    <view class="act" bindtap="goHistory">
+      <text>核销记录</text>
+    </view>
+    <view class="act act-warn" bindtap="onLogout">
+      <text>退出登录</text>
+    </view>
+  </view>
+</view>

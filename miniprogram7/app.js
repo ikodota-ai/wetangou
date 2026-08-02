@@ -12,7 +12,12 @@ require('./pages/order/submit/index.js');
 require('./pages/goods/detail/index.js');
 require('./pages/booking/detail/index.js');
 require('./pages/staff/login/index.js');
+require('./pages/staff/home/index.js');
 require('./pages/staff/verify/index.js');
+require('./pages/staff/bill/index.js');
+require('./pages/staff/booking/index.js');
+require('./pages/staff/order/index.js');
+require('./pages/staff/me/index.js');
 require('./pages/staff/history/index.js');
 
 App({

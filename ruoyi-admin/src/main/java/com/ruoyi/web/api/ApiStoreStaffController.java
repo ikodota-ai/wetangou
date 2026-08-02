@@ -2,6 +2,7 @@ package com.ruoyi.web.api;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -100,5 +101,15 @@ public class ApiStoreStaffController
         ajax.put("storeName", "");
         ajax.put("realName", user.getNickName() == null ? user.getUserName() : user.getNickName());
         return ajax;
+    }
+
+    /**
+     * 员工登出：清掉 JWT（前端同步清 wx.storage 即可，后端无状态）
+     */
+    @PostMapping("/logout")
+    public AjaxResult logout()
+    {
+        // JWT 无状态，后端只需要返回成功即可；前端清 staffUser / staffTokenBackup / token
+        return AjaxResult.success();
     }
 }
