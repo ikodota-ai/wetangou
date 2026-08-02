@@ -11,6 +11,9 @@ require('./pages/order/list/index.js');
 require('./pages/order/submit/index.js');
 require('./pages/goods/detail/index.js');
 require('./pages/booking/detail/index.js');
+require('./pages/staff/login/index.js');
+require('./pages/staff/verify/index.js');
+require('./pages/staff/history/index.js');
 
 App({
   globalData: {

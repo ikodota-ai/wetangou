@@ -91,6 +91,11 @@
       </view>
     </view>
 
+    <!-- 员工 / 商家入口：弱化显示，与 C 端功能分隔开 -->
+    <view class="staff-entry" bindtap="goStaffLogin">
+      <text class="staff-entry-text">员工 / 商家登录</text>
+    </view>
+
     <view class="logout btn-ghost" wx:if="{{logged}}" bindtap="onLogout">退出登录</view>
   </view>
 

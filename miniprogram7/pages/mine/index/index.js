@@ -9,7 +9,9 @@ Page({
     hasShowTip: false,
     servicePhone: '',
     serviceQrcode: '',
-    businessHours: ''
+    businessHours: '',
+    // 员工身份标识：true=当前是员工 token
+    staffActive: false
   },
 
   onLoad() {
@@ -17,6 +19,8 @@ Page({
   },
 
   onShow() {
+    const staff = wx.getStorageSync('staffUser') || {}
+    this.setData({ staffActive: !!(staff && staff.userType === 'store') })
     this.syncUser()
 
     // 已登录 + 资料不完整 + 未弹过提示 → 弹完善资料
@@ -46,6 +50,15 @@ Page({
     this.setData({ logged: !!user.logged, user })
   },
 
+  goStaffLogin() {
+    // 已登录员工：直接进工作台；否则进登录页
+    const staff = wx.getStorageSync('staffUser') || {}
+    if (staff && staff.userType === 'store' && wx.getStorageSync('token')) {
+      wx.navigateTo({ url: '/pages/staff/verify/index' })
+    } else {
+      wx.navigateTo({ url: '/pages/staff/login/index' })
+    }
+  },
   goLogin() {
     wx.navigateTo({ url: '/pages/login/login' })
   },

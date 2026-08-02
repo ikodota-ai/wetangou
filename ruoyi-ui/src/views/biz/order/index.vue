@@ -48,6 +48,7 @@
       </el-col>
       <el-col :span="1.5">
         <el-button type="warning" plain icon="el-icon-download" size="mini" @click="handleExport" v-hasPermi="['biz:order:export']">导出</el-button>
+        <el-button type="primary" plain icon="el-icon-check" size="mini" @click="openVerifyDialog()" v-hasPermi="['biz:order:verify']">核销</el-button>
       </el-col>
       <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -76,9 +77,10 @@
       </el-table-column>
       <el-table-column label="核销码" align="center" prop="verifyCode" width="120" />
       <el-table-column label="下单时间" align="center" prop="createTime" width="160" />
-      <el-table-column label="操作" align="center" width="90" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
         <template slot-scope="scope">
           <el-button size="mini" type="text" icon="el-icon-view" @click="handleView(scope.row)">详情</el-button>
+          <el-button v-if="scope.row.status === '1'" size="mini" type="text" icon="el-icon-check" v-hasPermi="['biz:order:verify']" @click="handleQuickVerify(scope.row)">核销</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -117,11 +119,37 @@
         <el-button @click="open = false">关 闭</el-button>
       </div>
     </el-dialog>
+
+    <!-- 核销弹窗 -->
+    <el-dialog title="订单核销" :visible.sync="verifyOpen" width="500px" append-to-body @closed="resetVerifyForm">
+      <el-form ref="verifyForm" :model="verifyForm" :rules="verifyRules" label-width="100px">
+        <el-form-item label="核销码" prop="verifyCode">
+          <el-input v-model="verifyForm.verifyCode" placeholder="请输入会员出示的 12 位核销码" maxlength="32" clearable style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="订单编号" prop="orderNo">
+          <el-input v-model="verifyForm.orderNo" placeholder="（可选）填写订单编号可直接核销" maxlength="32" clearable style="width: 100%" />
+        </el-form-item>
+        <el-alert v-if="verifyResult" :title="verifyResultTitle" :type="verifyResultType" :closable="false" show-icon style="margin-top: 8px">
+          <div slot="default">
+            <div v-if="verifyResult.orderNo">订单编号：{{ verifyResult.orderNo }}</div>
+            <div v-if="verifyResult.productName">商品：{{ verifyResult.productName }}</div>
+            <div v-if="verifyResult.storeName">门店：{{ verifyResult.storeName }}</div>
+            <div v-if="verifyResult.memberName">会员：{{ verifyResult.memberName }}</div>
+            <div v-if="verifyResult.payAmount">实付金额：¥{{ verifyResult.payAmount }}</div>
+            <div v-if="verifyResult.verifyTime">核销时间：{{ verifyResult.verifyTime }}</div>
+          </div>
+        </el-alert>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="verifyOpen = false">关 闭</el-button>
+        <el-button type="primary" :loading="verifyLoading" @click="submitVerify">确认核销</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listOrder, getOrder, delOrder } from "@/api/biz/order"
+import { listOrder, getOrder, delOrder, verifyOrder } from "@/api/biz/order"
 
 export default {
   name: "Order",
@@ -149,7 +177,23 @@ export default {
       },
       // 商户筛选：平台/代理商账号显示；商户账号自动隐藏（自带 merchantId 上下文）
       showMerchantFilter: this.isShowMerchantFilter(),
-      form: {}
+      form: {},
+      // 核销弹窗
+      verifyOpen: false,
+      verifyLoading: false,
+      verifyForm: {
+        verifyCode: '',
+        orderNo: ''
+      },
+      verifyRules: {
+        verifyCode: [
+          { required: true, message: '请输入核销码', trigger: 'blur' },
+          { min: 4, max: 32, message: '核销码长度 4-32 位', trigger: 'blur' }
+        ]
+      },
+      verifyResult: null,
+      verifyResultType: 'success',
+      verifyResultTitle: ''
     }
   },
   created() {
@@ -236,6 +280,52 @@ export default {
       // 商户账号自带 merchantId 上下文，前端再筛无意义
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
       return userType !== '2'
+    },
+    // 打开核销弹窗（顶部工具栏按钮）
+    openVerifyDialog() {
+      this.verifyOpen = true
+    },
+    // 行内快捷核销（直接把订单的核销码填入弹窗）
+    handleQuickVerify(row) {
+      this.verifyForm.verifyCode = row.verifyCode || ''
+      this.verifyForm.orderNo = row.orderNo || ''
+      this.verifyOpen = true
+    },
+    resetVerifyForm() {
+      this.verifyForm = { verifyCode: '', orderNo: '' }
+      this.verifyResult = null
+      this.verifyResultType = 'success'
+      this.verifyResultTitle = ''
+      if (this.$refs.verifyForm) this.$refs.verifyForm.clearValidate()
+    },
+    submitVerify() {
+      this.$refs.verifyForm.validate((valid) => {
+        if (!valid) return
+        const payload = {}
+        const code = (this.verifyForm.verifyCode || '').trim()
+        const no = (this.verifyForm.orderNo || '').trim()
+        if (code) payload.verifyCode = code
+        if (no) payload.orderNo = no
+        if (!code && !no) {
+          this.$modal.msgError('核销码和订单编号至少填一个')
+          return
+        }
+        this.verifyLoading = true
+        verifyOrder(payload).then((res) => {
+          this.verifyResult = res.data || res
+          this.verifyResultType = 'success'
+          this.verifyResultTitle = '核销成功'
+          this.$modal.msgSuccess('核销成功')
+          this.getList()
+        }).catch((err) => {
+          this.verifyResult = null
+          this.verifyResultType = 'error'
+          this.verifyResultTitle = (err && (err.msg || err.message)) || '核销失败'
+          this.$modal.msgError(this.verifyResultTitle)
+        }).finally(() => {
+          this.verifyLoading = false
+        })
+      })
     }
   }
 }

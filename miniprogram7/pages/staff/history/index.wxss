@@ -1,0 +1,102 @@
+.page {
+  min-height: 100vh;
+  background: #F2F2F7;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04);
+}
+.head .store-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 20rpx;
+}
+.head-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.stat-num {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-primary, #5A8A4A);
+}
+.stat-lab {
+  font-size: 22rpx;
+  color: #888;
+  margin-top: 4rpx;
+}
+.stat-act {
+  font-size: 26rpx;
+  color: #F56C6C;
+  border: 1rpx solid #F56C6C;
+  padding: 6rpx 20rpx;
+  border-radius: 20rpx;
+}
+.empty {
+  text-align: center;
+  color: #999;
+  font-size: 28rpx;
+  padding: 200rpx 0;
+}
+.item .row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.no {
+  font-size: 26rpx;
+  color: #888;
+}
+.amount {
+  font-size: 32rpx;
+  color: #F56C6C;
+  font-weight: 600;
+}
+.item .row2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12rpx;
+}
+.name {
+  font-size: 30rpx;
+  color: #1A1A1A;
+  font-weight: 500;
+  flex: 1;
+  margin-right: 16rpx;
+}
+.time {
+  font-size: 24rpx;
+  color: #AAA;
+  flex-shrink: 0;
+}
+.item .row3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #888;
+}
+.code {
+  letter-spacing: 1rpx;
+}
+.tag {
+  background: #5A8A4A;
+  color: #fff;
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 12rpx;
+}

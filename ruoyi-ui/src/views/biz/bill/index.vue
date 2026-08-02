@@ -152,6 +152,14 @@
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template slot-scope="scope">
           <el-button
+            v-if="scope.row.status === '0'"
+            size="mini"
+            type="text"
+            icon="el-icon-check"
+            v-hasPermi="['biz:bill:confirm']"
+            @click="handleConfirm(scope.row)"
+          >确认</el-button>
+          <el-button
             size="mini"
             type="text"
             icon="el-icon-edit"
@@ -247,7 +255,7 @@
 </template>
 
 <script>
-import { listBill, getBill, delBill, addBill, updateBill } from "@/api/biz/bill"
+import { listBill, getBill, delBill, addBill, updateBill } from "@/api/biz/bill", confirmBill }
 
 export default {
   name: "Bill",
@@ -407,6 +415,16 @@ export default {
           }
         }
       })
+    },
+    /** 确认买单（0 待确认 → 1 待支付） */
+    handleConfirm(row) {
+      const billId = row.billId
+      this.$modal.confirm('是否确认买单编号为 "' + row.billNo + '" 的消费金额？').then(() => {
+        return confirmBill(billId)
+      }).then(() => {
+        this.getList()
+        this.$modal.msgSuccess("确认成功")
+      }).catch(() => {})
     },
     /** 删除按钮操作 */
     handleDelete(row) {

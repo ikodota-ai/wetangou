@@ -17,6 +17,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Order;
+import com.ruoyi.biz.api.service.ApiOrderService;
 import com.ruoyi.biz.service.IOrderService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -33,6 +34,9 @@ public class OrderController extends BaseController
 {
     @Autowired
     private IOrderService orderService;
+
+    @Autowired
+    private ApiOrderService apiOrderService;
 
     /**
      * 查询订单列表
@@ -100,5 +104,57 @@ public class OrderController extends BaseController
     public AjaxResult remove(@PathVariable Long[] orderIds)
     {
         return toAjax(orderService.deleteOrderByOrderIds(orderIds));
+    }
+
+    /**
+     * 核销订单（后台 web 端：店长/收银员输入核销码）
+     *
+     * <p>复用 {@link ApiOrderService#verify} 业务逻辑：校验 status=1、未过期，
+     * 置为 status=2 + verify_time/verify_user。requirePermi 与 storeId 的额外
+     * 校验由调用方（运营/店长）通过 sys_user 的角色限定（biz:order:verify 权限）。</p>
+     */
+    @PreAuthorize("@ss.hasPermi('biz:order:verify')")
+    @Log(title = "订单", businessType = BusinessType.UPDATE)
+    @PostMapping("/verify")
+    public AjaxResult verify(@RequestBody Order body)
+    {
+        String verifyCode = body.getVerifyCode();
+        if (verifyCode == null || verifyCode.isEmpty())
+        {
+            throw new com.ruoyi.common.exception.ServiceException("核销码不能为空");
+        }
+        // 后台不强制 storeId：允许从订单表回填
+        Order order = orderService.selectOrderByOrderNo(verifyCode.trim());
+        Long storeId = null;
+        if (order != null)
+        {
+            storeId = order.getStoreId();
+        }
+        else
+        {
+            // 兼容：部分场景 verifyCode 字段是 orderNo，这里再按 verifyCode 字段查一次
+            Order q = new Order();
+            q.setVerifyCode(verifyCode.trim());
+            java.util.List<Order> list = orderService.selectOrderList(q);
+            if (!list.isEmpty())
+            {
+                order = list.get(0);
+                storeId = order.getStoreId();
+            }
+        }
+        if (order == null)
+        {
+            throw new com.ruoyi.common.exception.ServiceException("核销码无效");
+        }
+        // 拿当前登录 sys_user 名字作为核销人
+        String operator = "";
+        try
+        {
+            operator = com.ruoyi.common.utils.SecurityUtils.getUsername();
+        }
+        catch (Exception ignore)
+        {
+        }
+        return success(apiOrderService.verify(verifyCode.trim(), storeId, operator));
     }
 }

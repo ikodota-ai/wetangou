@@ -1,5 +1,6 @@
 package com.ruoyi.biz.controller;
 
+import java.util.Date;
 import java.util.List;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.PayBill;
 import com.ruoyi.biz.service.IPayBillService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -100,5 +103,33 @@ public class PayBillController extends BaseController
     public AjaxResult remove(@PathVariable Long[] billIds)
     {
         return toAjax(payBillService.deletePayBillByBillIds(billIds));
+    }
+
+    /**
+     * 确认买单（后台 web 端：店长/收银员确认消费金额并开单）
+     *
+     * <p>把买单 status 0→1，写入 confirm_user=当前 sys_user / confirm_time=now。
+     * 不强制 storeId 等于 sys_user.dept 关联门店：商户/平台账号都有 biz:bill:confirm 权限。</p>
+     */
+    @PreAuthorize("@ss.hasPermi('biz:bill:confirm')")
+    @Log(title = "买单流水", businessType = BusinessType.UPDATE)
+    @PostMapping("/confirm/{billId}")
+    public AjaxResult confirm(@PathVariable Long billId)
+    {
+        PayBill bill = payBillService.selectPayBillByBillId(billId);
+        if (bill == null || !"0".equals(bill.getStatus()))
+        {
+            throw new ServiceException("买单不存在或状态不允许确认");
+        }
+        bill.setStatus("1");
+        try
+        {
+            bill.setConfirmUser(SecurityUtils.getUsername());
+        }
+        catch (Exception ignore)
+        {
+        }
+        bill.setConfirmTime(new Date());
+        return toAjax(payBillService.updatePayBill(bill));
     }
 }

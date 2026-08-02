@@ -9,6 +9,14 @@ export function listBill(query) {
   })
 }
 
+// 确认买单（后台 web 端）
+export function confirmBill(billId) {
+  return request({
+    url: '/biz/bill/confirm/' + billId,
+    method: 'post'
+  })
+}
+
 // 查询买单流水详细
 export function getBill(billId) {
   return request({

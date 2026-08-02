@@ -1,5 +1,8 @@
 {
   "pages": [
+    "pages/staff/login/index",
+    "pages/staff/verify/index",
+    "pages/staff/history/index",
     "pages/home/index",
     "pages/album/index",
     "pages/booking/index",

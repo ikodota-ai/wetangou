@@ -149,9 +149,10 @@ public class ApiOrderController
     {
         Long storeId = body.getLong("storeId");
         String verifyCode = body.getString("verifyCode");
-        if (StringUtils.isEmpty(verifyCode))
+        String orderNo = body.getString("orderNo");
+        if (StringUtils.isEmpty(verifyCode) && StringUtils.isEmpty(orderNo))
         {
-            throw new ServiceException("核销码不能为空");
+            throw new ServiceException("核销码或订单编号至少填一个");
         }
         if (storeId == null)
         {
@@ -163,6 +164,16 @@ public class ApiOrderController
                 && !storeId.equals(loginMember.getStoreId()))
         {
             throw new ServiceException("无权操作其他门店");
+        }
+        // 优先 verifyCode；为空时用 orderNo 解析（一次额外查）
+        if (StringUtils.isEmpty(verifyCode) && !StringUtils.isEmpty(orderNo))
+        {
+            Order byNo = orderService.selectOrderByOrderNo(orderNo.trim());
+            if (byNo == null)
+            {
+                throw new ServiceException("订单编号无效");
+            }
+            verifyCode = byNo.getVerifyCode();
         }
         Order order = apiOrderService.verify(verifyCode, storeId,
                 "store:" + (loginMember == null ? "" : loginMember.getMemberId()));

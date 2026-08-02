@@ -1,0 +1,50 @@
+<view class="page">
+  <view class="head card">
+    <view class="identity-row">
+      <view class="identity-badge">员工工作台</view>
+      <text class="identity-staff" wx:if="{{realName}}">{{realName}}</text>
+    </view>
+    <view class="store-row">
+      <text class="store-label">当前门店</text>
+      <text class="store-name">{{storeName || '尚未登录'}}</text>
+    </view>
+  </view>
+
+  <view class="verify card">
+    <view class="section-title">输入核销码</view>
+    <view class="ipt-row">
+      <input class="ipt-code" type="text" placeholder="请输入 12 位核销码" value="{{verifyCode}}" bindinput="onCode" maxlength="32" />
+      <view class="btn-scan" bindtap="onScan">
+        <text>扫一扫</text>
+      </view>
+    </view>
+    <view class="ipt-row" style="margin-top:20rpx">
+      <input class="ipt-code" type="text" placeholder="或填写订单编号（可与核销码任填其一）" value="{{orderNo}}" bindinput="onOrderNo" maxlength="32" />
+    </view>
+    <button class="btn-primary" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}" hover-class="none">确认核销</button>
+  </view>
+
+  <view class="recent card" wx:if="{{history.length}}">
+    <view class="section-title">最近核销</view>
+    <view class="recent-item" wx:for="{{history}}" wx:key="orderId" data-idx="{{index}}" bindtap="onRepeat">
+      <view class="ri-left">
+        <text class="ri-no">{{item.orderNo}}</text>
+        <text class="ri-product">{{item.productName || '团购券'}}</text>
+        <text class="ri-time">{{item.verifyTimeStr || ''}}</text>
+      </view>
+      <view class="ri-right">
+        <text class="ri-amount">¥{{item.payAmount}}</text>
+        <text class="ri-tag">已核销</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="actions">
+    <view class="act" bindtap="goHistory">
+      <text>核销记录</text>
+    </view>
+    <view class="act" bindtap="goSwitchAccount">
+      <text>切换回会员</text>
+    </view>
+  </view>
+</view>
