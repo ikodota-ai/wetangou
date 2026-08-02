@@ -1,6 +1,5 @@
 const app = getApp();
 const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
-const mock = require('../../../utils/mock.js');
 
 Page({
   data: {
@@ -9,28 +8,42 @@ Page({
     imgIdx: 0,
     showShare: false,
     showAuthPhone: false,
-    showError: false,
-    errorMsg: '商品已过售卖期',
+    // 三个互斥状态：loading / loadError / 空
+    loading: true,
+    loadError: false,
+    errorMsg: '',
     user: { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
   },
   onLoad(opts) {
-    this.setData({ id: opts.id });
-    this.setData({ user: app.globalData.user });
+    this.setData({ id: opts.id, user: app.globalData.user });
     this.loadProduct(opts.id);
   },
   onUserUpdate(user) { this.setData({ user }); },
-  // 以后端商品为准，仅在接口不可用时回退 mock，避免拿假 productId 去下单
+  // 完全走后端，不做 mock 兜底；接口报错直接把错暴露给用户，便于排查
   loadProduct(id) {
-    api.productDetail(id).then((res) => {
-      const p = (res && (res.data || res)) || null;
-      if (p && p.productId) {
-        this.setData({ product: this.normalize(p) });
-      } else {
-        this.fallback(id);
-      }
-    }).catch(() => {
-      this.fallback(id);
-    });
+    if (!id) {
+      this.setData({ loading: false, loadError: true, errorMsg: '商品ID缺失' });
+      return;
+    }
+    this.setData({ loading: true, loadError: false, errorMsg: '' });
+    api.productDetail(id)
+      .then((res) => {
+        // 兼容后端两层封装：{ code, data: {product} } → res.data.product
+        const d = (res && res.data) || res || null;
+        const p = (d && (d.data || d)) || null;
+        console.log('[goods/detail] productDetail =>', JSON.stringify({ id, hasProduct: !!(p && p.productId), keys: p ? Object.keys(p) : null }));
+        if (p && p.productId) {
+          this.setData({ product: this.normalize(p), loading: false, loadError: false });
+        } else {
+          // 后端返回了 200 但 payload 没有 productId（理论上不该发生）
+          this.setData({ loading: false, loadError: true, errorMsg: '后端返回数据缺少 productId' });
+        }
+      })
+      .catch((err) => {
+        const msg = (err && (err.errMsg || err.msg)) || (err && err.message) || '网络请求失败';
+        console.error('[goods/detail] productDetail FAIL', id, err);
+        this.setData({ loading: false, loadError: true, errorMsg: msg });
+      });
   },
   normalize(p) {
     const images = p.images
@@ -46,22 +59,14 @@ Page({
       detail: fixRichText(p.detail)
     };
   },
-  fallback(id) {
-    const local = mock.goods.find((g) => String(g.productId) === String(id));
-    if (local) {
-      this.setData({ product: { ...local, images: local.images || [local.cover] } });
-      return;
-    }
-    this.setData({ showError: true, errorMsg: '商品已过售卖期' });
-  },
+  onRetry() { this.loadProduct(this.data.id); },
+  onBack() { wx.switchTab({ url: '/pages/home/index', fail: () => wx.navigateBack({ delta: 1 }) }); },
   goDetail(e) { wx.redirectTo({ url: '/pages/goods/detail/index?id=' + e.currentTarget.dataset.id }); },
   goStore() { wx.switchTab({ url: '/pages/home/index' }); },
   goOrderList() { wx.navigateTo({ url: '/pages/order/list/index' }); },
   openShare() { this.setData({ showShare: true }); },
   closeShare() { this.setData({ showShare: false }); },
   closeAuthPhone() { this.setData({ showAuthPhone: false }); },
-  closeError() { this.setData({ showError: false }); },
-  copyError() { wx.setClipboardData({ data: this.data.errorMsg }); },
   onBuy() {
     if (!app.globalData.user.logged) {
       wx.navigateTo({ url: '/pages/login/login' });

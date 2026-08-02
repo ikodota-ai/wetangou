@@ -1,6 +1,5 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
-const mock = require('../../utils/mock.js');
 
 Page({
   data: { list: [], storeName: '' },
@@ -21,7 +20,7 @@ Page({
   },
   loadAlbum(store) {
     if (!store || !store.storeId) {
-      this.fallback();
+      this.setData({ list: [] });
       return;
     }
     this.setData({ storeName: store.storeName || store.name || '' });
@@ -31,16 +30,12 @@ Page({
         id: a.albumId,
         url: toFullUrl(a.imageUrl)
       })).filter((a) => !!a.url);
-      if (list.length) {
-        this.setData({ list });
-      } else {
-        this.fallback();
-      }
-    }).catch(() => this.fallback());
-  },
-  fallback() {
-    const store = (app.globalData.stores && app.globalData.stores[0]) || mock.stores[0];
-    this.setData({ list: (store && store.album) || mock.stores[0].album });
+      // 无相册时显示空列表，不回退到 mock
+      this.setData({ list });
+    }).catch((err) => {
+      console.error('[album] storeAlbum FAIL', err);
+      this.setData({ list: [] });
+    });
   },
   // 点图全屏预览，相册页没有预览会很别扭
   preview(e) {

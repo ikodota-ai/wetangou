@@ -24,8 +24,15 @@ Page({
   },
   // 商品信息以后端为准：价格、库存都要真实，避免用本地数据下单后金额不符
   loadProduct(id) {
+    if (!id) {
+      wx.showToast({ title: '商品ID缺失', icon: 'none' });
+      return;
+    }
     api.productDetail(id).then((res) => {
-      const p = (res && (res.data || res)) || null;
+      // 兼容后端两层封装：{ code, data: {product} } → res.data.product
+      const d = (res && res.data) || res || null;
+      const p = (d && (d.data || d)) || null;
+      console.log('[order/submit] productDetail =>', JSON.stringify({ id, hasProduct: !!(p && p.productId) }));
       if (!p || !p.productId) {
         wx.showToast({ title: '商品不存在或已下架', icon: 'none' });
         return;
@@ -41,8 +48,10 @@ Page({
       this.setData({ product });
       this.loadStore(p.storeId);
       this.recalc();
-    }).catch(() => {
-      wx.showToast({ title: '商品加载失败，请重试', icon: 'none' });
+    }).catch((err) => {
+      const msg = (err && (err.errMsg || err.msg)) || (err && err.message) || '商品加载失败';
+      console.error('[order/submit] productDetail FAIL', id, err);
+      wx.showToast({ title: msg, icon: 'none' });
     });
   },
   loadStore(storeId) {

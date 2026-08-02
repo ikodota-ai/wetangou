@@ -1,19 +1,19 @@
 const { api, fixRichText } = require('../../../utils/request.js');
-const mock = require('../../../utils/mock.js');
 
-// 纯文本协议转 rich-text 可渲染的段落（mock 兜底时用）
-function textToHtml(txt) {
-  return String(txt || '')
-    .split('\n')
-    .filter((line) => !!line.trim())
-    .map((line) => '<p>' + line.trim() + '</p>')
-    .join('');
-}
+const FALLBACK_TITLES = {
+  user: '用户服务协议',
+  privacy: '用户隐私政策'
+};
 
 Page({
-  data: { title: '用户服务协议', nodes: '', loading: true },
-  onLoad() {
-    api.agreement('user').then((res) => {
+  data: { title: '', nodes: '', loading: true },
+  onLoad(opts) {
+    const type = (opts && opts.type) || 'privacy';
+    this.setData({ title: FALLBACK_TITLES[type] || '用户协议' });
+    this.load(type);
+  },
+  load(type) {
+    api.agreement(type).then((res) => {
       const d = (res && (res.data || res)) || null;
       if (d && d.content) {
         this.setData({
@@ -22,12 +22,18 @@ Page({
           loading: false
         });
       } else {
-        this.fallback();
+        // 后端返回 200 但 content 为空：提示用户协议未配置
+        this.setData({
+          nodes: '<p>协议内容暂未配置，请联系平台运营人员补充。</p>',
+          loading: false
+        });
       }
-    }).catch(() => this.fallback());
-  },
-  // 接口不可用时回退内置文本，保证协议页不空白（合规要求必须可查看）
-  fallback() {
-    this.setData({ nodes: textToHtml(mock.agreement.user), loading: false });
+    }).catch((err) => {
+      console.error('[agreement] FAIL', type, err);
+      this.setData({
+        nodes: '<p>协议加载失败，请稍后重试。</p>',
+        loading: false
+      });
+    });
   }
 });

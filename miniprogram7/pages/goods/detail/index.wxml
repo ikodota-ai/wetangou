@@ -1,4 +1,4 @@
-<view class="page" wx:if="{{product}}">
+<view class="page" wx:if="{{product && product.productId}}">
   <!-- 顶部大图 -->
   <view class="hero">
     <image class="hero-img" src="{{product.images[0] || product.cover}}" mode="aspectFill"></image>
@@ -145,19 +145,28 @@
       <view class="auth-cancel" bindtap="closeAuthPhone">暂不授权</view>
     </view>
   </view>
-
-  <!-- 错误弹窗 -->
-  <view class="modal-mask" wx:if="{{showError}}" catchtap="closeError">
-    <view class="err-box" catchtap="noop">
-      <view class="err-title">错误详情</view>
-      <view class="err-desc">{{errorMsg}}</view>
-      <view class="err-row">
-        <view class="err-btn" bindtap="closeError">关闭</view>
-        <view class="err-btn primary" bindtap="copyError">复制</view>
-      </view>
-    </view>
+</view>
+<!-- 加载中 -->
+<view class="loading" wx:elif="{{loading}}">
+  <view class="loading-spin"></view>
+  <text class="loading-text">商品加载中…</text>
+</view>
+<!-- 错误态：API 真的不可用，给出可重试的明确提示 -->
+<view class="empty error" wx:elif="{{loadError}}">
+  <text class="empty-icon">⚠️</text>
+  <text class="empty-text">商品加载失败</text>
+  <text class="empty-sub">{{errorMsg}}</text>
+  <view class="empty-actions">
+    <view class="err-btn" bindtap="onBack">返回首页</view>
+    <view class="err-btn primary" bindtap="onRetry">重试</view>
   </view>
 </view>
+<!-- 兜底：商品确实不存在或已下架 -->
 <view class="empty" wx:else>
+  <text class="empty-icon">🛒</text>
   <text class="empty-text">商品不存在或已下架</text>
+  <text class="empty-sub">该商品可能已下架或被删除</text>
+  <view class="empty-actions">
+    <view class="err-btn primary" bindtap="onBack">返回首页</view>
+  </view>
 </view>
