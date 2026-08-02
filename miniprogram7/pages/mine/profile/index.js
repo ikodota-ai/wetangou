@@ -7,17 +7,20 @@ Page({
     showAvatar: false,
     showNick: false,
     editingNick: '',
+    editingPhone: '',
+    phoneFocus: false,
     wxNickName: ''
   },
 
   onLoad() {
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {}
+    const user = (appInst.globalData && appInst.globalData.user) || {}
     this.setData({
-      user: app.globalData.user,
-      editingNick: app.globalData.user.nickName || ''
+      user: user,
+      editingNick: user.nickName || '',
+      editingPhone: user.phone || ''
     })
 
-    // 尝试获取微信昵称（type="nickname" input 需用户手动触发）
-    // 这里先存储一个默认微信昵称（实际从 userProfile 拿）
     const userInfo = wx.getStorageSync('userInfo')
     if (userInfo && userInfo.nickName) {
       this.setData({ wxNickName: userInfo.nickName })
@@ -55,18 +58,20 @@ Page({
 
   uploadAvatar(filePath) {
     wx.showLoading({ title: '上传中' })
-    // 先本地预览，成功后再用服务端返回的正式地址覆盖
-    app.globalData.user.avatarUrl = filePath
-    this.setData({ user: app.globalData.user })
-    app.notifyUserUpdate()
+    const appInst = getApp() || {}
+    appInst.globalData = appInst.globalData || {}
+    appInst.globalData.user = appInst.globalData.user || {}
+    appInst.globalData.user.avatarUrl = filePath
+    this.setData({ user: appInst.globalData.user })
+    appInst.notifyUserUpdate && appInst.notifyUserUpdate()
 
     api.uploadAvatar(filePath).then((res) => {
       wx.hideLoading()
       const url = res && (res.imgUrl || res.url)
       if (url) {
-        app.globalData.user.avatarUrl = url
-        this.setData({ user: app.globalData.user })
-        app.notifyUserUpdate()
+        appInst.globalData.user.avatarUrl = url
+        this.setData({ user: appInst.globalData.user })
+        appInst.notifyUserUpdate && appInst.notifyUserUpdate()
       }
       wx.showToast({ title: '已更新', icon: 'success' })
     }).catch((err) => {
@@ -78,7 +83,7 @@ Page({
   showNickSheet() {
     this.setData({
       showNick: true,
-      editingNick: app.globalData.user.nickName || ''
+      editingNick: (getApp() && getApp().globalData && getApp().globalData.user && getApp().globalData.user.nickName) || ''
     })
   },
 
@@ -102,11 +107,13 @@ Page({
       return
     }
 
-    app.globalData.user.nickName = this.data.editingNick
-    this.setData({ user: app.globalData.user, showNick: false })
-    app.notifyUserUpdate()
+    const appInst = getApp() || {}
+    appInst.globalData = appInst.globalData || {}
+    appInst.globalData.user = appInst.globalData.user || {}
+    appInst.globalData.user.nickName = this.data.editingNick
+    this.setData({ user: appInst.globalData.user, showNick: false })
+    appInst.notifyUserUpdate && appInst.notifyUserUpdate()
 
-    // 后端会员字段名是 nickname（非 nickName）
     api.updateMember({ nickname: this.data.editingNick }).then(() => {
       wx.showToast({ title: '已更新', icon: 'success' })
     }).catch((err) => {
@@ -114,8 +121,23 @@ Page({
     })
   },
 
-  // 微信新版 getPhoneNumber：把 e.detail.code 交给后端换号，绑定失败必须明确报错，
-  // 不能伪造成功，否则用户以为已绑定而实际未落库
+  // 手机号：默认走文本输入，11 位校验；编辑态展示 input
+  onEditPhone() {
+    this.setData({ editingPhone: this.data.user.phone || '', phoneFocus: true })
+  },
+  onClearPhone() {
+    const appInst = getApp() || {}
+    appInst.globalData = appInst.globalData || {}
+    appInst.globalData.user = appInst.globalData.user || {}
+    appInst.globalData.user.phone = ''
+    this.setData({ user: appInst.globalData.user, editingPhone: '' })
+    appInst.notifyUserUpdate && appInst.notifyUserUpdate()
+  },
+  onPhoneInput(e) {
+    this.setData({ editingPhone: e.detail.value })
+  },
+
+  // 微信新版 getPhoneNumber：把 e.detail.code 交给后端换号
   onGetPhone(e) {
     if (e.detail.errMsg !== 'getPhoneNumber:ok') {
       wx.showToast({ title: '取消授权', icon: 'none' })
@@ -133,9 +155,12 @@ Page({
         wx.showToast({ title: '绑定失败，请重试', icon: 'none' })
         return
       }
-      app.globalData.user.phone = phone
-      this.setData({ user: app.globalData.user })
-      app.notifyUserUpdate()
+      const appInst = getApp() || {}
+      appInst.globalData = appInst.globalData || {}
+      appInst.globalData.user = appInst.globalData.user || {}
+      appInst.globalData.user.phone = phone
+      this.setData({ user: appInst.globalData.user, editingPhone: '' })
+      appInst.notifyUserUpdate && appInst.notifyUserUpdate()
       wx.showToast({ title: '授权成功', icon: 'success' })
     }).catch((err) => {
       wx.hideLoading()
@@ -144,7 +169,8 @@ Page({
   },
 
   onSave() {
-    const u = app.globalData.user
+    const appInst = getApp() || {}
+    const u = (appInst.globalData && appInst.globalData.user) || {}
     if (!u.avatarUrl) {
       wx.showToast({ title: '请设置头像', icon: 'none' })
       return
@@ -153,8 +179,33 @@ Page({
       wx.showToast({ title: '请设置昵称', icon: 'none' })
       return
     }
-    if (!u.phone) {
-      wx.showToast({ title: '请授权手机号', icon: 'none' })
+    // 优先用正在编辑的 phone（editingPhone）；空时回退已存的 user.phone
+    const phone = (this.data.editingPhone || u.phone || '').trim()
+    if (phone) {
+      // 校验格式
+      if (!/^1\d{10}$/.test(phone)) {
+        wx.showToast({ title: '手机号格式不正确', icon: 'none' })
+        return
+      }
+      // 与已存的不同就同步到后端
+      if (phone !== u.phone) {
+        appInst.globalData = appInst.globalData || {}
+        appInst.globalData.user = appInst.globalData.user || {}
+        appInst.globalData.user.phone = phone
+        this.setData({ user: appInst.globalData.user, editingPhone: '' })
+        appInst.notifyUserUpdate && appInst.notifyUserUpdate()
+        api.updateMember({ phone }).then(() => {
+          wx.showToast({ title: '已保存', icon: 'success' })
+          setTimeout(() => wx.navigateBack(), 600)
+        }).catch((err) => {
+          wx.showToast({ title: (err && err.msg) || '保存失败，请重试', icon: 'none' })
+        })
+        return
+      }
+    } else {
+      // 没手机号也允许保存（不强求），只提示一下
+      wx.showToast({ title: '已保存（未填手机号）', icon: 'success' })
+      setTimeout(() => wx.navigateBack(), 600)
       return
     }
     wx.showToast({ title: '已保存', icon: 'success' })
