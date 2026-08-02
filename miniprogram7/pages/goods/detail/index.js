@@ -15,7 +15,12 @@ Page({
     user: { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
   },
   onLoad(opts) {
-    this.setData({ id: opts.id, user: app.globalData.user });
+    // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {};
+    this.setData({
+      id: opts.id,
+      user: (appInst.globalData && appInst.globalData.user) || { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
+    });
     this.loadProduct(opts.id);
   },
   onUserUpdate(user) { this.setData({ user }); },

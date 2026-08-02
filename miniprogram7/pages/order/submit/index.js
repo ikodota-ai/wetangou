@@ -15,10 +15,12 @@ Page({
     submitting: false
   },
   onLoad(opts) {
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {};
+    const u = (appInst.globalData && appInst.globalData.user) || {};
     this.setData({
       id: opts.id,
-      name: app.globalData.user.nickName || '',
-      phone: app.globalData.user.phone || ''
+      name: u.nickName || '',
+      phone: u.phone || ''
     });
     this.loadProduct(opts.id);
   },
