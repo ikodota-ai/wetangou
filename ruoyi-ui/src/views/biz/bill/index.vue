@@ -255,7 +255,7 @@
 </template>
 
 <script>
-import { listBill, getBill, delBill, addBill, updateBill } from "@/api/biz/bill", confirmBill }
+import { listBill, getBill, delBill, addBill, updateBill, confirmBill } from "@/api/biz/bill"
 
 export default {
   name: "Bill",
