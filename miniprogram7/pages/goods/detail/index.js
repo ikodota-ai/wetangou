@@ -8,9 +8,9 @@ Page({
     imgIdx: 0,
     showShare: false,
     showAuthPhone: false,
-    // 三个互斥状态：loading / loadError / 空
-    loading: false,
-    loadError: false,
+    // 单一状态机：loading / loaded / error / empty
+    // 任何时刻只有一个为 true，便于 WXML 用单一 wx:if 判断
+    state: 'loading',
     errorMsg: '',
     user: { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
   },
@@ -23,22 +23,21 @@ Page({
   loadProduct(id) {
     console.log('[goods/detail] loadProduct start, id=', id);
     if (!id) {
-      this.setData({ loading: false, loadError: true, errorMsg: '商品ID缺失' });
+      this.setData({ state: 'error', errorMsg: '商品ID缺失' });
       return;
     }
-    this.setData({ loading: true, loadError: false, errorMsg: '' });
-    // 5s 兜底：loading 状态被 setData 吞掉时强制结束，避免一直转圈
+    this.setData({ state: 'loading', errorMsg: '' });
+    // 5s 兜底：避免 setData 被吞掉时一直转圈
     this._loadTimer = setTimeout(() => {
-      if (this.data.loading && !this.data.product) {
-        console.warn('[goods/detail] loadProduct timeout, force clear loading');
-        this.setData({ loading: false, loadError: true, errorMsg: '请求超时，请检查网络或后端' });
+      if (this.data.state === 'loading') {
+        console.warn('[goods/detail] loadProduct timeout, force set error');
+        this.setData({ state: 'error', errorMsg: '请求超时，请检查网络或后端' });
       }
     }, 5000);
     api.productDetail(id)
       .then((res) => {
         clearTimeout(this._loadTimer);
         console.log('[goods/detail] productDetail response =>', JSON.stringify(res).slice(0, 500));
-        // 兼容后端两层封装：{ code, data: {product} } → res.data.product
         const d = (res && res.data) || res || null;
         const p = (d && (d.data || d)) || null;
         if (p && p.productId) {
@@ -47,20 +46,23 @@ Page({
             normalized = this.normalize(p);
           } catch (e) {
             console.error('[goods/detail] normalize FAIL', e, p);
-            this.setData({ loading: false, loadError: true, errorMsg: '数据规范化失败: ' + e.message });
+            this.setData({ state: 'error', errorMsg: '数据规范化失败: ' + e.message });
             return;
           }
-          this.setData({ product: normalized, loading: false, loadError: false });
+          this.setData({ product: normalized, state: 'loaded' });
+        } else if (p && p.code && p.code !== 200) {
+          // 后端返回非 200 的业务码
+          this.setData({ state: 'error', errorMsg: p.msg || '后端返回业务错误' });
         } else {
-          // 后端返回 200 但 payload 没有 productId
-          this.setData({ loading: false, loadError: true, errorMsg: '后端返回数据缺少 productId' });
+          // payload 没有 productId
+          this.setData({ state: 'empty', errorMsg: '商品已下架' });
         }
       })
       .catch((err) => {
         clearTimeout(this._loadTimer);
         const msg = (err && (err.errMsg || err.msg)) || (err && err.message) || '网络请求失败';
         console.error('[goods/detail] productDetail FAIL', id, err);
-        this.setData({ loading: false, loadError: true, errorMsg: msg });
+        this.setData({ state: 'error', errorMsg: msg });
       });
   },
   normalize(p) {

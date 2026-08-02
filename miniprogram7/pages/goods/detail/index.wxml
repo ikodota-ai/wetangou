@@ -1,4 +1,4 @@
-<view class="page" wx:if="{{product && product.productId}}">
+<view class="page" wx:if="{{state === 'loaded' && product && product.productId}}">
   <!-- 顶部大图 -->
   <view class="hero">
     <image class="hero-img" src="{{product.images[0] || product.cover}}" mode="aspectFill"></image>
@@ -147,26 +147,26 @@
   </view>
 </view>
 
-<block wx:else>
-  <view class="loading" wx:if="{{loading}}">
-    <view class="loading-spin"></view>
-    <text class="loading-text">商品加载中…</text>
+<view class="loading" wx:elif="{{state === 'loading'}}">
+  <view class="loading-spin"></view>
+  <text class="loading-text">商品加载中…</text>
+</view>
+
+<view class="empty error" wx:elif="{{state === 'error'}}">
+  <text class="empty-icon">⚠️</text>
+  <text class="empty-text">商品加载失败</text>
+  <text class="empty-sub">{{errorMsg}}</text>
+  <view class="empty-actions">
+    <view class="err-btn" bindtap="onBack">返回首页</view>
+    <view class="err-btn primary" bindtap="onRetry">重试</view>
   </view>
-  <view class="empty error" wx:elif="{{loadError}}">
-    <text class="empty-icon">⚠️</text>
-    <text class="empty-text">商品加载失败</text>
-    <text class="empty-sub">{{errorMsg}}</text>
-    <view class="empty-actions">
-      <view class="err-btn" bindtap="onBack">返回首页</view>
-      <view class="err-btn primary" bindtap="onRetry">重试</view>
-    </view>
+</view>
+
+<view class="empty" wx:else>
+  <text class="empty-icon">🛒</text>
+  <text class="empty-text">商品不存在或已下架</text>
+  <text class="empty-sub">该商品可能已下架或被删除</text>
+  <view class="empty-actions">
+    <view class="err-btn primary" bindtap="onBack">返回首页</view>
   </view>
-  <view class="empty" wx:else>
-    <text class="empty-icon">🛒</text>
-    <text class="empty-text">商品不存在或已下架</text>
-    <text class="empty-sub">该商品可能已下架或被删除</text>
-    <view class="empty-actions">
-      <view class="err-btn primary" bindtap="onBack">返回首页</view>
-    </view>
-  </view>
-</block>
+</view>
