@@ -257,4 +257,33 @@ public class FileUploadUtils
         }
         return extension;
     }
+
+    /**
+     * 走对象存储适配器上传（OSS / 七牛 / 本地，由 application.yml ruoyi.storage.type 决定）
+     *
+     * <p>此方法取代传统的本地磁盘 upload()，业务代码（CommonController / 业务上传）切换到本方法后，
+     * 切换云存储只需改 application.yml，无需改代码。</p>
+     *
+     * <p>返回值为对外可访问的完整 URL（OSS / 七牛返回 https 域名 + key，本地返回 /profile + key）。</p>
+     *
+     * @param file 上传的文件
+     * @return 公开访问 URL
+     */
+    public static final String uploadByStorage(MultipartFile file)
+    {
+        try
+        {
+            // 复用旧的 allow / size 校验
+            assertAllowed(file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
+            // key 形如 upload/2026/08/02/原文件名_序号.jpg
+            String key = extractFilename(file);
+            return com.ruoyi.common.storage.StorageFactory.get().upload(
+                    key, file.getInputStream(), file.getContentType(), file.getSize());
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("对象存储上传失败", e);
+        }
+    }
+
 }

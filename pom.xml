@@ -114,6 +114,13 @@
                 <version>${velocity.version}</version>
             </dependency>
 
+            <!-- MinIO 对象存储 SDK（兼容 AWS S3 协议 = 兼容阿里云 OSS / 七牛 / MinIO / 腾讯云 COS / AWS S3） -->
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>8.5.10</version>
+            </dependency>
+
             <!-- 阿里JSON解析器 -->
             <dependency>
                 <groupId>com.alibaba.fastjson2</groupId>

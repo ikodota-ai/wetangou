@@ -117,6 +117,13 @@
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
         </dependency>
+        <!-- MinIO 对象存储 SDK：兼容 AWS S3 协议
+             适用场景：本地 MinIO / 阿里云 OSS / 七牛 S3 兼容 / 腾讯云 COS / AWS S3
+             通过 application.yml ruoyi.storage.type + endpoint/bucket/accessKey/secretKey 切换 -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+        </dependency>
 
     </dependencies>
 

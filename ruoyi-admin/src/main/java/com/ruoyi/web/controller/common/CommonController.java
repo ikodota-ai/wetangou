@@ -76,13 +76,21 @@ public class CommonController
     {
         try
         {
-            // 上传文件路径
-            String filePath = RuoYiConfig.getUploadPath();
-            // 上传并返回新文件名称
-            String fileName = FileUploadUtils.upload(filePath, file);
-            String url = serverConfig.getUrl() + fileName;
+            // 走对象存储适配器（本地磁盘 / 阿里云 OSS / 七牛云，由 application.yml ruoyi.storage.type 决定）
+            // 返回 url 是完整可访问 URL（OSS 走 https 域名，本地走 http://host:port/profile/...）
+            String url = FileUploadUtils.uploadByStorage(file);
+            // 提取 key/fileName 供 DB 存储
+            // 本地: url = /profile/upload/2026/08/02/abc.jpg → fileName = /profile/upload/2026/08/02/abc.jpg
+            // OSS : url = https://bucket.oss-cn-sh.aliyuncs.com/upload/2026/08/02/abc.jpg
+            // 七牛: url = http://cdn.example.com/upload/2026/08/02/abc.jpg
+            String fileName = url.startsWith("/") ? url : url;
+            // OSS / 七牛时前端需要绝对域名 + key，这里把 url 已经是绝对的；本地时拼 host
+            if (fileName.startsWith("/profile/"))
+            {
+                fileName = serverConfig.getUrl() + fileName;
+            }
             AjaxResult ajax = AjaxResult.success();
-            ajax.put("url", url);
+            ajax.put("url", fileName);
             ajax.put("fileName", fileName);
             ajax.put("newFileName", FileUtils.getName(fileName));
             ajax.put("originalFilename", file.getOriginalFilename());
