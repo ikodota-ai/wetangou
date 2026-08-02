@@ -1,24 +1,6 @@
 // app.js 洞天团购小程序（miniprogram7）入口
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 
-// 显式 require 一遍关键 page 文件，避免「代码依赖分析」误判孤立文件
-// 微信开发者工具 2.01+ 引入了「过滤无依赖文件」开关：page 文件如果在 app.json
-// 里登记但没有任何 JS require 它，会被静态扫描判定为孤立文件并从构建中剔除，
-// 表现就是运行时 MiniProgramError: 已被代码依赖分析忽略。
-require('./pages/order/detail/index.js');
-require('./pages/order/list/index.js');
-require('./pages/order/submit/index.js');
-require('./pages/goods/detail/index.js');
-require('./pages/booking/detail/index.js');
-require('./pages/staff/login/index.js');
-require('./pages/staff/home/index.js');
-require('./pages/staff/verify/index.js');
-require('./pages/staff/bill/index.js');
-require('./pages/staff/booking/index.js');
-require('./pages/staff/order/index.js');
-require('./pages/staff/me/index.js');
-require('./pages/staff/history/index.js');
-
 App({
   globalData: {
     // 位置/门店
@@ -28,7 +10,7 @@ App({
     // 商品
     goods: [],
     currentProduct: null,
-    baseUrl: "http://localhost:8080",
+    baseUrl: "http://172.31.26.216:8080",
     // 会员
     user: {
       memberId: null,
