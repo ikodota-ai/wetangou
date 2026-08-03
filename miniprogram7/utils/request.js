@@ -31,7 +31,7 @@ function request(url, options = {}) {
       data: options.data || {},
       header: {
         'content-type': 'application/json',
-        'Authorization': token ? `${token}` : '',
+        'Authorization': token ? `Bearer ${token}` : '',
         'X-App-Id': APPID
       },
       success: (res) => {
@@ -66,7 +66,7 @@ function uploadFile(url, filePath, name = 'file', formData = {}) {
     wx.uploadFile({
       url: BASE_URL + url,
       filePath, name, formData,
-      header: { 'Authorization': token ? `${token}` : '', 'X-App-Id': APPID },
+      header: { 'Authorization': token ? `Bearer ${token}` : '', 'X-App-Id': APPID },
       success: (res) => {
         let d = res.data;
         try { d = JSON.parse(res.data); } catch (e) {}

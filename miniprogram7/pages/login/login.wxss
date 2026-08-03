@@ -73,3 +73,19 @@
   font-size: 24rpx;
   color: #3A6B35;
 }
+
+.perm-list { margin-top: 16rpx; }
+.perm-item { display: flex; align-items: center; gap: 12rpx; padding: 8rpx 0; }
+.perm-dot { width: 12rpx; height: 12rpx; border-radius: 50%; background: #2D6A2D; }
+.perm-dot.ok { background: #2D6A2D; }
+.perm-item text { font-size: 24rpx; color: #666; flex: 1; }
+
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal-box { width: 620rpx; background: #FFFFFF; border-radius: 24rpx; padding: 48rpx 40rpx 40rpx; }
+.modal-title { text-align: center; font-size: 36rpx; font-weight: 600; color: #1A1A1A; }
+.modal-sub { text-align: center; font-size: 26rpx; color: #666; line-height: 1.6; margin: 16rpx 0 32rpx; }
+.modal-input { width: 100%; height: 88rpx; padding: 0 24rpx; border: 2rpx solid #E0E0E0; border-radius: 12rpx; font-size: 28rpx; color: #1A1A1A; margin: 32rpx 0 24rpx; box-sizing: border-box; }
+.avatar-row { display: flex; justify-content: center; margin: 32rpx 0 16rpx; }
+.avatar-preview { width: 160rpx; height: 160rpx; border-radius: 50%; background: #F2F2F7; }
+.btn-full { width: 100%; }
+.modal-cancel { text-align: center; font-size: 28rpx; color: #999; margin-top: 24rpx; }
