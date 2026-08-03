@@ -440,12 +440,32 @@ cd ruoyi-ui && npm install && npm run dev
 
 ---
 
+### 4.10 小程序商家公开信息接口（`/api/merchant/info`）
+
+C 端小程序登录页 / 我的页 / 联系客服页需要展示商家名、Logo、客服电话、客服二维码、营业时间、简介。
+匿名接口由 `ApiMerchantController` 提供：
+
+- 请求头 `X-App-Id` 携带小程序 appid → `TenantService.getMerchantByAppid` 找到对应商户
+- 缺省头时兜底到 `merchantId=1`（MC000001 默认商家），方便本地调试不报错
+- 所有图片字段都过 `ImageUrlUtils.toAbsolute`，包 try/catch 防御
+- `servicePhone` / `serviceQrcode` / `businessHours` / `intro` 由商家级兜底（门店未配时使用商家级）
+
+### 4.11 Spring Boot 3.4 + Tomcat 11 错误恢复路径 ClassNotFound 修复
+
+Spring Boot 3.4 + Tomcat 11 nested fat-jar + Java 25 在错误恢复路径上会触发
+`ClassNotFoundException: org.apache.tomcat.util.buf.C2BConverter` 和
+`org.apache.catalina.core.ApplicationContext$DispatchData`，导致原本 401 的请求退化为 500。
+修复方式：`AuthenticationEntryPointImpl` 直接 `response.getOutputStream().write(bytes)` 写字节，
+绕过 `response.getWriter()` 的 C2BConverter 转换。
+
+---
+
 ## 九、已知边界（下一轮迭代）
 
 - 佣金结算未联动推客 `frozenAmount` ↔ `availableAmount`（commission.status 0→1 时未扣减冻结额）
 - Quartz 任务失败未配置告警（仅写 `sys_job_log`）
 - Banner 未做 VIP 等级加权排序缓存
-- 登录入口按 `userType` 路由分流未做（代理商/商户/平台三入口）
+- 登录入口按 `userType` 路由分流（代理商/商户/平台三入口） — 后端 `LoginUser.userType` 字段已加，前端 store + router 分流待下一轮完成（见 AGENTS.md Pending 1）
 - 微信支付模式 1（平台统收分账）待资质评估后接入
 - 商品配送（delivery tab）参数已预留，运力/范围规则待补
 
