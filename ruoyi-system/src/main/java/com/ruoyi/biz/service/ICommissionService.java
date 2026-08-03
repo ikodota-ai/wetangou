@@ -26,6 +26,11 @@ public interface ICommissionService
     public int settleExpiredCommissions(int settleDays);
 
     /**
+     * 与上面相同，但用调用方传入的 now 时间戳（避免 linkSettlementToDistributor 查不到刚写入的 settle_time）
+     */
+    public int settleExpiredCommissions(int settleDays, java.util.Date now);
+
+    /**
      * 把指定结算时间的佣金联动到推客的 frozenAmount / availableAmount
      */
     public int linkSettlementToDistributor(Date settleTime);

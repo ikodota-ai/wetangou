@@ -57,9 +57,16 @@ public class CommissionServiceImpl implements ICommissionService
     @Override
     public int settleExpiredCommissions(int settleDays)
     {
+        return settleExpiredCommissions(settleDays, DateUtils.getNowDate());
+    }
+
+    @Override
+    public int settleExpiredCommissions(int settleDays, java.util.Date now)
+    {
+        if (now == null) now = DateUtils.getNowDate();
         Map<String, Object> params = new HashMap<>();
         params.put("settleDays", settleDays);
-        params.put("now", DateUtils.getNowDate());
+        params.put("now", now);
         return commissionMapper.settleExpiredCommissions(params);
     }
 

@@ -116,7 +116,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <select id="selectSettleGroupsByTime" parameterType="Date" resultType="map">
         select distributor_id as distributorId, sum(amount) as totalAmount, count(*) as cnt
         from biz_commission
-        where settle_time = #{settleTime} and settled_to_distributor = 0
+        where settle_time &gt;= #{settleTime} and settle_time &lt; date_add(#{settleTime}, interval 2 second)
+          and settled_to_distributor = 0
         group by distributor_id
     </select>
 

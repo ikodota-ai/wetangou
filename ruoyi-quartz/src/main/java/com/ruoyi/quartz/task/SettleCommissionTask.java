@@ -42,13 +42,15 @@ public class SettleCommissionTask
     @Transactional(rollbackFor = Exception.class)
     public void ryNoParams()
     {
-        Date before = new Date();
-        int rows = commissionService.settleExpiredCommissions(DEFAULT_SETTLE_DAYS);
+        // 取与 settleExpiredCommissions 完全一致的时间戳，避免
+        // linkSettlementToDistributor 用任务开始前的 before 找不到刚写入的 settle_time
+        Date now = com.ruoyi.common.utils.DateUtils.getNowDate();
+        int rows = commissionService.settleExpiredCommissions(DEFAULT_SETTLE_DAYS, now);
         int distributors = 0;
         if (rows > 0)
         {
             // 同一个事务内：先 settle（写 status=1 + settle_time），再联动推客金额
-            distributors = commissionService.linkSettlementToDistributor(before);
+            distributors = commissionService.linkSettlementToDistributor(now);
         }
         log.info("[SettleCommissionTask] 冷静期到期结算 rows={} distributors={} settleDays={}",
                 rows, distributors, DEFAULT_SETTLE_DAYS);

@@ -149,7 +149,7 @@ public class WxMaService
         {
             throw new ServiceException("scene 长度不能超过 32 字符");
         }
-        if (wxMaConfig.isMockEnabled(merchantId) && StringUtils.isEmpty(wxMaConfig.getAppId(merchantId)))
+        if (wxMaConfig.isMockEnabled(merchantId))
         {
             log.info("[WxMaService] mock 模式返回 1x1 透明 PNG, scene={}", scene);
             // 1x1 透明 PNG，便于联调时前端仍能拿到图片链接
