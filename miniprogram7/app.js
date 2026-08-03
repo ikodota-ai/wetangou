@@ -2,6 +2,10 @@
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 
 App({
+  onLaunch() {
+    // 启动时拉一次会员资料（如果本地有 token），让「我的」页能直接显示真实头像/昵称/手机号
+    if (this.bootUser) this.bootUser()
+  },
   globalData: {
     // 位置/门店
     location: null,
@@ -33,6 +37,59 @@ App({
    * 如果用户拒绝授权位置，则默认选该商户第一个门店
    * 选出门店后顺手加载该门店的商品（保持与旧版本一致，避免首页商品列表为空）
    */
+  /**
+   * 全局用户资料变更通知：所有监听 onUserUpdate 的 page 都会被同步刷新
+   * 用法：app.notifyUserUpdate() 或 app.notifyUserUpdate(user)
+   */
+  notifyUserUpdate(user) {
+    if (user) {
+      this.globalData.user = Object.assign(this.globalData.user || {}, user)
+    }
+    const pages = getCurrentPages && getCurrentPages()
+    if (!pages || !pages.length) return
+    pages.forEach((p) => {
+      if (typeof p.onUserUpdate === 'function') {
+        try { p.onUserUpdate(this.globalData.user) } catch (e) { console.error('[app] onUserUpdate fail', e) }
+      }
+    })
+  },
+
+  /**
+   * 应用启动时如果本地有 token，主动拉一次会员资料，
+   * 把 nickName/avatarUrl/phone 同步到 globalData，让「我的」页立刻显示真实信息
+   */
+  bootUser() {
+    const token = wx.getStorageSync && wx.getStorageSync('token')
+    if (!token) return Promise.resolve()
+    if (this.globalData.user && this.globalData.user.logged) return Promise.resolve()
+    this.globalData.user = Object.assign(this.globalData.user || {}, {
+      memberId: wx.getStorageSync('memberId') || null,
+      token: token,
+      logged: false
+    })
+    return api.getUserInfo().then((u) => {
+      const m = u && (u.data || u)
+      if (m && m.memberId) {
+        this.globalData.user = Object.assign(this.globalData.user, {
+          memberId: m.memberId,
+          openid: m.openid || this.globalData.user.openid || '',
+          nickName: m.nickname || m.nickName || '',
+          avatarUrl: m.avatar || m.avatarUrl || '',
+          phone: m.phone || '',
+          logged: true
+        })
+        wx.setStorageSync('memberId', m.memberId)
+        this.notifyUserUpdate()
+      }
+    }).catch((err) => {
+      console.warn('[app] bootUser FAIL', err)
+      if (err && (err.code === 401 || /401/.test(String(err)))) {
+        wx.removeStorageSync('token')
+        wx.removeStorageSync('memberId')
+      }
+    })
+  },
+
   pickNearestStore(callback) {
     const useStore = (s) => {
       if (!s) {

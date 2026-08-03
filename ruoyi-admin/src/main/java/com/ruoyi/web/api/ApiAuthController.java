@@ -112,6 +112,11 @@ public class ApiAuthController
         AjaxResult ajax = AjaxResult.success("登录成功");
         ajax.put("token", token);
         ajax.put("memberId", member.getMemberId());
+        // 顺带返回会员资料，登录后小程序能立刻显示昵称/头像/手机号，
+        // 避免「我的」页一直显示默认「微信用户」和默认头像
+        ajax.put("nickName", member.getNickname());
+        ajax.put("avatarUrl", member.getAvatar());
+        ajax.put("phone", member.getPhone());
         return ajax;
     }
 
