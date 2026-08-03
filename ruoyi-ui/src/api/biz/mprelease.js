@@ -82,3 +82,19 @@ export function delMpRelease(releaseId) {
     method: 'delete'
   })
 }
+
+// 微信开放平台状态
+export function getPlatformStatus() {
+  return request({
+    url: '/biz/mprelease/platform-status',
+    method: 'get'
+  })
+}
+
+// 拉商户太阳码（用于代上传：拉取 authorizer_access_token 后生成 wxacode）
+export function getMpAuth(appid) {
+  return request({
+    url: '/biz/mpauth/appid/' + appid,
+    method: 'get'
+  })
+}

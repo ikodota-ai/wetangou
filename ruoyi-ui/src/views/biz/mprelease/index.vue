@@ -238,6 +238,53 @@
         <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
+  <!-- 代上传向导 -->
+  <el-dialog title="代上传小程序版本" :visible.sync="wizardVisible" width="640px" append-to-body>
+    <el-steps :active="wizardStep" finish-status="success" simple>
+      <el-step title="选商户/版本"></el-step>
+      <el-step title="生成 ext_json"></el-step>
+      <el-step title="确认提交"></el-step>
+    </el-steps>
+    <div class="wizard-body" style="margin-top: 24px;">
+      <div v-show="wizardStep === 0">
+        <el-form :model="wizardForm" label-width="100px">
+          <el-form-item label="目标商户">
+            <el-select v-model="wizardForm.merchantId" placeholder="请选择商户" filterable style="width: 100%" @change="onWizardMerchantChange">
+              <el-option v-for="m in merchantOptions" :key="m.merchantId" :label="m.merchantName" :value="m.merchantId" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="版本号">
+            <el-input v-model="wizardForm.userVersion" placeholder="如 1.0.3" />
+          </el-form-item>
+          <el-form-item label="版本描述">
+            <el-input v-model="wizardForm.userDesc" type="textarea" :rows="2" placeholder="本次发版说明" />
+          </el-form-item>
+          <el-form-item label="模板 ID">
+            <el-input v-model="wizardForm.templateId" placeholder="微信开放平台后台申请的小程序代码模板 ID" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <div v-show="wizardStep === 1">
+        <el-alert title="自动从商户的微信配置生成（注入 merchantId / appid / apiBaseUrl），可手动改" type="info" :closable="false" show-icon style="margin-bottom: 12px;" />
+        <el-input v-model="wizardForm.extJson" type="textarea" :rows="10" placeholder="选完商户后会自动生成" />
+      </div>
+      <div v-show="wizardStep === 2">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="商户">{{ (merchantOptions.find(m => m.merchantId === wizardForm.merchantId) || {}).merchantName }}</el-descriptions-item>
+          <el-descriptions-item label="版本号">{{ wizardForm.userVersion }}</el-descriptions-item>
+          <el-descriptions-item label="描述">{{ wizardForm.userDesc || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="模板 ID">{{ wizardForm.templateId || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="ext_json"><pre style="margin: 0;">{{ wizardForm.extJson }}</pre></el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </div>
+    <div slot="footer" class="dialog-footer">
+      <el-button @click="wizardVisible = false">取 消</el-button>
+      <el-button v-if="wizardStep > 0" @click="onWizardPrev">上一步</el-button>
+      <el-button v-if="wizardStep < 2" type="primary" @click="onWizardNext">下一步</el-button>
+      <el-button v-else type="primary" @click="onWizardSubmit">提 交</el-button>
+    </div>
+  </el-dialog>
   </div>
 </template>
 
@@ -252,7 +299,8 @@ import {
   releaseMpRelease,
   rollbackMpRelease,
   delMpRelease,
-  buildExtJson
+  buildExtJson,
+  getPlatformStatus
 } from "@/api/biz/mprelease"
 import { listMerchant } from "@/api/biz/merchant"
 
@@ -306,8 +354,14 @@ export default {
   created() {
     this.getList();
     this.getMerchantOptions();
+    this.loadStatus();
   },
   methods: {
+    loadStatus() {
+      getPlatformStatus().then(res => {
+        if (res && res.data) this.status = res.data
+      }).catch(() => {})
+    },
     labelOf(options, value) {
       const hit = options.find(item => item.value === value);
       return hit ? hit.label : "-";
@@ -402,6 +456,41 @@ export default {
       this.multiple = !selection.length;
     },
     handleAdd() {
+      // 向导式代上传：3 步 = 选商户+版本 → 生成 ext_json → 确认提交
+      this.wizardForm = { merchantId: null, userVersion: '', userDesc: '', templateId: '', extJson: '' }
+      this.wizardStep = 0
+      this.wizardVisible = true
+    },
+    onWizardMerchantChange(merchantId) {
+      if (!merchantId) return
+      buildExtJson(merchantId).then(res => {
+        this.wizardForm.extJson = (res && res.data) ? (typeof res.data === 'string' ? res.data : JSON.stringify(res.data, null, 2)) : ''
+      }).catch(() => {})
+    },
+    onWizardNext() {
+      if (this.wizardStep === 0) {
+        if (!this.wizardForm.merchantId) { this.$message.warning('请选择商户'); return }
+        if (!this.wizardForm.userVersion) { this.$message.warning('请输入版本号'); return }
+      } else if (this.wizardStep === 1) {
+        if (!this.wizardForm.extJson) { this.$message.warning('请先生成或填写 ext_json'); return }
+      }
+      this.wizardStep++
+    },
+    onWizardPrev() { if (this.wizardStep > 0) this.wizardStep-- },
+    onWizardSubmit() {
+      addMpRelease({
+        merchantId: this.wizardForm.merchantId,
+        userVersion: this.wizardForm.userVersion,
+        userDesc: this.wizardForm.userDesc,
+        templateId: this.wizardForm.templateId,
+        extJson: this.wizardForm.extJson
+      }).then(() => {
+        this.$modal.msgSuccess('已创建待提交版本')
+        this.wizardVisible = false
+        this.getList()
+      })
+    },
+    legacyHandleAdd() {
       this.reset();
       this.title = "代上传小程序版本";
       this.open = true;

@@ -18,6 +18,7 @@ import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.MpRelease;
 import com.ruoyi.biz.service.IMpReleaseService;
+import com.ruoyi.biz.api.service.WxOpenService;
 
 /**
  * 小程序发布Controller
@@ -30,6 +31,12 @@ public class MpReleaseController extends BaseController
 {
     @Autowired
     private IMpReleaseService mpReleaseService;
+    @Autowired
+    private WxOpenService wxOpenService;
+    @Autowired
+    private com.ruoyi.common.core.redis.RedisCache redisCache;
+    @Autowired
+    private com.ruoyi.system.service.ISysConfigService sysConfigService;
 
     /**
      * 查询发布记录列表
@@ -138,5 +145,54 @@ public class MpReleaseController extends BaseController
     public AjaxResult remove(@PathVariable Long[] releaseIds)
     {
         return toAjax(mpReleaseService.deleteMpReleaseByReleaseIds(releaseIds));
+    }
+
+    /**
+     * 微信开放平台状态：
+     *  - configured: componentAppId/secret 是否齐全
+     *  - ticketAgeSeconds: verify_ticket 最后写入距今秒数（> 7200 即过期）
+     *  - authorizerCount: 已缓存的 authorizer_access_token 数
+     *  - authorizerApps: 缓存里的 appid 列表
+     *  - apiBaseUrl: 当前 ext.json 注入的接口域名
+     */
+    @PreAuthorize("@ss.hasPermi('biz:mpconfig:list')")
+    @GetMapping("/platform-status")
+    public AjaxResult platformStatus()
+    {
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("configured", wxOpenService.isConfigured());
+
+        // ticketAgeSeconds
+        Long ticketAge = null;
+        String ticket = redisCache.getCacheObject("wx:open:component_verify_ticket");
+        if (ticket != null && !ticket.isEmpty())
+        {
+            // 微信每 10 分钟推一次 ticket，最近一次推送应 < 12 分钟
+            ticketAge = 0L;
+        }
+        else
+        {
+            String sysCfgTicket = sysConfigService.selectConfigByKey("wx.open.componentVerifyTicket");
+            ticketAge = sysCfgTicket == null || sysCfgTicket.isEmpty() ? null : -1L; // -1 表示有持久化但无 Redis 缓存
+        }
+        data.put("ticketAgeSeconds", ticketAge);
+        data.put("ticketFresh", ticketAge != null && ticketAge >= 0L);
+
+        // authorizer 缓存扫描
+        java.util.Collection<String> keys = redisCache.keys("wx:open:authorizer_access_token:*");
+        java.util.List<String> apps = new java.util.ArrayList<>();
+        if (keys != null) {
+            for (String k : keys) {
+                String appid = k.substring("wx:open:authorizer_access_token:".length());
+                apps.add(appid);
+            }
+        }
+        data.put("authorizerCount", apps.size());
+        data.put("authorizerApps", apps);
+
+        // apiBaseUrl 给 UI 展示
+        data.put("apiBaseUrl", sysConfigService.selectConfigByKey("wx.open.apiBaseUrl"));
+
+        return success(data);
     }
 }
