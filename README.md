@@ -418,6 +418,46 @@ cd ruoyi-ui && npm install && npm run dev
 
 用微信开发者工具导入 `miniprogram7/`，appid 在 `utils/config.js` 自取。
 
+### 5. JDK / 字节码版本
+
+| 项目 | 要求 |
+|---|---|
+| **编译 JDK** | 17 或 25 都行（Maven 用 `--release 17` 严格按 Java 17 编译） |
+| **运行 JDK** | 17 / 21 / 25 都行（产物字节码主版本号 = 61 = Java 17） |
+| **本机开发** | Apple Silicon Mac 自带 Temurin 17/25 任选其一 |
+| **服务器部署** | 推荐 Temurin 17 LTS（最少要 17+，但 17 是验证过的最小版本） |
+
+**关键配置**（`pom.xml`）：
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <configuration>
+        <release>17</release>   <!-- 不是 -source/-target，是 --release -->
+    </configuration>
+</plugin>
+```
+
+用 `--release 17` 而不是 `-source 17 -target 17` 的原因：
+- `-source 17`：只允许 Java 17 语法，**API 仍按编译时 JDK 解析**
+- `-target 17`：只生成 Java 17 字节码
+- **`--release 17`**：三者同时约束，API 也按 Java 17 解析，避免在 JDK 25 上编译时意外引用 Java 21/25 才有的 API，部署到 JDK 17 服务器 ClassNotFound
+
+**验证**（已跑过）：
+
+```bash
+# 1) 解压 jar 后检查所有 class 的字节码主版本号
+unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiApplication.class | od -A n -t x1 -N 8 | head -1
+# 期望输出包含：ca fe ba be 00 00 00 3d
+# 主版本号 0x3d = 61 = Java 17
+
+# 2) 嵌套依赖的版本抽查
+# - spring-boot-4.0.6.jar: 主版本 61 ✅
+# - tomcat-embed-core-11.0.21.jar: 主版本 61 ✅
+# - jackson-datatype-jsr310: 主版本 52（Java 8，向下兼容）✅
+```
+
 ---
 
 ## 八、已交付（plan 11/11 ✅）
