@@ -198,8 +198,13 @@
                 <version>3.13.0</version>
                 <configuration>
                     <parameters>true</parameters>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <!--
+                        用 release 标记而不是 source/target，确保产物严格符合 Java 17 字节码规范。
+                        即使 maven 跑在 JDK 25 上，javac 也会按 Java 17 语法和 API 编译，
+                        不会出现 compact source file 等 Java 25 隐式特性的误报，
+                        同时保证产物可以在 Java 17 运行时上启动。
+                    -->
+                    <release>17</release>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
