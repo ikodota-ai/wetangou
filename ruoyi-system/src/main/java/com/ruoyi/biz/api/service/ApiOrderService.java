@@ -16,6 +16,10 @@ import com.ruoyi.biz.domain.MemberVoucher;
 import com.ruoyi.biz.service.IOrderService;
 import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.IMemberVoucherService;
+import com.ruoyi.biz.service.IMemberService;
+import com.ruoyi.biz.service.IDistributorService;
+import com.ruoyi.biz.domain.Member;
+import com.ruoyi.biz.domain.Distributor;
 
 /**
  * 小程序-订单业务（下单、核销）
@@ -36,6 +40,12 @@ public class ApiOrderService
 
     @Autowired
     private ApiCommissionService commissionService;
+
+    @Autowired
+    private IMemberService memberService;
+
+    @Autowired
+    private IDistributorService distributorService;
 
     /**
      * 会员下单（到店自取）：生成待付款订单，含核销码占位
@@ -92,7 +102,19 @@ public class ApiOrderService
         order.setDiscountAmount(discount);
         order.setPayAmount(payAmount);
         order.setMemberVoucherId(memberVoucherId);
-        order.setDistributorId(distributorId);
+        // 如果前端没传 distributorId 但当前会员是被邀请用户，邀请人是推客时自动归属
+        if (order.getDistributorId() == null) {
+            Member me = memberService.selectMemberByMemberId(memberId);
+            if (me != null && me.getInviteBy() != null) {
+                Distributor dq = new Distributor();
+                dq.setMemberId(me.getInviteBy());
+                dq.setMerchantId(me.getMerchantId());
+                java.util.List<Distributor> ds = distributorService.selectDistributorList(dq);
+                if (ds != null && !ds.isEmpty()) {
+                    order.setDistributorId(ds.get(0).getDistributorId());
+                }
+            }
+        }
         order.setStatus("0");
         order.setCreateTime(new Date());
         orderService.insertOrder(order);
