@@ -92,7 +92,20 @@
         </template>
       </el-table-column>
       <el-table-column label="昵称" align="left" prop="nickname" min-width="120" show-overflow-tooltip />
-      <el-table-column label="手机号" align="center" prop="phone" width="120" />
+      <el-table-column label="手机号" align="center" prop="phone" width="140">
+        <template slot-scope="scope">
+          <span>{{ scope.row.phone }}</span>
+          <el-button
+            v-if="scope.row.memberId"
+            size="mini"
+            type="text"
+            icon="el-icon-view"
+            style="padding: 0 4px"
+            v-hasPermi="['biz:phone:decrypt']"
+            @click="handleViewPhone(scope.row)"
+          >查看完整</el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="性别" align="center" prop="gender" width="70">
         <template slot-scope="scope">
           {{ scope.row.gender === '1' ? '男' : scope.row.gender === '2' ? '女' : '未知' }}
@@ -166,11 +179,34 @@
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
+
+    <!-- 查看完整手机号（脱敏反操作，写审计日志） -->
+    <el-dialog title="查看完整手机号" :visible.sync="phoneDialog" width="480px" append-to-body>
+      <el-alert
+        title="本操作将写入审计日志（操作人 / 时间 / 原因 / 业务对象）"
+        type="warning" :closable="false" show-icon style="margin-bottom: 16px"
+      />
+      <el-form ref="phoneForm" :model="phoneForm" :rules="phoneRules" label-width="80px">
+        <el-form-item label="会员" prop="memberId">
+          <span>{{ phoneTarget ? (phoneTarget.nickname || ('会员' + phoneTarget.memberId)) : '' }}</span>
+        </el-form-item>
+        <el-form-item label="解密原因" prop="reason">
+          <el-input v-model="phoneForm.reason" type="textarea" :rows="3" placeholder="例如：客服回呼 / 财务对账 / 投诉处理" />
+        </el-form-item>
+        <el-form-item v-if="phoneFull" label="完整手机号">
+          <el-tag type="success" size="medium">{{ phoneFull }}</el-tag>
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitViewPhone">查 询</el-button>
+        <el-button @click="phoneDialog = false">关 闭</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { listMember, getMember, delMember, updateMember } from "@/api/biz/member"
+import { listMember, getMember, delMember, addMember, updateMember, decryptPhone } from "@/api/biz/member"
 
 export default {
   name: "Member",
@@ -196,6 +232,14 @@ export default {
         createTime: null
       },
       showMerchantFilter: this.isShowMerchantFilter(),
+      // 查看完整手机号弹窗
+      phoneDialog: false,
+      phoneTarget: null,
+      phoneFull: '',
+      phoneForm: { reason: '' },
+      phoneRules: {
+        reason: [{ required: true, message: '请填写解密原因（必填，将写入审计日志）', trigger: 'blur' }]
+      },
       form: {},
       rules: {
         nickname: [
@@ -264,6 +308,20 @@ export default {
         status: null
       };
       this.handleQuery();
+    },
+    handleViewPhone(row) {
+      this.phoneTarget = row
+      this.phoneFull = ''
+      this.phoneForm = { reason: '' }
+      this.phoneDialog = true
+    },
+    submitViewPhone() {
+      this.$refs.phoneForm.validate(valid => {
+        if (!valid) return
+        decryptPhone('member', this.phoneTarget.memberId, this.phoneForm.reason).then(res => {
+          this.phoneFull = res.data || res
+        }).catch(() => {})
+      })
     },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.memberId);

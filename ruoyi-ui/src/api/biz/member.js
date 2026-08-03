@@ -42,3 +42,12 @@ export function delMember(memberId) {
     method: 'delete'
   })
 }
+
+// 查看完整手机号（脱敏反操作，需 biz:phone:decrypt 权限，写审计日志）
+export function decryptPhone(bizType, bizId, reason) {
+  return request({
+    url: '/biz/phone/decrypt',
+    method: 'post',
+    data: { bizType, bizId, reason }
+  })
+}
