@@ -5,6 +5,8 @@ App({
   onLaunch() {
     // 启动时拉一次会员资料（如果本地有 token），让「我的」页能直接显示真实头像/昵称/手机号
     if (this.bootUser) this.bootUser()
+    // 启动时拉一次商家公开信息（商家名/客服兜底），登录页/我的页/联系客服都用得到
+    if (this.bootMerchant) this.bootMerchant()
   },
   globalData: {
     // 位置/门店
@@ -26,7 +28,9 @@ App({
       logged: false
     },
     shareDistributorId: null,
-    inviteBy: null
+    inviteBy: null,
+    // 当前商家公开信息（名称/logo/客服兜底/营业时间）
+    merchant: { merchantId: null, merchantName: '', logo: '', servicePhone: '', serviceQrcode: '', businessHours: '', intro: '' }
   },
   mockEnabled: mockEnabled,
   api,
@@ -87,6 +91,21 @@ App({
         wx.removeStorageSync('token')
         wx.removeStorageSync('memberId')
       }
+    })
+  },
+
+  /**
+   * 启动时拉取当前商家公开信息（匿名接口），写到 globalData.merchant
+   * 登录页要显示商家名、联系客服要从这里读客服兜底
+   */
+  bootMerchant() {
+    return api.merchantInfo().then((m) => {
+      const data = m && (m.data || m)
+      if (data && data.merchantId) {
+        this.globalData.merchant = Object.assign(this.globalData.merchant, data)
+      }
+    }).catch((err) => {
+      console.warn('[app] bootMerchant FAIL', err)
     })
   },
 

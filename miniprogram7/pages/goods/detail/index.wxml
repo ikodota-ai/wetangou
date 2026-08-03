@@ -65,7 +65,7 @@
     <view class="store-row">
       <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>
       <view class="store-info">
-        <text class="store-name">{{product.storeName || '菌鑫来餐饮'}}</text>
+        <text class="store-name">{{product.storeName || merchantName}}</text>
         <view class="store-rating">
           <view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view>
           <text class="rating-t">暂无评分</text>

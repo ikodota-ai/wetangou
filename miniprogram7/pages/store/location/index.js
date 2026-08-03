@@ -4,10 +4,14 @@ Page({
     latitude: 0,
     longitude: 0,
     storeName: '',
+    merchantName: '',
     address: '',
     markers: []
   },
   onLoad() {
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {}
+    const m = (appInst.globalData && appInst.globalData.merchant) || {}
+    this.setData({ merchantName: m.merchantName || '当前商家' })
     const s = app.globalData.store || (app.globalData.stores && app.globalData.stores[0]);
     if (s && s.latitude != null && s.longitude != null) {
       this.setData({

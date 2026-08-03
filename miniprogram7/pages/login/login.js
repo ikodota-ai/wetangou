@@ -4,7 +4,15 @@ const { api, APPID } = require('../../utils/request.js')
 Page({
   data: {
     agreed: false,
-    submitting: false
+    submitting: false,
+    merchantName: ''
+  },
+
+  onLoad() {
+    // 优先用 app.js bootMerchant 拉到的商家名，没有则回退到一个本地占位
+    const appInst = getApp() || {}
+    const m = (appInst.globalData && appInst.globalData.merchant) || {}
+    this.setData({ merchantName: m.merchantName || '当前商家' })
   },
 
   toggleAgree() { this.setData({ agreed: !this.data.agreed }) },

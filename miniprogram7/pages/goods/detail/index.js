@@ -17,9 +17,11 @@ Page({
   onLoad(opts) {
     // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
     const appInst = (typeof getApp === 'function' ? getApp() : null) || {};
+    const m = (appInst.globalData && appInst.globalData.merchant) || {}
     this.setData({
       id: opts.id,
-      user: (appInst.globalData && appInst.globalData.user) || { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
+      user: (appInst.globalData && appInst.globalData.user) || { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' },
+      merchantName: m.merchantName || '当前商家'
     });
     this.loadProduct(opts.id);
   },

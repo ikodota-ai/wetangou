@@ -149,7 +149,9 @@ const api = {
   // 协议：后端为单接口按 type 区分
   agreement: (type) => request('/api/agreement', { data: { type } }),
   agreementUser: () => request('/api/agreement', { data: { type: 'user' } }),
-  agreementPrivacy: () => request('/api/agreement', { data: { type: 'privacy' } })
+  agreementPrivacy: () => request('/api/agreement', { data: { type: 'privacy' } }),
+  // 当前商家公开信息（匿名接口，根据 X-App-Id 解析）
+  merchantInfo: () => request('/api/merchant/info')
 };
 
 module.exports = {

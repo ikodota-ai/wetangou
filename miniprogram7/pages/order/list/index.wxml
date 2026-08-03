@@ -27,7 +27,7 @@
   <view class="list" wx:else>
     <view class="card item" wx:for="{{list}}" wx:key="orderId" data-id="{{item.orderId}}" bindtap="goDetail">
       <view class="row1">
-        <text class="shop">{{item.shop || '菌鑫来餐饮'}}</text>
+        <text class="shop">{{item.shop || merchantName}}</text>
         <text class="status">{{item.statusText}}</text>
       </view>
       <view class="goods">

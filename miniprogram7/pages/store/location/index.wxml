@@ -1,7 +1,7 @@
 <view class="page">
   <map id="map" class="map" latitude="{{latitude}}" longitude="{{longitude}}" markers="{{markers}}" show-location></map>
   <view class="info card">
-    <text class="i-name">菌鑫来餐饮</text>
+    <text class="i-name">{{merchantName}}</text>
     <text class="i-addr">花城街道建设北路222号101房自编3号</text>
     <view class="i-row">
       <text class="i-dist">距你 1209 公里</text>

@@ -35,19 +35,25 @@ Page({
   },
   loadData() {
     app.pickNearestStore((store) => {
-      console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300));
+      console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300))
       // 后端字段是 storeName / businessHours，WXML 用了 name / hours，这里做一次兼容
       const viewStore = store ? Object.assign({}, store, {
         name: store.storeName || store.name || '',
         hours: store.businessHours || store.hours || '',
         logo: store.logo ? toFullUrl(store.logo) : ''
-      }) : {};
+      }) : {}
+      // 客服信息：门店优先，商家兜底
+      const m = (app.globalData && app.globalData.merchant) || {},
+            sp = (store && (store.servicePhone || store.phone)) || m.servicePhone || '',
+            sq = (store && store.serviceQrcode) || m.serviceQrcode || '',
+            sh = (store && (store.businessHours || store.hours)) || m.businessHours || ''
       this.setData({
         store: viewStore,
         goods: app.globalData.goods,
-        phone: (store && (store.servicePhone || store.phone)) || '',
-        qrcode: (store && store.serviceQrcode) ? toFullUrl(store.serviceQrcode) : ''
-      });
+        phone: sp,
+        qrcode: sq ? toFullUrl(sq) : '',
+        businessHours: sh
+      })
       if (store && store.storeId) {
         this.loadBanners(store.storeId);
         this.loadFacilities(store.storeId);

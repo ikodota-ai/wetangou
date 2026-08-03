@@ -19,10 +19,12 @@ const STATUS_TEXT = {
 };
 
 Page({
-  data: { tab: 'all', list: [], loading: false, loaded: false },
+  data: { tab: 'all', list: [], loading: false, loaded: false, merchantName: '' },
   onLoad(opts) {
-    this.setData({ tab: opts.type || 'all' });
-    this.loadList();
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {}
+    const m = (appInst.globalData && appInst.globalData.merchant) || {}
+    this.setData({ tab: opts.type || 'all', merchantName: m.merchantName || '当前商家' })
+    this.loadList()
   },
   // 从详情页返回或支付回来时刷新，保证状态是最新的
   onShow() {

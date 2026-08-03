@@ -53,6 +53,22 @@ public class Merchant extends BaseEntity
     @Excel(name = "联系电话")
     private String phone;
 
+    /** 客服电话（门店未配时兜底） */
+    @Excel(name = "客服电话")
+    private String servicePhone;
+
+    /** 客服二维码（门店未配时兜底） */
+    @Excel(name = "客服二维码")
+    private String serviceQrcode;
+
+    /** 营业时间（门店未配时兜底） */
+    @Excel(name = "营业时间")
+    private String businessHours;
+
+    /** 商家简介 */
+    @Excel(name = "商家简介")
+    private String intro;
+
     /** 营业执照号 */
     private String licenseNo;
 
@@ -353,6 +369,15 @@ public class Merchant extends BaseEntity
     {
         this.delFlag = delFlag;
     }
+
+    public String getServicePhone() { return servicePhone; }
+    public void setServicePhone(String servicePhone) { this.servicePhone = servicePhone; }
+    public String getServiceQrcode() { return serviceQrcode; }
+    public void setServiceQrcode(String serviceQrcode) { this.serviceQrcode = serviceQrcode; }
+    public String getBusinessHours() { return businessHours; }
+    public void setBusinessHours(String businessHours) { this.businessHours = businessHours; }
+    public String getIntro() { return intro; }
+    public void setIntro(String intro) { this.intro = intro; }
 
     @Override
     public String toString()
