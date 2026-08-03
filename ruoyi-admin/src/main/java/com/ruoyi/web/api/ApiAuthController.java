@@ -103,6 +103,12 @@ public class ApiAuthController
             {
                 member.setAvatar(avatarUrl);
             }
+            // 已存在会员且 invite_by 为空时，补一次邀请人（避免冷启动登录没拿到 inviteBy 后续回填）
+            if (member.getInviteBy() == null && inviteBy != null && isValidInviter(merchantId, inviteBy))
+            {
+                member.setInviteBy(inviteBy);
+                member.setInviteTime(new Date());
+            }
             memberService.updateMember(member);
         }
 

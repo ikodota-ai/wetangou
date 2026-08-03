@@ -39,6 +39,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by d.distributor_id desc
     </select>
     
+    <select id="selectDistributorByMemberId" resultMap="DistributorResult">
+        select distributor_id, member_id, level, total_commission, available_amount, frozen_amount,
+               withdraw_amount, status, join_time, create_time, update_time, merchant_id
+        from biz_distributor
+        where merchant_id = #{merchantId} and member_id = #{memberId}
+        limit 1
+    </select>
+
     <select id="selectDistributorByDistributorId" parameterType="Long" resultMap="DistributorResult">
         <include refid="selectDistributorVo"/>
         where d.distributor_id = #{distributorId}
@@ -101,8 +109,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{distributorId}
         </foreach>
     </delete>
-</mapper>
-    <update id="incFrozenAmount" parameterType="map">
+
+<update id="incFrozenAmount" parameterType="map">
         update biz_distributor
         set frozen_amount = ifnull(frozen_amount, 0) + #{delta}
         where distributor_id = #{distributorId}
@@ -113,3 +121,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         set available_amount = ifnull(available_amount, 0) + #{delta}
         where distributor_id = #{distributorId}
     </update>
+</mapper>

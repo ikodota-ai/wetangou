@@ -14,6 +14,11 @@ public interface DistributorMapper
 {
     public Distributor selectDistributorByDistributorId(Long distributorId);
 
+    /**
+     * 按商户+会员查推客（用于订单自动归属）
+     */
+    public Distributor selectDistributorByMemberId(@org.apache.ibatis.annotations.Param("merchantId") Long merchantId, @org.apache.ibatis.annotations.Param("memberId") Long memberId);
+
     public List<Distributor> selectDistributorList(Distributor distributor);
 
     public int insertDistributor(Distributor distributor);

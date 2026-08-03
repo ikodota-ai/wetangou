@@ -18,6 +18,7 @@ import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.IMemberVoucherService;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IDistributorService;
+import com.ruoyi.biz.mapper.DistributorMapper;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Distributor;
 
@@ -46,6 +47,9 @@ public class ApiOrderService
 
     @Autowired
     private IDistributorService distributorService;
+
+    @Autowired
+    private DistributorMapper distributorMapper;
 
     /**
      * 会员下单（到店自取）：生成待付款订单，含核销码占位
@@ -106,12 +110,10 @@ public class ApiOrderService
         if (order.getDistributorId() == null) {
             Member me = memberService.selectMemberByMemberId(memberId);
             if (me != null && me.getInviteBy() != null) {
-                Distributor dq = new Distributor();
-                dq.setMemberId(me.getInviteBy());
-                dq.setMerchantId(me.getMerchantId());
-                java.util.List<Distributor> ds = distributorService.selectDistributorList(dq);
-                if (ds != null && !ds.isEmpty()) {
-                    order.setDistributorId(ds.get(0).getDistributorId());
+                // 精准查推客（避免 selectDistributorList 走通用 mapper 出现 "Column merchant_id ambiguous"）
+                com.ruoyi.biz.domain.Distributor d = distributorMapper.selectDistributorByMemberId(me.getMerchantId(), me.getInviteBy());
+                if (d != null && "0".equals(d.getStatus())) {
+                    order.setDistributorId(d.getDistributorId());
                 }
             }
         }

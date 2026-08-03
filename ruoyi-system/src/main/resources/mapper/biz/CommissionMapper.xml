@@ -112,10 +112,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{commissionId}
         </foreach>
     </delete>
-</mapper>
 
-
-    <select id="selectSettleGroupsByTime" parameterType="Date" resultType="map">
+<select id="selectSettleGroupsByTime" parameterType="Date" resultType="map">
         select distributor_id as distributorId, sum(amount) as totalAmount, count(*) as cnt
         from biz_commission
         where settle_time = #{settleTime} and settled_to_distributor = 0
@@ -126,3 +124,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update biz_commission set settled_to_distributor = 1
         where settle_time = #{settleTime} and settled_to_distributor = 0
     </update>
+</mapper>

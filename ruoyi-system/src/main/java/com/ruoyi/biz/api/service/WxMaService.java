@@ -70,8 +70,9 @@ public class WxMaService
         }
         String appId = wxMaConfig.getAppId(merchantId);
         String secret = wxMaConfig.getSecret(merchantId);
-        // 本地联调模式：无真实appId时，用code派生openid，便于全链路测试
-        if (wxMaConfig.isMockEnabled(merchantId) && StringUtils.isEmpty(appId))
+        // 本地联调模式：mock 开关开启时直接用 code 派生 openid（即便有 appId 也优先 mock，
+        // 避免真实微信 code 过期/无效时无法联调）
+        if (wxMaConfig.isMockEnabled(merchantId))
         {
             JSONObject mock = new JSONObject();
             mock.put("openid", "mock_" + jsCode);
