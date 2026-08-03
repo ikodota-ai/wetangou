@@ -132,11 +132,15 @@ Page({
       return
     }
     wx.showLoading({ title: '授权中' })
+    console.log('[profile] POST /api/member/phone code=', e.detail.code)
     api.updatePhone({ code: e.detail.code }).then((res) => {
       wx.hideLoading()
+      console.log('[profile] /api/member/phone response =>', JSON.stringify(res))
       const phone = res && (res.phone || (res.data && res.data.phone))
       if (!phone) {
-        wx.showToast({ title: '绑定失败，请重试', icon: 'none' })
+        // 后端 200 但没回 phone —— 可能是 getuserphonenumber 报错被吞了
+        const msg = (res && (res.msg || (res.data && res.data.msg))) || '后端未返回 phone 字段'
+        wx.showModal({ title: '绑定失败', content: '后端响应: ' + JSON.stringify(res).slice(0, 300), showCancel: false })
         return
       }
       const appInst = getApp() || {}
@@ -148,7 +152,13 @@ Page({
       wx.showToast({ title: '已绑定', icon: 'success' })
     }).catch((err) => {
       wx.hideLoading()
-      wx.showToast({ title: (err && err.msg) || '绑定失败，请重试', icon: 'none' })
+      console.error('[profile] /api/member/phone FAIL =>', err)
+      // 区分网络层失败 vs 后端 4xx/5xx
+      const content = (err && err.errMsg) ? '网络层失败: ' + err.errMsg
+                    : (err && err.msg) ? '后端报错: ' + err.msg
+                    : (err && err.statusCode) ? 'HTTP ' + err.statusCode + '：' + JSON.stringify(err.data || {}).slice(0, 200)
+                    : '未知错误: ' + JSON.stringify(err).slice(0, 200)
+      wx.showModal({ title: '请求 /api/member/phone 失败', content: content, showCancel: false })
     })
   },
 
