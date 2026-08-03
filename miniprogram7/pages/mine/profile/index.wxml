@@ -19,9 +19,11 @@
       <view class="row-right">
         <block wx:if="{{user.phone}}">
           <text class="val">{{user.phone}}</text>
+          <text class="rebind" bindtap="showPhoneSheet">重新获取</text>
         </block>
         <block wx:else>
-          <button class="phone-btn" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone" hover-class="none">获取</button>
+          <text class="val placeholder">未绑定</text>
+          <text class="rebind" bindtap="showPhoneSheet">去获取</text>
         </block>
         <view class="arr"></view>
       </view>
@@ -32,7 +34,7 @@
     <view class="save-btn" bindtap="onSave">保存</view>
   </view>
 
-  <!-- 头像选择面板（无标题） -->
+  <!-- 头像选择面板 -->
   <view class="sheet-mask" wx:if="{{showAvatar}}" catchtap="hideAvatarSheet">
     <view class="sheet-box" catchtap="noop">
       <view class="sheet-item" bindtap="chooseImage">
@@ -51,14 +53,14 @@
     </view>
   </view>
 
-  <!-- 昵称编辑面板（居中标题 + 下方确定按钮） -->
+  <!-- 昵称编辑面板 -->
   <view class="sheet-mask" wx:if="{{showNick}}" catchtap="hideNickSheet">
     <view class="sheet-box nick-box" catchtap="noop">
       <view class="nick-center">
         <text class="nick-title">修改昵称</text>
       </view>
       <view class="nick-input-wrap">
-        <input class="nick-input" type="nickname" value="{{editingNick}}" bindinput="onNickInput" placeholder="请输入昵称" />
+        <input class="nick-input" type="nickname" value="{{editingNick}}" bindinput="onNickInput" placeholder="请输入或选择微信昵称" />
       </view>
       <view class="use-wx-nick" wx:if="{{wxNickName}}" bindtap="useWxNick">
         <text class="wx-tip">用微信昵称：</text>
@@ -66,6 +68,26 @@
       </view>
       <view class="nick-btn-wrap">
         <view class="nick-btn" bindtap="saveNick">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 手机号授权/重取弹窗 -->
+  <view class="sheet-mask" wx:if="{{showPhone}}" catchtap="hidePhoneSheet">
+    <view class="sheet-box" catchtap="noop">
+      <view class="sheet-item sheet-center">
+        <text class="sheet-title">{{user.phone ? '重新获取手机号' : '绑定手机号'}}</text>
+        <text class="sheet-sub">用于在该商户下单/核销，授权后会替换原手机号</text>
+      </view>
+      <view class="sheet-divider"></view>
+      <view class="sheet-item">
+        <button class="sheet-btn primary" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone" hover-class="none">
+          {{user.phone ? '重新获取微信手机号' : '一键获取微信手机号'}}
+        </button>
+      </view>
+      <view class="sheet-divider"></view>
+      <view class="sheet-item cancel" bindtap="hidePhoneSheet">
+        <text class="sheet-t">取消</text>
       </view>
     </view>
   </view>

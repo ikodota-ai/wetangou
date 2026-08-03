@@ -17,11 +17,12 @@
         <text>手机号（用于下单/核销，不用于营销推送）</text>
       </view>
     </view>
+    <view class="perm-tip">登录后会进入首页，昵称/头像/手机号可在「我的」-「会员资料」里分步完善</view>
   </view>
 
   <view class="btns">
     <button class="btn-primary" bindtap="onLogin" hover-class="none" disabled="{{submitting}}">
-      {{submitting ? '授权中...' : '授权登录'}}
+      {{submitting ? '登录中...' : '授权登录'}}
     </button>
     <button class="btn-ghost" bindtap="onSkip" hover-class="none">暂不登录</button>
   </view>
@@ -31,37 +32,5 @@
     <text class="agree-text">我已阅读并同意</text>
     <text class="link" bindtap="goAgreement" data-type="user">《用户注册协议》</text>
     <text class="link" bindtap="goAgreement" data-type="privacy">《隐私协议》</text>
-  </view>
-
-  <!-- 昵称授权弹窗：使用 input type="nickname" 让微信自动填入 -->
-  <view class="modal-mask" wx:if="{{showNickModal}}" catchtap="hideNickModal">
-    <view class="modal-box" catchtap="noop">
-      <text class="modal-title">设置昵称</text>
-      <input class="modal-input" type="nickname" value="{{nickInput}}" bindinput="onNickInput" placeholder="请输入或选择微信昵称" />
-      <button class="btn-primary btn-full" bindtap="onConfirmNick" hover-class="none">下一步</button>
-      <view class="modal-cancel" bindtap="hideNickModal">取消</view>
-    </view>
-  </view>
-
-  <!-- 头像授权弹窗：使用 button open-type="chooseAvatar" -->
-  <view class="modal-mask" wx:if="{{showAvatarModal}}" catchtap="hideAvatarModal">
-    <view class="modal-box" catchtap="noop">
-      <text class="modal-title">设置头像</text>
-      <view class="avatar-row">
-        <image class="avatar-preview" src="{{avatarUrl || '/assets/avatar/default.png'}}" mode="aspectFill"></image>
-      </view>
-      <button class="btn-primary btn-full" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" hover-class="none">选择微信头像</button>
-      <view class="modal-cancel" bindtap="hideAvatarModal">取消</view>
-    </view>
-  </view>
-
-  <!-- 手机号授权弹窗：使用 button open-type="getPhoneNumber" -->
-  <view class="modal-mask" wx:if="{{showPhoneModal}}" catchtap="hidePhoneModal">
-    <view class="modal-box" catchtap="noop">
-      <text class="modal-title">绑定手机号</text>
-      <text class="modal-sub">用于在该商户下单/核销，授权后自动绑定到当前账号</text>
-      <button class="btn-primary btn-full" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" hover-class="none">授权并完成登录</button>
-      <view class="modal-cancel" bindtap="hidePhoneModal">取消</view>
-    </view>
   </view>
 </view>

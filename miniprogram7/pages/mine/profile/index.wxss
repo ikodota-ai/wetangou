@@ -206,3 +206,14 @@
   font-size: 30rpx;
   font-weight: 600;
 }
+
+/* 手机号行：未绑定/重新获取 */
+.phone-row .row-right { align-items: center; }
+.rebind { font-size: 24rpx; color: var(--color-link); margin-left: 16rpx; padding: 4rpx 0; }
+.placeholder { color: #BBB !important; }
+
+/* phone sheet 标题 */
+.sheet-item.sheet-center { padding: 24rpx 16rpx 8rpx; }
+.sheet-title { display: block; text-align: center; font-size: 32rpx; font-weight: 600; color: #1A1A1A; }
+.sheet-sub { display: block; text-align: center; font-size: 24rpx; color: #999; margin-top: 8rpx; line-height: 1.5; }
+.sheet-btn.primary { background: var(--color-primary); color: #FFFFFF; border-radius: 0; }

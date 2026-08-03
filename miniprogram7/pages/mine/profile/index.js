@@ -6,6 +6,7 @@ Page({
     user: {},
     showAvatar: false,
     showNick: false,
+    showPhone: false,
     editingNick: '',
     wxNickName: ''
   },
@@ -119,6 +120,8 @@ Page({
   },
 
   // 微信新版 getPhoneNumber：e.detail.code 交给后端换号，成功后 user.phone 立刻可见
+  showPhoneSheet() { this.setData({ showPhone: true }) },
+  hidePhoneSheet() { this.setData({ showPhone: false }) },
   onGetPhone(e) {
     // 调试日志：完整 dump 微信回调，便于排查
     console.log('[profile] onGetPhone detail =>', JSON.stringify(e.detail))
@@ -147,7 +150,7 @@ Page({
       appInst.globalData = appInst.globalData || {}
       appInst.globalData.user = appInst.globalData.user || {}
       appInst.globalData.user.phone = phone
-      this.setData({ user: appInst.globalData.user })
+      this.setData({ user: appInst.globalData.user, showPhone: false })
       appInst.notifyUserUpdate && appInst.notifyUserUpdate()
       wx.showToast({ title: '已绑定', icon: 'success' })
     }).catch((err) => {
@@ -173,11 +176,7 @@ Page({
       wx.showToast({ title: '请设置昵称', icon: 'none' })
       return
     }
-    // 手机号已通过 onGetPhone 同步给后端，这里只判一下做提示
-    if (!u.phone) {
-      wx.showToast({ title: '请先获取手机号', icon: 'none' })
-      return
-    }
+    // 手机号可选（已通过 onGetPhone 同步给后端）
     wx.showToast({ title: '已保存', icon: 'success' })
     setTimeout(() => wx.navigateBack(), 600)
   },
