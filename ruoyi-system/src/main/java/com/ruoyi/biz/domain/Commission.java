@@ -62,6 +62,9 @@ public class Commission extends BaseEntity
     @Excel(name = "结算时间", width = 30, dateFormat = "yyyy-MM-dd")
     private Date settleTime;
 
+    /** 已联动推客冻结/可用金额（0否 1是），避免重复扣减 */
+    private Integer settledToDistributor;
+
     public void setCommissionId(Long commissionId) 
     {
         this.commissionId = commissionId;
@@ -154,6 +157,16 @@ public class Commission extends BaseEntity
         return settleTime;
     }
 
+    public void setSettledToDistributor(Integer settledToDistributor)
+    {
+        this.settledToDistributor = settledToDistributor;
+    }
+
+    public Integer getSettledToDistributor()
+    {
+        return settledToDistributor;
+    }
+
     public Long getMerchantId()
     {
         return merchantId;
@@ -175,6 +188,7 @@ public class Commission extends BaseEntity
             .append("rate", getRate())
             .append("status", getStatus())
             .append("settleTime", getSettleTime())
+            .append("settledToDistributor", getSettledToDistributor())
             .append("createTime", getCreateTime())
             .toString();
     }

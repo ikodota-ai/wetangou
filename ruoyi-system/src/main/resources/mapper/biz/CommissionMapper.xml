@@ -17,12 +17,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rate"    column="rate"    />
         <result property="status"    column="status"    />
         <result property="settleTime"    column="settle_time"    />
+        <result property="settledToDistributor"    column="settled_to_distributor"    />
         <result property="createTime"    column="create_time"    />
     </resultMap>
 
     <sql id="selectCommissionVo">
         select c.commission_id, c.distributor_id, c.order_id, o.order_no, c.store_id, s.store_name,
-               m.nickname as member_name, c.amount, c.rate, c.status, c.settle_time, c.create_time, c.merchant_id
+               m.nickname as member_name, c.amount, c.rate, c.status, c.settle_time, c.settled_to_distributor, c.create_time, c.merchant_id
         from biz_commission c
         left join biz_store s on s.store_id = c.store_id
         left join biz_order o on o.order_id = c.order_id
@@ -112,3 +113,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 </mapper>
+
+
+    <select id="selectSettleGroupsByTime" parameterType="Date" resultType="map">
+        select distributor_id as distributorId, sum(amount) as totalAmount, count(*) as cnt
+        from biz_commission
+        where settle_time = #{settleTime} and settled_to_distributor = 0
+        group by distributor_id
+    </select>
+
+    <update id="markSettledByTime" parameterType="Date">
+        update biz_commission set settled_to_distributor = 1
+        where settle_time = #{settleTime} and settled_to_distributor = 0
+    </update>

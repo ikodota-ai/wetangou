@@ -102,3 +102,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 </mapper>
+    <update id="incFrozenAmount" parameterType="map">
+        update biz_distributor
+        set frozen_amount = ifnull(frozen_amount, 0) + #{delta}
+        where distributor_id = #{distributorId}
+    </update>
+
+    <update id="incAvailableAmount" parameterType="map">
+        update biz_distributor
+        set available_amount = ifnull(available_amount, 0) + #{delta}
+        where distributor_id = #{distributorId}
+    </update>
