@@ -120,12 +120,15 @@ Page({
 
   // 微信新版 getPhoneNumber：e.detail.code 交给后端换号，成功后 user.phone 立刻可见
   onGetPhone(e) {
+    // 调试日志：完整 dump 微信回调，便于排查
+    console.log('[profile] onGetPhone detail =>', JSON.stringify(e.detail))
     if (e.detail.errMsg !== 'getPhoneNumber:ok') {
-      wx.showToast({ title: '取消授权', icon: 'none' })
+      // 拒绝 / 取消 / 工具模拟都会进这里
+      wx.showModal({ title: '未授权', content: e.detail.errMsg || '用户取消授权', showCancel: false })
       return
     }
     if (!e.detail.code) {
-      wx.showToast({ title: '授权失败，请重试', icon: 'none' })
+      wx.showModal({ title: '授权失败', content: '微信未返回 code。errMsg=' + e.detail.errMsg, showCancel: false })
       return
     }
     wx.showLoading({ title: '授权中' })
