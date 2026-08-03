@@ -194,7 +194,27 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="营业执照号" prop="licenseNo">
+                      <el-col :span="12">
+            <el-form-item label="客服电话" prop="servicePhone">
+              <el-input v-model="form.servicePhone" placeholder="门店未配置时小程序客服兜底" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="营业时间" prop="businessHours">
+              <el-input v-model="form.businessHours" placeholder="如 09:00-22:00" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="客服二维码" prop="serviceQrcode">
+              <image-upload v-model="form.serviceQrcode" :limit="1" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="商家简介" prop="intro">
+              <el-input v-model="form.intro" type="textarea" :rows="3" placeholder="小程序首页/联系客服展示" />
+            </el-form-item>
+          </el-col>
+<el-form-item label="营业执照号" prop="licenseNo">
               <el-input v-model="form.licenseNo" placeholder="请输入营业执照号" />
             </el-form-item>
           </el-col>
