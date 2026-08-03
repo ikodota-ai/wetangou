@@ -3,6 +3,7 @@ package com.ruoyi.biz.mapper;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.biz.domain.Member;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 会员Mapper接口
@@ -26,7 +27,7 @@ public interface MemberMapper
      * @param openid 微信openid
      * @return 会员
      */
-    public Member selectMemberByOpenid(@Param("merchantId") Long merchantId, @Param("openid") String openid);
+    public Member selectMemberByOpenid(@Param("merchantId") @NotNull Long merchantId, @Param("openid") String openid);
 
     /**
      * 查询会员列表

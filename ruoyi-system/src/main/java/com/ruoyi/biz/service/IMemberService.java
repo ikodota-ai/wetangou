@@ -1,6 +1,7 @@
 package com.ruoyi.biz.service;
 
 import java.util.List;
+import jakarta.validation.constraints.NotNull;
 import com.ruoyi.biz.domain.Member;
 
 /**
@@ -22,7 +23,7 @@ public interface IMemberService
     /**
      * 根据openid查询会员
      */
-    public Member selectMemberByOpenid(Long merchantId, String openid);
+    public Member selectMemberByOpenid(@NotNull Long merchantId, String openid);
 
     /**
      * 查询会员列表

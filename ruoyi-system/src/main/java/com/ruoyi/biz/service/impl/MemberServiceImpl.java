@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.biz.mapper.MemberMapper;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.service.IMemberService;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 会员Service业务层处理
@@ -36,8 +37,13 @@ public class MemberServiceImpl implements IMemberService
      * 根据openid查询会员
      */
     @Override
-    public Member selectMemberByOpenid(Long merchantId, String openid)
+    public Member selectMemberByOpenid(@NotNull Long merchantId, String openid)
     {
+        if (merchantId == null)
+        {
+            // 防御性：merchantId 为 null 会让 SQL 退化为「openid 全平台唯一匹配」，跨商户串数据
+            throw new IllegalArgumentException("selectMemberByOpenid: merchantId 不能为空");
+        }
         return memberMapper.selectMemberByOpenid(merchantId, openid);
     }
 
