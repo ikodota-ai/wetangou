@@ -161,7 +161,7 @@ public class ApiBillController
         Member member = memberService.selectMemberByMemberId(MemberContextHolder.getMemberId());
         String openid = member == null ? null : member.getOpenid();
         int fen = WxPayService.yuanToFen(bill.getPayAmount());
-        JSONObject payParams = wxPayService.createJsapiOrder(bill.getBillNo(), "买单-" + bill.getBillNo(), fen, openid);
+        JSONObject payParams = wxPayService.createJsapiOrderByMerchant(bill.getMerchantId(), bill.getBillNo(), "买单-" + bill.getBillNo(), fen, openid);
         return AjaxResult.success(payParams);
     }
 

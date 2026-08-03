@@ -92,7 +92,7 @@ public class ApiOrderController
         Member member = memberService.selectMemberByMemberId(MemberContextHolder.getMemberId());
         String openid = member == null ? null : member.getOpenid();
         int fen = WxPayService.yuanToFen(order.getPayAmount());
-        JSONObject payParams = wxPayService.createJsapiOrder(order.getOrderNo(), "订单-" + order.getOrderNo(), fen, openid);
+        JSONObject payParams = wxPayService.createJsapiOrderByMerchant(order.getMerchantId(), order.getOrderNo(), "订单-" + order.getOrderNo(), fen, openid);
         return AjaxResult.success(payParams);
     }
 
