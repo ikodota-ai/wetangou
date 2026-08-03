@@ -348,6 +348,27 @@ Jackson 3 序列化时按当前用户角色判断：
 
 ---
 
+### 4.10 小程序商家公开信息接口（`/api/merchant/info`）
+
+C 端小程序登录页 / 我的页 / 联系客服页需要展示商家名、Logo、客服电话、客服二维码、营业时间、简介。
+匿名接口由 `ApiMerchantController` 提供：
+
+- 请求头 `X-App-Id` 携带小程序 appid → `TenantService.getMerchantByAppid` 找到对应商户
+- 缺 `X-App-Id` 或未匹配到商家**直接返回 400 "未匹配到商家"**，不静默兜底
+  （多租户契约：一个 appid 对应唯一商户，忘带 header 应当立刻暴露 bug，而不是拿到别人家数据）
+- 所有图片字段都过 `ImageUrlUtils.toAbsolute`，包 try/catch 防御
+- `servicePhone` / `serviceQrcode` / `businessHours` / `intro` 由商家级兜底（门店未配时使用商家级）
+
+### 4.11 Spring Boot 3.4 + Tomcat 11 错误恢复路径 ClassNotFound 修复
+
+Spring Boot 3.4 + Tomcat 11 nested fat-jar + Java 25 在错误恢复路径上会触发
+`ClassNotFoundException: org.apache.tomcat.util.buf.C2BConverter` 和
+`org.apache.catalina.core.ApplicationContext$DispatchData`，导致原本 401 的请求退化为 500。
+修复方式：`AuthenticationEntryPointImpl` 直接 `response.getOutputStream().write(bytes)` 写字节，
+绕过 `response.getWriter()` 的 C2BConverter 转换。
+
+---
+
 ## 五、模块结构
 
 ```
@@ -460,55 +481,39 @@ unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiAppl
 
 ---
 
-## 八、已交付（plan 11/11 ✅）
+## 八、已交付（plan 11/11 ✅ + 增量 5 项）
 
-| # | 模块 | 状态 |
-|---|---|---|
-| 1 | 门店端操作鉴权（order/verify、bill/confirm、booking/cancel） | ✅ |
-| 2 | 关闭 mock 兜底（生产环境） | ✅ |
-| 3 | datetime 字段序列化精度修复（后端+前端） | ✅ |
-| 4 | 推客粉丝邀请机制（invite_by + 海报页） | ✅ |
-| 5 | 19 个业务页加「商户」筛选列 | ✅ |
-| 6 | 手机号加密数据后端解密（@Sensitive 全链路脱敏） | ✅ |
-| 7 | WxPayService 按商户取支付凭证 + 回调路由 | ✅ |
-| 8 | 微信第三方平台代发布真实接入 | ✅ |
-| 9 | sys_user ↔ 业务用户表身份回填 | ✅ |
-| 10 | 佣金冷静期自动结算定时任务 | ✅ |
-| 11 | 首页 banner 后端化 + 文档同步 | ✅ |
+| # | 模块 | 状态 | 关键 commit |
+|---|---|---|---|
+| 1 | 门店端操作鉴权（order/verify、bill/confirm、booking/cancel） | ✅ | — |
+| 2 | 关闭 mock 兜底（生产环境） | ✅ | — |
+| 3 | datetime 字段序列化精度修复（后端 Jackson + 前端展示） | ✅ | — |
+| 4 | 推客粉丝邀请机制（invite_by + scene 解析 + 海报页） | ✅ | `8639bb2d` |
+| 5 | 19 个业务页加「商户」筛选列（BizSelect 公共组件） | ✅ | — |
+| 6 | 手机号解密（`/biz/phone/decrypt` + 会员页「查看完整」+ 审计） | ✅ | `f0e55e76` |
+| 7 | WxPayService 按商户取支付凭证（`createJsapiOrderByMerchant` + 双入口回调路由） | ✅ | `c9e515f5` |
+| 8 | 微信第三方平台真实接入（ticket 回调 + preauthcode + ext_json + commit + token 轮换） | ✅ | `2226ab92` |
+| 9 | sys_user ↔ 业务用户表身份回填（`biz_merchant_user` 路由 + `TenantIdentityResolver` + `getInfo` 回传） | ✅ | — |
+| 10 | 佣金冷静期 Quartz（`SettleCommissionTask` + 推客 frozenAmount/availableAmount 联动 + `settled_to_distributor` 防重） | ✅ | `80674a87` |
+| 11 | 首页 banner 后端化（CRUD UI + `/api/banner/list` + 小程序首页接入） | ✅ | — |
+| 12 | pom 改用 `--release 17`（产物字节码 100% Java 17 兼容，JDK 17/21/25 都能跑） | ✅ | `0416420f` |
+| 13 | `/api/merchant/info` 强制 X-App-Id（缺 header 400，移除静默兜底） | ✅ | `c1f33805` |
+| 14 | Spring Boot 3.4 + Tomcat 11 nested fat-jar ClassNotFound 修复（EntryPoint 改字节流） | ✅ | `49805ff5` |
+| 15 | 小程序「我的」登录态从真实会员资料回填 + 推客海报页 + 商家客服兜底 | ✅ | `4209e256` |
 
-详见 `doc/多商户与代理商改造方案.md`。
-
----
-
-### 4.10 小程序商家公开信息接口（`/api/merchant/info`）
-
-C 端小程序登录页 / 我的页 / 联系客服页需要展示商家名、Logo、客服电话、客服二维码、营业时间、简介。
-匿名接口由 `ApiMerchantController` 提供：
-
-- 请求头 `X-App-Id` 携带小程序 appid → `TenantService.getMerchantByAppid` 找到对应商户
-- 缺 `X-App-Id` 或未匹配到商家**直接返回 400 "未匹配到商家"**，不静默兜底
-  （多租户契约：一个 appid 对应唯一商户，忘带 header 应当立刻暴露 bug，而不是拿到别人家数据）
-- 所有图片字段都过 `ImageUrlUtils.toAbsolute`，包 try/catch 防御
-- `servicePhone` / `serviceQrcode` / `businessHours` / `intro` 由商家级兜底（门店未配时使用商家级）
-
-### 4.11 Spring Boot 3.4 + Tomcat 11 错误恢复路径 ClassNotFound 修复
-
-Spring Boot 3.4 + Tomcat 11 nested fat-jar + Java 25 在错误恢复路径上会触发
-`ClassNotFoundException: org.apache.tomcat.util.buf.C2BConverter` 和
-`org.apache.catalina.core.ApplicationContext$DispatchData`，导致原本 401 的请求退化为 500。
-修复方式：`AuthenticationEntryPointImpl` 直接 `response.getOutputStream().write(bytes)` 写字节，
-绕过 `response.getWriter()` 的 C2BConverter 转换。
+详见 `doc/多商户与代理商改造方案.md` 与 `git log --oneline`。
 
 ---
 
 ## 九、已知边界（下一轮迭代）
 
-- 佣金结算未联动推客 `frozenAmount` ↔ `availableAmount`（commission.status 0→1 时未扣减冻结额）
-- Quartz 任务失败未配置告警（仅写 `sys_job_log`）
-- Banner 未做 VIP 等级加权排序缓存
+- Quartz 任务失败未配置告警（仅写 `sys_job_log`，未接邮件/钉钉）
+- Banner 未做 VIP 等级加权排序缓存（当前按 `sort, create_time` 排序）
 - 登录入口按 `userType` 路由分流（代理商/商户/平台三入口） — 后端 `LoginUser.userType` 字段已加，前端 store + router 分流待下一轮完成（见 AGENTS.md Pending 1）
 - 微信支付模式 1（平台统收分账）待资质评估后接入
 - 商品配送（delivery tab）参数已预留，运力/范围规则待补
+- mp release 流程 UI 已就绪（`biz/mprelease`），但真实 release 调用 `wxa/release` 依赖第三方平台授权（`biz_mp_auth.refresh_token` 落库轮换已实现）
+- 小程序「员工登录」入口已加（`pages/staff`），但门店员工的菜单/数据权限按 `store_id` 自动隔离的代码逻辑下一轮接入
 
 ---
 
