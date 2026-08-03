@@ -7,8 +7,6 @@ Page({
     showAvatar: false,
     showNick: false,
     editingNick: '',
-    editingPhone: '',
-    phoneFocus: false,
     wxNickName: ''
   },
 
@@ -17,8 +15,7 @@ Page({
     const user = (appInst.globalData && appInst.globalData.user) || {}
     this.setData({
       user: user,
-      editingNick: user.nickName || '',
-      editingPhone: user.phone || ''
+      editingNick: user.nickName || ''
     })
 
     const userInfo = wx.getStorageSync('userInfo')
@@ -121,23 +118,7 @@ Page({
     })
   },
 
-  // 手机号：默认走文本输入，11 位校验；编辑态展示 input
-  onEditPhone() {
-    this.setData({ editingPhone: this.data.user.phone || '', phoneFocus: true })
-  },
-  onClearPhone() {
-    const appInst = getApp() || {}
-    appInst.globalData = appInst.globalData || {}
-    appInst.globalData.user = appInst.globalData.user || {}
-    appInst.globalData.user.phone = ''
-    this.setData({ user: appInst.globalData.user, editingPhone: '' })
-    appInst.notifyUserUpdate && appInst.notifyUserUpdate()
-  },
-  onPhoneInput(e) {
-    this.setData({ editingPhone: e.detail.value })
-  },
-
-  // 微信新版 getPhoneNumber：把 e.detail.code 交给后端换号
+  // 微信新版 getPhoneNumber：e.detail.code 交给后端换号，成功后 user.phone 立刻可见
   onGetPhone(e) {
     if (e.detail.errMsg !== 'getPhoneNumber:ok') {
       wx.showToast({ title: '取消授权', icon: 'none' })
@@ -159,9 +140,9 @@ Page({
       appInst.globalData = appInst.globalData || {}
       appInst.globalData.user = appInst.globalData.user || {}
       appInst.globalData.user.phone = phone
-      this.setData({ user: appInst.globalData.user, editingPhone: '' })
+      this.setData({ user: appInst.globalData.user })
       appInst.notifyUserUpdate && appInst.notifyUserUpdate()
-      wx.showToast({ title: '授权成功', icon: 'success' })
+      wx.showToast({ title: '已绑定', icon: 'success' })
     }).catch((err) => {
       wx.hideLoading()
       wx.showToast({ title: (err && err.msg) || '绑定失败，请重试', icon: 'none' })
@@ -179,33 +160,9 @@ Page({
       wx.showToast({ title: '请设置昵称', icon: 'none' })
       return
     }
-    // 优先用正在编辑的 phone（editingPhone）；空时回退已存的 user.phone
-    const phone = (this.data.editingPhone || u.phone || '').trim()
-    if (phone) {
-      // 校验格式
-      if (!/^1\d{10}$/.test(phone)) {
-        wx.showToast({ title: '手机号格式不正确', icon: 'none' })
-        return
-      }
-      // 与已存的不同就同步到后端
-      if (phone !== u.phone) {
-        appInst.globalData = appInst.globalData || {}
-        appInst.globalData.user = appInst.globalData.user || {}
-        appInst.globalData.user.phone = phone
-        this.setData({ user: appInst.globalData.user, editingPhone: '' })
-        appInst.notifyUserUpdate && appInst.notifyUserUpdate()
-        api.updateMember({ phone }).then(() => {
-          wx.showToast({ title: '已保存', icon: 'success' })
-          setTimeout(() => wx.navigateBack(), 600)
-        }).catch((err) => {
-          wx.showToast({ title: (err && err.msg) || '保存失败，请重试', icon: 'none' })
-        })
-        return
-      }
-    } else {
-      // 没手机号也允许保存（不强求），只提示一下
-      wx.showToast({ title: '已保存（未填手机号）', icon: 'success' })
-      setTimeout(() => wx.navigateBack(), 600)
+    // 手机号已通过 onGetPhone 同步给后端，这里只判一下做提示
+    if (!u.phone) {
+      wx.showToast({ title: '请先获取手机号', icon: 'none' })
       return
     }
     wx.showToast({ title: '已保存', icon: 'success' })

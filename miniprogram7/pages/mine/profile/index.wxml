@@ -16,23 +16,14 @@
     </view>
     <view class="row phone-row">
       <text class="lab">手机号</text>
-      <view class="row-right phone-right">
-        <block wx:if="{{editingPhone}}">
-          <input class="phone-input" type="number" maxlength="11" value="{{editingPhone}}" bindinput="onPhoneInput" placeholder="请输入11位手机号" focus="{{phoneFocus}}" />
+      <view class="row-right">
+        <block wx:if="{{user.phone}}">
+          <text class="val">{{user.phone}}</text>
         </block>
         <block wx:else>
-          <text class="val">{{user.phone || '请填写手机号'}}</text>
+          <button class="phone-btn" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone" hover-class="none">获取</button>
         </block>
-        <view class="phone-ops">
-          <text class="phone-link" bindtap="onEditPhone">编辑</text>
-          <text class="phone-link" wx:if="{{user.phone}}" bindtap="onClearPhone">清除</text>
-        </view>
-      </view>
-    </view>
-    <view class="row auth-row" wx:if="{{!user.phone}}">
-      <text class="lab">微信授权</text>
-      <view class="row-right">
-        <button class="phone-btn" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone" hover-class="none">一键获取微信手机号</button>
+        <view class="arr"></view>
       </view>
     </view>
   </view>

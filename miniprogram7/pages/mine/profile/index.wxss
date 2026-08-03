@@ -206,11 +206,3 @@
   font-size: 30rpx;
   font-weight: 600;
 }
-
-/* 手机号编辑 */
-.phone-row .row-right { align-items: center; }
-.phone-right { display: flex; align-items: center; gap: 12rpx; flex: 1; }
-.phone-input { flex: 1; font-size: 28rpx; color: #1A1A1A; text-align: right; padding: 8rpx 0; }
-.phone-ops { display: flex; gap: 16rpx; margin-left: 8rpx; }
-.phone-link { font-size: 24rpx; color: var(--color-link); }
-.auth-row .row-right { justify-content: flex-end; }
