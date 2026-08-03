@@ -446,7 +446,8 @@ C 端小程序登录页 / 我的页 / 联系客服页需要展示商家名、Log
 匿名接口由 `ApiMerchantController` 提供：
 
 - 请求头 `X-App-Id` 携带小程序 appid → `TenantService.getMerchantByAppid` 找到对应商户
-- 缺省头时兜底到 `merchantId=1`（MC000001 默认商家），方便本地调试不报错
+- 缺 `X-App-Id` 或未匹配到商家**直接返回 400 "未匹配到商家"**，不静默兜底
+  （多租户契约：一个 appid 对应唯一商户，忘带 header 应当立刻暴露 bug，而不是拿到别人家数据）
 - 所有图片字段都过 `ImageUrlUtils.toAbsolute`，包 try/catch 防御
 - `servicePhone` / `serviceQrcode` / `businessHours` / `intro` 由商家级兜底（门店未配时使用商家级）
 

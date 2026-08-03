@@ -3,6 +3,7 @@ package com.ruoyi.web.api;
 import com.ruoyi.biz.domain.Merchant;
 import com.ruoyi.biz.service.ITenantService;
 import com.ruoyi.common.annotation.Anonymous;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
@@ -26,7 +27,9 @@ import java.util.Map;
  * 返回小程序需要的商家基础信息：商家名、logo、客服电话、客服二维码、营业时间、简介。
  * 登录页/我的页/联系客服等需要展示商家信息的地方都走这里。</p>
  *
- * <p>请求头 X-App-Id 缺失时兜底走 merchantId=1（默认商家 MC000001），方便本地开发。</p>
+ * <p>多租户契约：一个 appid 对应唯一商户。请求头 X-App-Id 缺失或未匹配到商家
+ * 一律返回 400 "未匹配到商家"，不再静默兜底到默认商户，避免前端忘带 header 时
+ * 拿到别人家的数据而 bug 难以暴露。</p>
  */
 @Anonymous
 @RestController
@@ -34,9 +37,6 @@ import java.util.Map;
 public class ApiMerchantController
 {
     private static final Logger log = LoggerFactory.getLogger(ApiMerchantController.class);
-
-    /** 缺省 merchantId，仅用于本地开发/调试，避免 X-App-Id 漏传直接 401 */
-    private static final long DEFAULT_MERCHANT_ID = 1L;
 
     @Autowired
     private ITenantService tenantService;
@@ -62,19 +62,14 @@ public class ApiMerchantController
             log.debug("resolve X-App-Id failed: {}", e.getMessage());
         }
 
-        Merchant merchant = null;
-        if (StringUtils.isNotEmpty(appid))
+        if (StringUtils.isEmpty(appid))
         {
-            merchant = tenantService.getMerchantByAppid(appid);
+            return AjaxResult.error(HttpStatus.BAD_REQUEST, "缺少 X-App-Id 请求头");
         }
+        Merchant merchant = tenantService.getMerchantByAppid(appid);
         if (merchant == null)
         {
-            // 兜底：缺省商家，避免小程序初次进入因头部问题拿到空数据
-            merchant = tenantService.getMerchantById(DEFAULT_MERCHANT_ID);
-        }
-        if (merchant == null)
-        {
-            return AjaxResult.error("未匹配到商家");
+            return AjaxResult.error(HttpStatus.BAD_REQUEST, "未匹配到商家");
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
