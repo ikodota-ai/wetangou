@@ -12,3 +12,11 @@
 .s-0 { background: #ECF5FF; color: #409EFF; }
 .s-1 { background: #F4F4F5; color: #909399; }
 .item .row3, .item .row4 { font-size: 24rpx; color: #888; margin-top: 8rpx; }
+.s-2 { background: #E1F3D8; color: #67C23A; }
+.s-3 { background: #FEF0F0; color: #F56C6C; }
+.item .row5 { font-size: 24rpx; color: #999; margin-top: 8rpx; }
+.review { color: #67C23A; }
+.item .row6 { display: flex; gap: 16rpx; margin-top: 16rpx; }
+.btn { flex: 1; text-align: center; padding: 16rpx 0; border-radius: 12rpx; font-size: 28rpx; font-weight: 500; }
+.btn-primary { background: #5A8A4A; color: #fff; }
+.btn-warn    { background: #fff; color: #F56C6C; border: 1rpx solid #FBC4C4; }

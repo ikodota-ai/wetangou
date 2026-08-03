@@ -85,8 +85,21 @@ public class BookingMember extends BaseEntity
     private Integer people;
 
     /** 状态（0已报名 1已取消） */
-    @Excel(name = "状态", readConverterExp = "0=已报名,1=已取消")
+    @Excel(name = "状态", readConverterExp = "0=已报名,1=已取消,2=已确认,3=已拒绝")
     private String status;
+
+
+    /** 确认/拒绝员工用户名 */
+    @Excel(name = "审核员工")
+    private String confirmUser;
+
+    /** 确认/拒绝时间 */
+    @Excel(name = "审核时间")
+    private java.util.Date confirmTime;
+
+    /** 审核备注（拒绝原因/到场备注） */
+    @Excel(name = "审核备注")
+    private String reviewRemark;
 
     public void setId(Long id)
     {
@@ -302,4 +315,32 @@ public class BookingMember extends BaseEntity
             .append("createTime", getCreateTime())
             .toString();
     }
+
+    public void setConfirmUser(String confirmUser)
+    {
+        this.confirmUser = confirmUser;
+    }
+    public String getConfirmUser()
+    {
+        return confirmUser;
+    }
+
+    public void setConfirmTime(java.util.Date confirmTime)
+    {
+        this.confirmTime = confirmTime;
+    }
+    public java.util.Date getConfirmTime()
+    {
+        return confirmTime;
+    }
+
+    public void setReviewRemark(String reviewRemark)
+    {
+        this.reviewRemark = reviewRemark;
+    }
+    public String getReviewRemark()
+    {
+        return reviewRemark;
+    }
+
 }

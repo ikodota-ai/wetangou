@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Anonymous;
@@ -246,6 +249,49 @@ public class ApiStoreStaffDashboardController
      * 写 confirm_user=当前员工、confirm_time=now。</p>
      */
     @StoreStaffRequired
+    @PostMapping("/booking/confirm/{signupId}")
+    public AjaxResult confirmSignup(@PathVariable Long signupId, @RequestBody(required=false) java.util.Map<String,Object> body)
+    {
+        LoginMember m = MemberContextHolder.get();
+        BookingMember bm = bookingService.selectBookingMemberById(signupId);
+        if (bm == null) return AjaxResult.error("报名记录不存在");
+        Booking parent = bookingService.selectBookingByBookingId(bm.getBookingId());
+        if (parent == null || !m.getStoreId().equals(parent.getStoreId())) return AjaxResult.error("无权操作该报名");
+        if ("1".equals(bm.getStatus())) return AjaxResult.error("该报名已取消");
+        if ("2".equals(bm.getStatus())) return AjaxResult.error("该报名已确认");
+        if ("3".equals(bm.getStatus())) return AjaxResult.error("该报名已拒绝");
+        bm.setStatus("2");
+        bm.setConfirmUser(m.getMemberId() == null ? "store-staff" : ("staff-" + m.getMemberId()));
+        bm.setConfirmTime(new Date());
+        String remark = body == null ? null : (String) body.get("remark");
+        if (remark != null && !remark.isEmpty()) bm.setReviewRemark(remark);
+        bookingService.updateBookingMember(bm);
+        return AjaxResult.success("已确认");
+    }
+
+    @StoreStaffRequired
+    @PostMapping("/booking/reject/{signupId}")
+    public AjaxResult rejectSignup(@PathVariable Long signupId, @RequestBody(required=false) java.util.Map<String,Object> body)
+    {
+        LoginMember m = MemberContextHolder.get();
+        BookingMember bm = bookingService.selectBookingMemberById(signupId);
+        if (bm == null) return AjaxResult.error("报名记录不存在");
+        Booking parent = bookingService.selectBookingByBookingId(bm.getBookingId());
+        if (parent == null || !m.getStoreId().equals(parent.getStoreId())) return AjaxResult.error("无权操作该报名");
+        if ("1".equals(bm.getStatus())) return AjaxResult.error("该报名已取消");
+        if ("2".equals(bm.getStatus())) return AjaxResult.error("已确认，不能拒绝");
+        if ("3".equals(bm.getStatus())) return AjaxResult.error("该报名已拒绝");
+        String reason = body == null ? null : (String) body.get("reason");
+        if (reason == null || reason.trim().isEmpty()) return AjaxResult.error("请填写拒绝原因");
+        bm.setStatus("3");
+        bm.setConfirmUser(m.getMemberId() == null ? "store-staff" : ("staff-" + m.getMemberId()));
+        bm.setConfirmTime(new Date());
+        bm.setReviewRemark(reason);
+        bookingService.updateBookingMember(bm);
+        return AjaxResult.success("已拒绝");
+    }
+
+    @StoreStaffRequired
     @GetMapping("/booking/signup/list")
     public AjaxResult bookingSignupList()
     {
@@ -279,6 +325,9 @@ public class ApiStoreStaffDashboardController
                 row.put("people", s.getPeople());
                 row.put("status", s.getStatus());
                 row.put("remark", s.getRemark());
+                row.put("reviewRemark", s.getReviewRemark());
+                row.put("confirmUser", s.getConfirmUser());
+                row.put("confirmTime", s.getConfirmTime());
                 row.put("createTime", s.getCreateTime());
                 out.add(row);
             }

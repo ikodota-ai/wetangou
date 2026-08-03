@@ -15,13 +15,20 @@
       <view class="row2">
         <text class="phone" wx:if="{{item.phone}}">{{item.phone}}</text>
         <text class="people">人数 {{item.people || 1}}</text>
-        <text class="status s-{{item.status}}">{{item.status === '1' ? '已取消' : '已报名'}}</text>
+        <text class="status s-{{item.status}}">{{item.status==='1'?'已取消':item.status==='2'?'已确认':item.status==='3'?'已拒绝':'已报名'}}</text>
       </view>
       <view class="row3" wx:if="{{item.serviceName}}">
         <text class="service">项目：{{item.serviceName}}</text>
       </view>
       <view class="row4" wx:if="{{item.remark}}">
         <text class="remark">备注：{{item.remark}}</text>
+      </view>
+      <view class="row5" wx:if="{{item.confirmUser}}">
+        <text class="review">审核：{{item.confirmUser}} · {{item.reviewRemark || '已处理'}}</text>
+      </view>
+      <view class="row6" wx:if="{{item.status === '0'}}">
+        <view class="btn btn-primary" data-id="{{item.signupId}}" bindtap="onConfirm">确认到店</view>
+        <view class="btn btn-warn" data-id="{{item.signupId}}" bindtap="onReject">拒绝</view>
       </view>
     </view>
   </view>

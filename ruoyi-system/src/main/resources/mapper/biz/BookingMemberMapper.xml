@@ -25,6 +25,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="phone"    column="phone"    />
         <result property="people"    column="people"    />
         <result property="status"    column="status"    />
+        <result property="confirmUser"    column="confirm_user"    />
+        <result property="confirmTime"    column="confirm_time"    />
+        <result property="reviewRemark"    column="review_remark"    />
         <result property="remark"    column="remark"    />
         <result property="createTime"    column="create_time"    />
         <result property="updateTime"    column="update_time"    />
@@ -36,7 +39,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                b.service_name, b.booking_date, b.time_slot, b.store_id, s.store_name,
                s.address as store_address, ifnull(nullif(s.service_phone,''), s.phone) as store_phone,
                s.longitude as store_longitude, s.latitude as store_latitude,
-               b.status as booking_status, b.booking_no, bm.merchant_id
+               b.status as booking_status, b.booking_no, bm.merchant_id,
+               bm.confirm_user, bm.confirm_time, bm.review_remark
         from biz_booking_member bm
         left join biz_member m on m.member_id = bm.member_id
         left join biz_booking b on b.booking_id = bm.booking_id
@@ -109,6 +113,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="phone != null">phone = #{phone},</if>
             <if test="people != null">people = #{people},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="confirmUser != null">confirm_user = #{confirmUser},</if>
+            <if test="confirmTime != null">confirm_time = #{confirmTime},</if>
+            <if test="reviewRemark != null">review_remark = #{reviewRemark},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>

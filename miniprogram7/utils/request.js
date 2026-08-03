@@ -118,6 +118,8 @@ const api = {
   staffTodayBills: () => request('/api/store/staff/today/bills'),
   staffTodayBookings: () => request('/api/store/staff/today/bookings'),
   staffBookingSignupList: () => request('/api/store/staff/booking/signup/list'),
+  staffBookingConfirm: (signupId, body) => request('/api/store/staff/booking/confirm/' + signupId, { method: 'POST', data: body || {} }),
+  staffBookingReject:  (signupId, body) => request('/api/store/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),
   // 预约
   bookingSlots: (params) => request('/api/booking/slots', { data: params }),
   createBooking: (data) => request('/api/booking', { method: 'POST', data }),
