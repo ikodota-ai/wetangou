@@ -3,10 +3,38 @@ const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 
 App({
   onLaunch() {
+    // 启动时解析 scene（带参进入：太阳码 scene=distributor:{merchantId}:{memberId}）
+    if (this.parseInviteFromScene) this.parseInviteFromScene()
     // 启动时拉一次会员资料（如果本地有 token），让「我的」页能直接显示真实头像/昵称/手机号
     if (this.bootUser) this.bootUser()
     // 启动时拉一次商家公开信息（商家名/客服兜底），登录页/我的页/联系客服都用得到
     if (this.bootMerchant) this.bootMerchant()
+  },
+  /**
+   * 解析太阳码 scene 里的 inviteBy：
+   *   1) 冷启动：wx.getLaunchOptionsSync().query.scene
+   *   2) 热启动（被扫码进入）：wx.getEnterOptionsSync() 同样读
+   * 格式约定：scene=distributor:{merchantId}:{memberId}，只取后半段写到 globalData.inviteBy
+   * 不会覆盖已有值（避免 A 邀请 B 扫了 B 的码，B 再扫 A 的码时 inviteBy 漂移）
+   */
+  parseInviteFromScene() {
+    try {
+      const opts = (wx.getLaunchOptionsSync && wx.getLaunchOptionsSync()) || {}
+      const enter = (wx.getEnterOptionsSync && wx.getEnterOptionsSync()) || {}
+      const scene = (opts.query && opts.query.scene) || (enter.query && enter.query.scene) || (opts.scene) || (enter.scene) || ''
+      this._applyInviteScene(scene)
+    } catch (e) {
+      console.warn('[app] parseInviteFromScene FAIL', e)
+    }
+  },
+  _applyInviteScene(scene) {
+    if (!scene || typeof scene !== 'string') return
+    if (this.globalData.inviteBy) return
+    const m = scene.match(/^distributor:\d+:(\d+)/)
+    if (m && m[1]) {
+      this.globalData.inviteBy = parseInt(m[1], 10)
+      try { wx.setStorageSync('inviteBy', this.globalData.inviteBy) } catch (e) {}
+    }
   },
   globalData: {
     // 位置/门店

@@ -41,9 +41,13 @@ Page({
         }
         // 一次性登录：仅用 wx.login 的 code 换 openid，
         // 昵称/头像/手机号留到「会员资料」页分步完善
+        // 如果是从推客太阳码扫码进入（scene 解析过），带上 inviteBy
+        const appInst0 = getApp() || {}
+        const inviteBy0 = (appInst0.globalData && appInst0.globalData.inviteBy) || wx.getStorageSync('inviteBy') || null
         api.login({
           code: res.code,
-          appid: APPID
+          appid: APPID,
+          inviteBy: inviteBy0
         }).then((data) => {
           wx.hideLoading()
           this.setData({ submitting: false })
