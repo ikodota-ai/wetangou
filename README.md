@@ -513,7 +513,12 @@ unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiAppl
 - 微信支付模式 1（平台统收分账）待资质评估后接入
 - 商品配送（delivery tab）参数已预留，运力/范围规则待补
 - mp release 流程 UI 已就绪（`biz/mprelease`），但真实 release 调用 `wxa/release` 依赖第三方平台授权（`biz_mp_auth.refresh_token` 落库轮换已实现）
-- 小程序「员工登录」入口已加（`pages/staff`），但门店员工的菜单/数据权限按 `store_id` 自动隔离的代码逻辑下一轮接入
+- 小程序「员工登录」入口 + **多门店权限** 已实现：
+  - 员工可关联多个门店（`biz_store_user` 多对多），登录时全部写入 token `storeIds` 集合
+  - 当前激活门店写入 `LoginMember.storeId`，员工可在「我的」页一键切换
+  - `MemberAuthInterceptor` 拦截所有 `@StoreStaffRequired` 端点，校验请求 storeId **属于** token storeIds 集合，否则 403
+  - 切换端点 `POST /api/store/staff/switch-store` 后端 `refreshToken` 写 redis 缓存；前端调 `me` 拿到新 storeName
+  - 已端到端实测：staff001 绑 100/101/200 三门店，切换 200→100 成功，跨店访问 999 拒绝
 
 ---
 
