@@ -34,7 +34,7 @@ import com.ruoyi.system.service.ISysUserService;
  * 小程序门店端-员工工作台（核销台/今日数据/预约审核）
  *
  * <p>所有端点都用 {@code @StoreStaffRequired} 走 MemberAuthInterceptor，
- * 校验 userType=store + storeId 与 token 一致；token 失效直接 401。</p>
+ * 校验 userType=store + 请求 storeId 属于 token storeIds 集合；token 失效直接 401。多门店员工可切换激活门店。</p>
  *
  * @author dytuangou
  */
@@ -79,6 +79,7 @@ public class ApiStoreStaffDashboardController
         data.put("userName", user == null ? "" : user.getUserName());
         data.put("avatar", user == null ? "" : (user.getAvatar() == null ? "" : user.getAvatar()));
         data.put("storeId", m.getStoreId());
+        data.put("storeIds", m.getStoreIds());
         data.put("storeName", store == null ? "" : store.getStoreName());
         data.put("merchantId", m.getMerchantId());
         return AjaxResult.success(data);

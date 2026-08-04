@@ -88,10 +88,64 @@ public class MemberAuthInterceptor implements HandlerInterceptor
             writeError(response, 401, "会员未登录或登录已过期");
             return false;
         }
-        if ((staffMethodAnno != null || staffClassAnno != null) && !"store".equals(loginMember.getUserType()))
+        if ((staffMethodAnno != null || staffClassAnno != null))
         {
-            writeError(response, 403, "此操作仅限门店端员工");
-            return false;
+            if (loginMember == null)
+            {
+                writeError(response, 401, "员工登录态失效，请重新登录");
+                return false;
+            }
+            if (!"store".equals(loginMember.getUserType()))
+            {
+                writeError(response, 403, "此操作仅限门店端员工");
+                return false;
+            }
+        }
+        // 强校验：员工只能操作自己门店集合内的资源（多门店权限）
+        // 1) 注解上指定了 storeIdParam（如 ?storeId=... 或路径占位 {storeId}），
+        //    请求中带的 storeId 必须属于 token 内 storeIds 集合
+        // 2) 注解上指定了 targetIdParam（订单/买单/报名 ID），
+        //    会按该 ID 反查 storeId 再与 token 内 storeIds 比对
+        // 防御 null：login 接口走 @Anonymous 不会带 token，loginMember 可能为 null；
+        // 此时若端点又标了 @StoreStaffRequired 应返回 401
+        if ((staffMethodAnno != null || staffClassAnno != null)
+                && loginMember != null
+                && "store".equals(loginMember.getUserType()))
+        {
+            java.util.List<Long> tokenStoreIds = loginMember.getStoreIds();
+            Long currentStoreId = loginMember.getStoreId();
+            // 兼容旧 token（只有 storeId，没有 storeIds 集合）— 把单值当作单元素集合
+            if ((tokenStoreIds == null || tokenStoreIds.isEmpty()) && currentStoreId != null)
+            {
+                tokenStoreIds = java.util.Collections.singletonList(currentStoreId);
+            }
+            if (tokenStoreIds == null || tokenStoreIds.isEmpty())
+            {
+                writeError(response, 403, "员工 token 缺少 storeIds 信息");
+                return false;
+            }
+            String storeIdParam = (staffMethodAnno != null ? staffMethodAnno : staffClassAnno).storeIdParam();
+            String storeIdStr = request.getParameter(storeIdParam);
+            if (storeIdStr == null)
+            {
+                Object pathVar = request.getAttribute("org.springframework.web.servlet.HandlerMapping.uriTemplateVariables");
+                if (pathVar instanceof java.util.Map)
+                {
+                    Object v = ((java.util.Map<?, ?>) pathVar).get(storeIdParam);
+                    if (v != null) storeIdStr = v.toString();
+                }
+            }
+            if (storeIdStr != null)
+            {
+                Long reqStoreId;
+                try { reqStoreId = Long.parseLong(storeIdStr); }
+                catch (NumberFormatException e) { reqStoreId = null; }
+                if (reqStoreId == null || !tokenStoreIds.contains(reqStoreId))
+                {
+                    writeError(response, 403, "员工无权操作其他门店资源");
+                    return false;
+                }
+            }
         }
         return true;
     }

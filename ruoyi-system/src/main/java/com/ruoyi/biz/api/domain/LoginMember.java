@@ -1,6 +1,7 @@
 package com.ruoyi.biz.api.domain;
 
 import java.io.Serializable;
+import java.util.List;
 import com.ruoyi.biz.domain.Member;
 
 /**
@@ -40,7 +41,14 @@ public class LoginMember implements Serializable
      */
     private String userType;
 
-    /** 门店员工身份时绑定的门店 ID */
+    /**
+     * 门店员工身份时可管理的门店 ID 集合（多门店权限）
+     */
+    private List<Long> storeIds;
+
+    /**
+     * 门店员工身份时当前激活的门店 ID（多门店时切换用，默认取集合第一个）
+     */
     private Long storeId;
 
     public LoginMember()
@@ -83,6 +91,26 @@ public class LoginMember implements Serializable
     public void setStoreId(Long storeId)
     {
         this.storeId = storeId;
+    }
+
+    public List<Long> getStoreIds()
+    {
+        return storeIds;
+    }
+
+    public void setStoreIds(List<Long> storeIds)
+    {
+        this.storeIds = storeIds;
+    }
+
+    /**
+     * 判断某个门店是否在员工权限范围内
+     */
+    public boolean hasStore(Long checkStoreId)
+    {
+        if (checkStoreId == null) return false;
+        if (storeIds == null || storeIds.isEmpty()) return false;
+        return storeIds.contains(checkStoreId);
     }
 
     public String getToken()

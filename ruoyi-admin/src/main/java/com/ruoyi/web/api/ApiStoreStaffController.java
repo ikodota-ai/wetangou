@@ -14,10 +14,13 @@ import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.biz.api.util.MemberTokenService;
 import com.ruoyi.biz.domain.StoreUser;
+import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.biz.service.IStoreUserService;
+import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.system.service.ISysUserService;
 
 /**
@@ -44,6 +47,9 @@ public class ApiStoreStaffController
 
     @Autowired
     private MemberTokenService memberTokenService;
+
+    @Autowired
+    private IStoreService storeService;
 
     /**
      * 门店员工登录
@@ -80,13 +86,34 @@ public class ApiStoreStaffController
         {
             throw new ServiceException("该账号未关联门店，无门店端权限");
         }
-        // 一个 sys_user 多门店时取第一个，后续可扩展选门店
-        StoreUser link = links.get(0);
+        // 多门店：把员工关联的所有 storeId 写入 token 集合，
+        // 切换门店只需更新 LoginMember.storeId（拦截器会校验范围）
+        java.util.List<Long> storeIds = new java.util.ArrayList<>();
+        java.util.Map<Long, String> storeNameMap = new java.util.HashMap<>();
+        for (StoreUser l : links)
+        {
+            if (l.getStoreId() != null && !storeIds.contains(l.getStoreId()))
+            {
+                storeIds.add(l.getStoreId());
+            }
+        }
+        // 默认激活第一个门店；前端可调用 /api/store/staff/switch-store 切换
+        Long currentStoreId = storeIds.isEmpty() ? null : storeIds.get(0);
+        // 顺手查一下门店名（避免每个端点都 join biz_store）
+        if (currentStoreId != null)
+        {
+            com.ruoyi.biz.domain.Store store = storeService.selectStoreByStoreId(currentStoreId);
+            if (store != null)
+            {
+                storeNameMap.put(store.getStoreId(), store.getStoreName());
+            }
+        }
 
         LoginMember loginMember = new LoginMember();
         loginMember.setUserType("store");
-        loginMember.setStoreId(link.getStoreId());
-        loginMember.setMerchantId(link.getMerchantId());
+        loginMember.setStoreId(currentStoreId);
+        loginMember.setStoreIds(storeIds);
+        loginMember.setMerchantId(links.get(0).getMerchantId());
         // 会员 ID 字段借用 sys_user.userId，门店员工无 biz_member 行
         loginMember.setMemberId(user.getUserId());
         loginMember.setOpenid("staff:" + user.getUserId());
@@ -97,9 +124,39 @@ public class ApiStoreStaffController
         AjaxResult ajax = AjaxResult.success();
         ajax.put("token", loginMember.getToken());
         ajax.put("userType", "store");
-        ajax.put("storeId", link.getStoreId());
-        ajax.put("storeName", "");
+        ajax.put("storeId", currentStoreId);
+        ajax.put("storeIds", storeIds);
+        ajax.put("storeName", storeNameMap.getOrDefault(currentStoreId, ""));
         ajax.put("realName", user.getNickName() == null ? user.getUserName() : user.getNickName());
+        return ajax;
+    }
+
+    /**
+     * 切换当前激活门店（仅在员工的 storeIds 范围内生效）
+     */
+    @LoginRequired
+    @PostMapping("/switch-store")
+    public AjaxResult switchStore(@RequestBody JSONObject body)
+    {
+        Long targetStoreId = body.getLong("storeId");
+        if (targetStoreId == null)
+        {
+            throw new ServiceException("请选择目标门店");
+        }
+        LoginMember lm = MemberContextHolder.get();
+        if (lm == null || !"store".equals(lm.getUserType()))
+        {
+            throw new ServiceException("此操作仅限门店端员工");
+        }
+        if (lm.getStoreIds() == null || !lm.getStoreIds().contains(targetStoreId))
+        {
+            throw new ServiceException("无权切换到该门店");
+        }
+        lm.setStoreId(targetStoreId);
+        // 同步更新 token 缓存（让后续请求看到新 storeId）
+        memberTokenService.refreshToken(lm);
+        AjaxResult ajax = AjaxResult.success("已切换到门店 " + targetStoreId);
+        ajax.put("storeId", targetStoreId);
         return ajax;
     }
 
