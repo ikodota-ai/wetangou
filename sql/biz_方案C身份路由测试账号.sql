@@ -52,3 +52,13 @@ ON DUPLICATE KEY UPDATE user_type='1', agent_id=100, merchant_id=0;
 INSERT INTO biz_merchant_user(user_id, user_type, agent_id, merchant_id, create_by)
 SELECT user_id, '2', 1, 1, 'admin' FROM sys_user WHERE user_name='merchant001'
 ON DUPLICATE KEY UPDATE user_type='2', agent_id=1, merchant_id=1;
+
+-- 补 agent 角色顶级父菜单绑定（修复 0 菜单 bug）
+-- 原因：SysMenuServiceImpl.selectMenuTreeByUserId 调 getChildPerms(list, 0)
+-- 找 parent_id=0 的顶级菜单；agent 角色没绑"团购运营"（menu_id=2001）
+-- 顶级菜单找不到 → returnList 空 → 0 router
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) VALUES(4, 2001);
+-- 补"代理商管理"(2216) C 菜单，让 agent 能看自己代理商信息
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) VALUES(4, 2216);
+-- 删 merchant 角色误绑的"代理商管理/代理商缴费"（merchant 不应看代理商）
+DELETE FROM sys_role_menu WHERE role_id=5 AND menu_id IN (2216, 2217);

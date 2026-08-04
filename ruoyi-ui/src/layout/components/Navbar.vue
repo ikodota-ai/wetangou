@@ -10,6 +10,13 @@
     </template>
     <div class="right-menu">
       <template v-if="device!=='mobile'">
+        <div class="right-menu-item identity-tag" :class="'identity-' + (userType || '0')" :title="identityDesc">
+          <i class="el-icon-user-solid"></i>
+          <span class="identity-label">{{ identityLabel }}</span>
+          <span v-if="agentId || merchantId" class="identity-sub">
+            {{ agentId ? '代理商#' + agentId : '商户#' + merchantId }}
+          </span>
+        </div>
         <search id="header-search" class="right-menu-item" />
 
         <el-tooltip content="源码地址" effect="dark" placement="bottom">
@@ -214,6 +221,38 @@ export default {
           background: rgba(0, 0, 0, .025)
         }
       }
+    }
+
+    // 当前登录身份标签（按 userType 区分）
+    .identity-tag {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px !important;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 18px;
+      height: 32px;
+      margin: 0 4px;
+      cursor: default;
+      transition: all .2s;
+
+      .el-icon-user-solid {
+        font-size: 15px;
+      }
+
+      .identity-sub {
+        font-size: 12px;
+        font-weight: 400;
+        margin-left: 2px;
+        padding: 1px 6px;
+        background: rgba(255,255,255,0.35);
+        border-radius: 8px;
+      }
+
+      &.identity-0 { background: rgba(64, 158, 255, 0.12); color: #409EFF; }
+      &.identity-1 { background: rgba(230, 162, 60, 0.12); color: #E6A23C; }
+      &.identity-2 { background: rgba(103, 194, 58, 0.12); color: #67C23A; }
     }
 
     .avatar-container {

@@ -55,6 +55,12 @@ const user = {
     }
   },
 
+  getters: {
+    userType: state => state.userType,
+    agentId: state => state.agentId,
+    merchantId: state => state.merchantId
+  },
+
   actions: {
     // 登录
     Login({ commit }, userInfo) {
