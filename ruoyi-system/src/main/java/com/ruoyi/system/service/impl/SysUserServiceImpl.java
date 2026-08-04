@@ -367,15 +367,30 @@ public class SysUserServiceImpl implements ISysUserService
         Long agentId = "1".equals(targetType) ? user.getTenantAgentId() : null;
         Long merchantId = "2".equals(targetType) ? user.getTenantMerchantId() : null;
 
-        // 3) 若为代理商身份但未传 agentId，拒绝（防越权）
-        if ("1".equals(targetType) && (agentId == null || agentId <= 0))
+        // 3) 校验租户 ID 完整性：仅当显式声明 userType='1'/'2' 但缺 ID 时报错（防越权）
+        //    按角色自动推断出 agent/merchant 但缺 ID 时降级为 userType='0'（平台/未绑定），
+        //    避免 admin 角色创建普通员工账号时被误拦
+        if (user.getTenantUserType() != null && !user.getTenantUserType().isEmpty())
         {
-            throw new ServiceException("代理商账号必须指定所属代理商");
+            if ("1".equals(targetType) && (agentId == null || agentId <= 0))
+            {
+                throw new ServiceException("代理商账号必须指定所属代理商");
+            }
+            if ("2".equals(targetType) && (merchantId == null || merchantId <= 0))
+            {
+                throw new ServiceException("商户账号必须指定所属商户");
+            }
         }
-        // 若为商户身份但未传 merchantId，拒绝
-        if ("2".equals(targetType) && (merchantId == null || merchantId <= 0))
+        else
         {
-            throw new ServiceException("商户账号必须指定所属商户");
+            if ("1".equals(targetType) && (agentId == null || agentId <= 0))
+            {
+                targetType = "0";
+            }
+            if ("2".equals(targetType) && (merchantId == null || merchantId <= 0))
+            {
+                targetType = "0";
+            }
         }
 
         // 4) upsert biz_merchant_user

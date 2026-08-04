@@ -26,13 +26,13 @@ public class SysUser extends BaseEntity
 {
     private static final long serialVersionUID = 1L;
     /** 租户身份（0平台 1代理商 2商户），不入库，由 Controller 临时携带；插入/更新时由 Service 解析后写入 biz_merchant_user */
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String tenantUserType;
     /** 代理商ID（仅当 tenantUserType=1 时有效） */
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private Long tenantAgentId;
     /** 商户ID（仅当 tenantUserType=2 时有效） */
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private Long tenantMerchantId;
 
     /** 用户ID */
