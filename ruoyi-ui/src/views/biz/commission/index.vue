@@ -167,9 +167,14 @@
               <el-input v-model="form.orderId" placeholder="请输入订单ID" />
             </el-form-item>
           </el-col>
+          <el-col :span="24" v-if="!isMerchant()">
+            <el-form-item label="所属商户" prop="merchantId">
+              <biz-select v-model="form.merchantId" type="merchant" @change="onMerchantChange" />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="门店" prop="storeId">
-              <biz-select v-model="form.storeId" type="store" />
+              <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" auto-pick-single @auto-pick="onStoreAutoPick" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -259,6 +264,23 @@ export default {
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
       return userType !== '2'
     },
+    // 商户账号自带 merchantId 上下文，表单里隐藏"所属商户"下拉
+    isMerchant() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType === '2'
+    },
+    // 商户账号登录时，从 vuex 取自己的 merchantId
+    currentMerchantId() {
+      const u = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.user) || {}
+      return u.merchantId || null
+    },
+    // 切换商户时清空已选门店（防越权）
+    onMerchantChange(val) {
+      this.form.storeId = null
+    },
+    onStoreAutoPick(val, row) {
+      this.$modal && this.$modal.msgSuccess && this.$modal.msgSuccess(`已自动选中唯一门店：${row.storeName}`)
+    },
     /** 查询佣金明细列表 */
     buildParams() {
       const p = { ...this.queryParams }
@@ -284,6 +306,7 @@ export default {
     reset() {
       this.form = {
         commissionId: null,
+        merchantId: this.currentMerchantId() || null,
         distributorId: null,
         orderId: null,
         storeId: null,

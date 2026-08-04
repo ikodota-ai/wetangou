@@ -81,7 +81,11 @@ export default {
     type: { type: String, required: true },
     multiple: { type: Boolean, default: false },
     placeholder: { type: String, default: '' },
-    width: { type: String, default: '100%' }
+    width: { type: String, default: '100%' },
+    // 所属商户 ID（非空时，列表只返回该商户下的数据）。后端 Store/Product/Member 等已全部支持 merchantId 过滤。
+    merchantId: { type: [Number, String], default: null },
+    // 单选且下拉只剩 1 个选项时自动选中（如：某商户下只有 1 个门店）。多选不生效。
+    autoPickSingle: { type: Boolean, default: false }
   },
   data() {
     return {
@@ -105,6 +109,22 @@ export default {
       handler(val) {
         this.innerValue = this.normalize(val)
         this.ensureLabels(this.innerValue)
+      }
+    },
+    // 切换商户时清空选项重新拉取；多选同步清空已选值
+    merchantId() {
+      this.options = []
+      this.loadedOnce = false
+      if (this.multiple) {
+        this.innerValue = []
+        this.handleChange([])
+      } else {
+        this.innerValue = null
+        this.handleChange(null)
+      }
+      // 触发一次空查询（用户点开下拉时 onVisible 也会拉）
+      if (this.innerValue == null) {
+        this.fetch('')
       }
     }
   },
@@ -132,11 +152,22 @@ export default {
       // pageSize=100 一次性拉完，避免商户/门店量超过 20 时下拉被截断
       const query = { pageNum: 1, pageSize: 100 }
       if (keyword) query[this.cfg.queryField] = keyword
+      if (this.merchantId != null && this.merchantId !== '') {
+        query.merchantId = this.merchantId
+      }
       this.cfg.api(query).then(res => {
         const rows = res.rows || res.data || []
         this.mergeOptions(rows.map(r => this.toOption(r)))
         this.loadedOnce = true
         this.loading = false
+        // 单选 + autoPickSingle + 仅 1 条 → 自动回填
+        if (!this.multiple && this.autoPickSingle && rows.length === 1 && this.innerValue == null) {
+          const only = rows[0]
+          const val = only[this.cfg.idField]
+          this.innerValue = val
+          this.handleChange(val)
+          this.$emit('auto-pick', val, only)
+        }
       }).catch(() => { this.loading = false })
     },
     // 回显：对已选但选项里没有的 id 补齐 label

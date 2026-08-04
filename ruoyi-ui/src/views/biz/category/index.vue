@@ -135,9 +135,14 @@
     <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
+          <el-col :span="24" v-if="!isMerchant()">
+            <el-form-item label="所属商户" prop="merchantId">
+              <biz-select v-model="form.merchantId" type="merchant" @change="onMerchantChange" />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="门店" prop="storeId">
-              <biz-select v-model="form.storeId" type="store" />
+              <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" auto-pick-single @auto-pick="onStoreAutoPick" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -253,8 +258,9 @@ export default {
         createBy: null,
         createTime: null,
         updateBy: null,
-        updateTime: null
-      }
+        updateTime: null,
+        merchantId: this.currentMerchantId() || null,
+        }
       this.resetForm("form")
     },
     /** 搜索按钮操作 */
