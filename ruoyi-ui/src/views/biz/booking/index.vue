@@ -101,11 +101,8 @@
     <!-- 新增/修改预约场次对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="560px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="所属商户" prop="merchantId" v-if="!isMerchant()">
-          <biz-select v-model="form.merchantId" type="merchant" @change="onMerchantChange" />
-        </el-form-item>
         <el-form-item label="门店" prop="storeId">
-          <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" auto-pick-single @auto-pick="onStoreAutoPick" />
+          <biz-select v-model="form.storeId" type="store" />
         </el-form-item>
         <el-form-item label="预约服务" prop="productId">
           <biz-select v-model="form.productId" type="product" @change="onProductChange" />
@@ -246,7 +243,6 @@ export default {
         timeSlot: null,
         status: '0',
         remark: null,
-        merchantId: this.currentMerchantId() || null,
         }
       this.resetForm("form")
     },

@@ -199,14 +199,9 @@
               <el-input v-model="form.orderId" placeholder="请输入关联订单ID" />
             </el-form-item>
           </el-col>
-          <el-col :span="24" v-if="!isMerchant()">
-            <el-form-item label="所属商户" prop="merchantId">
-              <biz-select v-model="form.merchantId" type="merchant" @change="onMerchantChange" />
-            </el-form-item>
-          </el-col>
           <el-col :span="24">
             <el-form-item label="门店" prop="storeId">
-              <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" auto-pick-single @auto-pick="onStoreAutoPick" />
+              <biz-select v-model="form.storeId" type="store" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -364,7 +359,6 @@ export default {
         status: null,
         createTime: null,
         updateTime: null,
-        merchantId: this.currentMerchantId() || null,
         }
       this.resetForm("form")
     },
