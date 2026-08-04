@@ -118,7 +118,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="incAvailableAmount" parameterType="map">
         update biz_distributor
-        set available_amount = ifnull(available_amount, 0) + #{delta}
+        set available_amount = ifnull(available_amount, 0) + #{delta},
+            total_commission = ifnull(total_commission, 0) + #{delta}
         where distributor_id = #{distributorId}
     </update>
 </mapper>

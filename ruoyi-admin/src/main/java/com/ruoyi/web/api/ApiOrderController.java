@@ -116,6 +116,31 @@ public class ApiOrderController
     }
 
     /**
+     * 调试端点：mock 模式开放 /_e2e_paySuccess/{orderId}，走真实 paySuccess 流程入账 commission
+     * 仅在 sys_config wx.pay.mockEnabled=true 时可用；生产应保持 false
+     * 不走 wxPayService.createOrder，直接落 paySuccess，验证佣金真实入账链路
+     */
+    @LoginRequired
+    @PostMapping("/_e2e_paySuccess/{orderId}")
+    public AjaxResult e2ePaySuccess(@PathVariable Long orderId)
+    {
+        if (!wxPayService.isMock())
+        {
+            throw new ServiceException("调试端点仅 mock 模式开放");
+        }
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null || !order.getMemberId().equals(MemberContextHolder.getMemberId()))
+        {
+            throw new ServiceException("订单不存在");
+        }
+        if (!"0".equals(order.getStatus()))
+        {
+            throw new ServiceException("订单状态不允许支付");
+        }
+        return AjaxResult.success(apiOrderService.paySuccess(orderId));
+    }
+
+    /**
      * 我的订单列表（按状态筛选）
      */
     @LoginRequired

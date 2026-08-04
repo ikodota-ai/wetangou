@@ -80,7 +80,12 @@ public class CommissionServiceImpl implements ICommissionService
         {
             return 0;
         }
-        List<Map<String, Object>> groups = commissionMapper.selectSettleGroupsByTime(settleTime);
+        // 关键修复：MySQL DATETIME 列只存秒精度，Java Date 毫秒精度，写入时
+        // 0.053s 会被截断为 0.000s，再用毫秒值匹配会漏掉刚写入的记录。
+        // 这里把 settleTime 截断到秒，让 selectSettleGroupsByTime / markSettledByTime
+        // 范围查询能命中刚刚 settleExpiredCommissions 写入的 settle_time。
+        Date secondPrecision = com.ruoyi.common.utils.DateUtils.truncateToSeconds(settleTime);
+        List<Map<String, Object>> groups = commissionMapper.selectSettleGroupsByTime(secondPrecision);
         int affectedDistributors = 0;
         Map<String, Object> params = new HashMap<>();
         for (Map<String, Object> g : groups)
@@ -98,7 +103,7 @@ public class CommissionServiceImpl implements ICommissionService
             distributorMapper.incAvailableAmount(params);
             affectedDistributors++;
         }
-        commissionMapper.markSettledByTime(settleTime);
+        commissionMapper.markSettledByTime(secondPrecision);
         return affectedDistributors;
     }
 

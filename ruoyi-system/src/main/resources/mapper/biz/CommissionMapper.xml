@@ -123,6 +123,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="markSettledByTime" parameterType="Date">
         update biz_commission set settled_to_distributor = 1
-        where settle_time = #{settleTime} and settled_to_distributor = 0
+        where settle_time &gt;= #{settleTime}
+          and settle_time &lt; date_add(#{settleTime}, interval 2 second)
+          and settled_to_distributor = 0
     </update>
 </mapper>

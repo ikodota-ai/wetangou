@@ -131,6 +131,19 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
     /**
      * 获取服务器启动时间
      */
+
+    /**
+     * 截断到秒（去掉毫秒部分）
+     *
+     * <p>MySQL DATETIME 列只存秒精度，Java Date 毫秒精度，写入时 0.053s 会被截断为 0.000s。
+     * 用于把内存中的 Date 与 DB 中的 DATETIME 对齐，避免 select 范围漏掉刚写入的记录。</p>
+     */
+    public static Date truncateToSeconds(Date date)
+    {
+        if (date == null) return null;
+        return new Date((date.getTime() / 1000L) * 1000L);
+    }
+
     public static Date getServerStartDate()
     {
         long time = ManagementFactory.getRuntimeMXBean().getStartTime();
