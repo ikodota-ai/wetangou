@@ -6,9 +6,29 @@
       <text class="badge">员工工作台</text>
     </view>
   </view>
-  <view class="row card">
+  <view class="row card {{hasMultiStore ? 'row-tap' : ''}}" bindtap="onStoreTap">
     <text class="lab">所属门店</text>
-    <text class="val">{{storeName}}</text>
+    <view class="val val-row">
+      <text>{{storeName || '未关联'}}</text>
+      <text wx:if="{{hasMultiStore}}" class="switch-hint">切换 ▾</text>
+    </view>
+  </view>
+
+  <!-- 多门店切换器（半屏弹层） -->
+  <view wx:if="{{showStorePicker}}" class="picker-mask" bindtap="onStorePickerClose">
+    <view class="picker-panel" catchtap="">
+      <view class="picker-title">切换门店</view>
+      <view class="picker-list">
+        <view wx:for="{{storeIds}}" wx:key="*this"
+              class="picker-item {{item == storeId ? 'picker-item-active' : ''}}"
+              data-storeid="{{item}}"
+              bindtap="onPickStore">
+          <text>门店 #{{item}}</text>
+          <text wx:if="{{item == storeId}}" class="picker-cur">当前</text>
+        </view>
+      </view>
+      <view class="picker-cancel" bindtap="onStorePickerClose">取消</view>
+    </view>
   </view>
   <view class="row card">
     <text class="lab">账号</text>
