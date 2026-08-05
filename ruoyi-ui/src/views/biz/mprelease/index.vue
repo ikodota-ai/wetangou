@@ -1,8 +1,9 @@
 <template>
   <div class="app-container">
     <el-alert
-      title="小程序代上传/提审/发布需接入微信开放平台第三方平台并完成认证。当前页面维护版本与流程状态留痕，接入后即可对接真实接口。"
-      type="info"
+      v-if="status"
+      :title="statusTitle"
+      :type="status.configured ? 'success' : 'warning'"
       :closable="false"
       show-icon
       class="mb8"
@@ -316,6 +317,8 @@ export default {
       releaseList: [],
       merchantOptions: [],
       title: "",
+      // 第三方平台状态（loadStatus 写入）
+      status: null,
       open: false,
       detailOpen: false,
       extLoading: false,
@@ -361,6 +364,20 @@ export default {
       getPlatformStatus().then(res => {
         if (res && res.data) this.status = res.data
       }).catch(() => {})
+    },
+    statusTitle() {
+      if (!this.status) return ''
+      const s = this.status
+      const ticketAge = s.ticketAgeSeconds != null
+        ? Math.floor(s.ticketAgeSeconds / 60) + ' 分钟前'
+        : '尚未推送'
+      if (!s.configured) {
+        return '微信开放平台第三方平台未配置：提审/发布将仅记录状态、不实际调用微信。可在【平台配置 → 小程序平台配置】中补全 component_appid / component_appsecret。'
+      }
+      if (!s.ticketFresh) {
+        return '第三方平台已配置，但 component_verify_ticket ' + ticketAge + ' 推送过旧，请检查回调连通性。已授权商户：' + s.authorizerCount + ' 个。'
+      }
+      return '第三方平台运行正常：ticket ' + ticketAge + ' 推送，已授权商户 ' + s.authorizerCount + ' 个。'
     },
     labelOf(options, value) {
       const hit = options.find(item => item.value === value);

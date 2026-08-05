@@ -36,3 +36,13 @@ DELETE rm FROM sys_role_menu rm LEFT JOIN sys_menu m ON rm.menu_id=m.menu_id WHE
 
 -- 5) 清 Redis 缓存（必须！否则 getRouters 返旧值）
 -- redis-cli -n 0 flushdb
+
+-- A3: 补 'biz:mpconfig:list' 菜单 + 绑 platform/admin/agent 角色
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark) 
+SELECT '平台状态查询', 2112, 1, '#', '', 1, 0, 'F', '0', '0', 'biz:mpconfig:list', '#', 'admin', NOW(), '第三方平台状态'
+FROM (SELECT 1) t
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:mpconfig:list');
+SET @mp_list = (SELECT menu_id FROM sys_menu WHERE perms='biz:mpconfig:list' LIMIT 1);
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) SELECT 1, @mp_list;
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) SELECT 3, @mp_list;
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) SELECT 4, @mp_list;
