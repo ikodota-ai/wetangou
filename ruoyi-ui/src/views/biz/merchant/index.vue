@@ -178,9 +178,19 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="8">
             <el-form-item label="商户Logo" prop="logo">
               <image-upload v-model="form.logo" :limit="1" tip-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="客服二维码" prop="serviceQrcode">
+              <image-upload v-model="form.serviceQrcode" :limit="1" tip-position="right" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="营业执照" prop="licenseImg">
+              <image-upload v-model="form.licenseImg" :limit="1" tip-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -205,16 +215,12 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="客服二维码" prop="serviceQrcode">
-              <image-upload v-model="form.serviceQrcode" :limit="1" tip-position="right" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
             <el-form-item label="商家简介" prop="intro">
               <el-input v-model="form.intro" type="textarea" :rows="3" placeholder="小程序首页/联系客服展示" />
             </el-form-item>
           </el-col>
-<el-form-item label="营业执照号" prop="licenseNo">
+          <el-col :span="12">
+            <el-form-item label="营业执照号" prop="licenseNo">
               <el-input v-model="form.licenseNo" placeholder="请输入营业执照号" />
             </el-form-item>
           </el-col>
@@ -227,11 +233,6 @@
                 placeholder="留空表示不限期"
                 style="width: 100%"
               />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="营业执照" prop="licenseImg">
-              <image-upload v-model="form.licenseImg" :limit="1" tip-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
