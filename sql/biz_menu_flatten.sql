@@ -76,3 +76,31 @@ INSERT IGNORE INTO sys_role_menu(role_id, menu_id)
   SELECT 1, menu_id FROM sys_menu WHERE parent_id=@banner_id;
 INSERT IGNORE INTO sys_role_menu(role_id, menu_id) 
   SELECT 3, menu_id FROM sys_menu WHERE parent_id=@banner_id;
+
+-- 轮播图管理（商户自管）— 移到 门店商品 顶级下
+DELETE FROM sys_role_menu WHERE menu_id IN (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list');
+DELETE FROM sys_role_menu WHERE menu_id IN (SELECT menu_id FROM sys_menu WHERE parent_id IN (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list'));
+DELETE FROM sys_menu WHERE parent_id IN (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list');
+DELETE FROM sys_menu WHERE perms='biz:banner:list';
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT '轮播图管理', 2108, 6, 'banner', 'biz/banner/index', NULL, '', 1, 0, 'C', '0', '0', 'biz:banner:list', 'picture', 'admin', NOW(), '商户首页轮播图'
+FROM (SELECT 1) t WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:banner:list');
+SET @banner_id = (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list' LIMIT 1);
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 'banner:query', @banner_id, 1, '#', NULL, NULL, '', 1, 0, 'F', '0', '0', 'biz:banner:query', '#', 'admin', NOW(), 'banner 按钮'
+FROM (SELECT 1) t WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:banner:query');
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 'banner:add', @banner_id, 2, '#', NULL, NULL, '', 1, 0, 'F', '0', '0', 'biz:banner:add', '#', 'admin', NOW(), 'banner 按钮'
+FROM (SELECT 1) t WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:banner:add');
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 'banner:edit', @banner_id, 3, '#', NULL, NULL, '', 1, 0, 'F', '0', '0', 'biz:banner:edit', '#', 'admin', NOW(), 'banner 按钮'
+FROM (SELECT 1) t WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:banner:edit');
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 'banner:remove', @banner_id, 4, '#', NULL, NULL, '', 1, 0, 'F', '0', '0', 'biz:banner:remove', '#', 'admin', NOW(), 'banner 按钮'
+FROM (SELECT 1) t WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:banner:remove');
+INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT 'banner:export', @banner_id, 5, '#', NULL, NULL, '', 1, 0, 'F', '0', '0', 'biz:banner:export', '#', 'admin', NOW(), 'banner 按钮'
+FROM (SELECT 1) t WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms='biz:banner:export');
+-- 绑商户(5) 角色（商户自管 banner）
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) SELECT 5, @banner_id;
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id) SELECT 5, menu_id FROM sys_menu WHERE parent_id=@banner_id;

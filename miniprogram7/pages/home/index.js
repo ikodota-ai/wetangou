@@ -58,17 +58,19 @@ Page({
   },
 
   // 拉后端 banner；不兜底：无数据 / 失败 / 缺 imageUrl 都视为错误并提示
+  // merchantId 从 app.globalData.merchant.merchantId 取（按当前登录商户过滤）
   loadBanners(storeId) {
-    api.bannerList({ position: 'home', merchantId: 0 }).then((res) => {
+    const merchantId = (app.globalData && app.globalData.merchant && app.globalData.merchant.merchantId) || 0
+    api.bannerList({ position: 'home', merchantId: merchantId }).then((res) => {
       const rows = (res && (res.data || res.rows || res)) || [];
       if (!Array.isArray(rows) || rows.length === 0) {
-        throw new Error('后端未配置首页 banner（position=home 0 条），请在【平台配置 → 轮播图管理】新增')
+        throw new Error('当前商户未配置首页 banner（position=home 0 条），请在后台【门店商品 → 轮播图管理】新增')
       }
       const banners = rows
         .filter((b) => b.imageUrl)
         .map((b) => ({ id: b.bannerId, src: toFullUrl(b.imageUrl), link: b.linkUrl || '' }));
       if (banners.length === 0) {
-        throw new Error('后端 banner 全部缺 imageUrl，请在【轮播图管理】检查图片字段')
+        throw new Error('当前商户所有 banner 缺 imageUrl，请在后台【门店商品 → 轮播图管理】检查图片字段')
       }
       this.setData({ banners });
     }).catch((err) => {

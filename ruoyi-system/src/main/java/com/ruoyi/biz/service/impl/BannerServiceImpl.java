@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.biz.mapper.BannerMapper;
 import com.ruoyi.biz.domain.Banner;
 import com.ruoyi.biz.service.IBannerService;
+import com.ruoyi.common.core.domain.model.TenantContext;
+import com.ruoyi.common.utils.TenantContextHolder;
 
 @Service
 public class BannerServiceImpl implements IBannerService
@@ -35,6 +37,15 @@ public class BannerServiceImpl implements IBannerService
     @Override
     public int insertBanner(Banner banner)
     {
+        // 租户身份注入：商户账号自动绑定自己的 merchant_id；代理商/平台账号建 banner 时必须显式传 merchantId
+        if (banner.getMerchantId() == null || banner.getMerchantId() == 0)
+        {
+            TenantContext ctx = TenantContextHolder.get();
+            if (ctx != null && ctx.isMerchant() && ctx.getMerchantId() != null)
+            {
+                banner.setMerchantId(ctx.getMerchantId());
+            }
+        }
         banner.setCreateTime(DateUtils.getNowDate());
         return bannerMapper.insertBanner(banner);
     }
