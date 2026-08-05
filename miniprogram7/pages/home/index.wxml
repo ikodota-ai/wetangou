@@ -40,7 +40,7 @@
       <view class="s-addr">
         <view class="addr-txt">
           <text class="a1">{{store.address}}</text>
-          <text class="a2">距您{{store.distance || '未知'}}</text>
+          <text class="a2">距您{{store.distanceText || '距离未知'}}</text>
         </view>
         <view class="addr-ops">
           <view class="op" bindtap="goLocation">

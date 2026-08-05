@@ -31,10 +31,13 @@ Page({
     app.pickNearestStore((store) => {
       console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300))
       // 后端字段是 storeName / businessHours，WXML 用了 name / hours，这里做一次兼容
+      const _distRaw = store && store.distance != null ? Number(store.distance) : null
+      const _distTxt = _distRaw == null ? '' : (_distRaw >= 1000 ? (_distRaw/1000).toFixed(1) + 'km' : Math.round(_distRaw) + 'm')
       const viewStore = store ? Object.assign({}, store, {
         name: store.storeName || store.name || '',
         hours: store.businessHours || store.hours || '',
-        logo: store.logo ? toFullUrl(store.logo) : ''
+        logo: store.logo ? toFullUrl(store.logo) : '',
+        distanceText: _distTxt
       }) : {}
       // 客服信息：门店优先，商家兜底（兜底是数据层兜底，不是 UI 兜底：拿不到店时用商家资料）
       const m = (app.globalData && app.globalData.merchant) || {},
