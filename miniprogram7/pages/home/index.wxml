@@ -143,16 +143,17 @@
   <!-- 在线咨询弹窗 -->
   <view class="modal-mask" wx:if="{{showConsult}}" catchtap="closeConsult">
     <view class="consult-box" catchtap="noop">
-      <text class="c-title">客服电话</text>
+      <text class="c-title">客服</text>
+      <text class="c-source">{{isStoreService ? '门店客服' : '商家统一客服'}}</text>
       <view class="c-phone" catchtap="callService">
-        <text class="c-tel">{{phone || '暂未配置'}}</text>
+        <text class="c-tel">{{phone || '暂未配置客服电话'}}</text>
         <view class="c-call-ic"></view>
       </view>
       <view class="c-qr" catchtap="previewQrcode">
         <image wx:if="{{qrcode}}" class="c-qr-img" src="{{qrcode}}" mode="aspectFit"></image>
         <text wx:else class="c-qr-txt">暂未配置客服二维码</text>
       </view>
-      <text class="c-hours">{{store.hours ? '客服工作时间 ' + store.hours : '客服工作时间请咨询门店'}}</text>
+      <text class="c-hours">{{serviceHours ? '客服服务时间 ' + serviceHours : '客服服务时间请咨询门店'}}</text>
     </view>
     <view class="consult-close" catchtap="closeConsult">
       <view class="cc-x"></view>

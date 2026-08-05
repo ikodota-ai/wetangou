@@ -65,6 +65,10 @@ public class Merchant extends BaseEntity
     @Excel(name = "营业时间")
     private String businessHours;
 
+    /** 客服服务时间（门店未配时兜底） */
+    @Excel(name = "客服服务时间")
+    private String serviceHours;
+
     /** 商家简介 */
     @Excel(name = "商家简介")
     private String intro;
@@ -375,6 +379,16 @@ public class Merchant extends BaseEntity
     public String getServiceQrcode() { return serviceQrcode; }
     public void setServiceQrcode(String serviceQrcode) { this.serviceQrcode = serviceQrcode; }
     public String getBusinessHours() { return businessHours; }
+
+    public void setServiceHours(String serviceHours)
+    {
+        this.serviceHours = serviceHours;
+    }
+
+    public String getServiceHours()
+    {
+        return serviceHours;
+    }
     public void setBusinessHours(String businessHours) { this.businessHours = businessHours; }
     public String getIntro() { return intro; }
     public void setIntro(String intro) { this.intro = intro; }

@@ -19,6 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="servicePhone"    column="service_phone"    />
         <result property="serviceQrcode"    column="service_qrcode"    />
         <result property="businessHours"    column="business_hours"    />
+        <result property="serviceHours"    column="service_hours"    />
         <result property="intro"    column="intro"    />
         <result property="services"    column="services"    />
         <result property="sort"    column="sort"    />
@@ -33,7 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectStoreVo">
-        select store_id, store_name, logo, province, city, district, address, longitude, latitude, phone, service_phone, service_qrcode, business_hours, intro, services, sort, status, del_flag, create_by, create_time, update_by, update_time, remark, merchant_id from biz_store
+        select store_id, store_name, logo, province, city, district, address, longitude, latitude, phone, service_phone, service_qrcode, business_hours, service_hours, intro, services, sort, status, del_flag, create_by, create_time, update_by, update_time, remark, merchant_id from biz_store
     </sql>
 
     <select id="selectStoreList" parameterType="Store" resultMap="StoreResult">
@@ -80,6 +81,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="servicePhone != null">service_phone,</if>
             <if test="serviceQrcode != null">service_qrcode,</if>
             <if test="businessHours != null">business_hours,</if>
+            <if test="serviceHours != null">service_hours,</if>
             <if test="intro != null">intro,</if>
             <if test="services != null">services,</if>
             <if test="sort != null">sort,</if>
@@ -105,6 +107,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="servicePhone != null">#{servicePhone},</if>
             <if test="serviceQrcode != null">#{serviceQrcode},</if>
             <if test="businessHours != null">#{businessHours},</if>
+            <if test="serviceHours != null">#{serviceHours},</if>
             <if test="intro != null">#{intro},</if>
             <if test="services != null">#{services},</if>
             <if test="sort != null">#{sort},</if>
@@ -133,6 +136,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="servicePhone != null">service_phone = #{servicePhone},</if>
             <if test="serviceQrcode != null">service_qrcode = #{serviceQrcode},</if>
             <if test="businessHours != null">business_hours = #{businessHours},</if>
+            <if test="serviceHours != null">service_hours = #{serviceHours},</if>
             <if test="intro != null">intro = #{intro},</if>
             <if test="services != null">services = #{services},</if>
             <if test="sort != null">sort = #{sort},</if>
@@ -166,7 +170,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SELECT
             s.store_id, s.store_name, s.logo, s.province, s.city, s.district, s.address,
             s.longitude, s.latitude, s.phone, s.service_phone, s.service_qrcode,
-            s.business_hours, s.intro, s.services, s.sort, s.status, s.del_flag,
+            s.business_hours, s.service_hours, s.intro, s.services, s.sort, s.status, s.del_flag,
             s.create_by, s.create_time, s.update_by, s.update_time, s.remark, s.merchant_id,
             (
                 6371000 * ACOS(

@@ -204,14 +204,18 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-                      <el-col :span="12">
             <el-form-item label="客服电话" prop="servicePhone">
               <el-input v-model="form.servicePhone" placeholder="门店未配置时小程序客服兜底" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="客服服务时间" prop="serviceHours">
+              <el-input v-model="form.serviceHours" placeholder="如 09:00-22:00（客服工作时段）" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="营业时间" prop="businessHours">
-              <el-input v-model="form.businessHours" placeholder="如 09:00-22:00" />
+              <el-input v-model="form.businessHours" placeholder="商家整体营业时间，如 09:00-22:00" />
             </el-form-item>
           </el-col>
           <el-col :span="24">

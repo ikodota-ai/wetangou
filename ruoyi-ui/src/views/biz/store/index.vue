@@ -101,6 +101,7 @@
         </template>
       </el-table-column>
       <el-table-column label="营业时间" align="center" prop="businessHours" width="150" />
+      <el-table-column label="客服服务时间" align="center" prop="serviceHours" width="150" />
       <el-table-column label="服务设施" align="center" prop="services" min-width="200">
         <template slot-scope="scope">
           <el-tag
@@ -210,9 +211,14 @@
               <el-input v-model="form.servicePhone" placeholder="请输入客服电话" />
             </el-form-item>
           </el-col>
-          <el-col :span="24">
+          <el-col :span="12">
             <el-form-item label="营业时间" prop="businessHours">
-              <el-input v-model="form.businessHours" placeholder="请输入营业时间，如：09:00-22:00" />
+              <el-input v-model="form.businessHours" placeholder="门店营业时间，如 09:00-22:00" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="客服服务时间" prop="serviceHours">
+              <el-input v-model="form.serviceHours" placeholder="客服工作时段，如 09:00-22:00" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -351,6 +357,7 @@ export default {
         phone: null,
         servicePhone: null,
         businessHours: null,
+        serviceHours: null,
         status: '0',
         sort: 0
       };

@@ -94,6 +94,7 @@
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 60rpx; }
 .consult-box { width: 620rpx; background: #FFFFFF; border-radius: 24rpx; padding: 48rpx 40rpx 40rpx; display: flex; flex-direction: column; align-items: center; gap: 32rpx; }
 .c-title { font-size: 28rpx; color: var(--color-text-4); }
+.c-source { display: block; font-size: 22rpx; color: #999; margin-top: 4rpx; margin-bottom: 12rpx; }
 .c-phone { display: flex; align-items: center; gap: 16rpx; }
 .c-tel { font-size: 56rpx; font-weight: 700; color: var(--color-primary); }
 .c-call-ic { width: 48rpx; height: 48rpx; border: 4rpx solid var(--color-primary); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative; }

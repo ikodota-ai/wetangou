@@ -74,6 +74,10 @@ public class Store extends BaseEntity
     @Excel(name = "营业时间")
     private String businessHours;
 
+    /** 客服服务时间 */
+    @Excel(name = "客服服务时间")
+    private String serviceHours;
+
     /** 门店简介 */
     @Excel(name = "门店简介")
     private String intro;
@@ -223,6 +227,16 @@ public class Store extends BaseEntity
         return businessHours;
     }
 
+    public void setServiceHours(String serviceHours)
+    {
+        this.serviceHours = serviceHours;
+    }
+
+    public String getServiceHours()
+    {
+        return serviceHours;
+    }
+
     public void setIntro(String intro) 
     {
         this.intro = intro;
@@ -299,6 +313,7 @@ public class Store extends BaseEntity
             .append("servicePhone", getServicePhone())
             .append("serviceQrcode", getServiceQrcode())
             .append("businessHours", getBusinessHours())
+            .append("serviceHours", getServiceHours())
             .append("intro", getIntro())
             .append("services", getServices())
             .append("sort", getSort())

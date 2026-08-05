@@ -82,6 +82,7 @@ public class ApiMerchantController
         data.put("servicePhone", merchant.getServicePhone());
         data.put("serviceQrcode", safeAbsolute(merchant.getServiceQrcode()));
         data.put("businessHours", merchant.getBusinessHours());
+        data.put("serviceHours", merchant.getServiceHours());
         return AjaxResult.success(data);
     }
 

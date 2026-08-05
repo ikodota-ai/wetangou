@@ -17,6 +17,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="servicePhone"    column="service_phone"    />
         <result property="serviceQrcode"    column="service_qrcode"    />
         <result property="businessHours"    column="business_hours"    />
+        <result property="serviceHours"    column="service_hours"    />
         <result property="intro"    column="intro"    />
         <result property="licenseNo"    column="license_no"    />
         <result property="licenseImg"    column="license_img"    />
@@ -43,7 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectMerchantVo">
         select m.merchant_id, m.merchant_no, m.merchant_name, m.agent_id, a.agent_name, m.dept_id,
-               m.logo, m.contact, m.phone, m.service_phone, m.service_qrcode, m.business_hours, m.intro,
+               m.logo, m.contact, m.phone, m.service_phone, m.service_qrcode, m.business_hours, m.service_hours, m.intro,
                m.license_no, m.license_img,
                m.appid, m.app_secret, m.mp_auth_mode,
                m.pay_mode, m.pay_mch_id, m.pay_appid, m.pay_cert_serial, m.pay_key_path,
@@ -95,6 +96,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="servicePhone != null">service_phone,</if>
             <if test="serviceQrcode != null">service_qrcode,</if>
             <if test="businessHours != null">business_hours,</if>
+            <if test="serviceHours != null">service_hours,</if>
             <if test="intro != null">intro,</if>
             <if test="licenseNo != null">license_no,</if>
             <if test="licenseImg != null">license_img,</if>
@@ -126,6 +128,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="servicePhone != null">#{servicePhone},</if>
             <if test="serviceQrcode != null">#{serviceQrcode},</if>
             <if test="businessHours != null">#{businessHours},</if>
+            <if test="serviceHours != null">#{serviceHours},</if>
             <if test="intro != null">#{intro},</if>
             <if test="licenseNo != null">#{licenseNo},</if>
             <if test="licenseImg != null">#{licenseImg},</if>
@@ -160,6 +163,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="servicePhone != null">service_phone = #{servicePhone},</if>
             <if test="serviceQrcode != null">service_qrcode = #{serviceQrcode},</if>
             <if test="businessHours != null">business_hours = #{businessHours},</if>
+            <if test="serviceHours != null">service_hours = #{serviceHours},</if>
             <if test="intro != null">intro = #{intro},</if>
             <if test="licenseNo != null">license_no = #{licenseNo},</if>
             <if test="licenseImg != null">license_img = #{licenseImg},</if>

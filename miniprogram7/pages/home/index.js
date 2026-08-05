@@ -12,7 +12,9 @@ Page({
     showConsult: false,
     showFacility: false,
     phone: '',
-    qrcode: ''
+    qrcode: '',
+    serviceHours: '',
+    isStoreService: false
   },
   onLoad() {
     try {
@@ -39,17 +41,22 @@ Page({
         logo: store.logo ? toFullUrl(store.logo) : '',
         distanceText: _distTxt
       }) : {}
-      // 客服信息：门店优先，商家兜底（兜底是数据层兜底，不是 UI 兜底：拿不到店时用商家资料）
-      const m = (app.globalData && app.globalData.merchant) || {},
-            sp = (store && (store.servicePhone || store.phone)) || m.servicePhone || '',
-            sq = (store && store.serviceQrcode) || m.serviceQrcode || '',
-            sh = (store && (store.businessHours || store.hours)) || m.businessHours || ''
+      // 客服信息：门店优先，商家兜底。
+      // hasStore* 标记用于 UI 提示"门店客服 / 商家统一客服"，避免被误认为 UI 兜底
+      const m = (app.globalData && app.globalData.merchant) || {}
+      const _storePhone = store && (store.servicePhone || store.phone)
+      const _storeQr = store && store.serviceQrcode
+      const _storeSvcHours = store && store.serviceHours
+      const sp = _storePhone || m.servicePhone || ''
+      const sq = _storeQr || m.serviceQrcode || ''
+      const sh = _storeSvcHours || m.serviceHours || m.businessHours || ''
       this.setData({
         store: viewStore,
         goods: app.globalData.goods,
         phone: sp,
         qrcode: sq ? toFullUrl(sq) : '',
-        businessHours: sh
+        serviceHours: sh,
+        isStoreService: !!_storePhone || !!_storeSvcHours || !!_storeQr
       })
       if (store && store.storeId) {
         this.loadBanners(store.storeId);
