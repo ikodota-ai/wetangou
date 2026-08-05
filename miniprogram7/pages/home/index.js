@@ -1,16 +1,10 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
 
-// 门店未配相册时的兜底轮播图，避免首页出现空白 swiper
-const FALLBACK_BANNERS = [
-  { id: 'f1', src: '/assets/img/RestaurantImg.png' },
-  { id: 'f2', src: '/assets/img/GoodsImg.jpg' }
-];
-
 Page({
   data: {
     statusBarHeight: 20,
-    banners: FALLBACK_BANNERS,
+    banners: [],  // 不设兜底图；后端无 banner 数据时由调用方显式报错
     store: {},
     goods: [],
     facilities: [],
@@ -42,7 +36,7 @@ Page({
         hours: store.businessHours || store.hours || '',
         logo: store.logo ? toFullUrl(store.logo) : ''
       }) : {}
-      // 客服信息：门店优先，商家兜底
+      // 客服信息：门店优先，商家兜底（兜底是数据层兜底，不是 UI 兜底：拿不到店时用商家资料）
       const m = (app.globalData && app.globalData.merchant) || {},
             sp = (store && (store.servicePhone || store.phone)) || m.servicePhone || '',
             sq = (store && store.serviceQrcode) || m.serviceQrcode || '',
@@ -63,27 +57,26 @@ Page({
     });
   },
 
-  // 首页轮播复用门店相册，门店没配图时保留内置兜底图
-  // 优先拉后端 banner，门店没配时再回退到 storeAlbum
+  // 拉后端 banner；不兜底：无数据 / 失败 / 缺 imageUrl 都视为错误并提示
   loadBanners(storeId) {
     api.bannerList({ position: 'home', merchantId: 0 }).then((res) => {
       const rows = (res && (res.data || res.rows || res)) || [];
-      const banners = (Array.isArray(rows) ? rows : [])
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error('后端未配置首页 banner（position=home 0 条），请在【平台配置 → 轮播图管理】新增')
+      }
+      const banners = rows
         .filter((b) => b.imageUrl)
         .map((b) => ({ id: b.bannerId, src: toFullUrl(b.imageUrl), link: b.linkUrl || '' }));
-      if (banners.length) {
-        this.setData({ banners });
-        return;
+      if (banners.length === 0) {
+        throw new Error('后端 banner 全部缺 imageUrl，请在【轮播图管理】检查图片字段')
       }
-      // 回退：复用门店相册
-      return api.storeAlbum(storeId).then((res2) => {
-        const rows2 = (res2 && (res2.data || res2.rows || res2)) || [];
-        const fb = (Array.isArray(rows2) ? rows2 : [])
-          .filter((a) => a.imgUrl)
-          .map((a, i) => ({ id: a.albumId || 'a' + i, src: toFullUrl(a.imgUrl) }));
-        if (fb.length) this.setData({ banners: fb });
-      }).catch(() => {});
-    }).catch(() => {});
+      this.setData({ banners });
+    }).catch((err) => {
+      console.error('[home] loadBanners FAIL', err)
+      wx.showToast({ title: '首页 banner 加载失败：' + ((err && (err.msg || err.message)) || '网络异常'), icon: 'none', duration: 4000 })
+      // 保持 banners=[]（空数组），让 swiper 显示空白以便排查
+      this.setData({ banners: [] })
+    });
   },
   // 设施标签由后端翻译字典，前端不再硬编码中文
   loadFacilities(storeId) {
@@ -94,19 +87,12 @@ Page({
   },
   onBannerChange() {},
   onBannerTap(e) {
-    // 平台 banner 带 linkUrl 时优先跳；门店相册兜底时跳贴图页
+    // 跳 banner.linkUrl；没 linkUrl 就不响应点击
     const item = (e && e.currentTarget && e.currentTarget.dataset) || {};
     const link = item.link;
-    if (link && /^https?:\/\//.test(link)) {
-      // 外链
-      wx.setClipboardData({ data: link });
-      return;
-    }
-    if (link) {
-      wx.navigateTo({ url: link, fail: () => { wx.switchTab({ url: '/pages/album/index' }); } });
-      return;
-    }
-    wx.switchTab({ url: '/pages/album/index' });
+    if (!link) { wx.showToast({ title: '该 banner 未配置跳转链接', icon: 'none' }); return; }
+    if (/^https?:\/\//.test(link)) { wx.setClipboardData({ data: link }); return; }
+    wx.navigateTo({ url: link, fail: (err) => { console.error('[home] banner navigate FAIL', err); wx.showToast({ title: '跳转失败：' + (err && err.errMsg) || '', icon: 'none' }); } });
   },
   switchTab(e) { this.setData({ tab: e.currentTarget.dataset.t }); },
   goDetail(e) { wx.navigateTo({ url: '/pages/goods/detail/index?id=' + e.currentTarget.dataset.id }); },
