@@ -16,7 +16,7 @@ Page({
         wx.showToast({ title: (e && (e.msg || e.message)) || '加载失败', icon: 'none' })
         this.setData({ loaded: true })
       })
-,
+  },
 
   onConfirm(e) {
     const id = e.currentTarget.dataset.id
