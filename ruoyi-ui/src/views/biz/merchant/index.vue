@@ -180,7 +180,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="商户Logo" prop="logo">
-              <image-upload v-model="form.logo" :limit="1" />
+              <image-upload v-model="form.logo" :limit="1" tip-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -206,7 +206,7 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="客服二维码" prop="serviceQrcode">
-              <image-upload v-model="form.serviceQrcode" :limit="1" />
+              <image-upload v-model="form.serviceQrcode" :limit="1" tip-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -231,7 +231,7 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="营业执照" prop="licenseImg">
-              <image-upload v-model="form.licenseImg" :limit="1" />
+              <image-upload v-model="form.licenseImg" :limit="1" tip-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="12">

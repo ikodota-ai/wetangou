@@ -1,5 +1,5 @@
 <template>
-  <div class="component-upload-image">
+  <div class="component-upload-image" :class="{'tip-on-right': tipPosition === 'right'}">
     <el-upload
       multiple
       :disabled="disabled"
@@ -71,6 +71,8 @@ export default {
        type: Number,
       default: 5
     },
+    // 提示文字位置：bottom 默认（上传框下方） | right 右侧
+    tipPosition: { type: String, default: 'bottom' },
     // 文件类型, 例如['png', 'jpg', 'jpeg']
     fileType: {
       type: Array,
@@ -267,6 +269,24 @@ export default {
 ::v-deep .el-list-enter, .el-list-leave-active {
   opacity: 0;
   transform: translateY(0);
+}
+
+/* 提示文字在右侧：上传框 + 提示 并排 */
+.component-upload-image.tip-on-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.component-upload-image.tip-on-right > .el-upload {
+  display: inline-flex;
+}
+.component-upload-image.tip-on-right .el-upload__tip {
+  flex: 1;
+  min-width: 200px;
+  padding-top: 8px;
+  line-height: 1.6;
+  color: #909399;
 }
 </style>
 
