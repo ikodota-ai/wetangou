@@ -1,0 +1,114 @@
+<view class="page">
+  <view class="head">
+    <view class="h-row">
+      <view class="avatar"><image src="{{user.avatarUrl || '/assets/avatar/default.png'}}"></image></view>
+      <view class="h-meta">
+        <text class="h-name">{{user.nickName || '未登录'}}</text>
+        <view class="h-tag"><text>{{joined ? 'Lv.' + (stat.level || 1) + ' 推客' : '未开通推客'}}</text></view>
+      </view>
+      <view class="bag">
+        <view class="bag-1"></view>
+        <view class="bag-2"></view>
+        <text class="bag-y">¥</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="content">
+    <view class="data-card card">
+      <view class="data-head">
+        <text class="data-t">数据概览</text>
+        <view class="data-pills">
+          <view class="pill" bindtap="goRecords">
+            <view class="p-ic p-rec"></view>
+            <text>提现记录</text>
+          </view>
+          <view class="pill" bindtap="openAgreement">
+            <view class="p-ic p-doc"></view>
+            <text>推客协议</text>
+          </view>
+        </view>
+      </view>
+      <view class="data-grid">
+        <view class="d-item"><text class="d-num">{{stat.totalCommission}}</text><text class="d-lab">累计收入</text></view>
+        <view class="d-item"><text class="d-num">{{stat.withdrawAmount}}</text><text class="d-lab">已提现收入</text></view>
+        <view class="d-item"><text class="d-num">{{stat.availableAmount}}</text><text class="d-lab">可提现收入</text></view>
+        <view class="d-item"><text class="d-num">{{stat.withdrawingAmount}}</text><text class="d-lab">提现中的收入</text></view>
+        <view class="d-item"><text class="d-num">{{stat.frozenAmount}}</text><text class="d-lab">冷静期收入</text></view>
+        <view class="d-item"><text class="d-num">{{orderCount}}</text><text class="d-lab">带货订单数</text></view>
+      </view>
+      <view class="go-withdraw btn-primary" wx:if="{{joined}}" bindtap="goWithdraw">去提现</view>
+      <view class="go-withdraw btn-primary" wx:else bindtap="onJoin">{{joining ? '提交中…' : '成为推客'}}</view>
+    </view>
+
+    <view class="tabs card">
+      <view class="tab {{tab==='order'?'on':''}}" data-t="order" bindtap="switchTab">
+        <text>带货订单({{orderCount}})</text>
+        <view class="tab-bar"></view>
+      </view>
+      <view class="tab {{tab==='fan'?'on':''}}" data-t="fan" bindtap="switchTab">
+        <text>我的粉丝</text>
+        <view class="tab-bar"></view>
+      </view>
+    </view>
+
+    <block wx:if="{{tab==='order'}}">
+      <view class="card cm-item" wx:for="{{orders}}" wx:key="id">
+        <view class="cm-top">
+          <text class="cm-store">{{item.storeName || '—'}}</text>
+          <text class="cm-amount">+{{item.amount}}</text>
+        </view>
+        <view class="cm-row"><text class="cm-lab">订单号</text><text class="cm-val">{{item.orderNo}}</text></view>
+        <view class="cm-row"><text class="cm-lab">下单人</text><text class="cm-val">{{item.memberName || '—'}}</text></view>
+        <view class="cm-row" wx:if="{{item.rate}}"><text class="cm-lab">佣金比例</text><text class="cm-val">{{item.rate}}</text></view>
+        <view class="cm-row"><text class="cm-lab">状态</text><text class="cm-val">{{item.statusText}}{{item.settleTime ? ' · ' + item.settleTime : ''}}</text></view>
+      </view>
+      <view class="empty" wx:if="{{!orders.length}}">
+        <text class="empty-text">{{joined ? '暂无带货订单' : '成为推客后即可分享赚佣金'}}</text>
+      </view>
+    </block>
+    <block wx:if="{{tab==='fan'}}">
+      <view class="card fan-poster" bindtap="goPoster">
+        <view class="fp-l">
+          <text class="fp-t">邀请海报</text>
+          <text class="fp-s">扫码即可成为你的粉丝，下单后获得佣金</text>
+        </view>
+        <view class="fp-r">
+          <text class="fp-badge">分享</text>
+        </view>
+      </view>
+      <view class="card cm-item" wx:for="{{fans}}" wx:key="memberId">
+        <view class="cm-top">
+          <view class="fan-info">
+            <image class="fan-avatar" src="{{item.avatar || '/assets/avatar/default.png'}}"></image>
+            <text class="cm-store">{{item.nickname || '匿名用户'}}</text>
+          </view>
+        </view>
+        <view class="cm-row"><text class="cm-lab">粉丝ID</text><text class="cm-val">{{item.memberId}}</text></view>
+        <view class="cm-row"><text class="cm-lab">邀请时间</text><text class="cm-val">{{item.inviteTime || '—'}}</text></view>
+        <view class="cm-row"><text class="cm-lab">最近登录</text><text class="cm-val">{{item.lastLoginTime || '—'}}</text></view>
+      </view>
+      <view class="empty" wx:if="{{!fans.length}}">
+        <text class="empty-text">{{joined ? '还没有粉丝，分享海报邀请好友吧' : '成为推客后即可邀请粉丝'}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="coin-bubble" bindtap="onBubble">
+    <text class="cb-t">赚</text>
+  </view>
+
+  <!-- 推客协议抽屉 -->
+  <view class="drawer-mask" wx:if="{{showAgreement}}" catchtap="closeAgreement">
+    <view class="agree-box" catchtap="noop">
+      <view class="ab-head">
+        <text class="ab-t">推客协议</text>
+        <view class="ab-close" bindtap="closeAgreement"></view>
+      </view>
+      <scroll-view scroll-y class="ab-body">
+        <rich-text wx:if="{{agreement}}" nodes="{{agreement}}"></rich-text>
+        <text wx:else>暂未配置协议内容</text>
+      </scroll-view>
+    </view>
+  </view>
+</view>

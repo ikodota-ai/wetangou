@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="card">
+    <text class="block-title">用户收入</text>
+    <view class="data-grid">
+      <view class="d-item"><text class="d-num">{{stat.totalCommission}}</text><text class="d-lab">累计收入金额</text></view>
+      <view class="d-item"><text class="d-num">{{stat.withdrawAmount}}</text><text class="d-lab">累计提现金额</text></view>
+      <view class="d-item"><text class="d-num">{{stat.availableAmount}}</text><text class="d-lab">可提现金额</text></view>
+      <view class="d-item"><text class="d-num">{{stat.waitAmount}}</text><text class="d-lab">处理中金额</text></view>
+      <view class="d-item"><text class="d-num">{{stat.doneAmount}}</text><text class="d-lab">已完成金额</text></view>
+      <view class="d-item"><text class="d-num">{{stat.rejectAmount}}</text><text class="d-lab">已驳回金额</text></view>
+    </view>
+  </view>
+
+  <view class="tabs">
+    <view class="tab {{tab==='all'?'on':''}}" data-t="all" bindtap="switchTab"><text>全部</text><view class="tab-bar"></view></view>
+    <view class="tab {{tab==='wait'?'on':''}}" data-t="wait" bindtap="switchTab"><text>处理中</text><view class="tab-bar"></view></view>
+    <view class="tab {{tab==='done'?'on':''}}" data-t="done" bindtap="switchTab"><text>已完成</text><view class="tab-bar"></view></view>
+    <view class="tab {{tab==='reject'?'on':''}}" data-t="reject" bindtap="switchTab"><text>已驳回</text><view class="tab-bar"></view></view>
+  </view>
+
+  <view class="rec-list" wx:if="{{shown.length}}">
+    <view class="card rec-item" wx:for="{{shown}}" wx:key="id">
+      <view class="r-top">
+        <text class="r-amount">¥{{item.amount}}</text>
+        <text class="r-status s-{{item.status}}">{{item.statusText}}</text>
+      </view>
+      <view class="r-row"><text class="r-lab">提现单号</text><text class="r-val">{{item.withdrawNo}}</text></view>
+      <view class="r-row" wx:if="{{item.accountName}}"><text class="r-lab">收款人</text><text class="r-val">{{item.accountName}}</text></view>
+      <view class="r-row" wx:if="{{item.account}}"><text class="r-lab">收款账户</text><text class="r-val">{{item.account}}</text></view>
+      <view class="r-row"><text class="r-lab">申请时间</text><text class="r-val">{{item.applyTime || '-'}}</text></view>
+      <view class="r-row" wx:if="{{item.finishTime}}"><text class="r-lab">完成时间</text><text class="r-val">{{item.finishTime}}</text></view>
+      <view class="r-row" wx:if="{{item.failReason}}"><text class="r-lab">驳回原因</text><text class="r-val warn">{{item.failReason}}</text></view>
+    </view>
+  </view>
+  <view class="empty" wx:elif="{{loading}}"><text class="empty-text">加载中…</text></view>
+  <view class="empty" wx:else><text class="empty-text">{{list.length ? '该分类下暂无记录' : '暂无提现记录'}}</text></view>
+</view>

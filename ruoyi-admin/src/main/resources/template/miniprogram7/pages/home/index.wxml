@@ -1,0 +1,162 @@
+<view class="page">
+  <!-- 自定义绿色顶栏 -->
+  <!-- <view class="topbar" style="height: {{statusBarHeight + 44}}px; padding-top: {{statusBarHeight}}px;">
+    <view class="topbar-inner">
+      <view class="placeholder"></view>
+      <text class="title">首页</text>
+      <view class="placeholder"></view>
+    </view>
+  </view>
+  <view class="topbar-pad" style="height: {{statusBarHeight + 44}}px;"></view> -->
+
+  <view class="content safe-bottom">
+    <!-- 轮播 -->
+    <swiper class="banner" indicator-dots autoplay circular bindchange="onBannerChange">
+      <swiper-item wx:for="{{banners}}" wx:key="id" bindtap="onBannerTap" data-id="{{item.id}}">
+        <image class="banner-img" src="{{item.src}}" mode="aspectFill"></image>
+      </swiper-item>
+    </swiper>
+
+    <!-- 门店卡 -->
+    <view class="store-card card">
+      <view class="sc-head">
+        <text class="s-name">{{store.name}}</text>
+        <view class="pay-btn" bindtap="goPay">买单</view>
+      </view>
+      <view class="s-rating">
+        <view class="star s-off"></view>
+        <view class="star s-off"></view>
+        <view class="star s-off"></view>
+        <view class="star s-off"></view>
+        <view class="star s-off"></view>
+        <text class="s-score">暂无评分</text>
+      </view>
+      <view class="s-hours">营业时间：{{store.hours}}</view>
+      <view class="tags">
+        <text class="tag">可堂食</text>
+        <text class="tag">可预约</text>
+        <text class="detail" bindtap="openFacility">详情 ></text>
+      </view>
+      <view class="s-addr">
+        <view class="addr-txt">
+          <text class="a1">{{store.address}}</text>
+          <text class="a2">距您{{store.distanceText || '距离未知'}}</text>
+        </view>
+        <view class="addr-ops">
+          <view class="op" bindtap="goLocation">
+            <view class="op-ic ic-nav"></view>
+            <text>导航</text>
+          </view>
+          <view class="op" bindtap="goService">
+            <view class="op-ic ic-tel"></view>
+            <text>联系商家</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 双入口 -->
+    <view class="entries card">
+      <view class="entry" bindtap="goBooking">
+        <view class="e-txt">
+          <text class="e-ttl">预约到店</text>
+          <text class="e-sub">提前预约到店</text>
+        </view>
+        <view class="e-ic ic-clock"></view>
+      </view>
+      <view class="vline"></view>
+      <view class="entry" bindtap="openConsult">
+        <view class="e-txt">
+          <text class="e-ttl">在线咨询</text>
+          <text class="e-sub">快速询问商家</text>
+        </view>
+        <view class="e-ic ic-chat"></view>
+      </view>
+    </view>
+
+    <!-- Tab + 列表 -->
+    <view class="tabs">
+      <view class="tab {{tab==='pickup'?'on':''}}" data-t="pickup" bindtap="switchTab">
+        <text>到店自取</text>
+        <view class="tab-bar"></view>
+      </view>
+      <view class="tab {{tab==='book'?'on':''}}" data-t="book" bindtap="switchTab">
+        <text>预约服务</text>
+        <view class="tab-bar"></view>
+      </view>
+    </view>
+
+    <view class="goods-list" wx:if="{{tab==='pickup'}}">
+      <view class="goods" wx:for="{{goods}}" wx:key="productId" data-id="{{item.productId}}" bindtap="goDetail">
+        <image class="g-img" src="{{item.cover}}"></image>
+        <view class="g-info">
+          <text class="g-name">{{item.name}}</text>
+          <text class="g-desc">购买后365天内可用｜免预约</text>
+          <text class="g-sold">已售 {{item.sold}}</text>
+          <view class="g-bottom">
+            <view class="g-price">
+              <text class="now">¥{{item.price}}</text>
+              <text class="old" wx:if="{{item.marketPrice && item.marketPrice != item.price}}">¥{{item.marketPrice}}</text>
+            </view>
+            <view class="g-buy">抢购</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="voucher-entry" wx:if="{{tab==='pickup'}}" bindtap="goVoucher">
+      <view class="ve-left">
+        <text class="ve-t">领券中心</text>
+        <text class="ve-sub">领代金券，到店买单更省</text>
+      </view>
+      <view class="ve-btn">去领券</view>
+    </view>
+
+    <view class="book-panel" wx:else>
+      <view class="bp-card" bindtap="goBooking">
+        <image class="bp-img" src="/assets/img/BookTypeImg.jpg"></image>
+        <view class="bp-txt">
+          <text class="bp-ttl">堂食预约</text>
+          <text class="bp-sub">在线选择时段，到店免排队</text>
+        </view>
+        <view class="bp-arr"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 设施及服务抽屉 -->
+  <view class="drawer-mask" wx:if="{{showFacility}}" catchtap="closeFacility">
+    <view class="drawer" catchtap="noop">
+      <view class="drawer-head">
+        <text class="d-title">设施及服务</text>
+        <view class="d-close" bindtap="closeFacility"></view>
+      </view>
+      <view class="drawer-body">
+        <view class="fac-line" wx:if="{{facilities.length}}">
+          <block wx:for="{{facilities}}" wx:key="*this"><text class="dot">·</text>{{item}}</block>
+        </view>
+        <view class="fac-line" wx:else>该门店暂未配置设施及服务</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 在线咨询弹窗 -->
+  <view class="modal-mask" wx:if="{{showConsult}}" catchtap="closeConsult">
+    <view class="consult-box" catchtap="noop">
+      <text class="c-title">客服</text>
+      <text class="c-source">{{isStoreService ? '门店客服' : '商家统一客服'}}</text>
+      <view class="c-phone" catchtap="callService">
+        <text class="c-tel">{{phone || '暂未配置客服电话'}}</text>
+        <view class="c-call-ic"></view>
+      </view>
+      <view class="c-qr" catchtap="previewQrcode">
+        <image wx:if="{{qrcode}}" class="c-qr-img" src="{{qrcode}}" mode="aspectFit"></image>
+        <text wx:else class="c-qr-txt">暂未配置客服二维码</text>
+      </view>
+      <text class="c-hours">{{serviceHours ? '客服服务时间 ' + serviceHours : '客服服务时间请咨询门店'}}</text>
+    </view>
+    <view class="consult-close" catchtap="closeConsult">
+      <view class="cc-x"></view>
+    </view>
+  </view>
+</view>

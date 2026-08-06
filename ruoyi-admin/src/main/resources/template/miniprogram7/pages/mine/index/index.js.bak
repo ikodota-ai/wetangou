@@ -1,0 +1,55 @@
+const app = getApp();
+Page({
+  data: {
+    statusBarHeight: 20,
+    logged: false,
+    user: { nickName: '', avatarUrl: '' },
+    showProfileTip: false,
+    showService: false
+  },
+  onLoad() {
+    try { this.setData({ statusBarHeight: wx.getSystemInfoSync().statusBarHeight || 20 }); } catch (e) {}
+    this.sync();
+  },
+  onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) this.getTabBar().setData({ selected: 3 });
+    this.sync();
+  },
+  sync() {
+    const u = app.globalData.user;
+    this.setData({ logged: !!u.logged, user: u });
+  },
+  onUserUpdate(user) { this.setData({ logged: !!user.logged, user }); },
+  goLogin() { wx.navigateTo({ url: '/pages/login/login' }); },
+  goProfile() {
+    if (!this.data.logged) return wx.navigateTo({ url: '/pages/login/login' });
+    wx.navigateTo({ url: '/pages/mine/profile/index' });
+  },
+  goOrder(e) {
+    const t = e.currentTarget.dataset.t;
+    wx.navigateTo({ url: '/pages/order/list/index?type=' + t });
+  },
+  goPromoter() { wx.navigateTo({ url: '/pages/promoter/index/index' }); },
+  goBookingList() { wx.navigateTo({ url: '/pages/booking/list/index' }); },
+  goAgreement(e) {
+    const t = e.currentTarget.dataset.t;
+    const url = t === 'user' ? '/pages/agreement/user/index' : '/pages/agreement/privacy/index';
+    wx.navigateTo({ url });
+  },
+  callService() { this.setData({ showService: true }); },
+  closeService() { this.setData({ showService: false }); },
+  callPhone() { wx.makePhoneCall({ phoneNumber: '13434123069' }); },
+  closeProfileTip() { this.setData({ showProfileTip: false }); },
+  onLogout() {
+    wx.showModal({
+      title: '提示', content: '确定要退出登录吗？',
+      success: (r) => {
+        if (r.confirm) {
+          app.logout();
+          this.setData({ logged: false, user: { nickName: '', avatarUrl: '' } });
+          wx.showToast({ title: '已退出', icon: 'success' });
+        }
+      }
+    });
+  }
+});

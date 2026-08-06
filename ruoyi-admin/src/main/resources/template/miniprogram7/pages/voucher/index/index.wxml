@@ -1,0 +1,63 @@
+<view class="page">
+  <view class="tabs">
+    <view class="tab {{tab==='get'?'on':''}}" data-t="get" bindtap="switchTab"><text>领券中心</text><view class="tab-bar"></view></view>
+    <view class="tab {{tab==='mine'?'on':''}}" data-t="mine" bindtap="switchTab"><text>我的代金券</text><view class="tab-bar"></view></view>
+  </view>
+
+  <!-- 领券中心 -->
+  <block wx:if="{{tab==='get'}}">
+    <view class="v-list" wx:if="{{list.length}}">
+      <view class="v-card" wx:for="{{list}}" wx:key="id">
+        <view class="v-left">
+          <text class="v-cur">¥</text>
+          <text class="v-val">{{item.faceValue}}</text>
+        </view>
+        <view class="v-mid">
+          <text class="v-name">{{item.name}}</text>
+          <text class="v-rule">满 {{item.threshold}} 元可用</text>
+          <text class="v-rule" wx:if="{{item.validDays}}">领取后 {{item.validDays}} 天内有效</text>
+          <text class="v-rule" wx:if="{{item.remain !== null}}">剩余 {{item.remain}} 张</text>
+        </view>
+        <view class="v-right">
+          <view class="v-btn {{item.soldOut?'off':''}}" data-id="{{item.id}}" bindtap="{{item.soldOut ? '' : 'onReceive'}}">
+            {{item.soldOut ? '已领完' : '立即领取'}}
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="empty" wx:elif="{{loading}}"><text class="empty-text">加载中…</text></view>
+    <view class="empty" wx:else><text class="empty-text">暂无可领取的代金券</text></view>
+  </block>
+
+  <!-- 我的代金券 -->
+  <block wx:else>
+    <view class="sub-tabs">
+      <view class="sub-tab {{mineTab==='0'?'on':''}}" data-s="0" bindtap="switchMineTab"><text>未使用</text></view>
+      <view class="sub-tab {{mineTab==='1'?'on':''}}" data-s="1" bindtap="switchMineTab"><text>已使用</text></view>
+      <view class="sub-tab {{mineTab==='2'?'on':''}}" data-s="2" bindtap="switchMineTab"><text>已过期</text></view>
+    </view>
+
+    <view class="empty" wx:if="{{!mine.length}}">
+      <text class="empty-text">暂无代金券</text>
+      <view class="go-btn" wx:if="{{mineTab==='0'}}" bindtap="switchTab" data-t="get">去领券 ></view>
+    </view>
+    <view class="v-list" wx:else>
+      <view class="v-card {{mineTab==='0'?'':'used'}}" wx:for="{{mine}}" wx:key="id">
+        <view class="v-left">
+          <text class="v-cur">¥</text>
+          <text class="v-val">{{item.faceValue}}</text>
+        </view>
+        <view class="v-mid">
+          <text class="v-name">满 {{item.threshold}} 元可用</text>
+          <text class="v-rule" wx:if="{{item.getTime}}">领取于 {{item.getTime}}</text>
+          <text class="v-rule" wx:if="{{item.expireTime}}">有效期至 {{item.expireTime}}</text>
+          <text class="v-rule" wx:if="{{item.useTime}}">使用于 {{item.useTime}}</text>
+        </view>
+        <view class="v-right">
+          <view class="v-btn" wx:if="{{mineTab==='0'}}" bindtap="goPay">去买单</view>
+          <text class="v-done" wx:else>{{mineTab==='1' ? '已使用' : '已过期'}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

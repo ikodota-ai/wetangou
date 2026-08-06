@@ -1,0 +1,132 @@
+<view class="page">
+  <!-- <view class="topbar-pad" ></view> -->
+  <view class="head banner">
+    
+    <view class="hi-row">
+      <view class="hi-left">
+        <text class="hi-prefix">Hi,</text>
+        <text class="hi-name" wx:if="{{logged}}" bindtap="goProfile">{{user.nickName || '微信用户'}}</text>
+        <text class="hi-name hi-guest" wx:else bindtap="goLogin">点击注册/登录 ></text>
+      </view>
+      <image class="hi-avatar" src="{{logged ? (user.avatarUrl || '/assets/avatar/default.png') : '/assets/avatar/default.png'}}" mode="aspectFill"></image>
+    </view>
+  </view>
+
+  <view class="content">
+    <view class="orders card" wx:if="{{logged}}">
+      <view class="order-item" bindtap="goOrder" data-type="all">
+        <view class="o-ic"><view class="ic ic-list"></view></view>
+        <text class="o-t">全部订单</text>
+      </view>
+      <view class="order-item" bindtap="goOrder" data-type="pending">
+        <view class="o-ic"><view class="ic ic-wallet"></view></view>
+        <text class="o-t">待支付</text>
+      </view>
+      <view class="order-item" bindtap="goOrder" data-type="unused">
+        <view class="o-ic"><view class="ic ic-clock"></view></view>
+        <text class="o-t">待使用</text>
+      </view>
+      <view class="order-item" bindtap="goOrder" data-type="refund">
+        <view class="o-ic"><view class="ic ic-yen"></view></view>
+        <text class="o-t">退款/售后</text>
+      </view>
+    </view>
+    <!-- 未登录态订单入口（灰色提示） -->
+    <view class="orders card" wx:else>
+      <view class="order-item" bindtap="goLogin">
+        <view class="o-ic"><view class="ic ic-list"></view></view>
+        <text class="o-t disabled">全部订单</text>
+      </view>
+      <view class="order-item" bindtap="goLogin">
+        <view class="o-ic"><view class="ic ic-wallet"></view></view>
+        <text class="o-t disabled">待支付</text>
+      </view>
+      <view class="order-item" bindtap="goLogin">
+        <view class="o-ic"><view class="ic ic-clock"></view></view>
+        <text class="o-t disabled">待使用</text>
+      </view>
+      <view class="order-item" bindtap="goLogin">
+        <view class="o-ic"><view class="ic ic-yen"></view></view>
+        <text class="o-t disabled">退款/售后</text>
+      </view>
+    </view>
+
+    <view class="func card">
+      <view class="func-item" wx:if="{{logged}}" bindtap="goProfile">
+        <view class="f-ic f-user"></view>
+        <text class="f-t">会员资料</text>
+        <view class="arr"></view>
+      </view>
+      <view class="func-item" wx:if="{{logged}}" bindtap="goPromoter">
+        <view class="f-ic f-promoter">
+          <text class="f-p-y">¥</text>
+        </view>
+        <text class="f-t">推客中心</text>
+        <view class="arr"></view>
+      </view>
+      <view class="func-item" bindtap="{{logged ? 'goBookingList' : 'goLogin'}}">
+        <view class="f-ic f-cal"></view>
+        <text class="f-t {{logged ? '' : 'disabled'}}">我的预约</text>
+        <view class="arr"></view>
+      </view>
+      <view class="func-item" bindtap="goVoucher">
+        <view class="f-ic f-voucher"><text class="f-v-y">¥</text></view>
+        <text class="f-t">代金券</text>
+        <view class="arr"></view>
+      </view>
+      <view class="func-item" bindtap="goAgreement" data-type="user">
+        <view class="f-ic f-doc"></view>
+        <text class="f-t">用户协议</text>
+        <view class="arr"></view>
+      </view>
+      <view class="func-item" bindtap="goAgreement" data-type="privacy">
+        <view class="f-ic f-shield"></view>
+        <text class="f-t">隐私协议</text>
+        <view class="arr"></view>
+      </view>
+      <view class="func-item" bindtap="callService">
+        <view class="f-ic f-cs"></view>
+        <text class="f-t">联系客服</text>
+        <view class="arr"></view>
+      </view>
+    </view>
+
+    <!-- 员工 / 商家入口：弱化显示，与 C 端功能分隔开 -->
+    <view class="staff-entry" bindtap="goStaffLogin">
+      <text class="staff-entry-text">员工 / 商家登录</text>
+    </view>
+
+    <view class="logout btn-ghost" wx:if="{{logged}}" bindtap="onLogout">退出登录</view>
+  </view>
+
+  <!-- 完善会员资料弹窗 -->
+  <view class="modal-mask" wx:if="{{showProfileTip}}" catchtap="closeProfileTip">
+    <view class="tip-box" catchtap="noop">
+      <view class="tip-title">完善会员资料</view>
+      <text class="tip-desc">授权微信头像和昵称后，个人中心会展示更完整的会员资料。</text>
+      <view class="tip-row">
+        <view class="tip-cancel" bindtap="closeProfileTip">暂不授权</view>
+        <view class="tip-confirm" bindtap="goProfile">去授权</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 客服弹窗 -->
+  <view class="modal-mask" wx:if="{{showService}}" catchtap="closeService">
+    <view class="sv-box" catchtap="noop">
+      <text class="sv-title">客服电话</text>
+      <view class="sv-phone" catchtap="callPhone">
+        <text class="sv-tel">{{servicePhone || '暂未配置'}}</text>
+        <view class="sv-ic"></view>
+      </view>
+      <view class="sv-qr" catchtap="previewQrcode">
+        <image wx:if="{{serviceQrcode}}" class="sv-qr-img" src="{{serviceQrcode}}" mode="aspectFit"></image>
+        <text wx:else class="sv-qr-t">暂未配置客服二维码</text>
+      </view>
+      <text class="sv-hours">{{businessHours ? '客服工作时间 ' + businessHours : '客服工作时间请咨询门店'}}</text>
+    </view>
+    <view class="sv-close" catchtap="closeService">
+      <view class="sv-x"></view>
+    </view>
+  </view>
+</view>

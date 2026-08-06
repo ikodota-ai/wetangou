@@ -1,0 +1,33 @@
+<view class="page">
+  <map id="map" class="map" latitude="{{latitude}}" longitude="{{longitude}}" markers="{{markers}}" show-location></map>
+  <view class="info card">
+    <text class="i-name">{{merchantName}}</text>
+    <text class="i-addr">花城街道建设北路222号101房自编3号</text>
+    <view class="i-row">
+      <text class="i-dist">距你 1209 公里</text>
+      <view class="i-drive">
+        <view class="drive-ic"></view>
+        <text class="i-time">15 小时 56 分钟</text>
+      </view>
+      <text class="i-more">更多</text>
+    </view>
+    <view class="ops">
+      <view class="op" bindtap="goNav">
+        <view class="op-ic ic-nav"></view>
+        <text>导航</text>
+      </view>
+      <view class="op" bindtap="goTaxi">
+        <view class="op-ic ic-taxi"></view>
+        <text>打车</text>
+      </view>
+      <view class="op" bindtap="onFav">
+        <view class="op-ic ic-fav"></view>
+        <text>收藏</text>
+      </view>
+      <view class="op" bindtap="onMore">
+        <view class="op-ic ic-more"></view>
+        <text>...</text>
+      </view>
+    </view>
+  </view>
+</view>

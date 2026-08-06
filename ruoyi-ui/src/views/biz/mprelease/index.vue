@@ -48,6 +48,16 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button
+          type="warning"
+          plain
+          icon="el-icon-download"
+          size="mini"
+          @click="handleDownloadCodePack"
+          v-hasPermi="['biz:mprelease:upload']"
+        >下载代码包</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
           type="primary"
           plain
           icon="el-icon-upload"
@@ -287,6 +297,42 @@
     </div>
   </el-dialog>
   </div>
+    <!-- 代码包下载弹窗 -->
+    <el-dialog title="下载小程序代码包" :visible.sync="codePackVisible" width="540px" append-to-body>
+      <el-form :model="codePackForm" label-width="100px" size="small">
+        <el-form-item label="选择商家" required>
+          <el-select v-model="codePackForm.merchantId" placeholder="请选择商家" filterable clearable style="width:100%" @change="onCodePackMerchantChange">
+            <el-option v-for="m in merchantOptions" :key="m.merchantId" :label="m.merchantName + ' (' + (m.merchantNo || ('M' + m.merchantId)) + ')'" :value="m.merchantId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="小程序 AppID">
+          <el-input v-model="codePackForm.appid" disabled placeholder="随商家自动带出" />
+        </el-form-item>
+        <el-form-item label="API 地址" required>
+          <el-input v-model="codePackForm.baseUrl" placeholder="https://api.wetangou.com 或 http://192.168.x.x:8080" />
+        </el-form-item>
+        <el-alert
+          v-if="codePackForm.appid === ''"
+          type="warning"
+          :closable="false"
+          show-icon
+          title="该商家尚未配置 AppID，无法下载"
+        />
+        <el-alert
+          v-else
+          type="info"
+          :closable="false"
+          show-icon
+          :title="'zip 里会自动改写 ' + codePackForm.appid + ' 与 API 地址'"
+        />
+      </el-form>
+      <div slot="footer">
+        <el-button @click="codePackVisible = false">取 消</el-button>
+        <el-button type="primary" :disabled="!codePackForm.appid" @click="onCodePackConfirm">下载 zip</el-button>
+      </div>
+    </el-dialog>
+
+
 </template>
 
 <script>
@@ -319,6 +365,14 @@ export default {
       title: "",
       // 第三方平台状态（loadStatus 写入）
       status: null,
+      // 代码包下载弹窗
+      codePackVisible: false,
+      codePackForm: {
+        merchantId: null,
+        merchantName: '',
+        appid: '',
+        baseUrl: 'https://api.wetangou.com'
+      },
       open: false,
       detailOpen: false,
       extLoading: false,
@@ -595,6 +649,33 @@ export default {
         this.getList();
         this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
+    },
+    /** 打开代码包下载弹窗 */
+    handleDownloadCodePack() {
+      this.codePackForm = { merchantId: null, merchantName: '', appid: '', baseUrl: 'https://api.wetangou.com' }
+      this.codePackVisible = true
+    },
+    /** 弹窗内点"确认"：浏览器走 a 标签下载 zip（后端返回 Content-Disposition: attachment） */
+    onCodePackConfirm() {
+      if (!this.codePackForm.merchantId) {
+        this.msgError('请选择商家')
+        return
+      }
+      if (!this.codePackForm.baseUrl) {
+        this.msgError('请填写 API 地址')
+        return
+      }
+      const url = `/biz/codepack/${this.codePackForm.merchantId}?baseUrl=${encodeURIComponent(this.codePackForm.baseUrl)}`
+      this.$download.zip(url, `dytuangou-mini-${this.codePackForm.merchantId}.zip`)
+      this.codePackVisible = false
+    },
+    /** 弹窗内选了商家后回填名称 / appid */
+    onCodePackMerchantChange(merchantId) {
+      const m = this.merchantOptions.find(x => x.merchantId === merchantId)
+      if (m) {
+        this.codePackForm.merchantName = m.merchantName
+        this.codePackForm.appid = m.appid || ''
+      }
     }
   }
 };

@@ -1,0 +1,27 @@
+.page { min-height: 100vh; background: var(--color-bg); padding: 24rpx 32rpx 200rpx; }
+.head { padding: 24rpx 0; }
+.h-t { display: block; font-size: 32rpx; font-weight: 600; color: #1A1A1A; }
+.h-sub { display: block; font-size: 24rpx; color: #999; margin-top: 8rpx; }
+.card { background: #FFFFFF; border-radius: 20rpx; padding: 0 32rpx; }
+.f-row { display: flex; align-items: center; padding: 24rpx 0; border-bottom: 1rpx solid #F0F0F0; }
+.f-row:last-child { border-bottom: none; }
+.f-lab { width: 200rpx; font-size: 28rpx; color: #1A1A1A; }
+.f-lab.required::before { content: '*'; color: var(--color-danger); margin-right: 4rpx; }
+.f-in { flex: 1; font-size: 28rpx; color: #1A1A1A; }
+.f-val { flex: 1; display: flex; align-items: center; gap: 12rpx; font-size: 28rpx; color: #1A1A1A; }
+.ph { color: #999; }
+.arr { width: 16rpx; height: 16rpx; border-right: 3rpx solid #BBB; border-top: 3rpx solid #BBB; transform: rotate(45deg); margin-left: auto; }
+.check-ic { width: 36rpx; height: 36rpx; border-radius: 50%; background: var(--color-primary); display: flex; align-items: center; justify-content: center; position: relative; }
+.check-ic::after { content: ''; width: 16rpx; height: 8rpx; border-left: 4rpx solid #FFFFFF; border-bottom: 4rpx solid #FFFFFF; transform: rotate(-45deg) translate(2rpx, -2rpx); }
+.bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 24rpx 32rpx; background: #FFFFFF; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); }
+.next-btn { width: 100%; height: 96rpx; line-height: 96rpx; text-align: center; background: var(--color-primary); color: #FFFFFF; border-radius: 16rpx; font-size: 32rpx; font-weight: 600; }
+
+/* 提现方式与金额快捷操作 */
+.type-row { flex: 1; display: flex; gap: 16rpx; justify-content: flex-end; }
+.type { padding: 12rpx 24rpx; background: #F2F2F7; border-radius: 8rpx; }
+.type text { font-size: 26rpx; color: #666; }
+.type.on { background: var(--color-primary); }
+.type.on text { color: #FFFFFF; }
+.all-btn { font-size: 26rpx; color: var(--color-primary); margin-left: 16rpx; }
+.tip { margin-top: 24rpx; font-size: 24rpx; color: #999; line-height: 1.6; }
+.next-btn.disabled { opacity: 0.6; }

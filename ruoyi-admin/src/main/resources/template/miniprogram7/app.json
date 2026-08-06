@@ -1,0 +1,74 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/album/index",
+    "pages/booking/index",
+    "pages/login/login",
+    "pages/booking/create/index",
+    "pages/booking/list/index",
+    "pages/booking/detail/index",
+    "pages/mine/index/index",
+    "pages/mine/profile/index",
+    "pages/store/location/index",
+    "pages/store/service/index",
+    "pages/goods/detail/index",
+    "pages/goods/share/index",
+    "pages/order/submit/index",
+    "pages/order/list/index",
+    "pages/order/detail/index",
+    "pages/voucher/index/index",
+    "pages/pay/index/index",
+    "pages/promoter/index/index",
+    "pages/promoter/withdraw/index",
+    "pages/promoter/records/index",
+    "pages/promoter/poster/index",
+    "pages/agreement/user/index",
+    "pages/agreement/privacy/index",
+    "pages/staff/login/index",
+    "pages/staff/home/index",
+    "pages/staff/verify/index",
+    "pages/staff/bill/index",
+    "pages/staff/booking/index",
+    "pages/staff/order/index",
+    "pages/staff/me/index",
+    "pages/staff/history/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#3A6B35",
+    "navigationBarTitleText": "川西坝子餐饮",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F2F2F7"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#AAAAAA",
+    "selectedColor": "#5A8A4A",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/album/index",
+        "text": "贴图"
+      },
+      {
+        "pagePath": "pages/booking/index",
+        "text": "预约"
+      },
+      {
+        "pagePath": "pages/mine/index/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "您的位置信息将用于为您推荐最近的店铺"
+    }
+  },
+  "usingComponents": {},
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}

@@ -1,0 +1,25 @@
+.page { min-height: 100vh; background: var(--color-bg); padding: 24rpx 32rpx 200rpx; }
+.card { background: #FFFFFF; border-radius: 20rpx; padding: 32rpx; margin-bottom: 24rpx; }
+.s-name { display: block; font-size: 36rpx; font-weight: 700; color: #1A1A1A; }
+.s-hours { display: block; font-size: 24rpx; color: #666; margin-top: 8rpx; }
+.s-addr { background: linear-gradient(90deg, #E2EFDC, #F2F2F7); border-radius: 16rpx; padding: 20rpx 24rpx; display: flex; align-items: center; justify-content: space-between; margin-top: 16rpx; }
+.addr-txt { flex: 1; display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
+.a1 { font-size: 26rpx; font-weight: 600; color: #1A1A1A; line-height: 1.4; }
+.a2 { font-size: 22rpx; color: #999; }
+.ops { display: flex; gap: 24rpx; }
+.op { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
+.op-ic { width: 64rpx; height: 64rpx; border-radius: 50%; background: #ECECEC; display: flex; align-items: center; justify-content: center; }
+.op text { font-size: 22rpx; color: #666; }
+.ic-nav { width: 32rpx; height: 32rpx; background: var(--color-primary); clip-path: polygon(50% 0%, 100% 100%, 70% 100%, 70% 75%, 30% 75%, 30% 100%, 0 100%); }
+.ic-tel { width: 30rpx; height: 30rpx; border: 4rpx solid var(--color-primary); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative; }
+.ic-tel::after { content: ''; position: absolute; left: 6rpx; bottom: 4rpx; width: 8rpx; height: 8rpx; background: var(--color-primary); border-radius: 50%; }
+
+.row { display: flex; justify-content: space-between; align-items: center; padding: 16rpx 0; }
+.lab { font-size: 26rpx; color: #999; }
+.val { font-size: 28rpx; color: #1A1A1A; font-weight: 500; }
+.block-title { display: block; font-size: 30rpx; font-weight: 600; color: #1A1A1A; margin-bottom: 16rpx; }
+.explain { display: block; font-size: 26rpx; color: #1A1A1A; line-height: 1.7; }
+.bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 24rpx 32rpx; background: #FFFFFF; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); }
+.cancel-btn { width: 100%; height: 96rpx; line-height: 96rpx; text-align: center; border: 2rpx solid var(--color-primary); color: var(--color-primary); border-radius: 16rpx; font-size: 32rpx; font-weight: 600; background: #FFFFFF; }
+
+.val.status { color: var(--color-primary); font-weight: 600; }
