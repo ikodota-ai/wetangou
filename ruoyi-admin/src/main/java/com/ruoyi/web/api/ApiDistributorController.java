@@ -260,7 +260,7 @@ public class ApiDistributorController
             fos.write(bytes);
         }
         String relativePath = "/distributor/" + fileName;
-        String url = serverConfig.getUrl() + "/upload" + relativePath;
+        String url = serverConfig.getUrl() + com.ruoyi.common.constant.Constants.RESOURCE_PREFIX + relativePath;
         return AjaxResult.success().put("url", url).put("scene", scene).put("fileName", fileName);
     }
 
