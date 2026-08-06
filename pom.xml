@@ -29,7 +29,6 @@
         <poi.version>4.1.2</poi.version>
         <velocity.version>2.3</velocity.version>
         <jwt.version>0.9.1</jwt.version>
-        <jaxb-api.version>2.3.1</jaxb-api.version>
         <springdoc.version>3.0.3</springdoc.version>
     </properties>
 
@@ -74,9 +73,15 @@
             </dependency>
 
             <dependency>
+                <groupId>jakarta.xml.bind</groupId>
+                <artifactId>jakarta.xml.bind-api</artifactId>
+                <version>2.3.3</version>
+            </dependency>
+            <!-- jjwt 0.9.1 内部仍用 javax.xml.bind.DatatypeConverter，需要运行时 jaxb 补上 -->
+            <dependency>
                 <groupId>javax.xml.bind</groupId>
                 <artifactId>jaxb-api</artifactId>
-                <version>${jaxb-api.version}</version>
+                <version>2.3.1</version>
             </dependency>
 
             <!-- 获取系统信息 -->

@@ -83,10 +83,10 @@
             <artifactId>jjwt</artifactId>
         </dependency>
 
-        <!-- Jaxb -->
+        <!-- Jaxb (Spring Boot 4 需 jakarta 包名) -->
         <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
         </dependency>
 
         <!-- redis 缓存操作 -->

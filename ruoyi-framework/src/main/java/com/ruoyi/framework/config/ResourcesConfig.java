@@ -10,6 +10,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.xml.Jaxb2RootElementHttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.constant.Constants;
@@ -46,6 +48,16 @@ public class ResourcesConfig implements WebMvcConfigurer
     public void addInterceptors(InterceptorRegistry registry)
     {
         registry.addInterceptor(repeatSubmitInterceptor).addPathPatterns("/**");
+    }
+
+    /**
+     * 移除 JAXB 转换器（Spring Boot 4 默认启用，但 ruoyi 用 application/x-www-form-urlencoded 登录，
+     * JAXB 转换器会抢在 form 转换器之前，认不出 form 数据导致 500）
+     */
+    @Override
+    public void extendMessageConverters(java.util.List<HttpMessageConverter<?>> converters)
+    {
+        converters.removeIf(c -> c instanceof Jaxb2RootElementHttpMessageConverter);
     }
 
     /**
