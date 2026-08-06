@@ -104,7 +104,10 @@ public class ApiAuthController
                 member.setAvatar(avatarUrl);
             }
             // 已存在会员且 invite_by 为空时，补一次邀请人（避免冷启动登录没拿到 inviteBy 后续回填）
-            if (member.getInviteBy() == null && inviteBy != null && isValidInviter(merchantId, inviteBy))
+            // 同时防御自邀：inviteBy 等于当前会员 id 时拒绝
+            if (member.getInviteBy() == null && inviteBy != null
+                    && !inviteBy.equals(member.getMemberId())
+                    && isValidInviter(merchantId, inviteBy))
             {
                 member.setInviteBy(inviteBy);
                 member.setInviteTime(new Date());
@@ -137,7 +140,8 @@ public class ApiAuthController
     }
 
     /**
-     * 占位方法：当前没有 member_id 概念，保留 hook 用于未来按场景扩展
+     * 自邀检查：当前会员（通过 openid 已识别）的 memberId 由调用方在拿到 member 对象后判定。
+     * 此方法作为保留 hook 留空——具体自邀防御在登录主流程里通过对 member.getMemberId() 与 inviteBy 比较实现。
      */
     private Long memberId0(String openid)
     {
