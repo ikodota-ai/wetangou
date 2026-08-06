@@ -11,7 +11,7 @@
 // 用电脑的 LAN IP（en0 上的 172.31.26.216）绕开。
 // 切换网络/WiFi 后 IP 可能变，重新跑 ifconfig en0 | grep 'inet ' 取新值。
 // 真机调试改成电脑本机 IP；上线改成 HTTPS 域名。
-const BASE_URL = 'http://172.31.26.216:8080';
+const BASE_URL = 'http://172.20.10.2:8080';
 
 /** 编译期 project.config.json.appid（开发者工具里能直接读到） */
 const BUILD_IN_APPID = 'wx9e147c4e2151b123';
