@@ -5,7 +5,9 @@ public class DisableMock {
     try (Connection c = DriverManager.getConnection(url, "root", "133301"); Statement s = c.createStatement()) {
       s.execute("UPDATE sys_config SET config_value='false' WHERE config_key='wx.miniapp.mockEnabled'");
       s.execute("UPDATE sys_config SET config_value='false' WHERE config_key='wx.pay.mockEnabled'");
-      System.out.println("[ok] mock disabled");
+      // 同时把商户的 mock_enabled 改回 '1'（关闭）
+      s.execute("UPDATE biz_merchant SET mock_enabled='1'");
+      System.out.println("[ok] mock disabled (sys_config + biz_merchant)");
     }
   }
 }
