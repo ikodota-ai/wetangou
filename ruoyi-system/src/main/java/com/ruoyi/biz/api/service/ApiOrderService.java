@@ -62,7 +62,13 @@ public class ApiOrderService
         {
             throw new ServiceException("商品不存在或已下架");
         }
-        long quantity = (num == null || num <= 0) ? 1 : num;
+        // 数量校验：必须 >= 1，null 报错（不静默修正），
+        // 避免前端传 0/-1 时被默默改成 1 产生反例
+        if (num == null || num < 1)
+        {
+            throw new ServiceException("购买数量必须大于等于 1");
+        }
+        long quantity = num;
         if (product.getStock() != null && product.getStock() < quantity)
         {
             throw new ServiceException("商品库存不足");
