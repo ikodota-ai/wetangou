@@ -84,16 +84,32 @@ public class ApiOrderController
         {
             throw new ServiceException("订单状态不允许支付");
         }
+        // 通用响应：orderNo / amount / payNo / payInfoId / expireTime
+        // mock 模式也返回这些字段（方便支付中间页展示）
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("orderNo", order.getOrderNo());
+        resp.put("amount", order.getPayAmount());
+        resp.put("expireTime", System.currentTimeMillis() + 2 * 60 * 60 * 1000L); // 2 小时过期
         if (wxPayService.isMock())
         {
-            apiOrderService.paySuccess(orderId);
-            return AjaxResult.success().put("mock", true);
+            // mock 模式：直接标为已支付，payNo/payInfoId 本地生成
+            String payNo = "MOCK" + System.currentTimeMillis() + (int) (Math.random() * 9000 + 1000);
+            Order paidOrder = apiOrderService.paySuccess(orderId);
+            Long payInfoId = paidOrder == null ? null : paidOrder.getOrderId();
+            resp.put("mock", true);
+            resp.put("payNo", payNo);
+            resp.put("payInfoId", payInfoId);
+            return AjaxResult.success(resp);
         }
         Member member = memberService.selectMemberByMemberId(MemberContextHolder.getMemberId());
         String openid = member == null ? null : member.getOpenid();
         int fen = WxPayService.yuanToFen(order.getPayAmount());
         JSONObject payParams = wxPayService.createJsapiOrderByMerchant(order.getMerchantId(), order.getOrderNo(), "订单-" + order.getOrderNo(), fen, openid);
-        return AjaxResult.success(payParams);
+        // 真实微信：payParams.timeStamp/nonceStr/package/signType/paySign，prepay_id 在 package 里
+        resp.put("payNo", payParams.getString("transaction_id"));   // 真实下单后微信返回
+        resp.put("payInfoId", payParams.getString("prepay_id"));     // 预支付交易会话标识
+        resp.putAll(payParams);                                      // timeStamp/nonceStr/package/signType/paySign
+        return AjaxResult.success(resp);
     }
 
     /**

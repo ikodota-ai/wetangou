@@ -123,5 +123,63 @@ Page({
       wx.showToast({ title: '已取消授权', icon: 'none' });
       this.setData({ showAuthPhone: false });
     }
+  },
+  // ====== 分享 / 收藏 / 保存图片 ======
+  /**
+   * 微信胶囊菜单「转发给朋友」与弹窗中<button open-type="share">都会触发此方法
+   * 走自己拼的 path（带 productId），让对方点进来直接定位到该商品详情
+   */
+  onShareAppMessage() {
+    const p = this.data.product;
+    const id = (p && (p.productId || p.id)) || this.data.id || '';
+    const m = (getApp().globalData && getApp().globalData.merchant) || {};
+    const name = (p && (p.name || p.productName)) || '好物';
+    const price = (p && p.price) || '';
+    return {
+      title: name + (price ? ' ¥' + price : '') + ' | ' + (m.merchantName || '洞天团购'),
+      path: '/pages/goods/detail/index?id=' + id,
+      imageUrl: (p && (p.images && p.images[0] || p.cover)) || ''
+    };
+  },
+  /**
+   * 微信胶囊菜单「分享到朋友圈」
+   * 分享到朋友圈时 imageUrl 必填，否则会触发警告
+   */
+  onShareTimeline() {
+    const p = this.data.product;
+    const m = (getApp().globalData && getApp().globalData.merchant) || {};
+    const name = (p && (p.name || p.productName)) || '好物';
+    const price = (p && p.price) || '';
+    return {
+      title: name + (price ? ' ¥' + price : '') + ' | ' + (m.merchantName || '洞天团购'),
+      query: 'id=' + ((p && (p.productId || p.id)) || this.data.id || ''),
+      imageUrl: (p && (p.images && p.images[0] || p.cover)) || ''
+    };
+  },
+  /**
+   * 微信基础库 2.10.0+ 起的「收藏」按钮（弹窗中<button open-type="favorite">触发）
+   * 静默成功，无需做额外处理；保留钩子便于以后打点
+   */
+  onAddToFavorites() {
+    const p = this.data.product;
+    return {
+      title: (p && (p.name || p.productName)) || '好物',
+      imageUrl: (p && (p.images && p.images[0] || p.cover)) || '',
+      query: 'id=' + ((p && (p.productId || p.id)) || this.data.id || '')
+    };
+  },
+  /**
+   * 保存图片：跳到海报页（pages/goods/share/index）让用户在那里点保存按钮
+   * 之所以跳页而不是在弹窗里直接画海报：弹窗层 canvas 在很多机型上 z-index/层级有问题
+   * 海报页有专门的 canvas 绘制 + 下载 + 保存相册完整流程
+   */
+  onSavePoster() {
+    const id = (this.data.product && (this.data.product.productId || this.data.product.id)) || this.data.id;
+    if (!id) {
+      wx.showToast({ title: '商品未加载', icon: 'none' });
+      return;
+    }
+    this.setData({ showShare: false });
+    wx.navigateTo({ url: '/pages/goods/share/index?id=' + id });
   }
 });

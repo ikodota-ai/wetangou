@@ -111,7 +111,7 @@ Page({
   // 带上当前门店，买单必须落到用户实际所在门店
   goPay() {
     const id = this.data.store && this.data.store.storeId;
-    wx.navigateTo({ url: '/pages/pay/index/index' + (id ? '?storeId=' + id : '') });
+    wx.navigateTo({ url: '/pages/pay/index' + (id ? '?storeId=' + id : '') });
   },
   goBooking() { wx.switchTab({ url: '/pages/booking/index' }); },
   goLocation() {

@@ -153,16 +153,27 @@ public class ApiBillController
         {
             throw new ServiceException("无权支付该买单");
         }
+        java.util.Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("orderNo", bill.getBillNo());
+        resp.put("amount", bill.getPayAmount());
+        resp.put("expireTime", System.currentTimeMillis() + 2 * 60 * 60 * 1000L);
         if (wxPayService.isMock())
         {
             markPaid(bill);
-            return AjaxResult.success().put("mock", true);
+            String payNo = "MOCK" + System.currentTimeMillis() + (int) (Math.random() * 9000 + 1000);
+            resp.put("mock", true);
+            resp.put("payNo", payNo);
+            resp.put("payInfoId", bill.getBillId());
+            return AjaxResult.success(resp);
         }
         Member member = memberService.selectMemberByMemberId(MemberContextHolder.getMemberId());
         String openid = member == null ? null : member.getOpenid();
         int fen = WxPayService.yuanToFen(bill.getPayAmount());
         JSONObject payParams = wxPayService.createJsapiOrderByMerchant(bill.getMerchantId(), bill.getBillNo(), "买单-" + bill.getBillNo(), fen, openid);
-        return AjaxResult.success(payParams);
+        resp.put("payNo", payParams.getString("transaction_id"));
+        resp.put("payInfoId", payParams.getString("prepay_id"));
+        resp.putAll(payParams);
+        return AjaxResult.success(resp);
     }
 
     /**

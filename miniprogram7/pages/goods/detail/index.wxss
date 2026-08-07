@@ -90,6 +90,8 @@
 .qr-circle::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 60rpx; height: 60rpx; border-radius: 50%; background: var(--color-primary); }
 .qr-tip { font-size: 24rpx; color: #999; }
 .share-ops { display: flex; justify-content: space-around; margin-top: 24rpx; padding-top: 16rpx; border-top: 1rpx solid #F0F0F0; }
+button.so { background: transparent; border: none; padding: 0; line-height: 1.2; outline: none; }
+button.so::after { border: none; }
 .so { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
 .so-ic { width: 64rpx; height: 64rpx; border-radius: 50%; background: var(--color-primary); }
 .so-friend { background: #2D6A2D; }

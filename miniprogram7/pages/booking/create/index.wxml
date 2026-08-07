@@ -40,6 +40,26 @@
       </view>
     </scroll-view>
 
+    <!-- 真日历选择器（弹出后用户可点选任意一天） -->
+    <view class="date-sheet-mask" wx:if="{{dateSheetVisible}}" catchtap="closeDateSheet">
+      <view class="date-sheet-box" catchtap="noop">
+        <view class="date-sheet-head">
+          <text class="date-sheet-title">选择预约日期</text>
+          <text class="date-sheet-close" bindtap="closeDateSheet">×</text>
+        </view>
+        <view class="date-sheet-weeks">
+          <text class="dw" wx:for="{{['日','一','二','三','四','五','六']}}" wx:key="*this">周{{item}}</text>
+        </view>
+        <view class="date-sheet-grid">
+          <view wx:for="{{calendarDays}}" wx:key="key"
+                class="dc {{item.empty ? 'empty' : ''}} {{item.disabled ? 'disabled' : ''}} {{item.date === pickedDate ? 'picked' : ''}}"
+                data-date="{{item.date}}" bindtap="onPickCalendarDate">
+            <text>{{item.day}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <view class="period-row">
       <view class="period {{period==='day'?'on':''}}" data-p="day" bindtap="switchPeriod">
         <text>白天 {{dayRange || '--'}}</text>

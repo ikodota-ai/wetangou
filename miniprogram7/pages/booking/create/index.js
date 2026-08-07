@@ -6,6 +6,10 @@ Page({
   data: {
     store: {},
     distance: '',
+    dateSheetVisible: false,
+    calendarDays: [],
+    calendarMonth: '',
+    calendarMonthIndex: 0,
     days: [],
     dateIdx: 0,
     period: 'day',
@@ -118,39 +122,78 @@ Page({
     this.setData({ slot: ds.s });
   },
   openCalendar() {
-    // 弹出真日历选择：默认只能选今天到 30 天后
+    // 弹出真日历：未来 60 天可选（今天之前不可选）
+    this.setData({ dateSheetVisible: true, pickedDate: this._today() })
+    this._buildCalendar(0)
+  },
+  closeDateSheet() { this.setData({ dateSheetVisible: false }) },
+  /**
+   * 构造 monthIndex 月的日历 (0=本月, 1=下月)
+   */
+  _buildCalendar(monthIndex) {
     const now = new Date()
-    const min = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0')
-    const maxDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-    const max = maxDate.getFullYear() + '-' + String(maxDate.getMonth() + 1).padStart(2, '0') + '-' + String(maxDate.getDate()).padStart(2, '0')
-    // 用 actionSheet 模拟日历选择：列出未来 30 天
-    const items = []
-    const labels = []
-    for (let i = 0; i <= 30; i++) {
-      const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000)
-      const date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-      const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
-      const label = (date + ' 周' + week) + (i === 0 ? ' (今天)' : '')
-      items.push(date)
-      labels.push(label)
+    const target = new Date(now.getFullYear(), now.getMonth() + monthIndex, 1)
+    const y = target.getFullYear()
+    const m = target.getMonth()
+    // 当月第一天是星期几（0=日）
+    const firstWeekday = new Date(y, m, 1).getDay()
+    // 当月天数
+    const lastDay = new Date(y, m + 1, 0).getDate()
+    const days = []
+    // 上月补位
+    for (let i = 0; i < firstWeekday; i++) {
+      days.push({ key: 'p' + i, day: '', empty: true })
     }
-    wx.showActionSheet({
-      itemList: labels,
-      success: (r) => {
-        const idx = r.tapIndex
-        const pickedDate = items[idx]
-        // 把 pickedDate 插入到 days 顶部（如果不是已有），并选中
-        const exists = (this.data.days || []).findIndex((d) => d.date === pickedDate)
-        if (exists >= 0) {
-          this.setData({ dateIdx: exists })
-        } else {
-          const newDay = { label: pickedDate.slice(5).replace('-', '/'), date: pickedDate, picked: true }
-          const days = [newDay].concat(this.data.days || [])
-          this.setData({ days, dateIdx: 0 })
-        }
-        this.loadSlots()
-      }
+    // 当月
+    for (let d = 1; d <= lastDay; d++) {
+      const dateStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+      // 过去日期 disabled
+      const isPast = (y < now.getFullYear()) ||
+        (y === now.getFullYear() && m < now.getMonth()) ||
+        (y === now.getFullYear() && m === now.getMonth() && d < now.getDate())
+      // 超出 60 天 disabled
+      const maxDate = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000)
+      const isOver = (y > maxDate.getFullYear()) ||
+        (y === maxDate.getFullYear() && m > maxDate.getMonth()) ||
+        (y === maxDate.getFullYear() && m === maxDate.getMonth() && d > maxDate.getDate())
+      days.push({
+        key: 'd' + d,
+        day: String(d),
+        date: dateStr,
+        empty: false,
+        disabled: isPast || isOver
+      })
+    }
+    this.setData({
+      calendarDays: days,
+      calendarMonth: y + ' 年 ' + (m + 1) + ' 月',
+      calendarMonthIndex: monthIndex
     })
+  },
+  /** 切换月（上/下月按钮） */
+  shiftCalendarMonth(e) {
+    const dir = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.dir
+    const cur = this.data.calendarMonthIndex || 0
+    const next = dir === 'prev' ? Math.max(0, cur - 1) : cur + 1
+    this._buildCalendar(next)
+  },
+  onPickCalendarDate(e) {
+    const date = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.date
+    if (!date) return
+    // 加入 days 列表（若不存在），并选中
+    const exists = (this.data.days || []).findIndex((d) => d.date === date)
+    if (exists >= 0) {
+      this.setData({ dateIdx: exists, dateSheetVisible: false })
+    } else {
+      const newDay = { label: date.slice(5).replace('-', '/'), date: date }
+      const days = [newDay].concat(this.data.days || [])
+      this.setData({ days, dateIdx: 0, dateSheetVisible: false })
+    }
+    this.loadSlots()
+  },
+  _today() {
+    const d = new Date()
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
   },
   onContact(e) { this.setData({ contact: e.detail.value }); },
   onPhone(e) { this.setData({ phone: e.detail.value }); },

@@ -1,9 +1,23 @@
 <view class="page">
-  <view class="box card">
-    <image class="cover" src="/assets/img/RestaurantImg.png" mode="aspectFill"></image>
-    <text class="name">{{product.name || '商品'}}</text>
-    <view class="price"><text class="now">¥{{product.price || '0.00'}}</text></view>
-    <view class="qr"><view class="qr-c"></view></view>
-    <text class="tip">扫码或长按小程序码</text>
+  <view class="poster-card">
+    <canvas class="poster-canvas" canvas-id="posterCanvas" id="posterCanvas" type="2d" style="width:600rpx;height:900rpx;"></canvas>
+    <view wx:if="{{generating}}" class="poster-mask">
+      <view class="poster-spinner"></view>
+      <text class="poster-mask-text">海报生成中…</text>
+    </view>
+  </view>
+
+  <view class="actions">
+    <view class="btn btn-primary" bindtap="onSave">
+      <text>保存到相册</text>
+    </view>
+    <view class="btn" bindtap="onPreview">
+      <text>预览大图</text>
+    </view>
+  </view>
+
+  <view class="tips">
+    <text>· 保存后可发送朋友、朋友圈</text>
+    <text>· 长按图片可识别小程序码进入</text>
   </view>
 </view>

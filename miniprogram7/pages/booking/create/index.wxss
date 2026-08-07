@@ -67,3 +67,80 @@
 .st-btn { width: 56rpx; height: 56rpx; line-height: 52rpx; text-align: center; border-radius: 8rpx; background: #F2F2F7; font-size: 32rpx; color: #1A1A1A; }
 .st-val { min-width: 48rpx; text-align: center; font-size: 30rpx; color: #1A1A1A; }
 .pay-btn.disabled { opacity: 0.6; }
+
+/* 真日历选择 sheet */
+.date-sheet-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.date-sheet-box {
+  width: 100%;
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 24rpx 24rpx 40rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.date-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 16rpx 24rpx;
+}
+.date-sheet-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+.date-sheet-close {
+  font-size: 48rpx;
+  color: #909399;
+  line-height: 1;
+  padding: 8rpx 16rpx;
+}
+.date-sheet-weeks {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 0 8rpx;
+  margin-bottom: 12rpx;
+}
+.dw {
+  text-align: center;
+  font-size: 24rpx;
+  color: #909399;
+  padding: 12rpx 0;
+}
+.date-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4rpx;
+  padding: 0 8rpx;
+}
+.dc {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #303133;
+  border-radius: 12rpx;
+  background: #f7f8fa;
+}
+.dc.empty {
+  background: transparent;
+}
+.dc.disabled {
+  color: #c0c4cc;
+  background: transparent;
+}
+.dc.picked {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}

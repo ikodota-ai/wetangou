@@ -15,13 +15,24 @@ Page({
     submitting: false
   },
   onLoad(opts) {
+    this.setData({ id: opts.id });
+    // 优先用 globalData 里的 user.phone（如有）
     const appInst = (typeof getApp === 'function' ? getApp() : null) || {};
     const u = (appInst.globalData && appInst.globalData.user) || {};
-    this.setData({
-      id: opts.id,
-      name: u.nickName || '',
-      phone: u.phone || ''
-    });
+    if (u.phone) {
+      this.setData({ name: u.nickName || '', phone: u.phone });
+    }
+    // 不管有没有，主动拉一次 profile 拿明文（解决 bootUser 还没回的问题）
+    if (appInst.globalData && appInst.globalData.user && appInst.globalData.user.logged) {
+      api.getUserInfo().then((r) => {
+        const m = r && (r.data || r);
+        if (m && m.phone) {
+          this.setData({ name: m.nickName || m.nickname || this.data.name, phone: m.phone });
+          appInst.globalData.user.phone = m.phone;
+          appInst.globalData.user.nickName = m.nickName || m.nickname;
+        }
+      }).catch(() => {});
+    }
     this.loadProduct(opts.id);
   },
   // 商品信息以后端为准：价格、库存都要真实，避免用本地数据下单后金额不符
