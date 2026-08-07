@@ -43,8 +43,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             status = '0'
             <if test="position != null and position != ''"> and position = #{position}</if>
-            <if test="merchantId != null"> and (merchant_id = #{merchantId} or merchant_id = 0)</if>
-            <if test="merchantId == null"> and merchant_id = 0</if>
+            <if test="merchantId != null and merchantId > 0"> and merchant_id = #{merchantId}</if>
+            <!-- merchantId=0/null 时不按商户过滤（让所有商户的 banner 都能被拉到） -->
             <if test="activeFrom != null"> and (active_from is null or active_from &lt;= now())</if>
             <if test="activeTo != null"> and (active_to is null or active_to &gt;= now())</if>
         </where>
