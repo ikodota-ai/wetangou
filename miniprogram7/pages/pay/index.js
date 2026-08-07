@@ -1,6 +1,6 @@
 const app = getApp();
-const { api } = require('../../../utils/request.js');
-const { formatMoney } = require('../../../utils/util.js');
+const { api } = require('../../utils/request.js');
+const { formatMoney } = require('../../utils/util.js');
 
 // 店员确认的轮询间隔与上限：买单需门店确认金额后才能付款
 const POLL_INTERVAL = 2000;
