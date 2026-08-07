@@ -1,0 +1,128 @@
+.pay-page {
+  min-height: 100vh;
+  background: #f5f6f8;
+  padding: 24rpx 24rpx 0;
+}
+
+/* 金额卡 */
+.amount-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 56rpx 32rpx 48rpx;
+  text-align: center;
+  margin-bottom: 24rpx;
+}
+.amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-bottom: 12rpx;
+}
+.amount-symbol {
+  font-size: 36rpx;
+  color: #2f8c4a;
+  font-weight: 600;
+  margin-right: 6rpx;
+}
+.amount-value {
+  font-size: 80rpx;
+  color: #2f8c4a;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+.amount-tip {
+  font-size: 26rpx;
+  color: #909399;
+}
+
+/* 信息卡 */
+.info-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 8rpx 32rpx;
+  margin-bottom: 24rpx;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #f0f1f3;
+}
+.info-row:last-child {
+  border-bottom: none;
+}
+.info-label {
+  font-size: 28rpx;
+  color: #606266;
+  flex-shrink: 0;
+}
+.info-value {
+  font-size: 28rpx;
+  color: #303133;
+  text-align: right;
+  word-break: break-all;
+}
+
+/* 支付方式 */
+.pay-method {
+  padding: 32rpx;
+}
+.method-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 24rpx;
+}
+.method-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f9f9f4;
+  border: 2rpx solid #b7c9a3;
+  border-radius: 12rpx;
+  padding: 28rpx 24rpx;
+}
+.method-left {
+  display: flex;
+  align-items: center;
+}
+.method-icon {
+  width: 44rpx;
+  height: 44rpx;
+  margin-right: 16rpx;
+}
+.method-name {
+  font-size: 30rpx;
+  color: #303133;
+}
+.method-check {
+  font-size: 32rpx;
+  color: #2f8c4a;
+  font-weight: 700;
+}
+
+/* 底部 */
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1rpx solid #eee;
+}
+.pay-btn {
+  background: #2f8c4a;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 12rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+}
+.pay-btn[disabled] {
+  background: #b4d4be;
+  color: #fff;
+}

@@ -75,19 +75,16 @@
   <!-- 手机号授权/重取弹窗 -->
   <view class="sheet-mask" wx:if="{{showPhone}}" catchtap="hidePhoneSheet">
     <view class="sheet-box" catchtap="noop">
-      <view class="sheet-item sheet-center">
-        <text class="sheet-title">{{user.phone ? '重新获取手机号' : '绑定手机号'}}</text>
-        <text class="sheet-sub">用于在该商户下单/核销，授权后会替换原手机号</text>
-      </view>
-      <view class="sheet-divider"></view>
-      <view class="sheet-item">
-        <button class="sheet-btn primary" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone" hover-class="none">
-          {{user.phone ? '重新获取微信手机号' : '一键获取微信手机号'}}
+      <view class="phone-sheet">
+        <view class="phone-icon">
+          <image src="/assets/img/phone5.svg" mode="aspectFit"></image>
+        </view>
+        <text class="phone-title">{{user.phone ? '重新获取手机号' : '绑定手机号'}}</text>
+        <text class="phone-sub">授权后用于在该商户下单/核销，会替换原手机号</text>
+        <button class="phone-btn primary" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone" hover-class="none">
+          <text class="phone-btn-t">{{user.phone ? '重新获取微信手机号' : '一键获取微信手机号'}}</text>
         </button>
-      </view>
-      <view class="sheet-divider"></view>
-      <view class="sheet-item cancel" bindtap="hidePhoneSheet">
-        <text class="sheet-t">取消</text>
+        <view class="phone-cancel" bindtap="hidePhoneSheet">取消</view>
       </view>
     </view>
   </view>

@@ -143,6 +143,8 @@ public class ApiBookingController
 
     /**
      * 我的预约列表（我报名过的场次明细）
+     *
+     * <p>自己看自己 → phone 明文；过滤 status=2（已取消）默认排除，避免列表噪音。</p>
      */
     @LoginRequired
     @GetMapping("/list")
@@ -150,15 +152,38 @@ public class ApiBookingController
     {
         BookingMember query = new BookingMember();
         query.setMemberId(MemberContextHolder.getMemberId());
-        query.setStatus(status);
+        if (status == null || status.isEmpty()) {
+            // 默认排除已取消
+            query.setNotStatus("2");
+        } else {
+            query.setStatus(status);
+        }
         List<BookingMember> list = bookingService.selectBookingMemberList(query);
-        return AjaxResult.success(list);
+        java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+        for (BookingMember signup : list) {
+            java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+            vo.put("id", signup.getId());
+            vo.put("bookingId", signup.getBookingId());
+            vo.put("memberId", signup.getMemberId());
+            vo.put("contact", signup.getContact());
+            vo.put("phone", signup.getPhone());
+            vo.put("people", signup.getPeople());
+            vo.put("status", signup.getStatus());
+            vo.put("confirmUser", signup.getConfirmUser());
+            vo.put("confirmTime", signup.getConfirmTime());
+            vo.put("createTime", signup.getCreateTime());
+            // 兼容字段：前端 booking/detail 用 bookingStatus
+            vo.put("bookingStatus", signup.getStatus());
+            rows.add(vo);
+        }
+        return AjaxResult.success(rows);
     }
 
     /**
      * 我的单条预约详情
      *
      * <p>小程序详情页用，仅允许查看本人报名，避免越权读取他人联系方式。</p>
+     * <p>自己看自己 → phone 明文；不返回实体，避免 @Sensitive 把它变 138****0000。</p>
      */
     @LoginRequired
     @GetMapping("/signup/{signupId}")
@@ -169,7 +194,20 @@ public class ApiBookingController
         {
             throw new ServiceException("预约记录不存在");
         }
-        return AjaxResult.success(signup);
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("id", signup.getId());
+        vo.put("bookingId", signup.getBookingId());
+        vo.put("memberId", signup.getMemberId());
+        vo.put("contact", signup.getContact());
+        vo.put("phone", signup.getPhone());   // 明文
+        vo.put("people", signup.getPeople());
+        vo.put("status", signup.getStatus());
+        vo.put("confirmUser", signup.getConfirmUser());
+        vo.put("confirmTime", signup.getConfirmTime());
+        vo.put("reviewRemark", signup.getReviewRemark());
+        vo.put("remark", signup.getRemark());
+        vo.put("createTime", signup.getCreateTime());
+        return AjaxResult.success(vo);
     }
 
     /**

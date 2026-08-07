@@ -117,7 +117,41 @@ Page({
     }
     this.setData({ slot: ds.s });
   },
-  openCalendar() { wx.showToast({ title: '仅支持预约近 7 天', icon: 'none' }); },
+  openCalendar() {
+    // 弹出真日历选择：默认只能选今天到 30 天后
+    const now = new Date()
+    const min = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0')
+    const maxDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    const max = maxDate.getFullYear() + '-' + String(maxDate.getMonth() + 1).padStart(2, '0') + '-' + String(maxDate.getDate()).padStart(2, '0')
+    // 用 actionSheet 模拟日历选择：列出未来 30 天
+    const items = []
+    const labels = []
+    for (let i = 0; i <= 30; i++) {
+      const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000)
+      const date = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+      const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+      const label = (date + ' 周' + week) + (i === 0 ? ' (今天)' : '')
+      items.push(date)
+      labels.push(label)
+    }
+    wx.showActionSheet({
+      itemList: labels,
+      success: (r) => {
+        const idx = r.tapIndex
+        const pickedDate = items[idx]
+        // 把 pickedDate 插入到 days 顶部（如果不是已有），并选中
+        const exists = (this.data.days || []).findIndex((d) => d.date === pickedDate)
+        if (exists >= 0) {
+          this.setData({ dateIdx: exists })
+        } else {
+          const newDay = { label: pickedDate.slice(5).replace('-', '/'), date: pickedDate, picked: true }
+          const days = [newDay].concat(this.data.days || [])
+          this.setData({ days, dateIdx: 0 })
+        }
+        this.loadSlots()
+      }
+    })
+  },
   onContact(e) { this.setData({ contact: e.detail.value }); },
   onPhone(e) { this.setData({ phone: e.detail.value }); },
   onRemark(e) { this.setData({ remark: e.detail.value }); },

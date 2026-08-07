@@ -56,6 +56,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="contact != null  and contact != ''"> and bm.contact like concat('%', #{contact}, '%')</if>
             <if test="phone != null  and phone != ''"> and bm.phone like concat('%', #{phone}, '%')</if>
             <if test="status != null  and status != ''"> and bm.status = #{status}</if>
+            <if test="notStatus != null  and notStatus != ''"> and bm.status &lt;&gt; #{notStatus}</if>
             <if test="storeId != null "> and b.store_id = #{storeId}</if>
             <if test="serviceName != null  and serviceName != ''"> and b.service_name like concat('%', #{serviceName}, '%')</if>
             <if test="bookingDate != null  and bookingDate != ''"> and b.booking_date = #{bookingDate}</if>

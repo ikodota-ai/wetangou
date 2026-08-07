@@ -18,6 +18,7 @@
     "pages/order/detail/index",
     "pages/voucher/index/index",
     "pages/pay/index/index",
+    "pages/order-pay/index",
     "pages/promoter/index/index",
     "pages/promoter/withdraw/index",
     "pages/promoter/records/index",

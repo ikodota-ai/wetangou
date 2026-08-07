@@ -101,6 +101,15 @@ public class BookingMember extends BaseEntity
     @Excel(name = "审核备注")
     private String reviewRemark;
 
+    /**
+     * 排除某个状态（用于"我的预约"默认不显示已取消的）
+     * <p>此字段不持久化，仅作为 SQL 查询条件。</p>
+     */
+    private String notStatus;
+
+    public String getNotStatus() { return notStatus; }
+    public void setNotStatus(String notStatus) { this.notStatus = notStatus; }
+
     public void setId(Long id)
     {
         this.id = id;

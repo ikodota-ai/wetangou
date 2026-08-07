@@ -108,43 +108,15 @@ Page({
       if (!order.orderId) {
         throw new Error(res && res.msg ? res.msg : '下单失败');
       }
-      return this.pay(order.orderId);
+      // 创建订单成功 → 跳支付中间页
+      wx.redirectTo({ url: '/pages/order-pay/index?type=order&id=' + order.orderId });
     }).catch((err) => {
       wx.hideLoading();
       this.setData({ submitting: false });
       wx.showToast({ title: (err && (err.msg || err.message)) || '下单失败', icon: 'none' });
     });
   },
-  // 发起支付：mock 模式后端已直接置为已支付，无需再调 wx.requestPayment
-  pay(orderId) {
-    return api.prepayOrder(orderId).then((res) => {
-      wx.hideLoading();
-      if (res && res.mock) {
-        this.onPaid(orderId);
-        return;
-      }
-      const p = (res && (res.data || res)) || {};
-      if (!p.paySign) {
-        this.setData({ submitting: false });
-        wx.showToast({ title: '订单已创建，请在订单列表完成支付', icon: 'none' });
-        setTimeout(() => wx.redirectTo({ url: '/pages/order/list/index?type=pending' }), 1200);
-        return;
-      }
-      wx.requestPayment({
-        timeStamp: String(p.timeStamp),
-        nonceStr: p.nonceStr,
-        package: p.package,
-        signType: p.signType || 'RSA',
-        paySign: p.paySign,
-        success: () => this.onPaid(orderId),
-        fail: () => {
-          this.setData({ submitting: false });
-          wx.showToast({ title: '已取消支付，可在订单列表继续付款', icon: 'none' });
-          setTimeout(() => wx.redirectTo({ url: '/pages/order/list/index?type=pending' }), 1200);
-        }
-      });
-    });
-  },
+
   onPaid(orderId) {
     this.setData({ submitting: false });
     wx.showToast({ title: '支付成功', icon: 'success' });

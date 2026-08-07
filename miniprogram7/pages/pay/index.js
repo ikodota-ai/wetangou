@@ -249,31 +249,9 @@ Page({
     }
   },
   pay() {
-    wx.showLoading({ title: '发起支付', mask: true });
-    api.prepayBill(this.data.billId).then((res) => {
-      wx.hideLoading();
-      if (res && res.mock) {
-        this.onPaid();
-        return;
-      }
-      const p = (res && (res.data || res)) || {};
-      if (!p.paySign) {
-        wx.showToast({ title: '暂不可支付，请稍后重试', icon: 'none' });
-        return;
-      }
-      wx.requestPayment({
-        timeStamp: String(p.timeStamp),
-        nonceStr: p.nonceStr,
-        package: p.package,
-        signType: p.signType || 'RSA',
-        paySign: p.paySign,
-        success: () => this.onPaid(),
-        fail: () => wx.showToast({ title: '已取消支付', icon: 'none' })
-      });
-    }).catch((err) => {
-      wx.hideLoading();
-      wx.showToast({ title: (err && err.msg) || '支付失败', icon: 'none' });
-    });
+    // 跳支付中间页（订单/买单共用）
+    if (!this.data.billId) return wx.showToast({ title: '账单ID缺失', icon: 'none' });
+    wx.redirectTo({ url: '/pages/order-pay/index?type=bill&id=' + this.data.billId });
   },
   onPaid() {
     this.setData({ status: '2' });

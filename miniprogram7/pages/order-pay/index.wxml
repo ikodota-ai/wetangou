@@ -1,0 +1,50 @@
+<view class="pay-page">
+  <!-- 金额卡 -->
+  <view class="amount-card">
+    <view class="amount-row">
+      <text class="amount-symbol">¥</text>
+      <text class="amount-value">{{amount}}</text>
+    </view>
+    <text class="amount-tip">请确认订单金额，点击支付后将调起微信支付</text>
+  </view>
+
+  <!-- 订单信息卡 -->
+  <view class="info-card">
+    <view class="info-row">
+      <text class="info-label">订单号</text>
+      <text class="info-value">{{orderNo}}</text>
+    </view>
+    <view class="info-row" wx:if="{{payNo}}">
+      <text class="info-label">支付单号</text>
+      <text class="info-value">{{payNo}}</text>
+    </view>
+    <view class="info-row" wx:if="{{payInfoId}}">
+      <text class="info-label">支付信息ID</text>
+      <text class="info-value">{{payInfoId}}</text>
+    </view>
+    <view class="info-row" wx:if="{{expireTimeText}}">
+      <text class="info-label">过期时间</text>
+      <text class="info-value">{{expireTimeText}}</text>
+    </view>
+  </view>
+
+  <!-- 支付方式 -->
+  <view class="info-card pay-method">
+    <view class="method-title">选择支付方式</view>
+    <view class="method-item on" bindtap="onPickWxPay">
+      <view class="method-left">
+        <image class="method-icon" src="/assets/img/wxpay.png" mode="aspectFit"></image>
+        <text class="method-name">微信支付</text>
+      </view>
+      <view class="method-check">✓</view>
+    </view>
+  </view>
+
+  <!-- 占位，避免底部按钮挡住内容 -->
+  <view style="height: 200rpx;"></view>
+
+  <!-- 底部固定去支付 -->
+  <view class="footer">
+    <button class="pay-btn" bindtap="onConfirmPay" loading="{{paying}}" disabled="{{paying}}">去支付</button>
+  </view>
+</view>

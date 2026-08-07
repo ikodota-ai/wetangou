@@ -42,12 +42,35 @@ public class ApiMemberController
 
     /**
      * 获取我的资料
+     *
+     * <p>会员查看自己的资料需要看到明文手机号。直接返回 Member 实体
+     * 会被 @Sensitive 把 phone 变 138****0000，所以这里手工拷贝字段，
+     * 不用 Jackson 反序列化 @Sensitive 注解。</p>
      */
     @LoginRequired
     @GetMapping("/profile")
     public AjaxResult profile()
     {
-        return AjaxResult.success(memberService.selectMemberByMemberId(MemberContextHolder.getMemberId()));
+        Member m = memberService.selectMemberByMemberId(MemberContextHolder.getMemberId());
+        if (m == null) return AjaxResult.success();
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("memberId", m.getMemberId());
+        vo.put("merchantId", m.getMerchantId());
+        vo.put("openid", m.getOpenid());
+        vo.put("unionid", m.getUnionid());
+        vo.put("nickname", m.getNickname());
+        vo.put("nickName", m.getNickname());
+        vo.put("avatar", m.getAvatar());
+        vo.put("avatarUrl", m.getAvatar());
+        vo.put("phone", m.getPhone());        // 明文
+        vo.put("gender", m.getGender());
+        vo.put("birthday", m.getBirthday());
+        vo.put("status", m.getStatus());
+        vo.put("lastLoginTime", m.getLastLoginTime());
+        vo.put("inviteBy", m.getInviteBy());
+        vo.put("inviteTime", m.getInviteTime());
+        vo.put("createTime", m.getCreateTime());
+        return AjaxResult.success(vo);
     }
 
     /**

@@ -131,7 +131,7 @@ const api = {
   createBill: (data) => request('/api/bill', { method: 'POST', data }),
   billDetail: (id) => request(`/api/bill/${id}`),
   confirmBill: (id) => request(`/api/bill/confirm/${id}`, { method: 'POST' }),
-  prepayBill: (id) => request(`/api/bill/prepay/${id}`, { method: 'POST' }),
+  billPrepay: (id) => request(`/api/bill/prepay/${id}`, { method: 'POST' }),
   payBill: (id) => request(`/api/bill/pay/${id}`, { method: 'POST' }),
   // 代金券
   voucherList: (params) => request('/api/voucher/list', { data: params }),
