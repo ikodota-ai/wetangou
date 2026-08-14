@@ -43,6 +43,10 @@ public interface ISysUserService
      */
     public SysUser selectUserByUserName(String userName);
 
+    public SysUser selectUserByOpenId(String openid);
+
+    public SysUser selectUserByUserId(Long userId);
+
     /**
      * 通过用户ID查询用户
      * 

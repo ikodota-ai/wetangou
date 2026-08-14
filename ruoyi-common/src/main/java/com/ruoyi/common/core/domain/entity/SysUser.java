@@ -66,6 +66,18 @@ public class SysUser extends BaseEntity
     /** 用户头像 */
     private String avatar;
 
+    /** 微信 openid */
+    private String openid;
+
+    /** openid 绑定状态 0未绑 1已绑 */
+    private Integer openidBound;
+
+    /** 用户类型（00系统用户 10代理商 20商户 30会员 40商家员工） */
+    private String userType;
+
+    /** 多商户隔离ID（商家员工场景下记录所属商户） */
+    private Long merchantId;
+
     /** 密码 */
     private String password;
 
@@ -216,6 +228,17 @@ public class SysUser extends BaseEntity
     {
         this.avatar = avatar;
     }
+
+    public String getOpenid() { return openid; }
+    public void setOpenid(String openid) { this.openid = openid; }
+    public Integer getOpenidBound() { return openidBound; }
+    public void setOpenidBound(Integer openidBound) { this.openidBound = openidBound; }
+
+    public String getUserType() { return userType; }
+    public void setUserType(String userType) { this.userType = userType; }
+
+    public Long getMerchantId() { return merchantId; }
+    public void setMerchantId(Long merchantId) { this.merchantId = merchantId; }
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     public String getPassword()

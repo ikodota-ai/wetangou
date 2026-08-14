@@ -45,6 +45,11 @@ public interface SysUserMapper
     public SysUser selectUserByUserName(String userName);
 
     /**
+     * 通过微信 openid 查询用户
+     */
+    public SysUser selectUserByOpenId(String openid);
+
+    /**
      * 通过用户ID查询用户
      * 
      * @param userId 用户ID

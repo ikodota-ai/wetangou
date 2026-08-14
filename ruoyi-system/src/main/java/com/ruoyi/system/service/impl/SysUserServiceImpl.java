@@ -126,6 +126,20 @@ public class SysUserServiceImpl implements ISysUserService
         return userMapper.selectUserByUserName(userName);
     }
 
+    @Override
+    public SysUser selectUserByOpenId(String openid)
+    {
+        if (openid == null || openid.isEmpty()) return null;
+        return userMapper.selectUserByOpenId(openid);
+    }
+
+    @Override
+    public SysUser selectUserByUserId(Long userId)
+    {
+        if (userId == null) return null;
+        return userMapper.selectUserById(userId);
+    }
+
     /**
      * 通过用户ID查询用户
      * 

@@ -24,6 +24,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"      column="update_by"       />
         <result property="updateTime"    column="update_time"     />
         <result property="remark"        column="remark"          />
+        <result property="openid"        column="openid"          />
+        <result property="openidBound"   column="openid_bound"    />
+        <result property="userType"      column="user_type"       />
+        <result property="merchantId"    column="merchant_id"     />
         <association property="dept"     javaType="SysDept"         resultMap="deptResult" />
         <collection  property="roles"    javaType="java.util.List"  resultMap="RoleResult" />
     </resultMap>
@@ -48,7 +52,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 	
 	<sql id="selectUserVo">
-        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.avatar, u.phonenumber, u.password, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.pwd_update_date, u.create_by, u.create_time, u.update_by, u.update_time, u.remark, 
+        select u.user_id, u.dept_id, u.user_name, u.nick_name, u.email, u.avatar, u.phonenumber, u.password, u.sex, u.status, u.del_flag, u.login_ip, u.login_date, u.pwd_update_date, u.create_by, u.create_time, u.update_by, u.update_time, u.remark, u.openid, u.openid_bound, u.user_type, 0 as merchant_id,
         d.dept_id, d.parent_id, d.ancestors, d.dept_name, d.order_num, d.leader, d.status as dept_status,
         r.role_id, r.role_name, r.role_key, r.role_sort, r.data_scope, r.status as role_status
         from sys_user u
@@ -124,6 +128,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	<select id="selectUserByUserName" parameterType="String" resultMap="SysUserResult">
 	    <include refid="selectUserVo"/>
 		where u.user_name = #{userName} and u.del_flag = '0'
+	</select>
+
+	<select id="selectUserByOpenId" parameterType="String" resultMap="SysUserResult">
+	    <include refid="selectUserVo"/>
+		where u.openid = #{openid} and u.openid_bound = 1 and u.del_flag = '0' limit 1
 	</select>
 	
 	<select id="selectUserById" parameterType="Long" resultMap="SysUserResult">
