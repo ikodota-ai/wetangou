@@ -1,0 +1,108 @@
+# 生产环境配置（prod profile）
+#
+# 为什么把 druid 数据源配置原样搬过来：
+#   application.yml 里只设了 spring.profiles.active=druid，
+#   一旦用 -Dspring.profiles.active=prod 启动，druid yml 就不会被加载，
+#   DruidProperties 的 @Value 全部报「Could not resolve placeholder」启动失败。
+#   所以 prod profile 必须自带一份等价的数据源配置，prod 才能独立启动。
+#
+# 同时：本文件保留 WxPayConfig / WxMaConfig 通过 environment.getActiveProfiles()
+# 检测到 prod 时强制 isMockEnabled()=false 的能力（无需额外配置）。
+#
+# 切换到阿里云 RDS / OSS 时改下面 spring.datasource.druid.master.url
+# 和 application.yml 里的 ruoyi.storage 段即可。
+
+# 数据源配置
+spring:
+    datasource:
+        type: com.alibaba.druid.pool.DruidDataSource
+        driverClassName: com.mysql.cj.jdbc.Driver
+        druid:
+            # 主库数据源
+            master:
+                url: jdbc:mysql://localhost:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+                username: root
+                password: 133301
+            # 从库数据源
+            slave:
+                # 从数据源开关/默认关闭
+                enabled: false
+                url: 
+                username: 
+                password: 
+            # 初始连接数
+            initialSize: 5
+            # 最小连接池数量
+            minIdle: 10
+            # 最大连接池数量
+            maxActive: 20
+            # 配置获取连接等待超时的时间
+            maxWait: 60000
+            # 配置连接超时时间
+            connectTimeout: 30000
+            # 配置网络超时时间
+            socketTimeout: 60000
+            # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+            timeBetweenEvictionRunsMillis: 60000
+            # 配置一个连接在池中最小生存的时间，单位是毫秒
+            minEvictableIdleTimeMillis: 300000
+            # 配置一个连接在池中最大生存的时间，单位是毫秒
+            maxEvictableIdleTimeMillis: 900000
+            # 配置检测连接是否有效
+            validationQuery: SELECT 1 FROM DUAL
+            testWhileIdle: true
+            testOnBorrow: false
+            testOnReturn: false
+            webStatFilter: 
+                enabled: true
+            statViewServlet:
+                enabled: true
+                # 设置白名单，不填则允许所有访问
+                allow:
+                url-pattern: /druid/*
+                # 控制台管理用户名和密码
+                login-username: ruoyi
+                login-password: 123456
+            filter:
+                stat:
+                    enabled: true
+                    # 慢SQL记录
+                    log-slow-sql: true
+                    slow-sql-millis: 1000
+                    merge-sql: true
+                wall:
+                    config:
+                        multi-statement-allow: true
+            # ====== 补充 DruidProperties 必需字段 ======
+            # 防止 @Value 注入失败导致启动崩溃
+            poolPreparedStatements: true
+            maxPoolPreparedStatementPerConnectionSize: 20
+            filters: stat,wall
+            loginUsername: druid
+            loginPassword: druid123
+            ip:
+
+
+# 阿里云 OSS（生产环境生效）
+# 通过 ruoyi.storage.type=oss 切换，对接阿里云 OSS S3 兼容 endpoint
+# 必填四项：endpoint / bucket / access-key / secret-key
+# 选填：public-domain（CDN 加速域名，配了之后返回的 URL 用它替代 endpoint）
+ruoyi:
+  storage:
+    type: oss
+    s3:
+      # 阿里云 OSS endpoint（按 bucket 所在 region 改）
+      # 华东1（杭州）：oss-cn-hangzhou.aliyuncs.com
+      # 华东2（上海）：oss-cn-shanghai.aliyuncs.com
+      # 华南1（深圳）：oss-cn-shenzhen.aliyuncs.com
+      # 华北2（北京）：oss-cn-beijing.aliyuncs.com
+      endpoint: https://oss-cn-hangzhou.aliyuncs.com
+      region: cn-hangzhou
+      # bucket 名称（不含 -oss 后缀）
+      bucket: dytuangou-prod
+      # RAM 用户的 AccessKey（建议只授 OSS 写读权限，不要用主账号 AK）
+      access-key: __REPLACE_ME_ACCESS_KEY__
+      # RAM 用户的 SecretKey
+      secret-key: __REPLACE_ME_SECRET_KEY__
+      # CDN 加速域名（可选，配置后图片 URL 用它替代 endpoint，访问更快更省流量）
+      # public-domain: https://cdn.example.com
