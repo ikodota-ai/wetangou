@@ -85,3 +85,6 @@ miniprogram7/tests/
 .agents/
 .playwright-cli/
 skills-lock.json
+
+# 8. 运维脚本（不入仓）
+doc/*.sh
