@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Product;
 
 /**
@@ -17,6 +18,7 @@ public interface ProductMapper
      * @param productId 商品主键
      * @return 商品
      */
+    @IgnoreTenant
     public Product selectProductByProductId(Long productId);
 
     /**

@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.biz.domain.Banner;
 import com.ruoyi.biz.service.IBannerService;
 
@@ -57,7 +58,12 @@ public class BannerController extends BaseController
     @GetMapping(value = "/{bannerId}")
     public AjaxResult getInfo(@PathVariable("bannerId") Long bannerId)
     {
-        return success(bannerService.selectBannerByBannerId(bannerId));
+        Banner banner = bannerService.selectBannerByBannerId(bannerId);
+        if (banner != null)
+        {
+            TenantFilterHelper.assertDataScope(banner.getMerchantId());
+        }
+        return success(banner);
     }
 
     @PreAuthorize("@ss.hasPermi('biz:banner:add')")

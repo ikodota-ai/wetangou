@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.StoreAlbum;
 
 /**
@@ -17,6 +18,7 @@ public interface StoreAlbumMapper
      * @param albumId 门店相册主键
      * @return 门店相册
      */
+    @IgnoreTenant
     public StoreAlbum selectStoreAlbumByAlbumId(Long albumId);
 
     /**

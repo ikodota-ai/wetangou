@@ -19,6 +19,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.StoreAlbum;
 import com.ruoyi.biz.service.IStoreAlbumService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -66,7 +67,12 @@ public class StoreAlbumController extends BaseController
     @GetMapping(value = "/{albumId}")
     public AjaxResult getInfo(@PathVariable("albumId") Long albumId)
     {
-        return success(storeAlbumService.selectStoreAlbumByAlbumId(albumId));
+        StoreAlbum storeAlbum = storeAlbumService.selectStoreAlbumByAlbumId(albumId);
+        if (storeAlbum != null)
+        {
+            TenantFilterHelper.assertDataScope(storeAlbum.getMerchantId());
+        }
+        return success(storeAlbum);
     }
 
     /**

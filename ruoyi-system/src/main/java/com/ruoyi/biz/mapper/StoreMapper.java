@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Store;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,6 +19,7 @@ public interface StoreMapper
      * @param storeId 门店主键
      * @return 门店
      */
+    @IgnoreTenant
     public Store selectStoreByStoreId(Long storeId);
 
     /**

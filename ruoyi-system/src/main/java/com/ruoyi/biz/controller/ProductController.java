@@ -78,6 +78,7 @@ public class ProductController extends BaseController
         Product p = productService.selectProductByProductId(productId);
         if (p != null)
         {
+            TenantFilterHelper.assertDataScope(p.getMerchantId());
             p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
             p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
         }

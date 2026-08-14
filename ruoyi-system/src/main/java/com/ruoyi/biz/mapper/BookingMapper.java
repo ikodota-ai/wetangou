@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Booking;
 
 /**
@@ -14,6 +15,7 @@ public interface BookingMapper
     /**
      * 查询在线预约场次
      */
+    @IgnoreTenant
     public Booking selectBookingByBookingId(Long bookingId);
 
     /**

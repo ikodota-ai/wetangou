@@ -62,7 +62,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectProductVo">
-        select p.product_id, p.store_id, p.store_ids, s.store_name, p.category_id, c.category_name,
+        select p.product_id, p.merchant_id, p.store_id, p.store_ids, s.store_name, p.category_id, c.category_name,
                (select group_concat(s2.store_name separator '、') from biz_store s2 where find_in_set(s2.store_id, p.store_ids)) as store_names,
                p.product_name, p.subtitle,
                p.cover, p.images, p.product_type, p.price, p.market_price, p.stock, p.sales, p.validity_days,

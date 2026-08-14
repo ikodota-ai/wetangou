@@ -19,6 +19,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Category;
 import com.ruoyi.biz.service.ICategoryService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -66,7 +67,12 @@ public class CategoryController extends BaseController
     @GetMapping(value = "/{categoryId}")
     public AjaxResult getInfo(@PathVariable("categoryId") Long categoryId)
     {
-        return success(categoryService.selectCategoryByCategoryId(categoryId));
+        Category category = categoryService.selectCategoryByCategoryId(categoryId);
+        if (category != null)
+        {
+            TenantFilterHelper.assertDataScope(category.getMerchantId());
+        }
+        return success(category);
     }
 
     /**

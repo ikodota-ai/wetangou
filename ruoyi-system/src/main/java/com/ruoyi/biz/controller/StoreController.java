@@ -78,6 +78,7 @@ public class StoreController extends BaseController
         Store s = storeService.selectStoreByStoreId(storeId);
         if (s != null)
         {
+            TenantFilterHelper.assertDataScope(s.getMerchantId());
             s.setLogo(ImageUrlUtils.toAbsolute(s.getLogo()));
         }
         return success(s);

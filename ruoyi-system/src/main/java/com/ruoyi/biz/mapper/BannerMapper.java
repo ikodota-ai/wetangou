@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Banner;
 
 /**
@@ -11,6 +12,7 @@ import com.ruoyi.biz.domain.Banner;
  */
 public interface BannerMapper
 {
+    @IgnoreTenant
     public Banner selectBannerByBannerId(Long bannerId);
 
     public List<Banner> selectBannerList(Banner banner);

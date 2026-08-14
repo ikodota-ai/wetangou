@@ -786,3 +786,53 @@ E15 P1 batch:
 ### 后续 batch 计划
 - **E16 P2（6 controller）**: Product / Category / Store / StoreAlbum / Booking / Banner（业务配置类，敏感度中）
 - **E17 P3（3 controller）**: Agreement / MpAuth / MpRelease（合规/认证类，敏感度低）
+
+## E16 收口（2026-08-14 · 23:10 · commit <待定>）
+
+### 背景
+E12 advisory 剩余 6 个 ⚠️ controller（业务配置类），统一走 merchantId 维度 assertDataScope。
+
+### 改动（13 文件 / +39 行）
+**6 mapper 加 @IgnoreTenant** + **6 controller getInfo 改写**：
+| Controller | 维度 | 备注 |
+|---|---|---|
+| Product | merchantId | ⚠️ 同时修 SQL: `selectProductVo` 缺 `p.merchant_id` (v2 升级遗留) |
+| Category | merchantId | ⚠️ pre-existing SQL bug: `c.store_id` 字段不存在, E16 跳过验证, controller 改动已就位 |
+| Store | merchantId | 改短变量名 s 走 if 块 |
+| StoreAlbum | merchantId | 路径 `/biz/album`（smoke 路径需对齐）|
+| Booking | merchantId | OK |
+| Banner | merchantId | agent 缺 `biz:banner:query` perms (pre-existing 403), smoke 只测 admin bypass |
+
+### 验证（13/13 PASS + 1 known bug）
+```
+E16 P2 batch (5 verified + 1 known pre-existing bug):
+  ✅ Product/Store/Booking/StoreAlbum
+     agent001 -> 别人 999301: 500 没有权限
+     agent001 -> 自己 999302: 200 操作成功
+     admin    -> 别人 999301: 200 操作成功
+  ✅ Banner admin    -> 别人 999301: 200 操作成功 (平台 bypass)
+  ⚠️  Category 跳过 E16 验证（pre-existing SQL bug c.store_id 不存在）
+```
+
+### 重要 SQL 修复（Product）
+`ruoyi-system/src/main/resources/mapper/biz/ProductMapper.xml` `selectProductVo` SQL 缺 `p.merchant_id` 字段，导致 `Product.merchantId` 一直为 null，guard 失效。
+- **根因**：v2 升级 (8-14) 时 SQL 改写漏掉 merchant_id
+- **修法**：在 `selectProductVo` select 列表加 `p.merchant_id,`
+- **验证**：agent001 查 product 999301 (mid=2) 修前 200+null，修后 500 没有权限
+- **副作用**：无（resultMap 已有 `merchantId → merchant_id` 映射）
+
+### 全套回归（9/9 PASS）
+- smoke-c1/subitem/e10/e4/e11/e13/e14/e15/e16 全 PASS
+- mvn test -pl ruoyi-system 10/10
+- 测试数据 fixture: `sql/smoke-e13-e16-fixture.sql`（idempotent INSERT...ON DUPLICATE KEY UPDATE）
+- 跑顺序：c1 先跑（避免 E15 commission 999202 污染 agent001 总额断言），再 fixture 重插后跑 e13-e16
+
+### 业务价值
+- 18/21 E12 advisory 已收口（剩 Banner 验证 + Category SQL bug 等修）
+- Product SQL 修复是 E16 关键护城河 — 否则 guard 调用了但 merchantId 永远 null
+- 模式稳定：「mapper 加 @IgnoreTenant + controller 加 assertDataScope/assertAgentDataScope + smoke」
+
+### 遗留（不在 E16 scope，待后续 session）
+1. **Category SQL bug**：`biz_product_category` 表无 `store_id` 字段，xml 引用 `c.store_id` 报 SQL 错
+2. **Banner perms**：agent 账号缺 `biz:banner:query` perms (pre-existing)
+3. **E17 P3 batch**：Agreement / MpAuth / MpRelease 3 controller

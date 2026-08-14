@@ -74,7 +74,12 @@ public class BookingController extends BaseController
     @GetMapping(value = "/{bookingId}")
     public AjaxResult getInfo(@PathVariable("bookingId") Long bookingId)
     {
-        return success(bookingService.selectBookingByBookingId(bookingId));
+        Booking booking = bookingService.selectBookingByBookingId(bookingId);
+        if (booking != null)
+        {
+            TenantFilterHelper.assertDataScope(booking.getMerchantId());
+        }
+        return success(booking);
     }
 
     /**

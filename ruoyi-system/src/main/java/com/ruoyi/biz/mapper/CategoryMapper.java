@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Category;
 
 /**
@@ -17,6 +18,7 @@ public interface CategoryMapper
      * @param categoryId 商品分类主键
      * @return 商品分类
      */
+    @IgnoreTenant
     public Category selectCategoryByCategoryId(Long categoryId);
 
     /**
