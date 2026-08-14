@@ -26,6 +26,7 @@ import com.ruoyi.biz.domain.Commission;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Withdraw;
 import com.ruoyi.biz.service.IDistributorService;
+import com.ruoyi.biz.service.ITenantService;
 import com.ruoyi.biz.service.ICommissionService;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IWithdrawService;
@@ -54,6 +55,9 @@ public class ApiDistributorController
     private IMemberService memberService;
 
     @Autowired
+    private ITenantService tenantService;
+
+    @Autowired
     private WxMaService wxMaService;
 
     @Autowired
@@ -74,6 +78,54 @@ public class ApiDistributorController
      * <p>除推客档案外一并返回概览统计，避免小程序端为几个数字多发几次请求。
      * 未成为推客时 data 为 null，前端据此展示「成为推客」入口。</p>
      */
+    /**
+     * C1 代理商佣金概览：代理商账号调用，返回名下商户的本月佣金汇总
+     * 入参：无（从 token 拿 agentId，再查名下 merchantIds）
+     * 返回：{ totalAmount, settledAmount, pendingAmount, commissionCount, merchants: [...] }
+     */
+    @LoginRequired
+    @GetMapping("/agent/summary")
+    public AjaxResult agentSummary()
+    {
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        if (me == null) {
+            throw new ServiceException("未登录");
+        }
+        if (!"1".equals(me.getUserType())) {
+            throw new ServiceException("仅代理商账号可调用");
+        }
+        // 从 tenant context 反查 agentId（LoginMember 没存 agentId 字段）
+        com.ruoyi.common.core.domain.model.TenantContext ctx = com.ruoyi.common.utils.TenantContextHolder.get();
+        Long agentId = ctx == null ? null : ctx.getAgentId();
+        if (agentId == null) {
+            throw new ServiceException("账号未绑定代理商");
+        }
+        // 名下商户
+        java.util.List<Long> merchantIds = tenantService.getMerchantIdsByAgentId(agentId);
+        // 本月 1 号 00:00:00 ~ 现在
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        java.util.Date beginTime = cal.getTime();
+        java.util.Date endTime = new java.util.Date();
+        java.util.Map<String, Object> overview = commissionService.sumAgentOverview(merchantIds, beginTime, endTime);
+        java.util.List<java.util.Map<String, Object>> byMerchant = commissionService.sumByMerchantIds(merchantIds, beginTime, endTime);
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("agentId", agentId);
+        data.put("merchantCount", merchantIds == null ? 0 : merchantIds.size());
+        data.put("beginTime", beginTime);
+        data.put("endTime", endTime);
+        data.put("totalAmount", overview.get("totalAmount"));
+        data.put("settledAmount", overview.get("settledAmount"));
+        data.put("pendingAmount", overview.get("pendingAmount"));
+        data.put("commissionCount", overview.get("commissionCount"));
+        data.put("byMerchant", byMerchant);
+        return AjaxResult.success(data);
+    }
+
     @LoginRequired
     @GetMapping("/center")
     public AjaxResult center()

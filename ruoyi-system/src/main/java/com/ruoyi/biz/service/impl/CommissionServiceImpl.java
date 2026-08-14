@@ -118,6 +118,35 @@ public class CommissionServiceImpl implements ICommissionService
     }
 
     @Override
+    public java.util.List<java.util.Map<String, Object>> sumByMerchantIds(java.util.List<Long> merchantIds, java.util.Date beginTime, java.util.Date endTime)
+    {
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("merchantIds", merchantIds);
+        params.put("beginTime", beginTime);
+        params.put("endTime", endTime);
+        return commissionMapper.sumByMerchantIds(params);
+    }
+
+    @Override
+    public java.util.Map<String, Object> sumAgentOverview(java.util.List<Long> merchantIds, java.util.Date beginTime, java.util.Date endTime)
+    {
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("merchantIds", merchantIds);
+        params.put("merchantIdsEmpty", merchantIds == null || merchantIds.isEmpty());
+        params.put("beginTime", beginTime);
+        params.put("endTime", endTime);
+        java.util.Map<String, Object> r = commissionMapper.sumAgentOverview(params);
+        if (r == null) {
+            r = new java.util.HashMap<>();
+            r.put("pendingAmount", java.math.BigDecimal.ZERO);
+            r.put("settledAmount", java.math.BigDecimal.ZERO);
+            r.put("totalAmount", java.math.BigDecimal.ZERO);
+            r.put("commissionCount", 0L);
+        }
+        return r;
+    }
+
+    @Override
     public int deleteCommissionByCommissionIds(Long[] commissionIds)
     {
         return commissionMapper.deleteCommissionByCommissionIds(commissionIds);

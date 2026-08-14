@@ -37,6 +37,18 @@ public interface CommissionMapper
     public List<Map<String, Object>> selectSettleGroupsByTime(Date settleTime);
 
     /**
+     * C1 代理商佣金概览：按 merchant_id 集合 + 时间范围聚合
+     * 返回每个 merchant 的 本月总额/已结算(settled=1)/待结算(settled=0)
+     * @param params { merchantIds: List<Long>, beginTime, endTime }
+     */
+    public List<Map<String, Object>> sumByMerchantIds(Map<String, Object> params);
+
+    /**
+     * C1 代理商佣金概览汇总：名下所有商户的本月总额/已结算/待结算
+     */
+    public Map<String, Object> sumAgentOverview(Map<String, Object> params);
+
+    /**
      * 把指定结算时间的记录标记为已联动
      */
     public int markSettledByTime(Date settleTime);

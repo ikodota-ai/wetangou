@@ -35,6 +35,16 @@ public interface ICommissionService
      */
     public int linkSettlementToDistributor(Date settleTime);
 
+    /**
+     * C1 代理商佣金概览：按 merchantId 集合 + 时间范围聚合
+     */
+    public java.util.List<java.util.Map<String, Object>> sumByMerchantIds(java.util.List<Long> merchantIds, java.util.Date beginTime, java.util.Date endTime);
+
+    /**
+     * C1 代理商佣金概览汇总：本月总佣金/已结算/待结算
+     */
+    public java.util.Map<String, Object> sumAgentOverview(java.util.List<Long> merchantIds, java.util.Date beginTime, java.util.Date endTime);
+
     public int deleteCommissionByCommissionIds(Long[] commissionIds);
 
     public int deleteCommissionByCommissionId(Long commissionId);

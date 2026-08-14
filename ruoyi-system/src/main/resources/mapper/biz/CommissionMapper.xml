@@ -125,7 +125,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
-<select id="selectSettleGroupsByTime" parameterType="Date" resultType="map">
+<select id="sumByMerchantIds" parameterType="map" resultType="map">
+        select merchant_id,
+               sum(case when status='0' then amount else 0 end) as pending_amount,
+               sum(case when status='1' then amount else 0 end) as settled_amount,
+               sum(amount) as total_amount,
+               count(*) as commission_count
+        from biz_commission
+        <where>
+            <if test="merchantIds != null and merchantIds.size() > 0">
+                and merchant_id in
+                <foreach collection="merchantIds" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+            </if>
+            <if test="beginTime != null and beginTime != ''"> and create_time &gt;= #{beginTime}</if>
+            <if test="endTime != null and endTime != ''"> and create_time &lt;= #{endTime}</if>
+        </where>
+        group by merchant_id
+    </select>
+
+    <select id="sumAgentOverview" parameterType="map" resultType="map">
+        select sum(case when status='0' then amount else 0 end) as pending_amount,
+               sum(case when status='1' then amount else 0 end) as settled_amount,
+               sum(amount) as total_amount,
+               count(*) as commission_count
+        from biz_commission
+        <where>
+            <if test="merchantIds != null and merchantIds.size() > 0">
+                and merchant_id in
+                <foreach collection="merchantIds" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+            </if>
+            <if test="merchantIdsEmpty == true"> and 1=0 </if>
+            <if test="beginTime != null and beginTime != ''"> and create_time &gt;= #{beginTime}</if>
+            <if test="endTime != null and endTime != ''"> and create_time &lt;= #{endTime}</if>
+        </where>
+    </select>
+
+    <select id="selectSettleGroupsByTime" parameterType="Date" resultType="map">
         select distributor_id as distributorId, sum(amount) as totalAmount, count(*) as cnt
         from biz_commission
         where settle_time &gt;= #{settleTime} and settle_time &lt; date_add(#{settleTime}, interval 2 second)
