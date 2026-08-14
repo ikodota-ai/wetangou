@@ -30,7 +30,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectMemberList" parameterType="Member" resultMap="MemberResult">
         <include refid="selectMemberVo"/>
         <where>  
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="merchantId != null ">
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+ and merchant_id = #{merchantId}</if>
             <if test="openid != null  and openid != ''"> and openid = #{openid}</if>
             <if test="unionid != null  and unionid != ''"> and unionid = #{unionid}</if>
             <if test="nickname != null  and nickname != ''"> and nickname like concat('%', #{nickname}, '%')</if>

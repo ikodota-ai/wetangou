@@ -19,6 +19,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -41,6 +43,9 @@ public class MemberController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Member member)
     {
+        TenantFilterHelper.apply((BaseEntity) member,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Member) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Member) e).getMerchantId());
         startPage();
         List<Member> list = memberService.selectMemberList(member);
         return getDataTable(list);
@@ -54,6 +59,9 @@ public class MemberController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Member member)
     {
+        TenantFilterHelper.apply((BaseEntity) member,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Member) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Member) e).getMerchantId());
         List<Member> list = memberService.selectMemberList(member);
         ExcelUtil<Member> util = new ExcelUtil<Member>(Member.class);
         util.exportExcel(response, list, "会员数据");

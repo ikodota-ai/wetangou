@@ -19,6 +19,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Voucher;
 import com.ruoyi.biz.service.IVoucherService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -41,6 +43,9 @@ public class VoucherController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Voucher voucher)
     {
+        TenantFilterHelper.apply((BaseEntity) voucher,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Voucher) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Voucher) e).getMerchantId());
         startPage();
         List<Voucher> list = voucherService.selectVoucherList(voucher);
         return getDataTable(list);
@@ -54,6 +59,9 @@ public class VoucherController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Voucher voucher)
     {
+        TenantFilterHelper.apply((BaseEntity) voucher,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Voucher) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Voucher) e).getMerchantId());
         List<Voucher> list = voucherService.selectVoucherList(voucher);
         ExcelUtil<Voucher> util = new ExcelUtil<Voucher>(Voucher.class);
         util.exportExcel(response, list, "代金券模板数据");

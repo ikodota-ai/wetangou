@@ -19,6 +19,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.CommissionRule;
 import com.ruoyi.biz.service.ICommissionRuleService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -41,6 +43,9 @@ public class CommissionRuleController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(CommissionRule commissionRule)
     {
+        TenantFilterHelper.apply((BaseEntity) commissionRule,
+                                  (e, v) -> ((com.ruoyi.biz.domain.CommissionRule) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.CommissionRule) e).getMerchantId());
         startPage();
         List<CommissionRule> list = commissionRuleService.selectCommissionRuleList(commissionRule);
         return getDataTable(list);
@@ -54,6 +59,9 @@ public class CommissionRuleController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, CommissionRule commissionRule)
     {
+        TenantFilterHelper.apply((BaseEntity) commissionRule,
+                                  (e, v) -> ((com.ruoyi.biz.domain.CommissionRule) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.CommissionRule) e).getMerchantId());
         List<CommissionRule> list = commissionRuleService.selectCommissionRuleList(commissionRule);
         ExcelUtil<CommissionRule> util = new ExcelUtil<CommissionRule>(CommissionRule.class);
         util.exportExcel(response, list, "佣金规则数据");

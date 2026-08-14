@@ -19,6 +19,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Agreement;
 import com.ruoyi.biz.service.IAgreementService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -41,6 +43,9 @@ public class AgreementController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Agreement agreement)
     {
+        TenantFilterHelper.apply((BaseEntity) agreement,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Agreement) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Agreement) e).getMerchantId());
         startPage();
         List<Agreement> list = agreementService.selectAgreementList(agreement);
         return getDataTable(list);
@@ -54,6 +59,9 @@ public class AgreementController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Agreement agreement)
     {
+        TenantFilterHelper.apply((BaseEntity) agreement,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Agreement) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Agreement) e).getMerchantId());
         List<Agreement> list = agreementService.selectAgreementList(agreement);
         ExcelUtil<Agreement> util = new ExcelUtil<Agreement>(Agreement.class);
         util.exportExcel(response, list, "协议数据");

@@ -40,7 +40,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectStoreList" parameterType="Store" resultMap="StoreResult">
         <include refid="selectStoreVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>  
+            <if test="merchantId != null ">
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+ and merchant_id = #{merchantId}</if>  
             <if test="storeName != null  and storeName != ''"> and store_name like concat('%', #{storeName}, '%')</if>
             <if test="logo != null  and logo != ''"> and logo = #{logo}</if>
             <if test="province != null  and province != ''"> and province = #{province}</if>

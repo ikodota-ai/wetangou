@@ -29,7 +29,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectAgreementList" parameterType="Agreement" resultMap="AgreementResult">
         <include refid="selectAgreementVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="merchantId != null ">
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and a.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and a.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+ and a.merchant_id = #{merchantId}</if>
             <if test="agreementType != null  and agreementType != ''"> and a.agreement_type = #{agreementType}</if>
             <if test="title != null  and title != ''"> and a.title like concat('%', #{title}, '%')</if>
             <if test="storeId != null "> and a.store_id = #{storeId}</if>

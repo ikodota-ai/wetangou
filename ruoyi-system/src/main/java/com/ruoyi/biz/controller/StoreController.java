@@ -20,6 +20,8 @@ import com.ruoyi.biz.domain.Store;
 import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -42,6 +44,9 @@ public class StoreController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Store store)
     {
+        TenantFilterHelper.apply((BaseEntity) store,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Store) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Store) e).getMerchantId());
         startPage();
         List<Store> list = storeService.selectStoreList(store);
         return getDataTable(fillImageUrls(list));
@@ -55,6 +60,9 @@ public class StoreController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Store store)
     {
+        TenantFilterHelper.apply((BaseEntity) store,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Store) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Store) e).getMerchantId());
         List<Store> list = storeService.selectStoreList(store);
         ExcelUtil<Store> util = new ExcelUtil<Store>(Store.class);
         util.exportExcel(response, list, "门店数据");

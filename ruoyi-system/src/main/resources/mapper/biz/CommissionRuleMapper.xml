@@ -37,7 +37,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectCommissionRuleList" parameterType="CommissionRule" resultMap="CommissionRuleResult">
         <include refid="selectCommissionRuleVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="merchantId != null ">
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and r.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and r.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+ and r.merchant_id = #{merchantId}</if>
             <if test="ruleName != null  and ruleName != ''"> and r.rule_name like concat('%', #{ruleName}, '%')</if>
             <if test="storeId != null "> and r.store_id = #{storeId}</if>
             <if test="categoryId != null "> and r.category_id = #{categoryId}</if>
