@@ -2,6 +2,7 @@ package com.ruoyi.biz.mapper;
 
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Member;
 import jakarta.validation.constraints.NotNull;
 
@@ -19,6 +20,7 @@ public interface MemberMapper
      * @param memberId 会员主键
      * @return 会员
      */
+    @IgnoreTenant
     public Member selectMemberByMemberId(Long memberId);
 
     /**

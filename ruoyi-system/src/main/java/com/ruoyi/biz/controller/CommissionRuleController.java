@@ -74,7 +74,12 @@ public class CommissionRuleController extends BaseController
     @GetMapping(value = "/{ruleId}")
     public AjaxResult getInfo(@PathVariable("ruleId") Long ruleId)
     {
-        return success(commissionRuleService.selectCommissionRuleByRuleId(ruleId));
+        CommissionRule commissionRule = commissionRuleService.selectCommissionRuleByRuleId(ruleId);
+        if (commissionRule != null)
+        {
+            TenantFilterHelper.assertDataScope(commissionRule.getMerchantId());
+        }
+        return success(commissionRule);
     }
 
     /**

@@ -137,4 +137,31 @@ public class TenantFilterHelper
             }
         }
     }
+
+    /**
+     * E15: 显式断言当前账号可访问该 agentId 资源（代理商维度）
+     *   - 平台 / 未登录 / agentId 为空 → 放行
+     *   - agent: agentId == ctx.agentId → 放行，否则抛
+     *   - merchant: 抛（merchant 不应能查代理商数据）
+     */
+    public static void assertAgentDataScope(Long agentId)
+    {
+        TenantContext ctx = TenantContextHolder.get();
+        if (ctx == null || ctx.isPlatform() || agentId == null)
+        {
+            return;
+        }
+        if (ctx.isAgent())
+        {
+            if (!agentId.equals(ctx.getAgentId()))
+            {
+                throw new ServiceException("没有权限访问该代理商数据");
+            }
+            return;
+        }
+        if (ctx.isMerchant())
+        {
+            throw new ServiceException("没有权限访问该代理商数据");
+        }
+    }
 }

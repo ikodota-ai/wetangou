@@ -3,6 +3,7 @@ package com.ruoyi.biz.mapper;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Commission;
 
 /**
@@ -13,6 +14,7 @@ import com.ruoyi.biz.domain.Commission;
  */
 public interface CommissionMapper
 {
+    @IgnoreTenant
     public Commission selectCommissionByCommissionId(Long commissionId);
 
     public List<Commission> selectCommissionList(Commission commission);

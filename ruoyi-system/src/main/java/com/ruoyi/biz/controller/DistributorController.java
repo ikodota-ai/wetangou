@@ -74,7 +74,12 @@ public class DistributorController extends BaseController
     @GetMapping(value = "/{distributorId}")
     public AjaxResult getInfo(@PathVariable("distributorId") Long distributorId)
     {
-        return success(distributorService.selectDistributorByDistributorId(distributorId));
+        Distributor distributor = distributorService.selectDistributorByDistributorId(distributorId);
+        if (distributor != null)
+        {
+            TenantFilterHelper.assertDataScope(distributor.getMerchantId());
+        }
+        return success(distributor);
     }
 
     /**

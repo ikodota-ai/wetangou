@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.MerchantFee;
 
 /**
@@ -18,6 +19,7 @@ public interface MerchantFeeMapper
      * @param feeId 收费主键
      * @return 商户收费
      */
+    @IgnoreTenant
     public MerchantFee selectMerchantFeeByFeeId(Long feeId);
 
     /**

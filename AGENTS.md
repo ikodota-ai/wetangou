@@ -739,3 +739,50 @@ E14 P0 batch (5 controllers: PayBill/Voucher/Withdraw/SettleRecord/SettleAccount
 - **E16 P2（6 controller）**: Product / Category / Store / StoreAlbum / Booking / Banner
 - **E17 P3（3 controller）**: Agreement / MpAuth / MpRelease
 - 收尾后删 `.github/scripts/audit-controller-scope.sh`（使命完成）
+
+## E15 收口（2026-08-14 · 23:00 · commit <待定>）
+
+### 背景
+E14 P0（资金/凭证）完成后，继续 P1（用户/员工/资金流）6 controller。引入新维度：**AgentFee 用 agentId 而非 merchantId**，需在 TenantFilterHelper 加 `assertAgentDataScope`。
+
+### 改动（13 文件 / +50/-6）
+**核心**：`TenantFilterHelper` 加 `assertAgentDataScope(Long agentId)` — agent/merchant 维度新断言
+
+**5 mapper 加 @IgnoreTenant**（AgentFee 之前 session 已加）：
+- MemberMapper / MerchantFeeMapper / DistributorMapper / CommissionMapper / CommissionRuleMapper
+
+**6 controller getInfo 改写**：
+| Controller | 维度 | 辅助方法 |
+|---|---|---|
+| Member | merchantId | assertDataScope |
+| MerchantFee | merchantId | assertDataScope |
+| Distributor | merchantId | assertDataScope |
+| Commission | merchantId | assertDataScope |
+| CommissionRule | merchantId | assertDataScope |
+| **AgentFee** | **agentId** | **assertAgentDataScope** |
+
+### 验证（18/18 PASS）
+```
+E15 P1 batch:
+  Member/Distributor/MerchantFee/Commission/CommissionRule
+    agent001 -> 别人 999201: 500 没有权限
+    agent001 -> 自己 999202: 200 操作成功
+    admin    -> 别人 999201: 200 操作成功 (平台 bypass)
+  AgentFee (新维度)
+    agent001 -> 别人 999201 (aid=101): 500 没有权限访问该缴费数据
+    agent001 -> 自己 999202 (aid=1):   200 操作成功
+    admin    -> 别人 999201:          200 操作成功
+```
+
+### 全套回归（7/7 PASS）
+- smoke-c1/subitem/e10/e4/e11/e13/e14/e15 全 PASS（8 项）
+- mvn test -pl ruoyi-system 10/10
+
+### 业务价值
+- 维度扩展：merchantId 维度已成熟，新增 agentId 维度（AgentFee + 后续 E17 MpRelease 也走 agentId 维度）
+- 模式统一：所有 GET /{id} 端点接入显式 guard，UX 一致「500 没有权限」
+- 6 controller 全部覆盖：Member（手机号/余额）/ Distributor（推客）/ MerchantFee/AgentFee（缴费）/ Commission/Rule（分账）
+
+### 后续 batch 计划
+- **E16 P2（6 controller）**: Product / Category / Store / StoreAlbum / Booking / Banner（业务配置类，敏感度中）
+- **E17 P3（3 controller）**: Agreement / MpAuth / MpRelease（合规/认证类，敏感度低）

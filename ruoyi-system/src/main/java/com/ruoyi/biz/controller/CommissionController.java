@@ -78,7 +78,12 @@ public class CommissionController extends BaseController
     @GetMapping(value = "/{commissionId}")
     public AjaxResult getInfo(@PathVariable("commissionId") Long commissionId)
     {
-        return success(commissionService.selectCommissionByCommissionId(commissionId));
+        Commission commission = commissionService.selectCommissionByCommissionId(commissionId);
+        if (commission != null)
+        {
+            TenantFilterHelper.assertDataScope(commission.getMerchantId());
+        }
+        return success(commission);
     }
 
     /**

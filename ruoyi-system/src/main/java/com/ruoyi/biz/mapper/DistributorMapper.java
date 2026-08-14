@@ -2,6 +2,7 @@ package com.ruoyi.biz.mapper;
 
 import java.util.List;
 import java.util.Map;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Distributor;
 
 /**
@@ -12,6 +13,7 @@ import com.ruoyi.biz.domain.Distributor;
  */
 public interface DistributorMapper
 {
+    @IgnoreTenant
     public Distributor selectDistributorByDistributorId(Long distributorId);
 
     /**

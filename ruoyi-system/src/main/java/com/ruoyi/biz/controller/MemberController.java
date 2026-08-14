@@ -74,7 +74,12 @@ public class MemberController extends BaseController
     @GetMapping(value = "/{memberId}")
     public AjaxResult getInfo(@PathVariable("memberId") Long memberId)
     {
-        return success(memberService.selectMemberByMemberId(memberId));
+        Member member = memberService.selectMemberByMemberId(memberId);
+        if (member != null)
+        {
+            TenantFilterHelper.assertDataScope(member.getMerchantId());
+        }
+        return success(member);
     }
 
     /**

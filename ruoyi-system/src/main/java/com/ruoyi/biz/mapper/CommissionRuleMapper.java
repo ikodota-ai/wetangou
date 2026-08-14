@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.CommissionRule;
 
 /**
@@ -17,6 +18,7 @@ public interface CommissionRuleMapper
      * @param ruleId 佣金规则主键
      * @return 佣金规则
      */
+    @IgnoreTenant
     public CommissionRule selectCommissionRuleByRuleId(Long ruleId);
 
     /**

@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.biz.domain.AgentFee;
 import com.ruoyi.biz.service.IAgentFeeService;
 
@@ -65,7 +66,12 @@ public class AgentFeeController extends BaseController
     @GetMapping(value = "/{feeId}")
     public AjaxResult getInfo(@PathVariable("feeId") Long feeId)
     {
-        return success(agentFeeService.selectAgentFeeByFeeId(feeId));
+        AgentFee agentFee = agentFeeService.selectAgentFeeByFeeId(feeId);
+        if (agentFee != null)
+        {
+            TenantFilterHelper.assertAgentDataScope(agentFee.getAgentId());
+        }
+        return success(agentFee);
     }
 
     /**
