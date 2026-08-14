@@ -137,8 +137,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 and merchant_id in
                 <foreach collection="merchantIds" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
             </if>
-            <if test="beginTime != null and beginTime != ''"> and create_time &gt;= #{beginTime}</if>
-            <if test="endTime != null and endTime != ''"> and create_time &lt;= #{endTime}</if>
+            <if test="beginTime != null"> and create_time &gt;= #{beginTime}</if>
+            <if test="endTime != null"> and create_time &lt;= #{endTime}</if>
         </where>
         group by merchant_id
     </select>
@@ -155,8 +155,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 <foreach collection="merchantIds" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
             </if>
             <if test="merchantIdsEmpty == true"> and 1=0 </if>
-            <if test="beginTime != null and beginTime != ''"> and create_time &gt;= #{beginTime}</if>
-            <if test="endTime != null and endTime != ''"> and create_time &lt;= #{endTime}</if>
+            <if test="beginTime != null"> and create_time &gt;= #{beginTime}</if>
+            <if test="endTime != null"> and create_time &lt;= #{endTime}</if>
         </where>
     </select>
 
