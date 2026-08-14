@@ -16,6 +16,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.biz.domain.MpRelease;
 import com.ruoyi.biz.service.IMpReleaseService;
 import com.ruoyi.biz.api.service.WxOpenService;
@@ -57,7 +58,12 @@ public class MpReleaseController extends BaseController
     @GetMapping(value = "/{releaseId}")
     public AjaxResult getInfo(@PathVariable("releaseId") Long releaseId)
     {
-        return success(mpReleaseService.selectMpReleaseByReleaseId(releaseId));
+        MpRelease mpRelease = mpReleaseService.selectMpReleaseByReleaseId(releaseId);
+        if (mpRelease != null)
+        {
+            TenantFilterHelper.assertDataScope(mpRelease.getMerchantId());
+        }
+        return success(mpRelease);
     }
 
     /**

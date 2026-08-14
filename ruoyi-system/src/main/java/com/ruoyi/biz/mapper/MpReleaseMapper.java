@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.MpRelease;
 
 /**
@@ -18,6 +19,7 @@ public interface MpReleaseMapper
      * @param releaseId 发布主键
      * @return 发布记录
      */
+    @IgnoreTenant
     public MpRelease selectMpReleaseByReleaseId(Long releaseId);
 
     /**

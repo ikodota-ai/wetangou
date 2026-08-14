@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.MpAuth;
 
 /**
@@ -10,6 +11,7 @@ import com.ruoyi.biz.domain.MpAuth;
  */
 public interface MpAuthMapper
 {
+    @IgnoreTenant
     public MpAuth selectMpAuthByAuthId(Long authId);
     public MpAuth selectMpAuthByAppid(String appid);
     public List<MpAuth> selectMpAuthList(MpAuth mpAuth);

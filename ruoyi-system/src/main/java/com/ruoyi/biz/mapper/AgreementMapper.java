@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Agreement;
 
 /**
@@ -17,6 +18,7 @@ public interface AgreementMapper
      * @param agreementId 协议主键
      * @return 协议
      */
+    @IgnoreTenant
     public Agreement selectAgreementByAgreementId(Long agreementId);
 
     /**

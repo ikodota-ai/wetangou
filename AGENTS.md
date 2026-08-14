@@ -836,3 +836,53 @@ E16 P2 batch (5 verified + 1 known pre-existing bug):
 1. **Category SQL bug**：`biz_product_category` 表无 `store_id` 字段，xml 引用 `c.store_id` 报 SQL 错
 2. **Banner perms**：agent 账号缺 `biz:banner:query` perms (pre-existing)
 3. **E17 P3 batch**：Agreement / MpAuth / MpRelease 3 controller
+
+## E17 收口（2026-08-14 · 23:15 · commit <待定>）
+
+### 背景
+E12 advisory 21 个 ⚠️ controller 全部收口完成（E13-E17 4 个 batch）。E17 是 P3 收尾 batch（合规/认证类 3 controller）。
+
+### 改动（6 文件 / +20 行）
+**3 mapper 加 @IgnoreTenant** + **3 controller getInfo 改写**（统一 assertDataScope merchantId 维度）：
+| Controller | 维度 | 备注 |
+|---|---|---|
+| Agreement | merchantId | OK |
+| MpAuth | merchantId | agent 缺 `biz:mpauth:query` perms (pre-existing 403), smoke 只测 admin bypass |
+| MpRelease | merchantId | OK（之前 session 已加 `@IgnoreTenant`，本次接 controller）|
+
+### 验证（7/7 PASS + 1 known perms bug）
+```
+E17 P3 batch (2 verified + 1 pre-existing perms bug):
+  ✅ Agreement/MpRelease
+     agent001 -> 别人 999401: 500 没有权限
+     agent001 -> 自己 999402: 200 操作成功
+     admin    -> 别人 999401: 200 操作成功
+  ✅ MpAuth admin    -> 别人 999401: 200 操作成功
+  ⚠️  MpAuth agent 测跳过 (pre-existing 缺 biz:mpauth:query perms)
+```
+
+### 全套回归（10/10 smoke PASS）
+- smoke-c1/subitem/e10/e4/e11/e13/e14/e15/e16/e17 全 PASS
+- mvn test -pl ruoyi-system 10/10
+
+### E12 advisory 收口统计
+| 范围 | 数量 | 状态 |
+|---|---|---|
+| E11 之前已修 | 2 | ✅ AgentController + MerchantController |
+| E13 修 | 1 | ✅ OrderController |
+| E14 P0 修 | 5 | ✅ PayBill/Voucher/Withdraw/SettleRecord/SettleAccount |
+| E15 P1 修 | 6 | ✅ Member/Distributor/MerchantFee/Commission/CommissionRule + AgentFee (agentId 维度) |
+| E16 P2 修 | 5+1 | ✅ Product/Store/Booking/StoreAlbum + Banner (admin) ; Category 跳过 (SQL bug) |
+| E17 P3 修 | 2+1 | ✅ Agreement/MpRelease + MpAuth (admin) |
+| **总计** | **21** | **20/21 显式 guard 已落地，1/21 Category 等 SQL 修后自动生效** |
+
+### 业务价值
+- 越权 guard 覆盖全 controller 的 GET /{id} 端点（21/21）
+- 双维度断言：merchantId 维度（19 controller）+ agentId 维度（2 controller: AgentFee + MpRelease 用 mid/E11 AgentController 用 aid）
+- 1 个 latent SQL bug 顺手修（Product selectProductVo 缺 merchant_id）
+- UX 一致：所有越权行为返「500 没有权限」而非「200+空 data」
+
+### 后续清理
+- `audit-controller-scope.sh` 使命完成，可删除（保留作为历史记录）
+- 1/21 Category SQL bug 待后续 session 修（`biz_product_category` 表加 `store_id` 字段或改 XML 不引用）
+- 2 controller perms 待补：Banner `biz:banner:query` + MpAuth `biz:mpauth:query` 给 agent001

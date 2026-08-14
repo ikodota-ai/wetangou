@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.biz.domain.MpAuth;
 import com.ruoyi.biz.service.IMpAuthService;
 
@@ -51,7 +52,12 @@ public class MpAuthController extends BaseController
     @GetMapping(value = "/{authId}")
     public AjaxResult getInfo(@PathVariable("authId") Long authId)
     {
-        return AjaxResult.success(mpAuthService.selectMpAuthByAuthId(authId));
+        MpAuth mpAuth = mpAuthService.selectMpAuthByAuthId(authId);
+        if (mpAuth != null)
+        {
+            TenantFilterHelper.assertDataScope(mpAuth.getMerchantId());
+        }
+        return AjaxResult.success(mpAuth);
     }
 
     @PreAuthorize("@ss.hasPermi('biz:mpauth:add')")

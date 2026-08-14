@@ -74,7 +74,12 @@ public class AgreementController extends BaseController
     @GetMapping(value = "/{agreementId}")
     public AjaxResult getInfo(@PathVariable("agreementId") Long agreementId)
     {
-        return success(agreementService.selectAgreementByAgreementId(agreementId));
+        Agreement agreement = agreementService.selectAgreementByAgreementId(agreementId);
+        if (agreement != null)
+        {
+            TenantFilterHelper.assertDataScope(agreement.getMerchantId());
+        }
+        return success(agreement);
     }
 
     /**
