@@ -20,6 +20,8 @@ import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -42,6 +44,9 @@ public class ProductController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Product product)
     {
+        TenantFilterHelper.apply((BaseEntity) product,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Product) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Product) e).getMerchantId());
         startPage();
         List<Product> list = productService.selectProductList(product);
         return getDataTable(fillImageUrls(list));
@@ -55,6 +60,9 @@ public class ProductController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Product product)
     {
+        TenantFilterHelper.apply((BaseEntity) product,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Product) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Product) e).getMerchantId());
         List<Product> list = productService.selectProductList(product);
         ExcelUtil<Product> util = new ExcelUtil<Product>(Product.class);
         util.exportExcel(response, list, "商品数据");
