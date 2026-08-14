@@ -518,3 +518,27 @@ git push origin master
 ### 业务价值
 - C1 跨租户修复 (`7a0299d4`) 现在有自动化防护：谁再删 xml 里的 `merchantIdsEmpty=1=0` guard，单测立刻红
 - 模板就绪：后续加 Commission / Distributor / WxPay 单测，直接 `@SpringBootTest(classes = MinimalTestApp.class)` + `@MapperScan` 模式复制
+
+## E9 推进（2026-08-14 · 21:10 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E9
+- **doc 误判澄清**：8-14 清单说「admin 商品详情无 subitem UI」—— 实装核对发现**详情底部早就有子品搭配 section**：
+  - line 270 `<el-divider>子品搭配（团购 / 组合券包）</el-divider>` 区段
+  - 完整 CRUD UI：`openAddGroup / submitAddGroup / onDeleteGroup / openAddSubitem / submitAddSubitem / onDeleteSubitem / loadSubitemGroups`
+  - 只在 `typeCode === 'GROUPON' || 'COMBO'` 时显示（v-show 条件）
+- **E9 真正缺的工作**：商品**列表**操作列没有快捷入口，运营得「修改」进详情才能看到子品
+- **本次补的改动**：
+  - `ruoyi-ui/src/views/biz/product/index.vue` 操作列「修改」「删除」之间加「子品」按钮
+  - `handleSubitem(row)` 直接复用 `handleUpdate(row)`，打开详情 dialog → 底部子品 section 自动加载
+  - `v-hasPermi="biz:product:query"` 权限（不要求 edit）
+
+### 验证
+- 不需要后端 build，纯 Vue SFC 改动
+- 按钮在 typeCode=GROUPON/COMBO 商品上点开能直接看到子品搭配 section
+- 其他 typeCode 商品点开依然走修改详情流程（子品 section 因 v-if 不显示，但不影响其他编辑）
+
+### E9 完成度 = 100%
+- 列表入口：本次 ✅
+- 详情子品 CRUD：之前已实装 ✅
+- 后端 API：上一轮 session `f874259a` 已实装 ✅
+- 后端 E2E smoke：`smoke-subitem.sh` 4/4 PASSED ✅

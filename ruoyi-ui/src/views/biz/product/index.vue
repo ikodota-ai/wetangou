@@ -116,6 +116,13 @@
           <el-button
             size="mini"
             type="text"
+            icon="el-icon-goods"
+            @click="handleSubitem(scope.row)"
+            v-hasPermi="['biz:product:query']"
+          >子品</el-button>
+          <el-button
+            size="mini"
+            type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
             v-hasPermi="['biz:product:remove']"
@@ -602,6 +609,10 @@ export default {
       this.reset();
       this.title = "添加商品";
       this.open = true;
+    },
+    /** E9: 子品管理入口（打开修改详情，复用底部子品搭配 section）*/
+    handleSubitem(row) {
+      this.handleUpdate(row);
     },
     handleUpdate(row) {
       this.reset();
