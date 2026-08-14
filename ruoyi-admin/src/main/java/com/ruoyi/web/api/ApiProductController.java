@@ -11,6 +11,8 @@ import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.domain.Category;
+import com.ruoyi.biz.domain.ProductSubitemGroup;
+import com.ruoyi.biz.service.IProductSubitemGroupService;
 import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.ICategoryService;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
@@ -30,6 +32,9 @@ public class ApiProductController
 
     @Autowired
     private ICategoryService categoryService;
+
+    @Autowired
+    private IProductSubitemGroupService subitemGroupService;
 
     /**
      * 商品列表（按门店、分类、类型筛选，仅上架）
@@ -60,7 +65,17 @@ public class ApiProductController
             p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
             p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
         }
-        return AjaxResult.success(p);
+        AjaxResult r = AjaxResult.success(p);
+        if (p != null)
+        {
+            String t = p.getTypeCode() == null ? "" : p.getTypeCode();
+            if ("GROUPON".equals(t) || "COMBO".equals(t))
+            {
+                List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
+                r.put("subitemGroups", groups);
+            }
+        }
+        return r;
     }
 
     /**

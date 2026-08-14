@@ -174,6 +174,16 @@ public class ApiBookingController
             vo.put("createTime", signup.getCreateTime());
             // 兼容字段：前端 booking/detail 用 bookingStatus
             vo.put("bookingStatus", signup.getStatus());
+            // 门店信息（BookingMember 已 left join biz_store，字段在实体里）
+            vo.put("storeId", signup.getStoreId());
+            vo.put("storeName", signup.getStoreName());
+            vo.put("storeAddress", signup.getStoreAddress());
+            vo.put("storePhone", signup.getStorePhone());
+            vo.put("storeLatitude", signup.getStoreLatitude());
+            vo.put("storeLongitude", signup.getStoreLongitude());
+            vo.put("serviceName", signup.getServiceName());
+            vo.put("bookingDate", signup.getBookingDate());
+            vo.put("timeSlot", signup.getTimeSlot());
             rows.add(vo);
         }
         return AjaxResult.success(rows);
@@ -207,6 +217,16 @@ public class ApiBookingController
         vo.put("reviewRemark", signup.getReviewRemark());
         vo.put("remark", signup.getRemark());
         vo.put("createTime", signup.getCreateTime());
+        // 门店信息（与 list 同源）
+        vo.put("storeId", signup.getStoreId());
+        vo.put("storeName", signup.getStoreName());
+        vo.put("storeAddress", signup.getStoreAddress());
+        vo.put("storePhone", signup.getStorePhone());
+        vo.put("storeLatitude", signup.getStoreLatitude());
+        vo.put("storeLongitude", signup.getStoreLongitude());
+        vo.put("serviceName", signup.getServiceName());
+        vo.put("bookingDate", signup.getBookingDate());
+        vo.put("timeSlot", signup.getTimeSlot());
         return AjaxResult.success(vo);
     }
 

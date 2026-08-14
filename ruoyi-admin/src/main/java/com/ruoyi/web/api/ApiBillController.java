@@ -93,6 +93,13 @@ public class ApiBillController
         bill.setPayAmount(amount.subtract(discount));
         bill.setStatus("0");
         bill.setCreateTime(new Date());
+        // 支付 mock 模式：跳过店员确认环节，create 后直接置为已确认，
+        // 前端轮询一次 status=1 即触发 prepay/pay，适合自助买单场景。
+        // 生产环境 wx.pay.mockEnabled=false 时仍走老流程（status=0 待确认）。
+        if (wxPayService.isMock())
+        {
+            bill.setStatus("1");
+        }
         payBillService.insertPayBill(bill);
         return AjaxResult.success(bill);
     }

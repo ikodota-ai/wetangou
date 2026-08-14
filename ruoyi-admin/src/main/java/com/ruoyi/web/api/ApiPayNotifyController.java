@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
-import com.ruoyi.biz.api.service.ApiOrderService;
+import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.api.service.WxPayService;
 import com.ruoyi.biz.domain.MemberVoucher;
 import com.ruoyi.biz.domain.Order;
@@ -37,7 +37,7 @@ public class ApiPayNotifyController
     private WxPayService wxPayService;
 
     @Autowired
-    private ApiOrderService apiOrderService;
+    private ApiOrderServiceImpl apiOrderService;
 
     @Autowired
     private IOrderService orderService;

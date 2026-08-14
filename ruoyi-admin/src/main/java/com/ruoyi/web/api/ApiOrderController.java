@@ -13,7 +13,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.biz.api.annotation.LoginRequired;
-import com.ruoyi.biz.api.service.ApiOrderService;
+import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.api.service.WxPayService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Member;
@@ -36,7 +36,7 @@ import com.ruoyi.biz.api.domain.LoginMember;
 public class ApiOrderController
 {
     @Autowired
-    private ApiOrderService apiOrderService;
+    private ApiOrderServiceImpl apiOrderService;
 
     @Autowired
     private IOrderService orderService;

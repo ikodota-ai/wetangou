@@ -36,6 +36,9 @@ public class WxMaConfig
     @Lazy
     private ITenantService tenantService;
 
+    @Autowired
+    private org.springframework.core.env.Environment environment;
+
     public String getAppId()
     {
         return sysConfigService.selectConfigByKey(KEY_APP_ID);
@@ -86,6 +89,11 @@ public class WxMaConfig
      */
     public boolean isMockEnabled(Long merchantId)
     {
+        // 生产环境强制关闭，与无参版本保持一致
+        if (isProductionProfile())
+        {
+            return false;
+        }
         Merchant merchant = getMerchant(merchantId);
         if (merchant != null && StringUtils.isNotEmpty(merchant.getMockEnabled()))
         {
@@ -104,11 +112,28 @@ public class WxMaConfig
 
     /**
      * 是否开启mock登录（无真实凭证时用于本地联调，用code直接作为openid）
+     *
+     * <p>生产环境（{@code spring.profiles.active=prod}）强制返回 false，
+     * 即便 sys_config 被误改也无效；本地 dev/test profile 下才读 sys_config。</p>
      */
     public boolean isMockEnabled()
     {
+        if (isProductionProfile())
+        {
+            return false;
+        }
         String value = sysConfigService.selectConfigByKey(KEY_MOCK_ENABLED);
-        // 未配置时默认关闭，避免误走mock
         return StringUtils.isNotEmpty(value) && "true".equalsIgnoreCase(value.trim());
+    }
+
+    private boolean isProductionProfile()
+    {
+        String[] profiles = environment.getActiveProfiles();
+        if (profiles == null) return false;
+        for (String p : profiles)
+        {
+            if ("prod".equalsIgnoreCase(p)) return true;
+        }
+        return false;
     }
 }

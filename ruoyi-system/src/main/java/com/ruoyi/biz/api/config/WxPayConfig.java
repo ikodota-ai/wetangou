@@ -42,6 +42,9 @@ public class WxPayConfig
     @Lazy
     private ISysConfigService sysConfigService;
 
+    @Autowired
+    private org.springframework.core.env.Environment environment;
+
     public String getMchId()
     {
         return sysConfigService.selectConfigByKey(KEY_MCH_ID);
@@ -75,15 +78,29 @@ public class WxPayConfig
     /**
      * 是否开启mock支付。
      *
-     * <p>所有环境（含 dev/prod）默认关闭；只有显式配置 {@code wx.pay.mockEnabled=true} 时才开启，
-     * 避免本地缺凭证时支付流程误走 mock 被告知「支付成功」实际没落库。
-     * 本地联调请按需临时打开，并确认不会发布到生产环境。</p>
+     * <p>生产环境（{@code spring.profiles.active=prod}）强制返回 false，
+     * 即便 sys_config 被误改为 true 也无效，避免生产误走 mock 导致钱收不到。
+     * 本地联调请在 dev/test profile 下配置 {@code wx.pay.mockEnabled=true}。</p>
      */
     public boolean isMockEnabled()
     {
+        if (isProductionProfile())
+        {
+            return false;
+        }
         String value = sysConfigService.selectConfigByKey(KEY_MOCK_ENABLED);
-        // 未配置时默认关闭 mock；只接受显式 true（兼容历史 true/false 大小写）
         return "true".equalsIgnoreCase(StringUtils.trimToEmpty(value));
+    }
+
+    private boolean isProductionProfile()
+    {
+        String[] profiles = environment.getActiveProfiles();
+        if (profiles == null) return false;
+        for (String p : profiles)
+        {
+            if ("prod".equalsIgnoreCase(p)) return true;
+        }
+        return false;
     }
 
     /**
