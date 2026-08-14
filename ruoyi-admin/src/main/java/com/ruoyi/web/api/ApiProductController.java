@@ -4,17 +4,22 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.ruoyi.common.annotation.Anonymous;
-import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.biz.api.annotation.LoginRequired;
+import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.domain.Category;
 import com.ruoyi.biz.domain.ProductSubitemGroup;
 import com.ruoyi.biz.service.IProductSubitemGroupService;
 import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.ICategoryService;
+import com.ruoyi.common.annotation.Anonymous;
+import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 
 /**
@@ -89,6 +94,52 @@ public class ApiProductController
         query.setStoreId(storeId);
         List<Category> list = categoryService.selectCategoryList(query);
         return AjaxResult.success(list);
+    }
+
+    /**
+     * 商家端-创建商品（P1-2 商家端商品创建）
+     * 需小程序员工登录；从 token 取 merchantId；前端只传 typeCode/价格/面值等业务字段
+     * merchantId/storeId 由后端强制覆盖防越权
+     */
+    @LoginRequired
+    @PostMapping("/add")
+    public AjaxResult add(@RequestBody Product body)
+    {
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        if (me == null) {
+            throw new ServiceException("未登录");
+        }
+        Long merchantId = me.getMerchantId();
+        if (merchantId == null || merchantId <= 0) {
+            throw new ServiceException("当前账号未绑定商户");
+        }
+        if (body == null) {
+            throw new ServiceException("商品数据不能为空");
+        }
+        // 强制覆盖租户字段，前端不可越权
+        body.setMerchantId(merchantId);
+        // 商家端必须指定至少一个适用门店（storeIds 逗号分隔），由 syncPrimaryStore 选第一个作为主门店
+        if (body.getStoreIds() == null || body.getStoreIds().trim().isEmpty()) {
+            throw new ServiceException("请至少选择一个适用门店");
+        }
+        // 默认值兜底
+        if (body.getProductType() == null) body.setProductType("0");
+        if (body.getStatus() == null) body.setStatus("0");
+        if (body.getDelFlag() == null) body.setDelFlag("0");
+        if (body.getSales() == null) body.setSales(0L);
+        if (body.getStock() == null) body.setStock(0L);
+        if (body.getSort() == null) body.setSort(0);
+        if (body.getCreateBy() == null) body.setCreateBy("merchant_" + me.getMemberId());
+
+        int rows = productService.insertProduct(body);
+        if (rows <= 0) {
+            return AjaxResult.error("保存失败");
+        }
+        AjaxResult r = AjaxResult.success();
+        r.put("productId", body.getProductId());
+        r.put("merchantId", body.getMerchantId());
+        r.put("storeId", body.getStoreId());
+        return r;
     }
 
     /**
