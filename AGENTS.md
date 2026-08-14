@@ -35,18 +35,12 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 
 ## 已交付（2026-08-02 全部 11 项已完成）
 
-### 1. 平台 / 代理商 / 商户登录入口分流（剩余项，本次未做）
-- 已交付 11/11 项 plan：sys_user 身份回填 / WxPayService 按商户 / 微信代发布 / 商户筛选列 / @Sensitive 脱敏 / 佣金冷静期 Quartz / 首页 banner 后端化 / 文档同步。
-- 剩余项：登录入口按 userType 路由分流未做（用户未授权），工作量约 0.6 天。
-- 待做：
-  - `LoginUser`/`getInfo` 返回体补 `userType / agentId / merchantId`
-  - `ruoyi-ui/src/views/login.vue` 顶部加「平台 / 代理商 / 商户」三选一 tabs（仅文案提示，不参与鉴权）
-  - `ruoyi-ui/src/store/modules/user.js` 登录成功按 `userType` 跳转：
-    - 平台 → `/index`
-    - 代理商 → `/agent/index`（新建代理商工作台：名下商户 / 缴费记录 / 额度）
-    - 商户 → `/merchant/index`（新建商户工作台：门店 / 订单 / 资金）
-  - 路由 + 菜单按 `userType` 过滤
-- 详情见 doc/多商户与代理商改造方案.md 6. 实施顺序表（11 项 ✅）
+### 1. 平台 / 代理商 / 商户登录入口分流 ✅ 已交付
+- 已交付 12/12 项 plan（含登录入口 userType 路由分流）。
+- 登录分流 commit：`fade76ff feat: 方案C身份路由与菜单权限（3测试账号+SQL脚本+验证报告，0行代码改动）`
+- 落地位置：`ruoyi-ui/src/views/login.vue` 的 `resolveEntryPath()` —— 平台→`/index`、代理商→`/agent/index`、商户→`/merchant/index`
+- 配套：`LoginUser`/`getInfo` 已返 `userType / agentId / merchantId`（`530c5a3b` commit）；路由 + 菜单按 `userType` 过滤（同 fade76ff）。
+- 详情见 doc/多商户与代理商改造方案.md 6. 实施顺序表（12 项 ✅）
 
 ## v2 升级交付（2026-08-14 · 13 commit）
 
@@ -70,7 +64,7 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 - **P1 商家端商品创建**: 10 page 无 typeCode/createProduct 入口，PRD §8 主流程未实现
 - **P1 菜单/权限**: 5 个新 controller 缺对应 sys_menu + biz:productType:* perms SQL
 - **P2 文档对账**: PRD 8 种 vs admin 12 种 vs SQL 11 种三方不一致（建议统一为 11 种）
-- **P2 登录分流**: 8-02 计划的 userType 路由分流仍未做（LoginUser / login.vue / user.js 待改）
+- **P2 登录分流**: ✅ fade76ff commit 已实装 login.vue resolveEntryPath + userType 路由过滤（不是"未做"，AGENTS.md 上方话术已修正）
 - **P3 待清理**: ApiPingController 仅调试用 / miniprogram7/tests/ 决定去留
 
 ### 13 commit 速查
