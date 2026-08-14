@@ -483,3 +483,38 @@ git push origin master
 ### 业务价值
 - 运营可在 admin 端看任一推客的太阳码，截图下发到推广群
 - admin 与小程序端共用同组 qr_*.png 文件，缓存命中避免重复调 wxacode
+
+## E5 推进（2026-08-14 · 21:05 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E5
+- `ruoyi-system/pom.xml` 加 `spring-boot-starter-test`（test scope，JUnit 5 + Mockito + AssertJ 已含）+ `mysql-connector-j`（test scope，生产用 ruoyi-admin 才有）
+- `ruoyi-system/src/test/resources/mybatis/mybatis-config.xml`：从 ruoyi-admin 复制（ruoyi-system 模块本身没这个文件）
+- 新建 `MinimalTestApp`（test scope 内 `@SpringBootApplication` + `@MapperScan("com.ruoyi.biz.mapper")`）
+- 新建 `CommissionMapperTest`：3 个 `@SpringBootTest` 单测真跑 MyBatis + 真 MySQL，验证 C1 跨租户 guard
+
+### 3 个单测（全部 0 mock，跑真 SQL）
+1. `sumByMerchantIds_emptyList_returnsZeroRows` — 传 `Collections.emptyList()` + `merchantIdsEmpty=true`，期望返 0 行
+2. `sumByMerchantIds_nullList_returnsZeroRows` — 传 `null`，期望返 0 行
+3. `sumAgentOverview_emptyList_returnsZeroRows` — 同上空 list 走 `sumAgentOverview`，期望 totalAmount=0
+
+### 反向验证（mutation test，证明单测真有效）
+- 临时删除 `sumByMerchantIds` xml 中 `<if test="merchantIdsEmpty == true"> and 1=0 </if>` guard
+- 跑 mvn test → **2/3 FAIL**（emptyList + nullList 测试都报「expected 0 rows but got N」）
+- 恢复 guard → **3/3 PASS**
+
+### 调试 5 个坑（避免再踩）
+1. spring-boot-starter-test 4.0.6 离线 cache 没 mybatis-spring-boot-test 包 → 放弃 `@MybatisTest` 切片，改用 `@SpringBootTest(classes = MinimalTestApp)` 自建最小入口
+2. RuoYiApplication 在 ruoyi-admin 模块，ruoyi-system 跨模块引不到 → 自建 MinimalTestApp
+3. DataSourceAutoConfiguration exclude 后找不到 DataSourceProperties → 去掉 exclude 让 auto config 全跑
+4. ruoyi-system 不引 druid，`spring.datasource.type=com.alibaba.druid.pool.DruidDataSource` 找不到类 → 删 type 属性
+5. ruoyi-system 不引 mysql-connector → 加 test scope `mysql-connector-j:8.4.0`
+6. mybatis mapper 接口无 `@Mapper` 注解且 RuoYi 没用 `@MapperScan`（生产靠 mybatis-spring-boot-starter auto config 同包扫描）→ 显式 `@MapperScan("com.ruoyi.biz.mapper")`
+
+### 验证
+- `mvn test -pl ruoyi-system`: Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+- 反向验证: 删 guard → 2/3 FAIL（证明测试真能 catch 跨租户 bug 回归）
+- E2E 回归: lint-mybatis 0 errors / smoke-c1 3/3 / smoke-subitem 4/4 / smoke-e10 4/4 / smoke-e4 4/4
+
+### 业务价值
+- C1 跨租户修复 (`7a0299d4`) 现在有自动化防护：谁再删 xml 里的 `merchantIdsEmpty=1=0` guard，单测立刻红
+- 模板就绪：后续加 Commission / Distributor / WxPay 单测，直接 `@SpringBootTest(classes = MinimalTestApp.class)` + `@MapperScan` 模式复制
