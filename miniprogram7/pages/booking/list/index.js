@@ -57,7 +57,10 @@ Page({
   },
   switchTab(e) { this.applyTab(e.currentTarget.dataset.t); },
   applyTab(tab) {
-    const shown = tab === 'all' ? this.data.list : this.data.list.filter((x) => x.group === tab);
+    const base = tab === 'all' ? this.data.list : this.data.list.filter((x) => x.group === tab);
+    // 单条时占满整行（避免 1 条占半宽空着难看），多条时半宽 2 列
+    const span = base.length === 1 ? 'full' : 'half';
+    const shown = base.map((it) => Object.assign({}, it, { _span: span }));
     this.setData({ tab, shown });
   },
   goDetail(e) {

@@ -115,9 +115,7 @@ Page({
       wx.showLoading({ title: '支付中', mask: true })
       setTimeout(() => {
         wx.hideLoading()
-        this.setData({ paying: false })
-        wx.showToast({ title: '支付成功', icon: 'success' })
-        setTimeout(() => this._goPaid(), 800)
+        this.setData({ paying: false, paid: true, paidTip: this.data.type === 'bill' ? '已支付，可在微信支付记录中查看' : '订单已支付完成' })
       }, 600)
       return
     }
@@ -134,9 +132,7 @@ Page({
       signType: p.signType || 'RSA',
       paySign: p.paySign,
       success: () => {
-        this.setData({ paying: false })
-        wx.showToast({ title: '支付成功', icon: 'success' })
-        setTimeout(() => this._goPaid(), 800)
+        this.setData({ paying: false, paid: true, paidTip: this.data.type === 'bill' ? '已支付，可在微信支付记录中查看' : '订单已支付完成' })
       },
       fail: () => {
         this.setData({ paying: false })
@@ -145,12 +141,18 @@ Page({
     })
   },
 
-  _goPaid() {
-    // 跳到对应"已支付"列表或详情
+  onPaidDone() {
+    // 买单：跳回首页（买单入口在首页 tabBar，且微信支付有支付记录可查）
+    // 订单：跳到订单列表
     if (this.data.type === 'bill') {
-      wx.redirectTo({ url: '/pages/bill/index' })
+      wx.switchTab({ url: '/pages/home/index' })
     } else {
       wx.redirectTo({ url: '/pages/order/list/index?type=paid' })
     }
+  },
+
+  _goPaid() {
+    // 兼容旧路径：直接跳
+    this.onPaidDone();
   }
 })

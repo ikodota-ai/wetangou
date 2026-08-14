@@ -8,11 +8,6 @@
       <el-form-item label="小程序AppSecret">
         <el-input v-model="form['wx.miniapp.secret']" placeholder="请输入小程序AppSecret" show-password style="width: 420px" />
       </el-form-item>
-      <el-form-item label="mock登录">
-        <el-switch v-model="miniappMock" active-text="开启（本地联调）" inactive-text="关闭（真实微信）" />
-        <div class="tip">开启后无需真实凭证即可联调；正式使用请关闭。</div>
-      </el-form-item>
-
       <el-divider content-position="left">微信支付配置</el-divider>
       <el-form-item label="商户号">
         <el-input v-model="form['wx.pay.mchId']" placeholder="请输入微信支付商户号" style="width: 420px" />
@@ -32,11 +27,6 @@
       <el-form-item label="支付回调地址">
         <el-input v-model="form['wx.pay.notifyUrl']" placeholder="需公网可访问的 https 地址" style="width: 420px" />
       </el-form-item>
-      <el-form-item label="mock支付">
-        <el-switch v-model="payMock" active-text="开启（本地联调）" inactive-text="关闭（真实支付）" />
-        <div class="tip">开启后未配齐凭证也可走模拟支付；正式使用请关闭。</div>
-      </el-form-item>
-
       <el-form-item>
         <el-button type="primary" @click="submit" v-hasPermi="['biz:wxconfig:edit']">保 存</el-button>
         <el-button @click="load">重 置</el-button>
@@ -57,14 +47,6 @@ export default {
     };
   },
   computed: {
-    miniappMock: {
-      get() { return String(this.form["wx.miniapp.mockEnabled"]) === "true"; },
-      set(v) { this.$set(this.form, "wx.miniapp.mockEnabled", v ? "true" : "false"); }
-    },
-    payMock: {
-      get() { return String(this.form["wx.pay.mockEnabled"]) === "true"; },
-      set(v) { this.$set(this.form, "wx.pay.mockEnabled", v ? "true" : "false"); }
-    }
   },
   created() {
     this.load();

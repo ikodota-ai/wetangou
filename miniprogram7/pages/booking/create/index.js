@@ -43,7 +43,11 @@ Page({
       if (s && s.storeId) {
         this.applyStore(s);
       } else {
-        app.pickNearestStore((st) => this.applyStore(st));
+        // 异步等 pickNearestStore：传 isCreateBookingCreate=true 强制同步占位优先
+        app.pickNearestStore((st) => {
+          if (st && st.storeId) this.applyStore(st);
+          else wx.showToast({ title: '请先选择门店', icon: 'none' });
+        });
       }
     }
   },

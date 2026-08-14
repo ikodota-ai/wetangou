@@ -16,24 +16,48 @@ Page({
   },
   onLoad(opts) {
     this.setData({ id: opts.id });
-    // 优先用 globalData 里的 user.phone（如有）
+    this._refreshUserContact();
+    this.loadProduct(opts.id);
+  },
+
+  // 每次进入/回到本页都重新拉一次会员资料，确保手机号/昵称最新
+  // 解决：首次进入时未授权；授权后从资料页/弹窗返回时 phone 是空
+  onShow() {
+    this._refreshUserContact();
+  },
+
+  // 监听 app.notifyUserUpdate：被其他页（资料页/详情页）授权手机号后即时刷新
+  onUserUpdate(u) {
+    if (u && u.phone) {
+      this.setData({
+        name: u.nickName || this.data.name,
+        phone: u.phone
+      });
+    }
+  },
+
+  _refreshUserContact() {
     const appInst = (typeof getApp === 'function' ? getApp() : null) || {};
     const u = (appInst.globalData && appInst.globalData.user) || {};
+    // 1) 先用缓存值（最快展示）
     if (u.phone) {
-      this.setData({ name: u.nickName || '', phone: u.phone });
+      this.setData({ name: u.nickName || this.data.name || '', phone: u.phone });
     }
-    // 不管有没有，主动拉一次 profile 拿明文（解决 bootUser 还没回的问题）
-    if (appInst.globalData && appInst.globalData.user && appInst.globalData.user.logged) {
+    // 2) 已登录则主动拉一次 profile 拿明文（解决 bootUser 还没回、或别处刚授权落库后未同步）
+    if (u && u.logged) {
       api.getUserInfo().then((r) => {
-        const m = r && (r.data || r);
+        // request() 已解一层 data，这里 r 就是 vo 本身
+        const m = r && (r.phone ? r : (r.data || r));
         if (m && m.phone) {
-          this.setData({ name: m.nickName || m.nickname || this.data.name, phone: m.phone });
+          this.setData({
+            name: m.nickName || m.nickname || this.data.name || '',
+            phone: m.phone
+          });
           appInst.globalData.user.phone = m.phone;
-          appInst.globalData.user.nickName = m.nickName || m.nickname;
+          appInst.globalData.user.nickName = appInst.globalData.user.nickName || m.nickName || m.nickname;
         }
       }).catch(() => {});
     }
-    this.loadProduct(opts.id);
   },
   // 商品信息以后端为准：价格、库存都要真实，避免用本地数据下单后金额不符
   loadProduct(id) {

@@ -18,13 +18,36 @@
   <!-- 标题 + 须知 -->
   <view class="info card">
     <text class="info-name">{{product.name}}</text>
+    <view class="info-row"><text class="lab">类型</text><text class="val type-tag">{{typeText(product.typeCode)}}</text></view>
+    <view class="info-row" wx:if="{{product.typeCode === 'VOUCHER' && product.faceValue}}"><text class="lab">面值</text><text class="val">¥{{product.faceValue}}</text></view>
+    <view class="info-row" wx:if="{{product.typeCode === 'VOUCHER' && product.minConsume && product.minConsume !== '0.00'}}"><text class="lab">最低消费</text><text class="val">¥{{product.minConsume}}</text></view>
+    <view class="info-row" wx:if="{{product.typeCode === 'TIMECARD' && product.totalTimes}}"><text class="lab">总次数</text><text class="val">{{product.totalTimes}} 次</text></view>
+    <view class="info-row" wx:if="{{product.typeCode === 'PERIOD_CARD' && product.periodType}}"><text class="lab">周期</text><text class="val">{{product.periodType === 'MONTH' ? '月卡' : product.periodType === 'QUARTER' ? '季卡' : product.periodType === 'YEAR' ? '年卡' : product.periodType}} {{product.periodCount ? '× ' + product.periodCount : ''}}</text></view>
+    <view class="info-row" wx:if="{{product.typeCode === 'COMBO' && product.totalValue}}"><text class="lab">总价值</text><text class="val">¥{{product.totalValue}}</text></view>
+    <view class="info-row" wx:if="{{product.requireXiaoxin}}"><text class="lab">冷静期</text><text class="val">购买后 {{product.consumeStartDays || 1}} 天起 {{product.consumeValidDays || 360}} 天内有效</text></view>
     <view class="info-row"><text class="lab">须知</text><text class="val">指定时间可用</text></view>
     <view class="info-row"><text class="lab">服务</text><text class="val">免预约</text></view>
     <view class="info-row"><text class="lab">门店</text><text class="val">全部门店适用</text></view>
   </view>
 
   <!-- 套餐详情 -->
-  <view class="card">
+  <view class="card" wx:if="{{product.subitemGroups && product.subitemGroups.length}}">
+    <text class="block-title">套餐详情</text>
+    <view class="subitem-block" wx:for="{{product.subitemGroups}}" wx:key="groupId" wx:for-item="g">
+      <view class="subitem-group-name">
+        <text class="dot">·</text>{{ g.groupName }}
+        <text class="subitem-rule" wx:if="{{g.pickRule && g.pickRule !== 'ALL'}}">{{ g.pickRule }}</text>
+      </view>
+      <view class="subitem-row" wx:for="{{g.subitems}}" wx:key="subitemId" wx:for-item="s">
+        <text class="subitem-name">{{ s.subitemName }}</text>
+        <view class="pkg-right">
+          <text class="pkg-qty" wx:if="{{s.quantity && s.quantity > 1}}">×{{ s.quantity }}</text>
+          <text class="pkg-price">¥{{ s.price }}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="card" wx:elif="{{product.packages && product.packages.length}}">
     <text class="block-title">套餐详情</text>
     <view class="pkg-line"><text class="dot">·</text><text class="pkg-name">{{product.name}}</text></view>
     <view class="pkg-row" wx:for="{{product.packages}}" wx:key="name">
@@ -35,6 +58,7 @@
       </view>
     </view>
   </view>
+
 
   <!-- 购买须知 -->
   <view class="card">
@@ -103,14 +127,14 @@
       <text>商家</text>
     </view>
     <view class="bb-item" bindtap="openShare">
-      <view class="bb-ic ic-share"></view>
+      <view class="bb-ic" style="font-size:32rpx;display:flex;align-items:center;justify-content:center;">⇪</view>
       <text>分享</text>
     </view>
     <view class="bb-item" bindtap="goOrderList">
       <view class="bb-ic ic-order"></view>
       <text>订单</text>
     </view>
-    <view class="buy-btn" bindtap="onBuy">立即购买 ¥{{product.price}}</view>
+    <view class="buy-btn" bindtap="onBuy">{{buyBtnText()}}</view>
   </view>
 
   <!-- 分享卡弹窗 -->
@@ -130,13 +154,13 @@
       <view class="qr"><view class="qr-circle"></view><text class="qr-tip">扫码或长按小程序码</text></view>
       <view class="share-ops">
         <button class="so" open-type="share" data-id="{{product.productId}}" hover-class="none">
-          <view class="so-ic so-friend"></view><text>发送给朋友</text>
+          <view class="so-ic so-friend">💬</view><text>发送给朋友</text>
         </button>
         <button class="so" open-type="favorite" hover-class="none">
-          <view class="so-ic so-fav"></view><text>收藏</text>
+          <view class="so-ic so-fav">★</view><text>收藏</text>
         </button>
         <view class="so" bindtap="onSavePoster">
-          <view class="so-ic so-save"></view><text>保存图片</text>
+          <view class="so-ic so-save">⤓</view><text>保存图片</text>
         </view>
       </view>
     </view>

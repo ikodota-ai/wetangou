@@ -6,24 +6,15 @@
     <view class="tab {{tab==='cancel'?'on':''}}" data-t="cancel" bindtap="switchTab"><text>已取消</text><view class="tab-bar"></view></view>
   </view>
 
-  <view class="content" wx:if="{{shown.length}}">
-    <view class="card item" wx:for="{{shown}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
-      <image class="i-img" src="/assets/img/BookTypeImg.jpg" mode="aspectFill"></image>
-      <view class="i-info">
-        <view class="i-top">
-          <text class="i-ttl">{{item.title}}</text>
-          <text class="i-status">{{item.statusText}}</text>
-        </view>
-        <text class="i-time">预约时间 {{item.time}}</text>
-        <text class="i-time">{{item.storeName}} · {{item.people}}人</text>
-        <view class="i-bot">
-          <text class="i-addr">{{item.address}}</text>
-          <view class="i-ops">
-            <view class="op-ic" data-id="{{item.id}}" catchtap="goLocation"><view class="ic-loc"></view></view>
-            <view class="op-ic" data-id="{{item.id}}" catchtap="callService"><view class="ic-tel"></view></view>
-          </view>
-        </view>
+  <view class="grid" wx:if="{{shown.length}}">
+    <view class="bl-card span-{{item._span || 'half'}}" wx:for="{{shown}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+      <image class="c-img" src="/assets/img/BookTypeImg.jpg" mode="aspectFill"></image>
+      <view class="c-info">
+        <text class="c-ttl">{{item.title}}</text>
+        <text class="c-time">{{item.time}}</text>
+        <text class="c-store">{{item.storeName}} · {{item.people}}人</text>
       </view>
+      <view class="c-status {{item.group}}">{{item.statusText}}</view>
     </view>
   </view>
   <view class="empty" wx:elif="{{loading}}">

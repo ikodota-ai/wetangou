@@ -256,6 +256,6 @@ Page({
   onPaid() {
     this.setData({ status: '2' });
     wx.showToast({ title: '支付成功', icon: 'success' });
-    setTimeout(() => wx.switchTab({ url: '/pages/mine/index/index' }), 1200);
+    setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 1200);
   }
 });

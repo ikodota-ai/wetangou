@@ -1,7 +1,19 @@
 // utils/request.js 网络请求封装
-const { BASE_URL, MOCK_ENABLED, APPID, BUILD_IN_APPID } = require('./config.js');
+const { BASE_URL, MOCK_ENABLED, APPID, BUILD_IN_APPID, probeBaseUrl } = require('./config.js');
 
 // 启动期一次性打印当前生效的 APPID 与构建期 APPID，便于在开发者工具 Console 排查租户解析问题
+
+// === 启动期探测可用的 BASE_URL（异步，结果会更新 _activeBaseUrl） ===
+let _activeBaseUrl = BASE_URL;
+probeBaseUrl().then(function (u) {
+  if (u && u !== _activeBaseUrl) {
+    _activeBaseUrl = u;
+    try { console.log('[miniprogram] probeBaseUrl switched to', u); } catch (e) {}
+  }
+}).catch(function () {});
+
+function _base() { return _activeBaseUrl || BASE_URL; }
+
 try {
   console.log('[miniprogram] APPID =>', APPID, '| BUILD_IN_APPID =>', BUILD_IN_APPID, '| BASE_URL =>', BASE_URL);
 } catch (e) {}
@@ -13,7 +25,7 @@ function toFullUrl(url) {
   if (/^https?:\/\//i.test(u)) return u;
   u = u.replace(/^\/dev-api/, '');
   if (u.charAt(0) !== '/') u = '/' + u;
-  return BASE_URL + u;
+  return _base() + u;
 }
 
 // 富文本图片补全
@@ -26,7 +38,7 @@ function request(url, options = {}) {
   const token = wx.getStorageSync('token');
   return new Promise((resolve, reject) => {
     wx.request({
-      url: BASE_URL + url,
+      url: _base() + url,
       method: options.method || 'GET',
       data: options.data || {},
       header: {
@@ -64,7 +76,7 @@ function uploadFile(url, filePath, name = 'file', formData = {}) {
   const token = wx.getStorageSync('token');
   return new Promise((resolve, reject) => {
     wx.uploadFile({
-      url: BASE_URL + url,
+      url: _base() + url,
       filePath, name, formData,
       header: { 'Authorization': token ? `Bearer ${token}` : '', 'X-App-Id': APPID },
       success: (res) => {
@@ -120,6 +132,22 @@ const api = {
   staffBookingSignupList: () => request('/api/store/staff/booking/signup/list'),
   staffBookingConfirm: (signupId, body) => request('/api/store/staff/booking/confirm/' + signupId, { method: 'POST', data: body || {} }),
   staffBookingReject:  (signupId, body) => request('/api/store/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),
+  // 商家端 v2（基于 sys_user.openid + biz_merchant_staff）
+  merchantStaffLogin: (data) => request('/api/merchant/staff/login', { method: 'POST', data }),
+  merchantStaffWxLogin: (data) => request('/api/merchant/staff/wxLogin', { method: 'POST', data }),
+  merchantStaffAcceptInvite: (data) => request('/api/merchant/staff/acceptInvite', { method: 'POST', data }),
+  merchantStaffBindWx: (data) => request('/api/merchant/staff/bindWx', { method: 'POST', data }),
+  merchantStaffMe: () => request('/api/merchant/staff/me'),
+  merchantStaffProfile: (data) => request('/api/merchant/staff/profile', { method: 'POST', data }),
+  merchantStaffLogout: () => request('/api/merchant/staff/logout', { method: 'POST' }),
+  // 商家工作台（对标旧 /api/store/staff/{home,today/*,booking/*}）
+  merchantStaffHome: () => request('/api/merchant/staff/home'),
+  merchantStaffTodayOrders: () => request('/api/merchant/staff/today/orders'),
+  merchantStaffTodayBills: () => request('/api/merchant/staff/today/bills'),
+  merchantStaffTodayBookings: () => request('/api/merchant/staff/today/bookings'),
+  merchantStaffBookingSignupList: () => request('/api/merchant/staff/booking/signup/list'),
+  merchantStaffBookingConfirm: (signupId, body) => request('/api/merchant/staff/booking/confirm/' + signupId, { method: 'POST', data: body || {} }),
+  merchantStaffBookingReject:  (signupId, body) => request('/api/merchant/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),
   // 预约
   bookingSlots: (params) => request('/api/booking/slots', { data: params }),
   createBooking: (data) => request('/api/booking', { method: 'POST', data }),

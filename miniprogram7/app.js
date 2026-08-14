@@ -9,6 +9,11 @@ App({
     if (this.bootUser) this.bootUser()
     // 启动时拉一次商家公开信息（商家名/客服兜底），登录页/我的页/联系客服都用得到
     if (this.bootMerchant) this.bootMerchant()
+    // 启动时主动预加载默认门店到 globalData.store/stores（不依赖位置授权）：
+    //   1) 用上一次缓存的 storeId 直接拉详情
+    //   2) 否则按商户取第一个门店
+    //   目的：进入任意页面（不一定是首页）都能直接读到门店，避免空 store 阻塞下单/买单/预约等流程
+    this.bootDefaultStore()
   },
   /**
    * 解析太阳码 scene 里的 inviteBy：
@@ -64,115 +69,148 @@ App({
   api,
   toFullUrl,
   /**
-   * 选择最近门店（小程序入口会调用）
-   * 流程：wx.getLocation 拿经纬度 → 调 /api/store/nearest 由服务端按距离排序
-   * 如果用户拒绝授权位置，则默认选该商户第一个门店
-   * 选出门店后顺手加载该门店的商品（保持与旧版本一致，避免首页商品列表为空）
+   * 选择门店（小程序入口会调用）
+   * 策略：「懒加载 + 静默 fuzzy」取位
+   *
+   *   A) 同步占位（立即 callback，**不**等位置）：
+   *      1) globalData.store 已有 → 直接用
+   *      2) wx.storage.lastStoreId → storeDetail 还原
+   *      3) 都没有 → storeList 拿第一个
+   *
+   *   B) 懒加载取位（异步，**只在需要时**才发）：
+   *      4) 如果 globalData.location 已有（之前 fuzzy 拿过）→ 直接用，调 storeNearest
+   *      5) 如果 wx.storage.lastUserLocation 有缓存 → 还原 + 调 storeNearest
+   *      6) 都没有 → 静默调 wx.getFuzzyLocation（用户已授权时不弹；首次未授权弹一次系统框）
+   *      7) 拿到位置 → 持久化 + 调 storeNearest → 升级 store
+   *      8) fuzzy fail（用户拒绝 / 系统未授权）→ 静默，保留同步占位的店
+   *
+   * force=true 时跳过缓存直接 storeList（页面下拉刷新用）
    */
-  /**
-   * 全局用户资料变更通知：所有监听 onUserUpdate 的 page 都会被同步刷新
-   * 用法：app.notifyUserUpdate() 或 app.notifyUserUpdate(user)
-   */
-  notifyUserUpdate(user) {
-    if (user) {
-      this.globalData.user = Object.assign(this.globalData.user || {}, user)
-    }
-    const pages = getCurrentPages && getCurrentPages()
-    if (!pages || !pages.length) return
-    pages.forEach((p) => {
-      if (typeof p.onUserUpdate === 'function') {
-        try { p.onUserUpdate(this.globalData.user) } catch (e) { console.error('[app] onUserUpdate fail', e) }
-      }
-    })
-  },
-
-  /**
-   * 应用启动时如果本地有 token，主动拉一次会员资料，
-   * 把 nickName/avatarUrl/phone 同步到 globalData，让「我的」页立刻显示真实信息
-   */
-  bootUser() {
-    const token = wx.getStorageSync && wx.getStorageSync('token')
-    if (!token) return Promise.resolve()
-    if (this.globalData.user && this.globalData.user.logged) return Promise.resolve()
-    this.globalData.user = Object.assign(this.globalData.user || {}, {
-      memberId: wx.getStorageSync('memberId') || null,
-      token: token,
-      logged: false
-    })
-    return api.getUserInfo().then((u) => {
-      const m = u && (u.data || u)
-      if (m && m.memberId) {
-        this.globalData.user = Object.assign(this.globalData.user, {
-          memberId: m.memberId,
-          openid: m.openid || this.globalData.user.openid || '',
-          nickName: m.nickname || m.nickName || '',
-          avatarUrl: m.avatar || m.avatarUrl || '',
-          phone: m.phone || '',
-          logged: true
-        })
-        wx.setStorageSync('memberId', m.memberId)
-        this.notifyUserUpdate()
-      }
-    }).catch((err) => {
-      console.warn('[app] bootUser FAIL', err)
-      if (err && (err.code === 401 || /401/.test(String(err)))) {
-        wx.removeStorageSync('token')
-        wx.removeStorageSync('memberId')
-      }
-    })
-  },
-
-  /**
-   * 启动时拉取当前商家公开信息（匿名接口），写到 globalData.merchant
-   * 登录页要显示商家名、联系客服要从这里读客服兜底
-   */
-  bootMerchant() {
-    return api.merchantInfo().then((m) => {
-      const data = m && (m.data || m)
-      if (data && data.merchantId) {
-        this.globalData.merchant = Object.assign(this.globalData.merchant, data)
-      }
-    }).catch((err) => {
-      console.warn('[app] bootMerchant FAIL', err)
-    })
-  },
-
-  pickNearestStore(callback) {
-    const useStore = (s) => {
-      if (!s) {
-        callback && callback(null);
+  pickNearestStore(callback, opts) {
+    const useStore = (s, source) => {
+      if (!s || !s.storeId) {
+        if (source === 'sync') callback && callback(null);
         return;
       }
-      this.globalData.store = s;
-      this.globalData.stores = [s];
-      this.globalData.location = { lat: s.latitude, lng: s.longitude };
-      // 顺手把该门店的商品加载到 globalData，供首页 / 商品详情复用
-      this.loadGoods(s.storeId).finally(() => callback && callback(s));
-    };
-    wx.getLocation({
-      type: 'gcj02',
-      success: (loc) => {
-        const { latitude, longitude } = loc;
-        this.globalData.location = { lat: latitude, lng: longitude };
-        api.storeNearest({ lat: latitude, lng: longitude, limit: 5 }).then((res) => {
-          const rows = (res && (res.rows || res.data || res)) || [];
-          const nearest = Array.isArray(rows) && rows.length ? rows[0] : null;
-          if (nearest) return useStore(nearest);
-          // 没按坐标找到，回退到该商户第一个门店
-          api.storeList({ page: 1, pageSize: 1 }).then((res2) => {
-            const r2 = (res2 && (res2.rows || res2.data || res2)) || [];
-            useStore(Array.isArray(r2) && r2.length ? r2[0] : null);
-          }).catch(() => useStore(null));
-        }).catch(() => useStore(null));
-      },
-      fail: () => {
-        // 拒绝授权位置：直接取第一个门店
-        api.storeList({ page: 1, pageSize: 1 }).then((res) => {
-          const rows = (res && (res.rows || res.data || res)) || [];
-          useStore(Array.isArray(rows) && rows.length ? rows[0] : null);
-        }).catch(() => useStore(null));
+      const prev = this.globalData.store
+      const changed = !prev || prev.storeId !== s.storeId || prev.latitude !== s.latitude
+      this.globalData.store = s
+      this.globalData.stores = [s]
+      try { wx.setStorageSync('lastStoreId', s.storeId) } catch (e) {}
+      this.loadGoods(s.storeId).catch(() => {})
+      console.log('[pickNearestStore] source=' + source + ' storeId=' + s.storeId + ' name=' + (s.storeName || s.name || ''))
+      if (changed) callback && callback(s)
+    }
+    const fetchList = (src) => api.storeList({ page: 1, pageSize: 1 }).then((res) => {
+      const rows = (res && (res.rows || res.data || res)) || []
+      useStore(Array.isArray(rows) && rows.length ? rows[0] : null, src)
+    }).catch(() => useStore(null, src + '_fail'))
+    const fetchDetail = (id, src) => api.storeDetail(id).then((res) => {
+      const d = (res && (res.data || res)) || null
+      if (d && d.storeId) useStore(d, src + '_hit')
+      else fetchList(src + '_empty')
+    }).catch(() => fetchList(src + '_fail'))
+
+    // 静默取位：用户已授权时不再弹，未授权时弹一次（之后不再弹）
+    const _reqLoc = function (cb) {
+      if (typeof wx.getFuzzyLocation === 'function') {
+        wx.getFuzzyLocation({
+          type: 'gcj02',
+          success: cb,
+          fail: function () {
+            // fuzzy 失败：fallback 一次 getLocation
+            try {
+              wx.getLocation({
+                type: 'gcj02',
+                success: cb,
+                fail: function () { cb(null) }
+              })
+            } catch (e) {
+              cb(null)
+            }
+          }
+        })
+      } else {
+        try {
+          wx.getLocation({
+            type: 'gcj02',
+            success: cb,
+            fail: function () { cb(null) }
+          })
+        } catch (e) {
+          cb(null)
+        }
       }
-    });
+    }
+
+    // 还原 storage 里的 lastUserLocation
+    if (!this.globalData.location) {
+      const lastLoc = wx.getStorageSync && wx.getStorageSync('lastUserLocation')
+      if (lastLoc && Number.isFinite(lastLoc.lat) && Number.isFinite(lastLoc.lng)) {
+        this.globalData.location = { lat: lastLoc.lat, lng: lastLoc.lng }
+      }
+    }
+
+    // 异步取位 + 查最近（懒加载：仅在 location 还没拿到时才调）
+    const tryLazyLoc = () => {
+      const loc = this.globalData.location
+      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+        // 已有位置 → 直接调 nearest
+        api.storeNearest({ latitude: loc.lat, longitude: loc.lng, limit: 5 }).then((res) => {
+          const rows = (res && (res.rows || res.data || res)) || []
+          const nearest = Array.isArray(rows) && rows.length ? rows[0] : null
+          if (nearest) useStore(nearest, 'nearest')
+          // 没找到：保留同步占位的店
+        }).catch(() => {})  // 失败：静默
+        return
+      }
+      // 缓存全空 → 静默 fuzzy
+      try {
+        _reqLoc((newLoc) => {
+          if (!newLoc) return  // 用户拒绝 / 系统未授权 → 静默
+          const { latitude, longitude } = newLoc
+          this.globalData.location = { lat: latitude, lng: longitude }
+          try { wx.setStorageSync('lastUserLocation', { lat: latitude, lng: longitude, ts: Date.now() }) } catch (e) {}
+          api.storeNearest({ latitude, longitude, limit: 5 }).then((res) => {
+            const rows = (res && (res.rows || res.data || res)) || []
+            const nearest = Array.isArray(rows) && rows.length ? rows[0] : null
+            if (nearest) useStore(nearest, 'nearest')
+          }).catch((e) => {
+            // nearest 失败时 fallback 到 storeList（避免完全没有门店）
+            console.warn('[pickNearestStore] nearest FAIL, fallback to list', e)
+            api.storeList({ page: 1, pageSize: 1 }).then((r2) => {
+              const rs = (r2 && (r2.rows || r2.data || r2)) || []
+              const fb = Array.isArray(rs) && rs.length ? rs[0] : null
+              if (fb) useStore(fb, 'nearest_fail_fallback')
+            }).catch(() => {})
+          })
+        })
+      } catch (e) {
+        // getFuzzyLocation 抛错（极少见）→ 静默
+      }
+    }
+
+    // force=true 模式：跳过缓存直接 list
+    if (opts && opts.force) {
+      fetchList('list_force')
+      return
+    }
+    // 同步占位
+    const cached = this.globalData && this.globalData.store
+    if (cached && cached.storeId) {
+      useStore(cached, 'globalData_placeholder')
+      tryLazyLoc()
+      return
+    }
+    const cachedId = wx.getStorageSync && wx.getStorageSync('lastStoreId')
+    if (cachedId) {
+      fetchDetail(cachedId, 'storage_placeholder')
+      tryLazyLoc()
+      return
+    }
+    // 首启无缓存：先 list 拿一个
+    fetchList('list_placeholder')
+    tryLazyLoc()
   },
   // 加载商品
   loadGoods(storeId) {
@@ -191,6 +229,8 @@ App({
             sold: p.sales || p.sold || 0,
             cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png'
           }));
+          // 刷新当前在场的 home 页 goods 列表（pickNearestStore 同步 callback 时 goods 还是空）
+          this._refreshHomeGoods()
           resolve(this.globalData.goods);
         } else {
           // 商户未配商品时返回空数组，不回退到 mock
@@ -204,5 +244,15 @@ App({
         reject(e);
       });
     });
+  },
+  _refreshHomeGoods() {
+    try {
+      const pages = getCurrentPages && getCurrentPages()
+      if (!pages || !pages.length) return
+      const home = pages.find((p) => p && p.route === 'pages/home/index')
+      if (home && typeof home.setData === 'function') {
+        home.setData({ goods: this.globalData.goods })
+      }
+    } catch (e) {}
   }
 });

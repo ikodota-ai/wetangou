@@ -126,3 +126,12 @@
   background: #b4d4be;
   color: #fff;
 }
+
+
+/* 支付完成态 */
+.paid-view { display: flex; flex-direction: column; align-items: center; padding: 120rpx 64rpx 0; }
+.paid-icon { width: 160rpx; height: 160rpx; line-height: 160rpx; border-radius: 50%; background: #2E7D32; color: #FFFFFF; font-size: 100rpx; text-align: center; margin-bottom: 32rpx; }
+.paid-title { font-size: 40rpx; font-weight: 700; color: #1A1A1A; margin-bottom: 16rpx; }
+.paid-amount { font-size: 56rpx; font-weight: 700; color: #E8734A; margin-bottom: 12rpx; }
+.paid-tip { font-size: 26rpx; color: #999; margin-bottom: 64rpx; }
+.paid-btn { width: 100%; height: 88rpx; line-height: 88rpx; background: var(--color-primary); color: #FFFFFF; border-radius: 44rpx; font-size: 30rpx; font-weight: 600; }

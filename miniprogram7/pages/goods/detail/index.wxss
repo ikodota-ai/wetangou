@@ -94,9 +94,10 @@ button.so { background: transparent; border: none; padding: 0; line-height: 1.2;
 button.so::after { border: none; }
 .so { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
 .so-ic { width: 64rpx; height: 64rpx; border-radius: 50%; background: var(--color-primary); }
-.so-friend { background: #2D6A2D; }
-.so-fav { background: #9B59B6; }
-.so-save { background: #3498DB; }
+.so-friend { background: #2D6A2D; color: #fff; }
+.so-fav { background: #9B59B6; color: #fff; }
+.so-save { background: #3498DB; color: #fff; }
+.so-ic { display:flex; align-items:center; justify-content:center; font-size: 28rpx; line-height: 1; font-weight: bold; }
 .so text { font-size: 22rpx; color: #666; }
 
 /* 授权 */
@@ -128,3 +129,10 @@ button.so::after { border: none; }
 .empty-actions { display: flex; gap: 24rpx; margin-top: 32rpx; }
 .empty-actions .err-btn { width: 200rpx; height: 80rpx; background: #FFFFFF; border: 2rpx solid #E0E0E0; border-radius: 12rpx; font-size: 28rpx; color: #1A1A1A; }
 .empty-actions .err-btn.primary { background: var(--color-primary); border-color: var(--color-primary); color: #FFFFFF; }
+.type-tag { color: #3A6B35; font-weight: 600; }
+.subitem-block { padding: 12rpx 0; border-bottom: 1rpx solid #F0F0F0; }
+.subitem-block:last-child { border-bottom: none; }
+.subitem-group-name { font-size: 28rpx; color: #1A1A1A; font-weight: 600; margin-bottom: 8rpx; }
+.subitem-rule { font-size: 22rpx; color: #B26A00; background: #FFF7E6; padding: 2rpx 10rpx; border-radius: 6rpx; margin-left: 8rpx; }
+.subitem-row { display: flex; align-items: center; justify-content: space-between; padding: 6rpx 0 6rpx 24rpx; font-size: 26rpx; color: #444; }
+.subitem-name { flex: 1; }

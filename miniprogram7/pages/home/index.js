@@ -1,5 +1,6 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
+const { haversineKm, formatDistance } = require('../../utils/util.js');
 
 Page({
   data: {
@@ -16,37 +17,72 @@ Page({
     serviceHours: '',
     isStoreService: false
   },
+  _lastBannerStoreId: null,
+  _bannerToastShown: false,
+  _firstLoadDone: false,
+  _slowTimer: null,
   onLoad() {
+    // 3.5s 内还没拿到 store → 触发降级（避免白板卡死）
+    this._slowTimer = setTimeout(() => {
+      if (!this.data.store || !this.data.store.storeId) {
+        console.warn('[home] 3.5s 仍无 store，触发降级');
+        this.setData({ store: { name: '门店加载中…' } });
+      }
+    }, 3500);
     try {
       const sys = wx.getSystemInfoSync();
       this.setData({ statusBarHeight: sys.statusBarHeight || 20 });
     } catch (e) {}
-    // 加载商品
+    // 始终调 pickNearestStore：
+    //   - 有缓存 → 立刻 callback 渲染（占位）
+    //   - 同时异步取位 + 查最近门店，nearest 拿到后 callback 升级 store
+    // 两种情况都走 loadData，统一收口
     this.loadData();
   },
+  onUnload() { if (this._slowTimer) { clearTimeout(this._slowTimer); this._slowTimer = null; } },
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 });
     }
   },
+  // 把后端 store 字段转成 wxml 用的视图模型（name/hours/distanceText）
+  _compatStoreView(s) {
+    if (!s) return {}
+    const loc = (app.globalData && app.globalData.location) || null
+    let _distKm = null
+    if (s.distance != null && s.distance !== '') {
+      // 后端字段单位约定为米；统一转成 km 传给 formatDistance
+      const d = Number(s.distance)
+      _distKm = d / 1000
+    } else if (loc && loc.lat != null && loc.lng != null && s.latitude != null && s.longitude != null) {
+      _distKm = haversineKm(loc.lat, loc.lng, s.latitude, s.longitude)
+    } else {
+      // 没有位置时，距离显示 formatDistance 的 ""（wxml fallback "距离未知"）
+      // 不主动取位（懒加载策略：避免频繁弹系统授权框）
+    }
+    return Object.assign({}, s, {
+      name: s.storeName || s.name || '',
+      hours: s.businessHours || s.hours || '',
+      logo: s.logo ? toFullUrl(s.logo) : '',
+      distanceText: formatDistance(_distKm) || '计算中…'
+    })
+  },
+
   loadData() {
+    let lastStoreId = null
     app.pickNearestStore((store) => {
+      if (!store) {
+        console.warn('[home] pickNearestStore returned null')
+        return
+      }
       console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300))
-      // 后端字段是 storeName / businessHours，WXML 用了 name / hours，这里做一次兼容
-      const _distRaw = store && store.distance != null ? Number(store.distance) : null
-      const _distTxt = _distRaw == null ? '' : (_distRaw >= 1000 ? (_distRaw/1000).toFixed(1) + 'km' : Math.round(_distRaw) + 'm')
-      const viewStore = store ? Object.assign({}, store, {
-        name: store.storeName || store.name || '',
-        hours: store.businessHours || store.hours || '',
-        logo: store.logo ? toFullUrl(store.logo) : '',
-        distanceText: _distTxt
-      }) : {}
+      // 距离计算走 _compatStoreView（包含「计算中…」占位 + 缺位置时后台异步补位）
+      const viewStore = this._compatStoreView(store)
       // 客服信息：门店优先，商家兜底。
-      // hasStore* 标记用于 UI 提示"门店客服 / 商家统一客服"，避免被误认为 UI 兜底
       const m = (app.globalData && app.globalData.merchant) || {}
-      const _storePhone = store && (store.servicePhone || store.phone)
-      const _storeQr = store && store.serviceQrcode
-      const _storeSvcHours = store && store.serviceHours
+      const _storePhone = store.servicePhone || store.phone
+      const _storeQr = store.serviceQrcode
+      const _storeSvcHours = store.serviceHours
       const sp = _storePhone || m.servicePhone || ''
       const sq = _storeQr || m.serviceQrcode || ''
       const sh = _storeSvcHours || m.serviceHours || m.businessHours || ''
@@ -58,11 +94,12 @@ Page({
         serviceHours: sh,
         isStoreService: !!_storePhone || !!_storeSvcHours || !!_storeQr
       })
-      if (store && store.storeId) {
-        this.loadBanners(store.storeId);
-        this.loadFacilities(store.storeId);
-      } else {
-        console.warn('[home] store is null, skip banners/facilities');
+      // 只在 storeId 变化时重拉 banners / facilities（占位 → 真实最近切换时才刷）
+      if (store.storeId !== lastStoreId) {
+        lastStoreId = store.storeId
+        this._lastBannerStoreId = null
+        this.loadBanners(store.storeId)
+        this.loadFacilities(store.storeId)
       }
     });
   },
@@ -71,6 +108,8 @@ Page({
   // merchantId 从 app.globalData.merchant.merchantId 取（按当前登录商户过滤）
   loadBanners(storeId) {
     const merchantId = (app.globalData && app.globalData.merchant && app.globalData.merchant.merchantId) || 0
+    if (this._lastBannerStoreId === storeId) return
+    this._lastBannerStoreId = storeId
     api.bannerList({ position: 'home', merchantId: merchantId }).then((res) => {
       const rows = (res && (res.data || res.rows || res)) || [];
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -82,10 +121,14 @@ Page({
       if (banners.length === 0) {
         throw new Error('当前商户所有 banner 缺 imageUrl，请在后台【门店商品 → 轮播图管理】检查图片字段')
       }
+      this._bannerToastShown = false
       this.setData({ banners });
     }).catch((err) => {
       console.error('[home] loadBanners FAIL', err)
-      wx.showToast({ title: '首页 banner 加载失败：' + ((err && (err.msg || err.message)) || '网络异常'), icon: 'none', duration: 4000 })
+      if (!this._bannerToastShown) {
+        this._bannerToastShown = true
+        wx.showToast({ title: '首页 banner 加载失败：' + ((err && (err.msg || err.message)) || '网络异常'), icon: 'none', duration: 4000 })
+      }
       // 保持 banners=[]（空数组），让 swiper 显示空白以便排查
       this.setData({ banners: [] })
     });

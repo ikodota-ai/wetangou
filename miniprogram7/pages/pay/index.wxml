@@ -1,6 +1,6 @@
 <view class="page">
   <view class="head">
-    <text class="h-name">{{store.name || '门店加载中...'}}</text>
+    <text class="h-name">{{store.name || (_storeLoadTimedOut ? '门店加载失败' : '门店加载中…')}}</text>
     <text class="h-addr">{{store.address}}</text>
   </view>
 

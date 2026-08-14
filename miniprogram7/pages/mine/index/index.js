@@ -19,6 +19,10 @@ Page({
   },
 
   onShow() {
+    // 同步 tabBar 选中态
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 3 });
+    }
     const staff = wx.getStorageSync('staffUser') || {}
     this.setData({ staffActive: !!(staff && staff.userType === 'store') })
     this.syncUser()
@@ -57,6 +61,15 @@ Page({
       wx.reLaunch({ url: '/pages/staff/home/index' })
     } else {
       wx.navigateTo({ url: '/pages/staff/login/index' })
+    }
+  },
+  goMerchantLogin() {
+    // 商家端 v2：已登录（userType=merchant）进工作台，否则进登录页
+    const staff = wx.getStorageSync('staffUser') || {}
+    if (staff && staff.userType === 'merchant' && wx.getStorageSync('token')) {
+      wx.reLaunch({ url: '/pages/merchant/home/index' })
+    } else {
+      wx.navigateTo({ url: '/pages/merchant/login/index' })
     }
   },
   goLogin() {

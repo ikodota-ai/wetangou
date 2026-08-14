@@ -41,7 +41,9 @@ Page({
       // 未成为推客时后端不返回 data，据此展示加入入口
       const d = res && res.data;
       if (!d || !d.distributorId) {
-        this.setData({ joined: false, loading: false });
+        // 兜底：如果是 onJoin 后立即触发，d 可能还是旧快照（中心接口异步、缓存或 join 与 center 跨 token）
+        // 任何情况下都不强行清 joined（后端可能临时没返回 distributorId，但 join 已成功）
+        this.setData({ loading: false });
         return;
       }
       this.setData({
@@ -59,8 +61,9 @@ Page({
       this.loadOrders();
       this.loadFans();
     }).catch((err) => {
+      // 网络/接口失败：保留已设的 joined 状态，仅清 loading
       this.setData({ loading: false });
-      wx.showToast({ title: (err && (err.msg || err.message)) || '加载失败', icon: 'none' });
+      console.warn('[loadCenter] FAIL =>', JSON.stringify(err));
     });
   },
   loadOrders() {
@@ -100,7 +103,12 @@ Page({
     });
   },
   goPoster() {
-    if (!this.data.joined) {
+    let joined = this.data.joined;
+    if (!joined) {
+      // fallback：onShow → loadCenter 可能没拉到 distributorId 但 join 已成功
+      try { joined = !!wx.getStorageSync('promoterJoinedFlag'); } catch (e) {}
+    }
+    if (!joined) {
       return wx.showToast({ title: '请先成为推客', icon: 'none' });
     }
     wx.navigateTo({ url: '/pages/promoter/poster/index' });
@@ -113,15 +121,43 @@ Page({
     }
     this.setData({ joining: true });
     wx.showLoading({ title: '提交中', mask: true });
-    api.joinPromoter().then(() => {
+    console.log('[onJoin] start, token=', wx.getStorageSync('token'));
+    api.joinPromoter().then((res) => {
+      console.log('[onJoin] success =>', JSON.stringify(res));
       wx.hideLoading();
       this.setData({ joining: false });
       wx.showToast({ title: '已成为推客', icon: 'success' });
-      this.loadCenter();
+      // 立即 setData 强制刷新界面（不依赖 loadCenter 异步返回 + 不依赖 distributorId 字段）
+      // 后端 join 接口通常只返 {code:200}，distributorId 要等 loadCenter 拉
+      this.setData({ joined: true });
+      // 持久化标志：即便 loadCenter 后续被 onShow 触发且没拉到 distributorId，
+      // 也能保证 goPoster 允许进入（避免「已成为推客」后仍被「请先成为推客」挡）
+      try { wx.setStorageSync('promoterJoinedFlag', true); } catch (e) {}
+      const d = res && (res.data || res);
+      if (d && d.distributorId) {
+        this.setData({
+          stat: {
+            totalCommission: formatMoney(d.totalCommission),
+            withdrawAmount: formatMoney(d.withdrawAmount),
+            availableAmount: formatMoney(d.availableAmount),
+            withdrawingAmount: formatMoney(d.withdrawingAmount),
+            frozenAmount: formatMoney(d.frozenAmount)
+          }
+        });
+      }
+      // 200ms 后再调 loadCenter 拉详细数据（避免 onJoin 的 setData 被 loadCenter 的 false 覆盖）
+      setTimeout(() => this.loadCenter(), 200);
     }).catch((err) => {
+      console.error('[onJoin] FAIL =>', JSON.stringify(err));
       wx.hideLoading();
       this.setData({ joining: false });
-      wx.showToast({ title: (err && (err.msg || err.message)) || '加入失败', icon: 'none' });
+      const msg = (err && (err.msg || err.message || err.errMsg)) || '加入失败';
+      // 完整 dump 到弹窗便于排查
+      wx.showModal({
+        title: '加入推客失败',
+        content: msg + '\n\n' + JSON.stringify(err).slice(0, 400),
+        showCancel: false
+      });
     });
   },
   switchTab(e) { this.setData({ tab: e.currentTarget.dataset.t }); },

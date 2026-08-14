@@ -47,10 +47,11 @@ Page({
         console.log('[goods/detail] productDetail response =>', JSON.stringify(res).slice(0, 500));
         const d = (res && res.data) || res || null;
         const p = (d && (d.data || d)) || null;
+        const groups = d && d.subitemGroups ? d.subitemGroups : (p && p.subitemGroups) || []
         if (p && p.productId) {
           let normalized;
           try {
-            normalized = this.normalize(p);
+            normalized = this.normalize(p, groups);
           } catch (e) {
             console.error('[goods/detail] normalize FAIL', e, p);
             this.setData({ state: 'error', errorMsg: '数据规范化失败: ' + e.message });
@@ -72,14 +73,36 @@ Page({
         this.setData({ state: 'error', errorMsg: msg });
       });
   },
-  normalize(p) {
+  normalize(p, groups) {
     const images = p.images
       ? (Array.isArray(p.images) ? p.images : String(p.images).split(','))
       : (p.cover ? [p.cover] : []);
+    const typeCode = p.typeCode || (p.productType === '1' ? 'BILL' : p.productType === '2' ? 'BOOKING' : 'GROUPON');
+    const subitemGroups = Array.isArray(groups) ? groups.map(g => ({
+      groupId: g.groupId,
+      groupName: g.groupName,
+      pickRule: g.pickRule || 'ALL',
+      sort: g.sort || 0,
+      subitems: Array.isArray(g.subitems) ? g.subitems.map(s => ({
+        subitemId: s.subitemId,
+        subitemName: s.subitemName,
+        quantity: s.quantity || 1,
+        price: s.price != null ? String(s.price) : '0.00'
+      })) : []
+    })) : [];
     return {
       ...p,
       name: p.productName || p.name,
       price: p.price != null ? String(p.price) : '0.00',
+      typeCode: typeCode,
+      faceValue: p.faceValue != null ? String(p.faceValue) : '',
+      minConsume: p.minConsume != null ? String(p.minConsume) : '',
+      totalTimes: p.totalTimes || 0,
+      periodType: p.periodType || '',
+      periodCount: p.periodCount || 0,
+      totalValue: p.totalValue != null ? String(p.totalValue) : '',
+      requireXiaoxin: p.requireXiaoxin || 0,
+      subitemGroups: subitemGroups,
       sold: p.sales || p.sold || 0,
       cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',
       images: images.filter((u) => !!u).map((u) => toFullUrl(u)),
@@ -104,6 +127,25 @@ Page({
       return;
     }
     wx.navigateTo({ url: '/pages/order/submit/index?id=' + this.data.id });
+  },
+  typeText(code) {
+    return ({
+      GROUPON: '团购套餐', VOUCHER: '代金券', TIMECARD: '次卡',
+      STORED_CARD: '储值卡', PERIOD_CARD: '周期卡', HUIXIANG_CARD: '惠享卡',
+      COMBO: '组合券包', BILL: '到店买单', BOOKING: '预约服务',
+      PRESALE: '预售券', PICKUP_VOUCHER: '提货券'
+    })[code] || (code || '团购')
+  },
+  buyBtnText() {
+    const t = this.data.product && this.data.product.typeCode
+    if (t === 'BILL') return '买单 ¥' + (this.data.product.price || '0.00')
+    if (t === 'BOOKING') return '立即预约 ¥' + (this.data.product.price || '0.00')
+    if (t === 'VOUCHER') return '购买代金券 ¥' + (this.data.product.price || '0.00')
+    if (t === 'TIMECARD') return '购买次卡 ¥' + (this.data.product.price || '0.00')
+    if (t === 'STORED_CARD') return '充值 ¥' + (this.data.product.price || '0.00')
+    if (t === 'PERIOD_CARD') return '开通周期卡 ¥' + (this.data.product.price || '0.00')
+    if (t === 'COMBO') return '购买组合券包 ¥' + (this.data.product.price || '0.00')
+    return '立即购买 ¥' + (this.data.product.price || '0.00')
   },
   onGotPhone(e) {
     if (e.detail.errMsg && e.detail.errMsg.indexOf('ok') !== -1) {
@@ -135,10 +177,12 @@ Page({
     const m = (getApp().globalData && getApp().globalData.merchant) || {};
     const name = (p && (p.name || p.productName)) || '好物';
     const price = (p && p.price) || '';
+    const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
+    const shareImg = rawImg ? toFullUrl(rawImg) : '';
     return {
       title: name + (price ? ' ¥' + price : '') + ' | ' + (m.merchantName || '洞天团购'),
       path: '/pages/goods/detail/index?id=' + id,
-      imageUrl: (p && (p.images && p.images[0] || p.cover)) || ''
+      imageUrl: shareImg
     };
   },
   /**
@@ -150,10 +194,12 @@ Page({
     const m = (getApp().globalData && getApp().globalData.merchant) || {};
     const name = (p && (p.name || p.productName)) || '好物';
     const price = (p && p.price) || '';
+    const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
+    const shareImg = rawImg ? toFullUrl(rawImg) : '';
     return {
       title: name + (price ? ' ¥' + price : '') + ' | ' + (m.merchantName || '洞天团购'),
       query: 'id=' + ((p && (p.productId || p.id)) || this.data.id || ''),
-      imageUrl: (p && (p.images && p.images[0] || p.cover)) || ''
+      imageUrl: shareImg
     };
   },
   /**
@@ -162,9 +208,10 @@ Page({
    */
   onAddToFavorites() {
     const p = this.data.product;
+    const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
     return {
       title: (p && (p.name || p.productName)) || '好物',
-      imageUrl: (p && (p.images && p.images[0] || p.cover)) || '',
+      imageUrl: rawImg ? toFullUrl(rawImg) : '',
       query: 'id=' + ((p && (p.productId || p.id)) || this.data.id || '')
     };
   },

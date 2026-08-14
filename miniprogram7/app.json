@@ -32,7 +32,17 @@
     "pages/staff/booking/index",
     "pages/staff/order/index",
     "pages/staff/me/index",
-    "pages/staff/history/index"
+    "pages/staff/history/index",
+    "pages/merchant/login/index",
+    "pages/merchant/home/index",
+    "pages/merchant/scan/index",
+    "pages/merchant/verify/index",
+    "pages/merchant/bill/index",
+    "pages/merchant/booking/index",
+    "pages/merchant/order/index",
+    "pages/merchant/me/index",
+    "pages/merchant/history/index",
+    "pages/merchant/profile/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#3A6B35",

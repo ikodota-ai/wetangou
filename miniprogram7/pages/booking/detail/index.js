@@ -20,6 +20,7 @@ Page({
   },
   loadDetail() {
     api.bookingSignupDetail(this.data.signupId).then((res) => {
+      console.log('[booking/detail] raw =>', JSON.stringify(res).slice(0, 400));
       const r = (res && (res.data || res)) || {};
       const cancelled = r.status === '1' || r.bookingStatus === '3';
       this.setData({

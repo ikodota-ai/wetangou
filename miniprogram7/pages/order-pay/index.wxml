@@ -4,8 +4,16 @@
     <view class="amount-row">
       <text class="amount-symbol">¥</text>
       <text class="amount-value">{{amount}}</text>
-    </view>
-    <text class="amount-tip">请确认订单金额，点击支付后将调起微信支付</text>
+    
+  <!-- 支付完成视图 -->
+  <view class="paid-view" wx:if="{{paid}}">
+    <view class="paid-icon">✓</view>
+    <text class="paid-title">支付成功</text>
+    <text class="paid-amount">¥{{amount}}</text>
+    <text class="paid-tip">{{paidTip || '订单已支付'}}</text>
+    <button class="paid-btn" bindtap="onPaidDone">完成</button>
+  </view>
+</view>    <text class="amount-tip">请确认订单金额，点击支付后将调起微信支付</text>
   </view>
 
   <!-- 订单信息卡 -->

@@ -13,7 +13,10 @@
 
   <view class="content">
     <view class="store-card card">
-      <text class="s-name">{{store.name || '门店加载中'}}</text>
+      <view class="s-name-row">
+        <text class="s-name">{{store.name || (_storeLoadTimedOut ? '门店加载失败' : '门店加载中…')}}</text>
+        <text class="s-retry" wx:if="{{_storeLoadTimedOut}}" bindtap="retryStore">↻ 重新加载</text>
+      </view>
       <view class="s-hours" wx:if="{{store.hours}}">营业时间：{{store.hours}}</view>
       <view class="s-addr">
         <view class="addr-txt">

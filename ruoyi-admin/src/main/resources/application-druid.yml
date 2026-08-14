@@ -59,3 +59,11 @@ spring:
                 wall:
                     config:
                         multi-statement-allow: true
+            # ====== 补充 DruidProperties 必需字段 ======
+            # 防止 @Value 注入失败导致启动崩溃
+            poolPreparedStatements: true
+            maxPoolPreparedStatementPerConnectionSize: 20
+            filters: stat,wall
+            loginUsername: druid
+            loginPassword: druid123
+            ip:
