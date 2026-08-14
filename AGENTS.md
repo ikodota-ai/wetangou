@@ -584,3 +584,39 @@ git push origin master
 - API 响应体从「双写 + 重复数据」瘦身：原本返 2 份 subitemGroups（顶层 + data 内），现在只 1 份
 - 前端兼容代码（`d.subitemGroups || d.data.subitemGroups`）可后续清理
 - 彻底消除"data 子对象"歧义：响应顶层 = 业务字段，data = AjaxResult 标准包装
+
+## E11 推进（2026-08-14 · 21:30 · commit <待定>）
+
+### 主动审计发现
+对照 `MerchantController.getInfo` 调 `merchantService.checkMerchantDataScope(merchantId)` 的同源模式，
+发现 `AgentController.getInfo` **没有**调对应 guard —— 任何登录用户都能查任意代理商详情（越权读）。
+
+### 修复
+- `IAgentService` 加 `public void checkAgentDataScope(Long agentId)` 接口
+- `AgentServiceImpl.checkAgentDataScope` 从 `private` 改 `public` + 加 `@Override`
+- `AgentController.getInfo` 加 `agentService.checkAgentDataScope(agentId)` 双保险
+
+### 实际防护层次
+- 核心防护在 service 层（`selectAgentByAgentId` line 33 已调 guard）— 任何 controller 调此 service 都被保护
+- controller 层的 guard 是「双保险」— 让 API 端点的安全策略显式可见
+
+### 验证（jar PID 64110）
+- **E2E smoke** `.github/scripts/smoke-e11.sh`: 6/6 PASSED
+  - A agent001 查自己 (1) → 200
+  - B agent001 查别人 (101) → 500
+  - C agent002 查自己 (101) → 200
+  - D agent002 查别人 (1) → 500
+  - E admin 查任意 → 200（平台放行）
+  - F no auth → 401
+- **JUnit 单测** `AgentServiceImplTest`: 7/7 PASSED
+  - 5 个 checkAgentDataScope 直接测（null context / null agentId / platform / agent self / agent other）
+  - 2 个 selectAgentByAgentId 集成测（self / other）— 防 service 内部 guard 回归
+- **反向验证**：
+  - 注释 `selectAgentByAgentId` line 33 内部 `checkAgentDataScope(agentId)` → `selectAgentByAgentId_other_throws` FAIL（1/7）
+  - 恢复 → 7/7 PASS
+- 回归：lint-mybatis 0 / smoke-c1 3/3 / smoke-subitem 4/4 / smoke-e10 4/4 / smoke-e4 4/4
+
+### 业务价值
+- 防越权读代理商信息（其他代理商的 contact / phone / paidAmount 等敏感字段）
+- 同源防御模型（merchant 端 + agent 端）一致
+- 单测 + E2E smoke 双层防护：service 层改坏 → 单测红；controller 改坏 → smoke 红

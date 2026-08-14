@@ -49,4 +49,10 @@ public interface IAgentService
      * @return 结果
      */
     public int deleteAgentByAgentIds(Long[] agentIds);
+
+    /**
+     * 校验当前账号是否有权访问该代理商数据
+     * 平台 / 未登录 / agentId 为空 → 放行；代理商账号只能访问自己
+     */
+    public void checkAgentDataScope(Long agentId);
 }

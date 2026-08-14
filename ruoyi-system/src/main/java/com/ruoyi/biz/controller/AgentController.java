@@ -65,6 +65,8 @@ public class AgentController extends BaseController
     @GetMapping(value = "/{agentId}")
     public AjaxResult getInfo(@PathVariable("agentId") Long agentId)
     {
+        // E11: 防越权读其他代理商信息（对标 MerchantController.getInfo 的 checkMerchantDataScope）
+        agentService.checkAgentDataScope(agentId);
         return success(agentService.selectAgentByAgentId(agentId));
     }
 

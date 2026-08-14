@@ -139,8 +139,10 @@ public class AgentServiceImpl implements IAgentService
 
     /**
      * 代理商账号只能访问自己的数据
+     * E11: 提升为 public 供 AgentController.getInfo 调用，防越权读其他代理商信息
      */
-    private void checkAgentDataScope(Long agentId)
+    @Override
+    public void checkAgentDataScope(Long agentId)
     {
         TenantContext context = TenantContextHolder.get();
         if (context == null || context.isPlatform() || agentId == null)
