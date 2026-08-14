@@ -432,3 +432,26 @@ git push origin master
 ### 验证
 - 当前 jar PID 57061 由该模板起：captcha 200 / smoke-c1 3/3 / smoke-subitem 4/4
 - 文档一致：与 AGENTS.md「v2 升级交付」段提到的「spring-boot 4.0.6 + Java 25，profile=druid」匹配
+
+## E10 推进（2026-08-14 · 20:45 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E10
+- `ApiDistributorController.qrcode()` 加文件层缓存：按 `qr_<memberId>_*.png` 命中直接返 URL + `cached:true`；miss 才调 `wxMaService.getWxaCodeUnlimited` 落盘。
+- 选最近 mtime 那张（兼容历史遗留的多张同 memberId 文件）。
+- 响应体增 `cached:boolean` 字段，前端可识别是命中还是现生成。
+
+### 根因
+- 历史：member 1070 已存 2 张 `qr_1070_*.png`（时间戳 8/8 03:39 + 04:01），证明 wxacode 配额被重复消耗。
+- 文件名带 `System.currentTimeMillis()` 永远不命中——改成「按 baseName 列表」扫描。
+
+### 验证（jar PID 57533）
+- `.github/scripts/smoke-e10.sh`: 4/4 PASSED
+  - B 首次：cached=false + 落盘 1 个 qr_1076_*.png
+  - C 二次：cached=true + URL 完全一致 + 文件数稳定 (1)
+  - D no auth: body.code=401
+- 回归：smoke-c1 3/3 / smoke-subitem 4/4 / lint-mybatis 0 errors
+
+### 业务收益
+- 推客「我的海报」每次海报渲染不重复调 wxacode 接口，节省微信侧配额
+- 同一 member 跨设备/跨请求稳定返同一 URL，海报缓存可生效
+- 文件层（不上 Redis）零额外依赖

@@ -294,18 +294,43 @@ public class ApiDistributorController
         }
         Long merchantId = member.getMerchantId() == null ? 1L : member.getMerchantId();
         String scene = "distributor:" + merchantId + ":" + member.getMemberId();
-        byte[] bytes = wxMaService.getWxaCodeUnlimited(scene, "pages/index/index", merchantId);
-        if (bytes == null || bytes.length == 0)
-        {
-            throw new ServiceException("生成太阳码失败");
-        }
+
+        // E10 缓存：按 memberId 复用已生成文件，命中直接返 URL，避免重复调 wxacode
         String dir = RuoYiConfig.getProfile() + "/distributor";
         java.io.File dirFile = new java.io.File(dir);
         if (!dirFile.exists() && !dirFile.mkdirs())
         {
             throw new ServiceException("无法创建太阳码目录");
         }
-        String fileName = "qr_" + member.getMemberId() + "_" + System.currentTimeMillis() + ".png";
+        String baseName = "qr_" + member.getMemberId();
+        java.io.File[] existing = dirFile.listFiles(new java.io.FilenameFilter()
+        {
+            @Override
+            public boolean accept(java.io.File d, String name)
+            {
+                return name.startsWith(baseName + "_") && name.endsWith(".png");
+            }
+        });
+        if (existing != null && existing.length > 0)
+        {
+            // 命中：选最近 mtime 的那张
+            java.io.File latest = existing[0];
+            for (java.io.File f : existing)
+            {
+                if (f.lastModified() > latest.lastModified()) latest = f;
+            }
+            String relativePath = "/distributor/" + latest.getName();
+            String url = serverConfig.getUrl() + com.ruoyi.common.constant.Constants.RESOURCE_PREFIX + relativePath;
+            return AjaxResult.success().put("url", url).put("scene", scene).put("fileName", latest.getName()).put("cached", true);
+        }
+
+        // miss：调 wxacode 并落盘
+        byte[] bytes = wxMaService.getWxaCodeUnlimited(scene, "pages/index/index", merchantId);
+        if (bytes == null || bytes.length == 0)
+        {
+            throw new ServiceException("生成太阳码失败");
+        }
+        String fileName = baseName + "_" + System.currentTimeMillis() + ".png";
         java.io.File target = new java.io.File(dir, fileName);
         try (java.io.FileOutputStream fos = new java.io.FileOutputStream(target))
         {
@@ -313,7 +338,7 @@ public class ApiDistributorController
         }
         String relativePath = "/distributor/" + fileName;
         String url = serverConfig.getUrl() + com.ruoyi.common.constant.Constants.RESOURCE_PREFIX + relativePath;
-        return AjaxResult.success().put("url", url).put("scene", scene).put("fileName", fileName);
+        return AjaxResult.success().put("url", url).put("scene", scene).put("fileName", fileName).put("cached", false);
     }
 
     /**
