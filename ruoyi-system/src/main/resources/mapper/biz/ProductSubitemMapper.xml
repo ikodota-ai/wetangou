@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.ProductSubitemMapper">
+
+    <resultMap type="ProductSubitem" id="SubitemResult">
+        <result property="subitemId"   column="subitem_id"   />
+        <result property="groupId"     column="group_id"     />
+        <result property="productId"   column="product_id"   />
+        <result property="subitemName" column="subitem_name" />
+        <result property="quantity"    column="quantity"     />
+        <result property="price"       column="price"        />
+        <result property="sort"        column="sort"         />
+        <result property="createTime"  column="create_time"  />
+    </resultMap>
+
+    <sql id="selectVo">
+        select subitem_id, group_id, product_id, subitem_name, quantity, price, sort, create_time
+        from biz_product_subitem
+    </sql>
+
+    <select id="selectById" resultMap="SubitemResult">
+        <include refid="selectVo"/>
+        where subitem_id = #{subitemId}
+    </select>
+
+    <select id="selectByGroupId" resultMap="SubitemResult">
+        <include refid="selectVo"/>
+        where group_id = #{groupId}
+        order by sort asc, subitem_id asc
+    </select>
+
+    <select id="selectByProductId" resultMap="SubitemResult">
+        <include refid="selectVo"/>
+        where product_id = #{productId}
+        order by sort asc, subitem_id asc
+    </select>
+
+    <insert id="insert" parameterType="ProductSubitem" useGeneratedKeys="true" keyProperty="subitemId">
+        insert into biz_product_subitem
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="groupId != null">group_id,</if>
+            <if test="productId != null">product_id,</if>
+            <if test="subitemName != null">subitem_name,</if>
+            <if test="quantity != null">quantity,</if>
+            <if test="price != null">price,</if>
+            <if test="sort != null">sort,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="groupId != null">#{groupId},</if>
+            <if test="productId != null">#{productId},</if>
+            <if test="subitemName != null">#{subitemName},</if>
+            <if test="quantity != null">#{quantity},</if>
+            <if test="price != null">#{price},</if>
+            <if test="sort != null">#{sort},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="update" parameterType="ProductSubitem">
+        update biz_product_subitem
+        <set>
+            <if test="subitemName != null">subitem_name = #{subitemName},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="sort != null">sort = #{sort},</if>
+        </set>
+        where subitem_id = #{subitemId}
+    </update>
+
+    <delete id="deleteById">
+        delete from biz_product_subitem where subitem_id = #{subitemId}
+    </delete>
+
+    <delete id="deleteByGroupId">
+        delete from biz_product_subitem where group_id = #{groupId}
+    </delete>
+
+    <delete id="deleteByProductId">
+        delete from biz_product_subitem where product_id = #{productId}
+    </delete>
+</mapper>

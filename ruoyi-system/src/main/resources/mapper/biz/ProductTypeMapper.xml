@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.ProductTypeMapper">
+
+    <resultMap type="ProductType" id="ProductTypeResult">
+        <result property="typeCode"     column="type_code"     />
+        <result property="typeName"     column="type_name"     />
+        <result property="typeDesc"     column="type_desc"     />
+        <result property="fieldConfig"  column="field_config"  />
+        <result property="icon"         column="icon"          />
+        <result property="sort"         column="sort"          />
+        <result property="appCanCreate" column="app_can_create"/>
+        <result property="needLicense"  column="need_license"  />
+        <result property="status"       column="status"        />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <sql id="selectVo">
+        select type_code, type_name, type_desc, field_config, icon, sort,
+               app_can_create, need_license, status, create_time, update_time
+        from biz_product_type
+    </sql>
+
+    <select id="selectByCode" resultMap="ProductTypeResult">
+        <include refid="selectVo"/>
+        where type_code = #{typeCode}
+    </select>
+
+    <select id="selectList" parameterType="ProductType" resultMap="ProductTypeResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="appCanCreate != null"> and app_can_create = #{appCanCreate}</if>
+        </where>
+        order by sort asc
+    </select>
+
+    <insert id="insert" parameterType="ProductType">
+        insert into biz_product_type
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="typeCode != null">type_code,</if>
+            <if test="typeName != null">type_name,</if>
+            <if test="typeDesc != null">type_desc,</if>
+            <if test="fieldConfig != null">field_config,</if>
+            <if test="icon != null">icon,</if>
+            <if test="sort != null">sort,</if>
+            <if test="appCanCreate != null">app_can_create,</if>
+            <if test="needLicense != null">need_license,</if>
+            <if test="status != null">status,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="typeCode != null">#{typeCode},</if>
+            <if test="typeName != null">#{typeName},</if>
+            <if test="typeDesc != null">#{typeDesc},</if>
+            <if test="fieldConfig != null">#{fieldConfig},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="sort != null">#{sort},</if>
+            <if test="appCanCreate != null">#{appCanCreate},</if>
+            <if test="needLicense != null">#{needLicense},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="update" parameterType="ProductType">
+        update biz_product_type
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="typeName != null">type_name = #{typeName},</if>
+            <if test="typeDesc != null">type_desc = #{typeDesc},</if>
+            <if test="fieldConfig != null">field_config = #{fieldConfig},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="appCanCreate != null">app_can_create = #{appCanCreate},</if>
+            <if test="needLicense != null">need_license = #{needLicense},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where type_code = #{typeCode}
+    </update>
+
+    <delete id="deleteByCode">
+        delete from biz_product_type where type_code = #{typeCode}
+    </delete>
+</mapper>

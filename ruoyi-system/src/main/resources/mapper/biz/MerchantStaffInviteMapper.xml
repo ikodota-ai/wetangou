@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.MerchantStaffInviteMapper">
+
+    <resultMap type="MerchantStaffInvite" id="InviteResult">
+        <result property="inviteId"     column="invite_id"     />
+        <result property="inviteCode"   column="invite_code"   />
+        <result property="scene"        column="scene"         />
+        <result property="wxacodeUrl"   column="wxacode_url"   />
+        <result property="merchantId"   column="merchant_id"   />
+        <result property="storeId"      column="store_id"      />
+        <result property="role"         column="role"          />
+        <result property="expireAt"     column="expire_at"     />
+        <result property="usedAt"       column="used_at"       />
+        <result property="usedBy"       column="used_by"       />
+        <result property="status"       column="status"        />
+        <result property="remark"       column="remark"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="storeName"    column="store_name"    />
+        <result property="merchantName" column="merchant_name" />
+        <result property="usedByName"   column="used_by_name"  />
+    </resultMap>
+
+    <sql id="selectVo">
+        select mi.invite_id, mi.invite_code, mi.scene, mi.wxacode_url,
+               mi.merchant_id, mi.store_id, mi.role, mi.expire_at, mi.used_at, mi.used_by,
+               mi.status, mi.remark, mi.create_by, mi.create_time,
+               bs.store_name, bm.merchant_name, su.nick_name as used_by_name
+        from biz_merchant_staff_invite mi
+        left join biz_store bs on bs.store_id = mi.store_id
+        left join biz_merchant bm on bm.merchant_id = mi.merchant_id
+        left join sys_user su on su.user_id = mi.used_by
+    </sql>
+
+    <select id="selectById" resultMap="InviteResult">
+        <include refid="selectVo"/>
+        where mi.invite_id = #{inviteId}
+    </select>
+
+    <select id="selectByCode" resultMap="InviteResult">
+        <include refid="selectVo"/>
+        where mi.invite_code = #{inviteCode}
+    </select>
+
+    <select id="selectList" parameterType="MerchantStaffInvite" resultMap="InviteResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="merchantId != null"> and mi.merchant_id = #{merchantId}</if>
+            <if test="storeId != null"> and mi.store_id = #{storeId}</if>
+            <if test="status != null and status != ''"> and mi.status = #{status}</if>
+            <if test="inviteCode != null and inviteCode != ''"> and mi.invite_code = #{inviteCode}</if>
+        </where>
+        order by mi.create_time desc
+    </select>
+
+    <insert id="insert" parameterType="MerchantStaffInvite" useGeneratedKeys="true" keyProperty="inviteId">
+        insert into biz_merchant_staff_invite
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="inviteCode != null">invite_code,</if>
+            <if test="scene != null">scene,</if>
+            <if test="wxacodeUrl != null">wxacode_url,</if>
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="role != null">role,</if>
+            <if test="expireAt != null">expire_at,</if>
+            <if test="status != null">status,</if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="inviteCode != null">#{inviteCode},</if>
+            <if test="scene != null">#{scene},</if>
+            <if test="wxacodeUrl != null">#{wxacodeUrl},</if>
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="role != null">#{role},</if>
+            <if test="expireAt != null">#{expireAt},</if>
+            <if test="status != null">#{status},</if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="update" parameterType="MerchantStaffInvite">
+        update biz_merchant_staff_invite
+        <set>
+            <if test="wxacodeUrl != null">wxacode_url = #{wxacodeUrl},</if>
+            <if test="expireAt != null">expire_at = #{expireAt},</if>
+            <if test="usedAt != null">used_at = #{usedAt},</if>
+            <if test="usedBy != null">used_by = #{usedBy},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </set>
+        where invite_id = #{inviteId}
+    </update>
+
+    <delete id="deleteById">
+        delete from biz_merchant_staff_invite where invite_id = #{inviteId}
+    </delete>
+
+    <update id="expireOverdue">
+        update biz_merchant_staff_invite
+        set status = '2'
+        where status = '0' and expire_at &lt; NOW()
+    </update>
+</mapper>

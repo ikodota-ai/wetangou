@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.MerchantStaffMapper">
+
+    <resultMap type="MerchantStaff" id="StaffResult">
+        <result property="id"          column="id"          />
+        <result property="merchantId"  column="merchant_id"  />
+        <result property="storeId"     column="store_id"     />
+        <result property="userId"      column="user_id"      />
+        <result property="role"        column="role"         />
+        <result property="staffNo"     column="staff_no"     />
+        <result property="realName"    column="real_name"    />
+        <result property="phone"       column="phone"        />
+        <result property="hiredAt"     column="hired_at"     />
+        <result property="status"      column="status"       />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+        <result property="userName"    column="user_name"    />
+        <result property="nickName"    column="nick_name"    />
+        <result property="avatar"      column="avatar"       />
+        <result property="openid"      column="openid"       />
+        <result property="storeName"   column="store_name"   />
+    </resultMap>
+
+    <sql id="selectVo">
+        select ms.id, ms.merchant_id, ms.store_id, ms.user_id, ms.role,
+               ms.staff_no, ms.real_name, ms.phone, ms.hired_at, ms.status,
+               ms.create_by, ms.create_time, ms.update_by, ms.update_time,
+               su.user_name, su.nick_name, su.avatar, su.openid,
+               bs.store_name
+        from biz_merchant_staff ms
+        left join sys_user su on su.user_id = ms.user_id
+        left join biz_store bs on bs.store_id = ms.store_id
+    </sql>
+
+    <select id="selectById" resultMap="StaffResult">
+        <include refid="selectVo"/>
+        where ms.id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="StaffResult">
+        <include refid="selectVo"/>
+        where ms.user_id = #{userId}
+    </select>
+
+    <select id="selectList" parameterType="MerchantStaff" resultMap="StaffResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="merchantId != null"> and ms.merchant_id = #{merchantId}</if>
+            <if test="storeId != null"> and ms.store_id = #{storeId}</if>
+            <if test="userId != null"> and ms.user_id = #{userId}</if>
+            <if test="role != null and role != ''"> and ms.role = #{role}</if>
+            <if test="status != null and status != ''"> and ms.status = #{status}</if>
+            <if test="realName != null and realName != ''"> and ms.real_name like concat('%', #{realName}, '%')</if>
+        </where>
+        order by ms.create_time desc
+    </select>
+
+    <insert id="insert" parameterType="MerchantStaff" useGeneratedKeys="true" keyProperty="id">
+        insert into biz_merchant_staff
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">merchant_id,</if>
+            <if test="storeId != null">store_id,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="role != null">role,</if>
+            <if test="staffNo != null">staff_no,</if>
+            <if test="realName != null">real_name,</if>
+            <if test="phone != null">phone,</if>
+            <if test="hiredAt != null">hired_at,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="merchantId != null">#{merchantId},</if>
+            <if test="storeId != null">#{storeId},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="role != null">#{role},</if>
+            <if test="staffNo != null">#{staffNo},</if>
+            <if test="realName != null">#{realName},</if>
+            <if test="phone != null">#{phone},</if>
+            <if test="hiredAt != null">#{hiredAt},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+         </trim>
+    </insert>
+
+    <update id="update" parameterType="MerchantStaff">
+        update biz_merchant_staff
+        <set>
+            <if test="role != null">role = #{role},</if>
+            <if test="staffNo != null">staff_no = #{staffNo},</if>
+            <if test="realName != null">real_name = #{realName},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="hiredAt != null">hired_at = #{hiredAt},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <update id="updateByUserId" parameterType="MerchantStaff">
+        update biz_merchant_staff
+        <set>
+            <if test="realName != null">real_name = #{realName},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </set>
+        where user_id = #{userId}
+    </update>
+
+    <delete id="deleteById">
+        delete from biz_merchant_staff where id = #{id}
+    </delete>
+
+    <select id="countByUserId" resultType="int">
+        select count(1) from biz_merchant_staff where user_id = #{userId} and status = '0'
+    </select>
+</mapper>
