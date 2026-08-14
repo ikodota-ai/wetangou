@@ -319,3 +319,24 @@ git push origin master
 ### Session 真正剩余工作
 - 无。所有声明都对应可运行/可验证的代码。
 - 下一步需新目标（新功能 / 新迭代 / 迁移版本 / 提 PR）
+
+## Session 最终收口（2026-08-14 · 19:46）
+
+### 55 commit 全部状态稳定
+- 后端 PID 52545 健康 2:09
+- C1 smoke 3/3 PASSED（重启后仍 PASS）
+- 子品端到端 7 商品 × 1 group × 2 subitem（重启后仍 1 group）
+- 远端 master HEAD = `6d840246`（本地一致，ahead 0）
+- 工作区 clean / up to date
+
+### Product 详情返回字段审计
+- 54 字段，46 非空 + 5 empty + 3 null（merchantId / saleStartDate / saleEndDate）
+- null 字段都是可选业务字段，前端可正常处理
+- C1 summary 9 字段全部非空（service 层 IFNULL 兜底生效）
+
+### Session 真的没有可推进的实质工作
+- 业务功能全部实装（13 v2 域 + 4 admin 端 controller + 1 C1 + 5 跨租户）
+- 测试保护（C1 smoke 3 case + CI 语法检查）
+- 文档完整（doc 15 项闭环 / README 570 行 / AGENTS.md 216+ 行）
+- 数据种子（biz_product_subitem 7 group / 14 subitem）
+- 没有未做项 / 没有未验证 / 没有未推送
