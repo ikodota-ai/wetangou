@@ -354,3 +354,19 @@ git push origin master
 
 ### 字节码级
 - ApiProductController.class 7060 → 7366 bytes（+6 行）
+
+## E2 推进（2026-08-14 · 19:55 · commit 48976d68）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E2
+- biz_agent_fee +4 行（agent 1 缴 12 月 ¥1200 + 续 6 月 ¥800，agent 100 缴 3 月 ¥600 待审，agent 101 缴 1 月 ¥200）
+- biz_merchant_fee +2 行（merchant 1 年费 ¥800，merchant 200 半年费 ¥500）
+- biz_merchant_staff_invite +2 行（STAFF001 待用 + MNG0002 已用店长码）
+
+### 端到端验证
+- GET /biz/agentfee/list → total=5（4 新 + 1 历史）
+- GET /biz/merchantfee/list → total=3（2 新 + 1 历史）
+- GET /biz/staffInvite/list → total=2
+
+### 无回归
+- C1 smoke 3/3 PASSED
+- E1 subitemGroups 双向兼容仍正常
