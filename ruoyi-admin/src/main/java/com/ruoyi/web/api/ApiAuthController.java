@@ -67,7 +67,7 @@ public class ApiAuthController
 
         Long inviteBy = body.getLong("inviteBy");
         // 防止自邀 / 邀请不存在的会员
-        if (inviteBy != null && inviteBy.equals(memberId0(openid)))
+        if (inviteBy != null && inviteBy.equals(memberId0(merchantId, openid)))
         {
             inviteBy = null;
         }
@@ -140,12 +140,19 @@ public class ApiAuthController
     }
 
     /**
-     * 自邀检查：当前会员（通过 openid 已识别）的 memberId 由调用方在拿到 member 对象后判定。
-     * 此方法作为保留 hook 留空——具体自邀防御在登录主流程里通过对 member.getMemberId() 与 inviteBy 比较实现。
+     * 自邀检查前置查询：按 openid 查当前会员是否已存在。
+     * <p>已存在则返回 memberId，登录主流程据此在 insert 前清掉自邀；新会员返回 null，
+     * 此时 inviteBy 与未生成 memberId 不可能相等，line 71 防御降级为「仅保留外部传值」。</p>
+     * <p>多商户隔离：必须传 merchantId，同一 openid 在不同商户下属于不同会员。</p>
      */
-    private Long memberId0(String openid)
+    private Long memberId0(Long merchantId, String openid)
     {
-        return null;
+        if (StringUtils.isEmpty(openid))
+        {
+            return null;
+        }
+        Member existing = memberService.selectMemberByOpenid(merchantId, openid);
+        return existing == null ? null : existing.getMemberId();
     }
 
     /**
