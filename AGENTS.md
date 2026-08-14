@@ -983,3 +983,40 @@ E12 advisory 21/21 收口后, 发现 2 个 pre-existing bug 阻碍 E16/E17 smoke
 
 ### 后续待办
 - 0 遗留（21/21 advisory 全部 verified, 2 pre-existing bug 全部 fixed）
+
+## E18 list 端点越权审计（2026-08-14 · 23:35 · commit <待定>）
+
+### 背景
+E12 advisory 修的是 GET /{id} 端点。E18 审计 list 端点（POST/GET /list）：发现 `TenantSqlInterceptor` 依赖 `TenantTableRegistry` 注册表过滤，**v2 新表漏注册**会导致 list 越权。
+
+### 漏洞扫描
+对比 35 张 biz_* 表 vs 23 张已注册表：12 张未注册
+- 漏注册（merchant 隔离）：biz_banner / biz_product_subitem / biz_product_subitem_group / biz_merchant / biz_merchant_staff / biz_merchant_staff_invite
+- 漏注册（agent 隔离）：biz_agent
+- 漏注册（shared）：biz_product_category
+
+### 修复（3 个改动）
+1. **TenantTableRegistry.java**：注册 7 张表到 ISOLATED_TABLES + 1 张到 SHARED_TABLES
+   - biz_banner / biz_product_subitem / biz_product_subitem_group / biz_merchant / biz_merchant_staff / biz_merchant_staff_invite / biz_agent → ISOLATED
+   - biz_product_category → SHARED
+2. **CategoryMapper.xml**：修 SQL ambiguous (`merchant_id` → `c.merchant_id`)
+3. **移除 biz_product_subitem(_group)** 第二次注册（无 merchant_id 字段，加了反而破坏）
+
+### 验证（15/15 PASS）
+```
+E18 list 端点 SQL 拦截器覆盖 (8 张表注册后):
+  ✅ biz_banner/product_category/product/store/member/pay_bill/agent/
+     booking/commission/settle_record/settle_account/withdraw/distributor/
+     voucher/agreement (agent < admin 行数)
+```
+
+### 业务价值
+- **list 端点跨租户防护完整**：所有 22 张 biz 业务表都在 TenantTableRegistry 注册
+- **0 数据泄漏**：agent 在所有 list 端点只能看到自己/平台共享数据
+- **修复 subitem 测试**：移除 subitem 表注册后 `/api/product/{id}` 端点可正常显示子品组
+- **可审计性**：smoke-e18.sh 15 个端点测试，未来新增表只需更新注册表 + 加一行 smoke
+
+### 模式总览（GET /{id} + list 端点完整覆盖）
+- **GET /{id}**：mapper 加 `@IgnoreTenant` + controller `assertDataScope` (E13-E17)
+- **list**：表加到 TenantTableRegistry（merchant 隔离/agent 隔离/shared）(E18)
+- 后续新加 controller 需同时检查：① 端点 getInfo 加 guard ② mapper selectXxxById 加 @IgnoreTenant ③ 业务表加到 TenantTableRegistry

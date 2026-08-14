@@ -40,7 +40,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectCategoryList" parameterType="Category" resultMap="CategoryResult">
         <include refid="selectCategoryVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="merchantId != null "> and c.merchant_id = #{merchantId}</if>
             <if test="storeId != null "> and c.store_id = #{storeId}</if>
             <if test="parentId != null "> and c.parent_id = #{parentId}</if>
             <if test="industryCode != null  and industryCode != ''"> and c.industry_code = #{industryCode}</if>

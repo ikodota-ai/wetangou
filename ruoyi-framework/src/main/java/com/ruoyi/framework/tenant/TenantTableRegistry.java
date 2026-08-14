@@ -35,11 +35,17 @@ public class TenantTableRegistry
             "biz_settle_record",
             "biz_mp_auth",
             "biz_mp_release",
-            "biz_merchant_fee")));
+            "biz_merchant_fee",
+            "biz_banner",
+            "biz_merchant",
+            "biz_merchant_staff",
+            "biz_merchant_staff_invite",
+            "biz_agent")));
 
     /** 平台共享表（merchant_id=0 表示全平台通用） */
     private static final Set<String> SHARED_TABLES = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
             "biz_category",
+            "biz_product_category",
             "biz_voucher",
             "biz_agreement",
             "biz_commission_rule")));
