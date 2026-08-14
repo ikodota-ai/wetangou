@@ -56,6 +56,10 @@
       <view class="arr"></view>
     </view>
   </view>
+    <view class="module-item" bindtap="goCreateProduct">
+      <view class="m-text"><text class="m-t">创建商品</text><text class="m-d">新增团购 / 代金券</text></view>
+      <view class="arr"></view>
+    </view>
 
   <view class="recent card" wx:if="{{recentOrders.length}}">
     <view class="section-title">最近订单</view>

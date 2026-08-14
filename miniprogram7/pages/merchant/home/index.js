@@ -76,6 +76,10 @@ Page({
   goVerify() { wx.navigateTo({ url: '/pages/merchant/verify/index' }) },
   goBill()   { wx.navigateTo({ url: '/pages/merchant/bill/index' }) },
   goBooking(){ wx.navigateTo({ url: '/pages/merchant/booking/index' }) },
+  goCreateProduct() {
+    wx.navigateTo({ url: '/pages/merchant/product/create/index' })
+  },
+
   goOrders() { wx.navigateTo({ url: '/pages/merchant/order/index' }) },
   goHistory(){ wx.navigateTo({ url: '/pages/merchant/history/index' }) },
   goMe()     { wx.navigateTo({ url: '/pages/merchant/me/index' }) },

@@ -115,6 +115,9 @@ const api = {
   productList: (params) => request('/api/product/list', { data: params }),
   productDetail: (id) => request(`/api/product/${id}`),
   categoryList: (params) => request('/api/product/category/list', { data: params }),
+  // 商家端-创建商品（P1-2）
+  productTypeAppCreatable: () => request('/biz/productType/appCreatable'),
+  productAdd: (data) => request('/api/product/add', { method: 'POST', data }),
   // 订单
   createOrder: (data) => request('/api/order', { method: 'POST', data }),
   prepayOrder: (id) => request(`/api/order/prepay/${id}`, { method: 'POST' }),

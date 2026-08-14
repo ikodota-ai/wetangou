@@ -42,7 +42,8 @@
     "pages/merchant/order/index",
     "pages/merchant/me/index",
     "pages/merchant/history/index",
-    "pages/merchant/profile/index"
+    "pages/merchant/profile/index",
+    "pages/merchant/product/create/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#3A6B35",

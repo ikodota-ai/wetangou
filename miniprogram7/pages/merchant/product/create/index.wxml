@@ -1,0 +1,109 @@
+<view class="page">
+  <view class="card">
+    <view class="head">
+      <view class="identity-badge">商家端</view>
+      <text class="tip">{{storeName || '尚未登录'}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">选择商品类型</view>
+    <view class="type-grid">
+      <view wx:for="{{typeList}}" wx:key="typeCode"
+            class="type-cell {{form.typeCode === item.typeCode ? 'active' : ''}}"
+            data-code="{{item.typeCode}}"
+            bindtap="onPickType">
+        <view>{{item.typeName}}</view>
+        <view class="type-desc">{{item.shortDesc}}</view>
+      </view>
+    </view>
+    <view class="tip" wx:if="{{pickedType}}">已选：{{pickedTypeDesc}}</view>
+  </view>
+
+  <view class="card" wx:if="{{form.typeCode}}">
+    <view class="section-title">基础信息</view>
+    <view class="ipt-row">
+      <text class="ipt-label">商品名称</text>
+      <input class="ipt" placeholder="如：川西坝子 4 人套餐" value="{{form.productName}}" maxlength="60" bindinput="onField" data-key="productName" />
+    </view>
+    <view class="ipt-row">
+      <text class="ipt-label">副标题</text>
+      <input class="ipt" placeholder="一句话卖点（选填）" value="{{form.subtitle}}" maxlength="80" bindinput="onField" data-key="subtitle" />
+    </view>
+    <view class="ipt-row">
+      <text class="ipt-label">所属门店</text>
+      <picker mode="selector" range="{{storeOptions}}" range-key="label" value="{{storeIdx}}" bindchange="onPickStore">
+        <view class="ipt" style="min-width:380rpx">{{storeOptions[storeIdx].label || '请选择门店'}}</view>
+      </picker>
+    </view>
+    <view class="ipt-row">
+      <text class="ipt-label">分类</text>
+      <picker mode="selector" range="{{categoryOptions}}" range-key="label" value="{{categoryIdx}}" bindchange="onPickCategory">
+        <view class="ipt" style="min-width:380rpx">{{categoryOptions[categoryIdx].label || '不选'}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{form.typeCode === 'GROUPON' || form.typeCode === 'VOUCHER'}}">
+    <view class="section-title">{{form.typeCode === 'GROUPON' ? '团购' : '代金券'}}设置</view>
+
+    <view class="ipt-row" wx:if="{{form.typeCode === 'GROUPON'}}">
+      <text class="ipt-label">市场价</text>
+      <input class="ipt" type="digit" placeholder="划线价" value="{{form.marketPrice}}" bindinput="onField" data-key="marketPrice" />
+    </view>
+
+    <view class="ipt-row">
+      <text class="ipt-label">售价 ¥</text>
+      <input class="ipt" type="digit" placeholder="用户实付" value="{{form.price}}" bindinput="onField" data-key="price" />
+    </view>
+
+    <view class="ipt-row" wx:if="{{form.typeCode === 'GROUPON'}}">
+      <text class="ipt-label">商品面值 ¥</text>
+      <input class="ipt" type="digit" placeholder="套餐价值（选填）" value="{{form.faceValue}}" bindinput="onField" data-key="faceValue" />
+    </view>
+
+    <view class="ipt-row" wx:if="{{form.typeCode === 'VOUCHER'}}">
+      <text class="ipt-label">起用金额 ¥</text>
+      <input class="ipt" type="digit" placeholder="满 X 元可用" value="{{form.minConsume}}" bindinput="onField" data-key="minConsume" />
+    </view>
+
+    <view class="ipt-row" wx:if="{{form.typeCode === 'GROUPON'}}">
+      <text class="ipt-label">有效期</text>
+      <input class="ipt" type="number" placeholder="售出后 N 天内有效，默认 30" value="{{form.validityDays}}" bindinput="onField" data-key="validityDays" />
+    </view>
+
+    <view class="toggle-row" wx:if="{{form.typeCode === 'GROUPON'}}">
+      <text class="toggle-label">需预约</text>
+      <switch checked="{{form.bookingRequired === 1}}" bindchange="onSwitch" data-key="bookingRequired" color="#3A6B35" />
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{form.typeCode && form.typeCode !== 'GROUPON' && form.typeCode !== 'VOUCHER'}}">
+    <view class="section-title">提示</view>
+    <view class="tip">该商品类型（MVP 阶段）暂未开放小程序端自助创建，请联系平台在 admin 后台创建。</view>
+  </view>
+
+  <view class="card" wx:if="{{form.typeCode}}">
+    <view class="section-title">库存与说明</view>
+    <view class="ipt-row">
+      <text class="ipt-label">库存</text>
+      <input class="ipt" type="number" placeholder="0 = 不限" value="{{form.stock}}" bindinput="onField" data-key="stock" />
+    </view>
+    <view class="ipt-row">
+      <text class="ipt-label">每人限购</text>
+      <input class="ipt" type="number" placeholder="0 = 不限" value="{{form.limitPerUser}}" bindinput="onField" data-key="limitPerUser" />
+    </view>
+    <view class="ipt-row">
+      <text class="ipt-label">单次最多</text>
+      <input class="ipt" type="number" placeholder="默认 1" value="{{form.maxPerOrder}}" bindinput="onField" data-key="maxPerOrder" />
+    </view>
+    <view class="ipt-row" style="align-items:flex-start">
+      <text class="ipt-label">使用说明</text>
+      <textarea class="ipt-area" placeholder="使用规则 / 退改政策" value="{{form.notice}}" maxlength="500" bindinput="onField" data-key="notice" />
+    </view>
+  </view>
+
+  <button class="btn-primary" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting || !canSubmit}}">
+    {{submitting ? '保存中…' : '保存商品'}}
+  </button>
+</view>
