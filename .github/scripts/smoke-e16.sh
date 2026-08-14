@@ -26,16 +26,18 @@ chk() {
 P() { python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('code',''), d.get('msg',''))"; }
 echo "E16 P2 batch (5 verified + 1 known pre-existing bug):"
 # 4 个 assertDataScope + admin bypass
-for spec in "Product|product" "Store|store" "Booking|booking" "StoreAlbum|album"; do
+for spec in "Product|product" "Category|category" "Store|store" "Booking|booking" "StoreAlbum|album"; do
   IFS='|' read -r c p <<< "$spec"
   chk "$c agent001 -> 别人 999301" 500 "没有权限" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999301 | P)"
   chk "$c agent001 -> 自己 999302" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999302 | P)"
   chk "$c admin    -> 别人 999301" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T2" $H/biz/$p/999301 | P)"
 done
-# Banner: pre-existing perms 403，admin 测 bypass
+# Banner: agent 已有 biz:banner:query perms (F2 grant), 完整 agent 测
 c="Banner"; p="banner"
+chk "$c agent001 -> 别人 999301" 500 "没有权限" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999301 | P)"
+chk "$c agent001 -> 自己 999302" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999302 | P)"
 chk "$c admin    -> 别人 999301" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T2" $H/biz/$p/999301 | P)"
 # Category: pre-existing SQL bug，等修
-echo "  ⚠️  Category 跳过 E16 验证（pre-existing SQL bug c.store_id 不存在）"
-echo "E16 result: PASS=$PASS FAIL=$FAIL (Category 待 SQL 修复后回归)"
+echo "  ✅ Category pre-existing SQL bug 已修 (biz_product_category 加 store_id 列 + fixture 改表)"
+echo "E16 result: PASS=$PASS FAIL=$FAIL (6 controller 全 verified)"
 [ $FAIL -eq 0 ] || exit 1

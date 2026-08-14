@@ -72,9 +72,9 @@ INSERT INTO biz_product (product_id, merchant_id, store_id, product_name, price,
   (999302, 1, 1, 'SMOKE_PROD_999302', 199.00, '0', NOW())
 ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
 
-INSERT INTO biz_category (category_id, merchant_id, category_name, status, create_time) VALUES
-  (999301, 2, 'SMOKE_CAT_999301', '0', NOW()),
-  (999302, 1, 'SMOKE_CAT_999302', '0', NOW())
+INSERT INTO biz_product_category (category_id, merchant_id, category_name, industry_code, status, create_time) VALUES
+  (999301, 2, 'SMOKE_CAT_999301', 'DINING', '0', NOW()),
+  (999302, 1, 'SMOKE_CAT_999302', 'DINING', '0', NOW())
 ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
 
 INSERT INTO biz_store (store_id, merchant_id, store_name, status, create_time) VALUES

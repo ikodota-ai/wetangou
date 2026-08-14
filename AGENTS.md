@@ -938,3 +938,48 @@ public AjaxResult getInfo(@PathVariable("orderId") Long orderId) {
 1. **Category SQL bug**：`biz_product_category` 表加 `store_id` 字段或 XML 移除 `c.store_id` 引用
 2. **Perms 补全**：给 agent001 加 `biz:banner:query` + `biz:mpauth:query` 角色权限
 3. **审计脚本回归**：未来新增 controller 时可重启用 `lint-mybatis.sh` 配合 `IgnoreTenant` 检查
+
+## E16/E17 收尾（2026-08-14 · 23:17 · commit <待定>）
+
+### 背景
+E12 advisory 21/21 收口后, 发现 2 个 pre-existing bug 阻碍 E16/E17 smoke 完整验证:
+- **F1 Category SQL bug**：`biz_product_category` 表无 `store_id` 字段, XML 引用 `c.store_id` 报 SQL 错
+- **F2 Banner/MpAuth perms 缺失**：agent 角色 (role_id=4) 缺 `biz:banner:query` perms + MpAuth sys_menu 完全未注册
+
+### F1 SQL 修复
+- `ALTER TABLE biz_product_category ADD COLUMN store_id BIGINT(20) DEFAULT NULL AFTER compliance_notice`
+- DEFAULT NULL：兼容现有 7 行数据（merchant_id=0 平台级）
+- 迁移脚本：`sql/migration-2026-08-14-f1-category-store-id.sql`
+- 验证：E16 Category 段 6/6 PASS（agent 别人 500 / 自己 200 / admin 200）
+- 顺带修 fixture：`biz_category` (5字段旧表) → `biz_product_category` (v2 实际表)
+
+### F2 perms 修复
+- sys_role_menu: role_id=4 加 (2259=banner:list, 2260=banner:query)
+- sys_menu: 新增 2290/2291 (mpauth:list/query, parent=0 顶级)
+- sys_role_menu: role_id=4 加 (2290, 2291)
+- 迁移脚本：`sql/migration-2026-08-14-f2-mpauth-menu.sql`
+- 验证：E16 Banner 3/3 PASS + E17 MpAuth 3/3 PASS（agent 别人 500 / 自己 200 / admin 200）
+
+### 完整 E2E 验证（10/10 smoke + 10/10 JUnit）
+| Smoke | 范围 | 状态 |
+|---|---|---|
+| c1 | 跨租户 commission 概览 | 3/3 PASS |
+| subitem | 商品子品 API | 4/4 PASS |
+| e4 | 推客二维码 admin | 4/4 PASS |
+| e10 | 推客太阳码缓存 | 4/4 PASS |
+| e11 | AgentController 越权 guard | 6/6 PASS |
+| e13 | OrderController guard | 5/5 PASS |
+| e14 | 5 controller P0 guard | 15/15 PASS |
+| e15 | 6 controller P1 guard (含 agentId 维度) | 18/18 PASS |
+| **e16** | **6 controller P2 guard (Category 完整 agent 测)** | **18/18 PASS** |
+| **e17** | **3 controller P3 guard (MpAuth 完整 agent 测)** | **9/9 PASS** |
+| **总计** | | **86/86 PASS** |
+| JUnit | CommissionMapperTest + AgentServiceImplTest | 10/10 PASS |
+
+### 业务价值
+- **100% 越权 guard 验证**：21/21 controller 全部用 agent 真实账号 + 自己/别人/平台三场景验证
+- **2 个 latent bug 顺手修**：Category SQL + MpAuth perms 注册
+- **迁移脚本 2 份**：F1/F2 均可重复执行（INSERT IGNORE / ADD COLUMN）
+
+### 后续待办
+- 0 遗留（21/21 advisory 全部 verified, 2 pre-existing bug 全部 fixed）

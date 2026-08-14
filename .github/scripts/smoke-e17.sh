@@ -31,9 +31,10 @@ for spec in "Agreement|agreement" "MpRelease|mprelease"; do
   chk "$c agent001 -> 自己 999402" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999402 | P)"
   chk "$c admin    -> 别人 999401" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T2" $H/biz/$p/999401 | P)"
 done
-# MpAuth: pre-existing perms 403，admin 测 bypass
+# MpAuth: agent 已有 biz:mpauth:query perms (F2 grant), 完整 agent 测
 c="MpAuth"; p="mpauth"
+chk "$c agent001 -> 别人 999401" 500 "没有权限" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999401 | P)"
+chk "$c agent001 -> 自己 999402" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T1" $H/biz/$p/999402 | P)"
 chk "$c admin    -> 别人 999401" 200 "操作成功" "$(curl -s -H "Authorization: Bearer $T2" $H/biz/$p/999401 | P)"
-echo "  ⚠️  MpAuth agent 测跳过 (pre-existing 缺 biz:mpauth:query perms)"
-echo "E17 result: PASS=$PASS FAIL=$FAIL (MpAuth perms 待补)"
+echo "E17 result: PASS=$PASS FAIL=$FAIL (3 controller 全 verified)"
 [ $FAIL -eq 0 ] || exit 1
