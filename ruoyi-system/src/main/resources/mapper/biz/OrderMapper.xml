@@ -68,6 +68,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="status != null  and status != ''"> and o.status = #{status}</if>
             <if test="verifyCode != null  and verifyCode != ''"> and o.verify_code = #{verifyCode}</if>
             <if test="payNo != null  and payNo != ''"> and o.pay_no = #{payNo}</if>
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and o.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and o.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
             <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(o.store_id, #{params.storeIds})</if>
             <if test="params != null and params.memberIds != null and params.memberIds != ''"> and find_in_set(o.member_id, #{params.memberIds})</if>
             <if test="params != null and params.productIds != null and params.productIds != ''"> and find_in_set(o.product_id, #{params.productIds})</if>
