@@ -1020,3 +1020,45 @@ E18 list 端点 SQL 拦截器覆盖 (8 张表注册后):
 - **GET /{id}**：mapper 加 `@IgnoreTenant` + controller `assertDataScope` (E13-E17)
 - **list**：表加到 TenantTableRegistry（merchant 隔离/agent 隔离/shared）(E18)
 - 后续新加 controller 需同时检查：① 端点 getInfo 加 guard ② mapper selectXxxById 加 @IgnoreTenant ③ 业务表加到 TenantTableRegistry
+
+## E19/E20 写入端点 + 小程序端越权审计（2026-08-15 · 00:45 · commit <待定>）
+
+### E19 写入端点越权（admin 端 POST/PUT/DELETE）
+**审计发现**：add/edit/remove 端点看起来"无 guard"，但实际由两层防御：
+- **add**：`TenantInsertInterceptor` 拦 (无权向非名下商户写入数据 → 500)
+- **edit/delete**：`TenantSqlInterceptor` 改写 WHERE merchant_id=ctx，跨 mid 0 行 → 500
+- **edit 自己传 mid=2**：`UPDATE biz_order SET ...` 实际 SET 不含 merchant_id 字段，DB mid 不变（仅其他字段被改）— 这是预期行为
+
+**验证 (E19 8/8 PASS)**：
+- 4 controller add mid=2 越权 → 500 无权向非名下商户写入数据
+- edit 自己 999502 传 mid=2 → 200 OK 但 DB mid 仍 1
+- delete 别人 999501 → 500 操作失败，DB 仍在
+
+### E20 小程序端 ApiController 越权审计
+**审计发现**：17 个 ApiController（小程序端）扫描：
+- **ApiOrderController.detail `/{orderId}`** — **无 guard**（member A 查 member B 的 order 返 200）🔴
+- **ApiBillController.detail `/{billId}`** — **无 guard**（同上）🔴
+- **ApiBillController.pay `/{billId}`** — **无 member guard**（仅 mock 模式）🟡
+- ApiOrderController.pay/list/verify/prepay 已有 guard
+- ApiBillController.prepay/confirm 已有 guard
+- ApiProductController/ApiStoreController 类级 @Anonymous（公开数据，设计如此）
+
+**修复**（2 controller，3 端点）：
+1. ApiOrderController.detail：取 order + 校验 `order.getMemberId() == ctx.memberId` → 否则 `无权查看他人订单`
+2. ApiBillController.detail：取 bill + 校验 `bill.getMemberId() == ctx.memberId` → 否则 `无权查看他人账单`
+3. ApiBillController.pay：取 bill + 校验 memberId 一致 → 否则 `无权支付该买单`
+
+**验证**：E20 member 端需 wxcode 登录（无法直接 E2E），通过 code review + admin 端回归确认：
+- admin 端全套 11/11 smoke PASS
+- JUnit 10/10 PASS
+- LoginRequired 拦截无 auth 仍 401 正常
+
+### 业务价值
+- **E19 + E20 = admin 端 + 小程序端写入防护完整**
+- 21 controller GET /{id} + 22 list 端点 + 全部 add/edit/remove 都覆盖
+- TenantInsertInterceptor + TenantSqlInterceptor 双层防御无需 controller 改写（仅 detail/pay 几个 member 端点需手动加 member guard）
+
+### 关键文件
+- `ruoyi-framework/src/main/java/com/ruoyi/framework/tenant/TenantInsertInterceptor.java:104` — `无权向非名下商户写入数据`
+- `ruoyi-admin/src/main/java/com/ruoyi/web/api/ApiOrderController.java:detail` — 新增 member guard
+- `ruoyi-admin/src/main/java/com/ruoyi/web/api/ApiBillController.java:detail/pay` — 新增 member guard

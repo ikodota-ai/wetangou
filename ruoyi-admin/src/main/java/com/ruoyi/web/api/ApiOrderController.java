@@ -177,7 +177,16 @@ public class ApiOrderController
     @GetMapping("/{orderId}")
     public AjaxResult detail(@PathVariable Long orderId)
     {
-        return AjaxResult.success(orderService.selectOrderByOrderId(orderId));
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null)
+        {
+            throw new ServiceException("订单不存在");
+        }
+        if (!order.getMemberId().equals(MemberContextHolder.getMemberId()))
+        {
+            throw new ServiceException("无权查看他人订单");
+        }
+        return AjaxResult.success(order);
     }
 
     /**

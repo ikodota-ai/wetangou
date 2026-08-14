@@ -111,7 +111,18 @@ public class ApiBillController
     @GetMapping("/{billId}")
     public AjaxResult detail(@PathVariable Long billId)
     {
-        return AjaxResult.success(payBillService.selectPayBillByBillId(billId));
+        com.ruoyi.biz.domain.PayBill bill = payBillService.selectPayBillByBillId(billId);
+        if (bill == null)
+        {
+            throw new ServiceException("账单不存在");
+        }
+        // 账单可由 memberId 关联到下单人, 防止会员越权查看他人账单
+        Long memberId = MemberContextHolder.getMemberId();
+        if (bill.getMemberId() != null && !bill.getMemberId().equals(memberId))
+        {
+            throw new ServiceException("无权查看他人账单");
+        }
+        return AjaxResult.success(bill);
     }
 
     /**
@@ -195,6 +206,10 @@ public class ApiBillController
         if (bill == null || !"1".equals(bill.getStatus()))
         {
             throw new ServiceException("买单未确认或状态异常");
+        }
+        if (!bill.getMemberId().equals(MemberContextHolder.getMemberId()))
+        {
+            throw new ServiceException("无权支付该买单");
         }
         if (!wxPayService.isMock())
         {
