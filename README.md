@@ -532,6 +532,38 @@ unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiAppl
 
 ---
 
+## Smoke Test
+
+本地手跑 C1 端点跨租户回归测试：
+
+```bash
+# 前置：后端 jar 已 build 且在 8080 跑，MySQL 有 biz_agent / biz_merchant / biz_commission 真实数据
+bash .github/scripts/smoke-c1.sh
+```
+
+期望输出（3/3 通过）：
+
+```
+[A] OK: total=62.8, byMerchant=1 row
+[B] OK: total=0.0, byMerchant=0 row (no cross-tenant leak)
+[C] OK: no auth -> 401
+C1 smoke test PASSED
+```
+
+**测试覆盖**：
+- A: agentId=1（有 1 个下属商户）→ total=62.80, byMerchant 1 行
+- B: agentId=999（无下属商户）→ total=0, byMerchant 0 行（**防跨租户泄漏**，对应 commit `7a0299d4`）
+- C: 无 token → 401（鉴权必须）
+
+**回归触发场景**：
+- 改了 `CommissionMapper.xml` 漏掉 `merchantIdsEmpty` guard
+- 改了 `BizAgentCommissionController` 漏掉 `.get('total_amount')` 驼峰对齐
+- 改了 `CommissionServiceImpl` 漏 IFNULL 兜底
+
+CI 流水线只做 `bash -n` 静态语法校验（避免 macos-14 runner 缺 docker/mysql-client 的环境问题）；**端到端 smoke 留给开发者本地手跑**。
+
+---
+
 ## License
 
 基于 [RuoYi-Vue](https://gitee.com/y_project/RuoYi-Vue) v3.9.2 改造，二次开发用于多商户团购 SaaS。
