@@ -290,3 +290,32 @@ git push origin master
 - 本地与远端一致（0 commit ahead）
 - 后端 PID 49205 5:39 健康
 - 49 commit 累计
+
+## Session 深度审计（2026-08-14 · 19:28）
+
+### 字节码级证据
+- `BizAgentCommissionController.class` 在 jar 中，summary(Long) 方法
+- javap bytecode 确认 `Map.put("totalAmount", overview.get("total_amount"))` 真编译
+- `CommissionServiceImpl.class` sumByMerchantIds + sumAgentOverview 各 1 处 `merchantIdsEmpty` 字面量
+- mapper XML 2 处 `merchantIdsEmpty` guard（两 select 都有）
+
+### 源 vs 产线一致
+- 源 18:49 改动，dist 18:55 build（6 分钟后）
+- 4 个 CSS class（commission-total/settled/pending/extra）都在 chunk-7d1735ea
+
+### 安全审计
+- admin 端 5 个 biz controller 全部有 @PreAuthorize
+- system 端 14 个 controller 全部端点都有权限注解
+- 没有无权限的开放端点
+
+### 业务功能审计
+- biz_product_subitem 0 行（v2 抖音来客子品表，本地无种子）
+  - 不影响 C1 smoke（commission 与子品无关）
+  - 影响商品详情 subitemGroups 端到端测试
+- biz_agent_fee 1 行（fee_id=100000, agent_id=100, amount=100.00）
+- biz_merchant_fee 1 行
+- 缴费功能端到端可走
+
+### Session 真正剩余工作
+- 无。所有声明都对应可运行/可验证的代码。
+- 下一步需新目标（新功能 / 新迭代 / 迁移版本 / 提 PR）
