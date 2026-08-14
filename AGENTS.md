@@ -340,3 +340,17 @@ git push origin master
 - 文档完整（doc 15 项闭环 / README 570 行 / AGENTS.md 216+ 行）
 - 数据种子（biz_product_subitem 7 group / 14 subitem）
 - 没有未做项 / 没有未验证 / 没有未推送
+
+## E1 推进（2026-08-14 · 19:54 · commit e495896a）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E1
+- ApiProductController.detail 同时放 r.put('subitemGroups', groups) + r.put('data', {product, subitemGroups})
+- 兼容老调用（顶层）+ 新调用（data 子对象）
+
+### 端到端验证
+- top-level subitemGroups: 1 group ✓
+- data.subitemGroups: 1 group (套餐规格 + 2 subitem) ✓
+- C1 smoke 3/3 PASSED（无回归）
+
+### 字节码级
+- ApiProductController.class 7060 → 7366 bytes（+6 行）
