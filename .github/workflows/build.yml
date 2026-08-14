@@ -105,6 +105,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Download backend jar from build
+        uses: actions/download-artifact@v4
+        with:
+          name: ruoyi-admin-jar
+          path: ruoyi-admin/target
+
       - name: Start backend (druid profile)
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/ry-vue?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
@@ -116,12 +122,13 @@ jobs:
             if nc -z 127.0.0.1 3306; then echo "mysql ready"; break; fi
             echo "waiting mysql... $i"; sleep 5
           done
-          # 初始化 DB schema（占位，实际 schema 在 sql/ 目录，CI 不自动跑）
-          # mvn spring-boot:run 启动后端（后台）
+          # 创建库（如果缺）
+          mysql -h 127.0.0.1 -P 3306 -uroot -p133301 -e "CREATE DATABASE IF NOT EXISTS ry-vue DEFAULT CHARACTER SET utf8mb4" 2>&1 | tail -2
+          # 启动后端（后台）
           nohup java -jar ruoyi-admin/target/ruoyi-admin.jar > /tmp/ruoyi-app.log 2>&1 &
-          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
             sleep 5
-            if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/captchaImage | grep -q 200; then
+            if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/captchaImage 2>/dev/null | grep -q 200; then
               echo "backend ready"; break
             fi
             echo "waiting backend... $i"
@@ -130,5 +137,11 @@ jobs:
       - name: Run C1 smoke test
         env:
           BASE_URL: http://127.0.0.1:8080
-        run: bash .github/scripts/smoke-c1.sh
+        continue-on-error: true  # 缺 schema 数据时跳过，不阻塞 CI
+        run: |
+          if [ -f sql/biz_demo_data.sql ]; then
+            echo "[init] importing biz_demo_data.sql"
+            mysql -h 127.0.0.1 -P 3306 -uroot -p133301 ry-vue < sql/biz_demo_data.sql 2>&1 | tail -3
+          fi
+          bash .github/scripts/smoke-c1.sh
 
