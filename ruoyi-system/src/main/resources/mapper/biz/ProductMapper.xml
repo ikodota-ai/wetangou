@@ -23,6 +23,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="stock"    column="stock"    />
         <result property="sales"    column="sales"    />
         <result property="validityDays"    column="validity_days"    />
+        <result property="typeCode"        column="type_code"        />
+        <result property="industryCode"    column="industry_code"    />
+        <result property="faceValue"       column="face_value"       />
+        <result property="minConsume"      column="min_consume"      />
+        <result property="totalTimes"      column="total_times"      />
+        <result property="periodType"      column="period_type"      />
+        <result property="periodCount"     column="period_count"     />
+        <result property="saleStartDate"   column="sale_start_date"  />
+        <result property="saleEndDate"     column="sale_end_date"    />
+        <result property="consumeStartDays" column="consume_start_days" />
+        <result property="consumeValidDays" column="consume_valid_days" />
+        <result property="consumeStartToday" column="consume_start_today" />
+        <result property="limitPerUser"    column="limit_per_user"   />
+        <result property="maxPerOrder"     column="max_per_order"    />
+        <result property="maxPersons"      column="max_persons"      />
+        <result property="refundPolicy"    column="refund_policy"    />
+        <result property="bookingRequired" column="booking_required" />
+        <result property="bookingWorkdayOnly" column="booking_workday_only" />
+        <result property="collectMethod"   column="collect_method"   />
+        <result property="mutexWithStorePromotion" column="mutex_with_store_promotion" />
+        <result property="extraFeeDesc"    column="extra_fee_desc"   />
+        <result property="otherNotice"     column="other_notice"     />
+        <result property="commissionRate"  column="commission_rate"  />
+        <result property="totalValue"      column="total_value"      />
+        <result property="subitemPickRule" column="subitem_pick_rule" />
+        <result property="requireXiaoxin"  column="require_xiaoxin"  />
         <result property="detail"    column="detail"    />
         <result property="notice"    column="notice"    />
         <result property="sort"    column="sort"    />
@@ -40,6 +66,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                (select group_concat(s2.store_name separator '、') from biz_store s2 where find_in_set(s2.store_id, p.store_ids)) as store_names,
                p.product_name, p.subtitle,
                p.cover, p.images, p.product_type, p.price, p.market_price, p.stock, p.sales, p.validity_days,
+               p.type_code, p.industry_code, p.face_value, p.min_consume, p.total_times, p.period_type, p.period_count,
+               p.sale_start_date, p.sale_end_date, p.consume_start_days, p.consume_valid_days, p.consume_start_today,
+               p.limit_per_user, p.max_per_order, p.max_persons, p.refund_policy,
+               p.booking_required, p.booking_workday_only, p.collect_method,
+               p.mutex_with_store_promotion, p.extra_fee_desc, p.other_notice,
+               p.commission_rate, p.total_value, p.subitem_pick_rule, p.require_xiaoxin,
                p.detail, p.notice, p.sort, p.status, p.del_flag, p.create_by, p.create_time, p.update_by,
                p.update_time, p.remark
         from biz_product p
@@ -78,6 +110,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cover != null">cover,</if>
             <if test="images != null">images,</if>
             <if test="productType != null">product_type,</if>
+            <if test="typeCode != null">type_code,</if>
+            <if test="industryCode != null">industry_code,</if>
+            <if test="faceValue != null">face_value,</if>
+            <if test="minConsume != null">min_consume,</if>
+            <if test="totalTimes != null">total_times,</if>
+            <if test="periodType != null">period_type,</if>
+            <if test="periodCount != null">period_count,</if>
+            <if test="saleStartDate != null">sale_start_date,</if>
+            <if test="saleEndDate != null">sale_end_date,</if>
+            <if test="consumeStartDays != null">consume_start_days,</if>
+            <if test="consumeValidDays != null">consume_valid_days,</if>
+            <if test="consumeStartToday != null">consume_start_today,</if>
+            <if test="limitPerUser != null">limit_per_user,</if>
+            <if test="maxPerOrder != null">max_per_order,</if>
+            <if test="maxPersons != null">max_persons,</if>
+            <if test="refundPolicy != null">refund_policy,</if>
+            <if test="bookingRequired != null">booking_required,</if>
+            <if test="bookingWorkdayOnly != null">booking_workday_only,</if>
+            <if test="collectMethod != null">collect_method,</if>
+            <if test="mutexWithStorePromotion != null">mutex_with_store_promotion,</if>
+            <if test="extraFeeDesc != null">extra_fee_desc,</if>
+            <if test="otherNotice != null">other_notice,</if>
+            <if test="commissionRate != null">commission_rate,</if>
+            <if test="totalValue != null">total_value,</if>
+            <if test="subitemPickRule != null">subitem_pick_rule,</if>
+            <if test="requireXiaoxin != null">require_xiaoxin,</if>
             <if test="price != null">price,</if>
             <if test="marketPrice != null">market_price,</if>
             <if test="stock != null">stock,</if>
@@ -104,6 +162,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cover != null">#{cover},</if>
             <if test="images != null">#{images},</if>
             <if test="productType != null">#{productType},</if>
+            <if test="typeCode != null">#{typeCode},</if>
+            <if test="industryCode != null">#{industryCode},</if>
+            <if test="faceValue != null">#{faceValue},</if>
+            <if test="minConsume != null">#{minConsume},</if>
+            <if test="totalTimes != null">#{totalTimes},</if>
+            <if test="periodType != null">#{periodType},</if>
+            <if test="periodCount != null">#{periodCount},</if>
+            <if test="saleStartDate != null">#{saleStartDate},</if>
+            <if test="saleEndDate != null">#{saleEndDate},</if>
+            <if test="consumeStartDays != null">#{consumeStartDays},</if>
+            <if test="consumeValidDays != null">#{consumeValidDays},</if>
+            <if test="consumeStartToday != null">#{consumeStartToday},</if>
+            <if test="limitPerUser != null">#{limitPerUser},</if>
+            <if test="maxPerOrder != null">#{maxPerOrder},</if>
+            <if test="maxPersons != null">#{maxPersons},</if>
+            <if test="refundPolicy != null">#{refundPolicy},</if>
+            <if test="bookingRequired != null">#{bookingRequired},</if>
+            <if test="bookingWorkdayOnly != null">#{bookingWorkdayOnly},</if>
+            <if test="collectMethod != null">#{collectMethod},</if>
+            <if test="mutexWithStorePromotion != null">#{mutexWithStorePromotion},</if>
+            <if test="extraFeeDesc != null">#{extraFeeDesc},</if>
+            <if test="otherNotice != null">#{otherNotice},</if>
+            <if test="commissionRate != null">#{commissionRate},</if>
+            <if test="totalValue != null">#{totalValue},</if>
+            <if test="subitemPickRule != null">#{subitemPickRule},</if>
+            <if test="requireXiaoxin != null">#{requireXiaoxin},</if>
             <if test="price != null">#{price},</if>
             <if test="marketPrice != null">#{marketPrice},</if>
             <if test="stock != null">#{stock},</if>
@@ -133,6 +217,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cover != null">cover = #{cover},</if>
             <if test="images != null">images = #{images},</if>
             <if test="productType != null">product_type = #{productType},</if>
+            <if test="typeCode != null">type_code = #{typeCode},</if>
+            <if test="industryCode != null">industry_code = #{industryCode},</if>
+            <if test="faceValue != null">face_value = #{faceValue},</if>
+            <if test="minConsume != null">min_consume = #{minConsume},</if>
+            <if test="totalTimes != null">total_times = #{totalTimes},</if>
+            <if test="periodType != null">period_type = #{periodType},</if>
+            <if test="periodCount != null">period_count = #{periodCount},</if>
+            <if test="saleStartDate != null">sale_start_date = #{saleStartDate},</if>
+            <if test="saleEndDate != null">sale_end_date = #{saleEndDate},</if>
+            <if test="consumeStartDays != null">consume_start_days = #{consumeStartDays},</if>
+            <if test="consumeValidDays != null">consume_valid_days = #{consumeValidDays},</if>
+            <if test="consumeStartToday != null">consume_start_today = #{consumeStartToday},</if>
+            <if test="limitPerUser != null">limit_per_user = #{limitPerUser},</if>
+            <if test="maxPerOrder != null">max_per_order = #{maxPerOrder},</if>
+            <if test="maxPersons != null">max_persons = #{maxPersons},</if>
+            <if test="refundPolicy != null">refund_policy = #{refundPolicy},</if>
+            <if test="bookingRequired != null">booking_required = #{bookingRequired},</if>
+            <if test="bookingWorkdayOnly != null">booking_workday_only = #{bookingWorkdayOnly},</if>
+            <if test="collectMethod != null">collect_method = #{collectMethod},</if>
+            <if test="mutexWithStorePromotion != null">mutex_with_store_promotion = #{mutexWithStorePromotion},</if>
+            <if test="extraFeeDesc != null">extra_fee_desc = #{extraFeeDesc},</if>
+            <if test="otherNotice != null">other_notice = #{otherNotice},</if>
+            <if test="commissionRate != null">commission_rate = #{commissionRate},</if>
+            <if test="totalValue != null">total_value = #{totalValue},</if>
+            <if test="subitemPickRule != null">subitem_pick_rule = #{subitemPickRule},</if>
+            <if test="requireXiaoxin != null">require_xiaoxin = #{requireXiaoxin},</if>
             <if test="price != null">price = #{price},</if>
             <if test="marketPrice != null">market_price = #{marketPrice},</if>
             <if test="stock != null">stock = #{stock},</if>
@@ -163,3 +273,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 </mapper>
+        left join biz_product_category c on c.category_id = p.category_id

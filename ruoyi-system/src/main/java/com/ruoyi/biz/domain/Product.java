@@ -82,6 +82,84 @@ public class Product extends BaseEntity
     @Excel(name = "有效天数")
     private Integer validityDays;
 
+    /** 类型代码（v2：GROUPON/VOUCHER/TIMECARD/...） */
+    private String typeCode;
+
+    /** 行业编码（CATERING/EDUCATION/...） */
+    private String industryCode;
+
+    /** 面值/划线价（代金券面值/次卡总价值） */
+    private BigDecimal faceValue;
+
+    /** 最低消费门槛（代金券用） */
+    private BigDecimal minConsume;
+
+    /** 总次数（次卡用） */
+    private Long totalTimes;
+
+    /** 周期类型 MONTH/QUARTER/YEAR */
+    private String periodType;
+
+    /** 周期数 */
+    private Integer periodCount;
+
+    /** 售卖开始时间 */
+    private java.util.Date saleStartDate;
+
+    /** 售卖结束时间 */
+    private java.util.Date saleEndDate;
+
+    /** 顾客可消费起始天数（自购买次日起） */
+    private Integer consumeStartDays;
+
+    /** 顾客可消费有效天数 */
+    private Integer consumeValidDays;
+
+    /** 购买当天是否可用 0否 1是 */
+    private Integer consumeStartToday;
+
+    /** 每人限购件数（0=不限） */
+    private Long limitPerUser;
+
+    /** 单次消费最多使用张数 */
+    private Integer maxPerOrder;
+
+    /** 每张券最多使用人数（团购用，0=不限） */
+    private Integer maxPersons;
+
+    /** 售后政策 */
+    private String refundPolicy;
+
+    /** 是否需要预约 0否 1是 */
+    private Integer bookingRequired;
+
+    /** 预约是否仅工作日 0否 1是 */
+    private Integer bookingWorkdayOnly;
+
+    /** 券码类型 PLATFORM/THIRD_PARTY/MERCHANT_OWN */
+    private String collectMethod;
+
+    /** 是否与店内优惠互斥 0否 1是 */
+    private Integer mutexWithStorePromotion;
+
+    /** 额外费用说明 */
+    private String extraFeeDesc;
+
+    /** 其他说明（500字内） */
+    private String otherNotice;
+
+    /** 推客佣金比例（%） */
+    private BigDecimal commissionRate;
+
+    /** 组合券包总价值（划线价） */
+    private BigDecimal totalValue;
+
+    /** 子品 N 选 M 规则：1选1/2选2/ALL */
+    private String subitemPickRule;
+
+    /** 是否需要冷静期（次卡/储值卡/周期卡/惠享卡=1） */
+    private Integer requireXiaoxin;
+
     /** 图文详情 */
     @Excel(name = "图文详情")
     private String detail;
@@ -297,6 +375,59 @@ public class Product extends BaseEntity
     {
         return delFlag;
     }
+
+    public String getTypeCode() { return typeCode; }
+    public void setTypeCode(String typeCode) { this.typeCode = typeCode; }
+    public String getIndustryCode() { return industryCode; }
+    public void setIndustryCode(String industryCode) { this.industryCode = industryCode; }
+    public java.math.BigDecimal getFaceValue() { return faceValue; }
+    public void setFaceValue(java.math.BigDecimal faceValue) { this.faceValue = faceValue; }
+    public java.math.BigDecimal getMinConsume() { return minConsume; }
+    public void setMinConsume(java.math.BigDecimal minConsume) { this.minConsume = minConsume; }
+    public Long getTotalTimes() { return totalTimes; }
+    public void setTotalTimes(Long totalTimes) { this.totalTimes = totalTimes; }
+    public String getPeriodType() { return periodType; }
+    public void setPeriodType(String periodType) { this.periodType = periodType; }
+    public Integer getPeriodCount() { return periodCount; }
+    public void setPeriodCount(Integer periodCount) { this.periodCount = periodCount; }
+    public java.util.Date getSaleStartDate() { return saleStartDate; }
+    public void setSaleStartDate(java.util.Date saleStartDate) { this.saleStartDate = saleStartDate; }
+    public java.util.Date getSaleEndDate() { return saleEndDate; }
+    public void setSaleEndDate(java.util.Date saleEndDate) { this.saleEndDate = saleEndDate; }
+    public Integer getConsumeStartDays() { return consumeStartDays; }
+    public void setConsumeStartDays(Integer consumeStartDays) { this.consumeStartDays = consumeStartDays; }
+    public Integer getConsumeValidDays() { return consumeValidDays; }
+    public void setConsumeValidDays(Integer consumeValidDays) { this.consumeValidDays = consumeValidDays; }
+    public Integer getConsumeStartToday() { return consumeStartToday; }
+    public void setConsumeStartToday(Integer consumeStartToday) { this.consumeStartToday = consumeStartToday; }
+    public Long getLimitPerUser() { return limitPerUser; }
+    public void setLimitPerUser(Long limitPerUser) { this.limitPerUser = limitPerUser; }
+    public Integer getMaxPerOrder() { return maxPerOrder; }
+    public void setMaxPerOrder(Integer maxPerOrder) { this.maxPerOrder = maxPerOrder; }
+    public Integer getMaxPersons() { return maxPersons; }
+    public void setMaxPersons(Integer maxPersons) { this.maxPersons = maxPersons; }
+    public String getRefundPolicy() { return refundPolicy; }
+    public void setRefundPolicy(String refundPolicy) { this.refundPolicy = refundPolicy; }
+    public Integer getBookingRequired() { return bookingRequired; }
+    public void setBookingRequired(Integer bookingRequired) { this.bookingRequired = bookingRequired; }
+    public Integer getBookingWorkdayOnly() { return bookingWorkdayOnly; }
+    public void setBookingWorkdayOnly(Integer bookingWorkdayOnly) { this.bookingWorkdayOnly = bookingWorkdayOnly; }
+    public String getCollectMethod() { return collectMethod; }
+    public void setCollectMethod(String collectMethod) { this.collectMethod = collectMethod; }
+    public Integer getMutexWithStorePromotion() { return mutexWithStorePromotion; }
+    public void setMutexWithStorePromotion(Integer mutexWithStorePromotion) { this.mutexWithStorePromotion = mutexWithStorePromotion; }
+    public String getExtraFeeDesc() { return extraFeeDesc; }
+    public void setExtraFeeDesc(String extraFeeDesc) { this.extraFeeDesc = extraFeeDesc; }
+    public String getOtherNotice() { return otherNotice; }
+    public void setOtherNotice(String otherNotice) { this.otherNotice = otherNotice; }
+    public java.math.BigDecimal getCommissionRate() { return commissionRate; }
+    public void setCommissionRate(java.math.BigDecimal commissionRate) { this.commissionRate = commissionRate; }
+    public java.math.BigDecimal getTotalValue() { return totalValue; }
+    public void setTotalValue(java.math.BigDecimal totalValue) { this.totalValue = totalValue; }
+    public String getSubitemPickRule() { return subitemPickRule; }
+    public void setSubitemPickRule(String subitemPickRule) { this.subitemPickRule = subitemPickRule; }
+    public Integer getRequireXiaoxin() { return requireXiaoxin; }
+    public void setRequireXiaoxin(Integer requireXiaoxin) { this.requireXiaoxin = requireXiaoxin; }
 
     public Long getMerchantId()
     {

@@ -6,8 +6,8 @@ import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
- * 商品分类对象 biz_category
- * 
+ * 商品品类对象 biz_product_category（v2：合并原店内分类 + 抖音来客行业品类）
+ *
  * @author dytuangou
  * @date 2026-07-24
  */
@@ -35,6 +35,30 @@ public class Category extends BaseEntity
     /** 分类图标 */
     @Excel(name = "分类图标")
     private String icon;
+
+    /** 父级ID（0=顶级） */
+    private Long parentId;
+
+    /** 完整路径（如：购物·服饰鞋帽·服装） */
+    private String fullPath;
+
+    /** 层级 1/2/3 */
+    private Integer level;
+
+    /** 行业编码（CATERING/EDUCATION/...） */
+    private String industryCode;
+
+    /** 行业保证金（分） */
+    private Long depositAmount;
+
+    /** 允许的商品类型（逗号分隔） */
+    private String allowedTypes;
+
+    /** 必填资质（JSON） */
+    private String licenseRequired;
+
+    /** 平台统一说明模板 */
+    private String complianceNotice;
 
     /** 显示顺序 */
     @Excel(name = "显示顺序")
@@ -118,6 +142,23 @@ public class Category extends BaseEntity
     {
         this.merchantId = merchantId;
     }
+
+    public Long getParentId() { return parentId; }
+    public void setParentId(Long parentId) { this.parentId = parentId; }
+    public String getFullPath() { return fullPath; }
+    public void setFullPath(String fullPath) { this.fullPath = fullPath; }
+    public Integer getLevel() { return level; }
+    public void setLevel(Integer level) { this.level = level; }
+    public String getIndustryCode() { return industryCode; }
+    public void setIndustryCode(String industryCode) { this.industryCode = industryCode; }
+    public Long getDepositAmount() { return depositAmount; }
+    public void setDepositAmount(Long depositAmount) { this.depositAmount = depositAmount; }
+    public String getAllowedTypes() { return allowedTypes; }
+    public void setAllowedTypes(String allowedTypes) { this.allowedTypes = allowedTypes; }
+    public String getLicenseRequired() { return licenseRequired; }
+    public void setLicenseRequired(String licenseRequired) { this.licenseRequired = licenseRequired; }
+    public String getComplianceNotice() { return complianceNotice; }
+    public void setComplianceNotice(String complianceNotice) { this.complianceNotice = complianceNotice; }
 
     @Override
     public String toString() {

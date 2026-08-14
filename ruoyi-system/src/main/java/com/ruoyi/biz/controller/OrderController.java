@@ -17,7 +17,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Order;
-import com.ruoyi.biz.api.service.ApiOrderService;
+import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.service.IOrderService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -36,7 +36,7 @@ public class OrderController extends BaseController
     private IOrderService orderService;
 
     @Autowired
-    private ApiOrderService apiOrderService;
+    private ApiOrderServiceImpl apiOrderService;
 
     /**
      * 查询订单列表
@@ -109,7 +109,7 @@ public class OrderController extends BaseController
     /**
      * 核销订单（后台 web 端：店长/收银员输入核销码）
      *
-     * <p>复用 {@link ApiOrderService#verify} 业务逻辑：校验 status=1、未过期，
+     * <p>复用 {@link ApiOrderServiceImpl#verify} 业务逻辑：校验 status=1、未过期，
      * 置为 status=2 + verify_time/verify_user。requirePermi 与 storeId 的额外
      * 校验由调用方（运营/店长）通过 sys_user 的角色限定（biz:order:verify 权限）。</p>
      */
