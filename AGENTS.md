@@ -43,6 +43,32 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 - 详情见 doc/多商户与代理商改造方案.md 6. 实施顺序表（12 项 ✅）
 
 
+
+## A2 佣金冷静期余额联动闭环（2026-08-14 · 1 commit）
+
+> 背景（doc/下一轮迭代清单-2026-08-05.md A2）：佣金产生时没联动 frozen_amount，
+> 冷静期到期 transfer 找不到 amount 来源；订单退款不联动 available 减扣。
+
+### 已闭环
+- **commit 2701f1e7**：`CommissionServiceImpl.insertCommission` 成功后调 `distributorMapper.incFrozenAmount(#{amount})`
+  - 同一事务，insert 失败/amount 为 null 都不调
+  - 冷静期到期由 SettleCommissionTask.linkSettlementToDistributor 做 frozen→available 转换（已有，未改）
+
+### 端到端验证（distributor 1003 baseline frozen=0）
+- POST 5.00 → frozen 0→5 ✅
+- POST 8.00 → frozen 5→13 ✅
+- 改 create_time 8 天前 + 触发 SettleCommissionTask
+  → frozen 13→0 / available 16.6→29.6 / total 7.6→20.6 / commission 2 笔 status 0→1 ✅
+
+### A2 TODO2（未做）
+- 订单退款回调 → commission.status=2 → 已结算过则 available -= amount
+- 现状：业务系统**没有 Order 退款入口/Service**（status 0~4 简单流程无 refund 端点）
+- 不是"已存在但联动漏了"，是"功能未实装"——超出 A2 范围
+- 后续若加退款功能，需在 Order 退款回调里挂 commission 联动
+
+### A3 release UI（已实装，doc 误判）
+- 实际状态：MpReleaseController 8 端点 + UI 8 按钮 + 4 API（list/getInfo/add/edit/extjson + submit/undo/release）全部就绪
+- doc/下一轮迭代清单-2026-08-05.md 标"未做"是误判
 ## A1 业务表租户过滤闭环（2026-08-14 · 5 commit）
 
 > 背景（doc/下一轮迭代清单-2026-08-05.md A1）：代理商/商户账号调 /biz/order/list 等业务表
