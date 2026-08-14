@@ -113,6 +113,10 @@ public class ApiOrderServiceImpl implements IApiOrderService
         order.setDiscountAmount(discount);
         order.setPayAmount(payAmount);
         order.setMemberVoucherId(memberVoucherId);
+        // 前端传了 distributorId 优先用（推客场景：扫太阳码下单时 URL 带 distributorId）
+        if (distributorId != null) {
+            order.setDistributorId(distributorId);
+        }
         // 如果前端没传 distributorId 但当前会员是被邀请用户，邀请人是推客时自动归属
         if (order.getDistributorId() == null) {
             Member me = memberService.selectMemberByMemberId(memberId);

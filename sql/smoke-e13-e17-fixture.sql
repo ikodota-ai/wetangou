@@ -62,8 +62,8 @@ INSERT INTO biz_commission (commission_id, merchant_id, distributor_id, order_id
 ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
 
 INSERT INTO biz_commission_rule (rule_id, merchant_id, rule_name, level, rate, settle_days, status, create_time) VALUES
-  (999201, 2, 'SMOKE_RULE_999201', 1, 0.10, 7, '0', NOW()),
-  (999202, 1, 'SMOKE_RULE_999202', 1, 0.10, 7, '0', NOW())
+  (999201, 2, 'SMOKE_RULE_999201', 1, 10.00, 7, '0', NOW()),
+  (999202, 1, 'SMOKE_RULE_999202', 1, 10.00, 7, '0', NOW())
 ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
 
 -- E16: 6 controllers (mid=2 别人 / mid=1 自己)
