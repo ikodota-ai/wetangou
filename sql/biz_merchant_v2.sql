@@ -81,9 +81,8 @@ CREATE VIEW biz_store_user_v AS
 
 -- 4) 数据迁移：把现有 biz_store_user 数据同步到 biz_merchant_staff
 INSERT INTO biz_merchant_staff (merchant_id, store_id, user_id, role, status, create_time)
-SELECT IFNULL(merchant_id, 0), store_id, user_id, 'STAFF', status, create_time
+SELECT IFNULL(merchant_id, 0), store_id, user_id, 'STAFF', create_time
 FROM biz_store_user
-WHERE del_flag = '0'
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
 -- 5) biz_merchant_staff_invite 邀请码表
@@ -109,8 +108,12 @@ CREATE TABLE biz_merchant_staff_invite (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT = '商家员工邀请码表';
 
 -- 6) 索引：提升查询效率
-ALTER TABLE biz_merchant_staff ADD INDEX idx_staff_merchant (merchant_id);
-ALTER TABLE biz_merchant_staff_invite ADD INDEX idx_invite_status (status, expire_at);
+SET @idx := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_merchant_staff' AND INDEX_NAME = 'idx_staff_merchant');
+SET @sql := IF(@idx = 0, 'ALTER TABLE biz_merchant_staff ADD INDEX idx_staff_merchant (merchant_id)', 'SELECT "idx_staff_merchant exists" AS msg');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+SET @idx := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_merchant_staff_invite' AND INDEX_NAME = 'idx_invite_status');
+SET @sql := IF(@idx = 0, 'ALTER TABLE biz_merchant_staff_invite ADD INDEX idx_invite_status (status, expire_at)', 'SELECT "idx_invite_status exists" AS msg');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- ============================================================
 -- 商家员工/邀请码 admin 菜单（idempotent）
@@ -121,30 +124,30 @@ ALTER TABLE biz_merchant_staff_invite ADD INDEX idx_invite_status (status, expir
 -- 1) 员工管理菜单（若已存在则忽略）
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '员工管理',
-       (SELECT menu_id FROM sys_menu WHERE menu_name = '门店商品' AND parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '团购运营' AND parent_id = 0) AND del_flag = '0' LIMIT 1),
+       (SELECT menu_id FROM sys_menu WHERE menu_name = '门店商品' AND parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '团购运营' AND parent_id = 0) LIMIT 1 LIMIT 1),
        6, 'staffInvite', 'biz/staffInvite/index', 1, 0, 'C', '0', '0', 'biz:staffInvite:list', 'peoples', 'admin', SYSDATE(), '商家员工邀请码 + 员工名单管理'
 FROM (SELECT 1) t
-WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE component = 'biz/staffInvite/index' AND del_flag = '0');
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE component = 'biz/staffInvite/index' LIMIT 1);
 
 -- 2) 按钮权限（list / add / edit / remove / query / export）
 --    按 ruoyi 习惯直接用 menu_id 拼 perms，这里用存储过程式逐行插入
-SET @m_staff = (SELECT menu_id FROM sys_menu WHERE component = 'biz/staffInvite/index' AND del_flag = '0' LIMIT 1);
+SET @m_staff = (SELECT menu_id FROM sys_menu WHERE component = 'biz/staffInvite/index' LIMIT 1 LIMIT 1);
 
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '员工查询', @m_staff, 1, '', '', 1, 0, 'F', '0', '0', 'biz:staffInvite:query', '#', 'admin', SYSDATE(), ''
-FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:query' AND del_flag = '0');
+FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:query' LIMIT 1);
 
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '生成邀请码', @m_staff, 2, '', '', 1, 0, 'F', '0', '0', 'biz:staffInvite:add', '#', 'admin', SYSDATE(), ''
-FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:add' AND del_flag = '0');
+FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:add' LIMIT 1);
 
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '修改员工', @m_staff, 3, '', '', 1, 0, 'F', '0', '0', 'biz:staffInvite:edit', '#', 'admin', SYSDATE(), ''
-FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:edit' AND del_flag = '0');
+FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:edit' LIMIT 1);
 
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '删除员工', @m_staff, 4, '', '', 1, 0, 'F', '0', '0', 'biz:staffInvite:remove', '#', 'admin', SYSDATE(), ''
-FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:remove' AND del_flag = '0');
+FROM (SELECT 1) t WHERE @m_staff IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'biz:staffInvite:remove' LIMIT 1);
 
 -- 3) 把菜单 + 按钮权限授予 admin 角色（其它角色按需自行分配）
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id)

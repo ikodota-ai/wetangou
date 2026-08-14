@@ -41,8 +41,7 @@ select
   status,
   create_by,
   create_time
-from biz_category
-where del_flag = '0';
+from biz_category -- v2 注: 旧表无 del_flag 列，迁移全部数据
 
 -- 9) 同步商品表的 industry_code（基于其原 category_id 反查）
 update biz_product p
