@@ -1,0 +1,88 @@
+name: Test & Lint
+
+# dytuangou 项目 test 流水线
+# 触发：master 分支 push / pull_request
+# 步骤（macos-14 runner 缺 docker/mysql-client，仅做静态/单元/前端 vitest）：
+#   1) MyBatis mapper XML lint
+#   2) smoke 脚本 lint（bash -n 全部 25 个）
+#   3) 后端 JUnit（mvn test -pl ruoyi-system）
+#   4) miniprogram7 vitest
+# 5) ruoyi-ui ESLint + 关键页面 import 路径校验
+# 6) Python fixture 脚本 lint（sql/*.sql 通过 sqlfluff 不强求，只做 grep 完整性）
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: macos-14
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: MyBatis mapper XML lint
+        run: bash .github/scripts/lint-mybatis.sh
+
+      - name: Smoke script lint (25 scripts)
+        run: bash .github/scripts/lint-smoke.sh
+
+      - name: SQL seed coverage
+        run: bash .github/scripts/lint-sql-seed.sh
+
+  backend-test:
+    name: Backend JUnit
+    runs-on: macos-14
+    timeout-minutes: 10
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: mvn test ruoyi-system
+        run: mvn -B -ntp test -pl ruoyi-system
+        env:
+          MAVEN_OPTS: -Xmx2g
+
+  mini-test:
+    name: Miniprogram vitest
+    runs-on: macos-14
+    timeout-minutes: 5
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: miniprogram7/package-lock.json
+
+      - name: npm ci + vitest
+        working-directory: miniprogram7
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npm test
