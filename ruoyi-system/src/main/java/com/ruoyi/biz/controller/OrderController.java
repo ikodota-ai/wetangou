@@ -20,9 +20,9 @@ import com.ruoyi.biz.domain.Order;
 import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.service.IOrderService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
-import com.ruoyi.common.core.domain.model.TenantContext;
-import com.ruoyi.common.utils.TenantContextHolder;
 
 /**
  * 订单Controller
@@ -44,47 +44,13 @@ public class OrderController extends BaseController
      * 查询订单列表
      */
 
-    /**
-     * 按当前租户上下文强制设置订单查询过滤条件（A1 防跨租户泄漏）
-     *
-     * <ul>
-     *   <li>平台账号（userType=0）：不强制，覆盖全平台</li>
-     *   <li>代理商账号（userType=1）：强制限定到名下商户集合，agent_id 不能由前端覆盖</li>
-     *   <li>商户账号（userType=2）：强制限定到自己的 merchant_id，前端传的 merchantId 须一致</li>
-     * </ul>
-     */
-    private void applyTenantFilter(Order order)
-    {
-        TenantContext ctx = TenantContextHolder.get();
-        if (ctx == null || ctx.isPlatform()) {
-            return;
-        }
-        if (ctx.isAgent()) {
-            List<Long> ids = ctx.getMerchantIds();
-            if (ids == null || ids.isEmpty()) {
-                // 代理商名下无商户 → 强制返回空集
-                order.getParams().put("merchantIdsIn", "-1");
-                return;
-            }
-            // 覆盖前端传的 merchantId，强制限定到名下商户
-            order.getParams().put("merchantIdsIn", ids);
-            return;
-        }
-        if (ctx.isMerchant()) {
-            Long mid = ctx.getMerchantId();
-            // 商户强制按 token 的 merchantId 过滤；前端若传 merchantId 须一致
-            if (order.getMerchantId() != null && !order.getMerchantId().equals(mid)) {
-                throw new com.ruoyi.common.exception.ServiceException("无权查询其他商户的订单");
-            }
-            order.setMerchantId(mid);
-            return;
-        }
-    }
     @PreAuthorize("@ss.hasPermi('biz:order:list')")
     @GetMapping("/list")
     public TableDataInfo list(Order order)
     {
-        applyTenantFilter(order);
+        TenantFilterHelper.apply((com.ruoyi.common.core.domain.BaseEntity) order,
+                                    (o, v) -> ((com.ruoyi.biz.domain.Order) o).setMerchantId(v),
+                                    o -> ((com.ruoyi.biz.domain.Order) o).getMerchantId());
         startPage();
         List<Order> list = orderService.selectOrderList(order);
         return getDataTable(list);
@@ -98,7 +64,9 @@ public class OrderController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Order order)
     {
-        applyTenantFilter(order);
+        TenantFilterHelper.apply((com.ruoyi.common.core.domain.BaseEntity) order,
+                                    (o, v) -> ((com.ruoyi.biz.domain.Order) o).setMerchantId(v),
+                                    o -> ((com.ruoyi.biz.domain.Order) o).getMerchantId());
         List<Order> list = orderService.selectOrderList(order);
         ExcelUtil<Order> util = new ExcelUtil<Order>(Order.class);
         util.exportExcel(response, list, "订单数据");

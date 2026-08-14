@@ -37,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectBookingList" parameterType="Booking" resultMap="BookingResult">
         <include refid="selectBookingVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="merchantId != null "> and b.merchant_id = #{merchantId}</if>
             <if test="bookingNo != null  and bookingNo != ''"> and b.booking_no like concat('%', #{bookingNo}, '%')</if>
             <if test="storeId != null "> and b.store_id = #{storeId}</if>
             <if test="productId != null "> and b.product_id = #{productId}</if>
@@ -45,6 +45,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="bookingDate != null "> and b.booking_date = #{bookingDate}</if>
             <if test="timeSlot != null  and timeSlot != ''"> and b.time_slot = #{timeSlot}</if>
             <if test="status != null  and status != ''"> and b.status = #{status}</if>
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and b.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and b.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
             <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(b.store_id, #{params.storeIds})</if>
         </where>
         order by b.booking_date desc, b.booking_id desc

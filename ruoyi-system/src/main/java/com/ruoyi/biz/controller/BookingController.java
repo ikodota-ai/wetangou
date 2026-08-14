@@ -20,6 +20,7 @@ import com.ruoyi.biz.domain.Booking;
 import com.ruoyi.biz.domain.BookingMember;
 import com.ruoyi.biz.service.IBookingService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -42,6 +43,9 @@ public class BookingController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Booking booking)
     {
+        TenantFilterHelper.apply((com.ruoyi.common.core.domain.BaseEntity) booking,
+                                    (b, v) -> ((com.ruoyi.biz.domain.Booking) b).setMerchantId(v),
+                                    b -> ((com.ruoyi.biz.domain.Booking) b).getMerchantId());
         startPage();
         List<Booking> list = bookingService.selectBookingList(booking);
         return getDataTable(list);
@@ -55,6 +59,9 @@ public class BookingController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Booking booking)
     {
+        TenantFilterHelper.apply((com.ruoyi.common.core.domain.BaseEntity) booking,
+                                    (b, v) -> ((com.ruoyi.biz.domain.Booking) b).setMerchantId(v),
+                                    b -> ((com.ruoyi.biz.domain.Booking) b).getMerchantId());
         List<Booking> list = bookingService.selectBookingList(booking);
         ExcelUtil<Booking> util = new ExcelUtil<Booking>(Booking.class);
         util.exportExcel(response, list, "在线预约数据");
