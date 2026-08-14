@@ -370,3 +370,20 @@ git push origin master
 ### 无回归
 - C1 smoke 3/3 PASSED
 - E1 subitemGroups 双向兼容仍正常
+
+## E3 推进（2026-08-14 · 19:56 · commit e66fa510）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E3
+- biz_mp_auth +2 行（merchant 1 已授权 wx9e147c4e2151b123，merchant 200 待授权）
+- biz_settle_account +3 行（merchant 1: 70% 商户 + 30% 平台 / merchant 200: 10% 推客）
+- biz_settle_record +4 行（order 1001 成功分 2 笔 70+30 / order 1002 处理中 / order 1003 失败）
+
+### 端到端验证
+- GET /biz/mpauth/list → total=2
+- GET /biz/account/list → total=3
+- GET /biz/record/list → total=4
+
+### 业务演示价值
+- 70/30 平台抽佣比例（典型 SaaS 模式）
+- 3 种 receiver_type（MERCHANT_ID / PLATFORM / DISTRIBUTOR_ID）
+- 3 种 status（1 成功 / 0 处理中 / 2 失败）
