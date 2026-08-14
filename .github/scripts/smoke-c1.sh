@@ -19,6 +19,11 @@ TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \
   "$BASE_URL/login" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
 [ -n "$TOKEN" ] || { echo "FAIL: login no token"; exit 1; }
 
+# 清理 E15/E16 smoke fixture 中可能污染 c1 断言的数据 (commission 999x + commission 999x 各自 80)
+if command -v /usr/local/mysql/bin/mysql >/dev/null 2>&1; then
+  /usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue -e "DELETE FROM biz_commission WHERE commission_id IN (999201, 999202);" 2>/dev/null || true
+fi
+
 # 2) agentId=1
 RESP=$(curl -s "$BASE_URL/biz/agent/commission/summary?agentId=1" -H "Authorization: $TOKEN")
 echo "[A] agentId=1: $(echo $RESP | head -c 200)"
