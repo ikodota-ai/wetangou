@@ -137,6 +137,13 @@
           <el-button
             size="mini"
             type="text"
+            icon="el-icon-picture"
+            @click="handleQrcode(scope.row)"
+            v-hasPermi="['biz:distributor:query']"
+          >二维码</el-button>
+          <el-button
+            size="mini"
+            type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
             v-hasPermi="['biz:distributor:remove']"
@@ -204,11 +211,34 @@
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
+
+    <!-- E4: 推客太阳码预览 -->
+    <el-dialog title="推客太阳码" :visible.sync="qrcodeOpen" width="420px" append-to-body>
+      <div style="text-align:center;">
+        <div v-if="qrcodeLoading" v-loading="true" style="height:320px;"></div>
+        <template v-else>
+          <el-image
+            v-if="qrcodeUrl"
+            :src="qrcodeUrl"
+            fit="contain"
+            style="width:360px;height:360px;border:1px solid #ebeef5;"
+          />
+          <div style="margin-top:12px;color:#909399;font-size:12px;">
+            scene: <code>{{ qrcodeScene }}</code>
+            <span v-if="qrcodeCached" style="margin-left:8px;color:#67c23a;">[缓存命中]</span>
+          </div>
+          <div style="margin-top:8px;">
+            <el-link :href="qrcodeUrl" target="_blank" type="primary">新窗口打开</el-link>
+          </div>
+        </template>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
 <script>
-import { listDistributor, getDistributor, delDistributor, addDistributor, updateDistributor } from "@/api/biz/distributor"
+import { listDistributor, getDistributor, delDistributor, addDistributor, updateDistributor, getDistributorQrcode } from "@/api/biz/distributor"
 
 export default {
   name: "Distributor",
@@ -254,12 +284,35 @@ export default {
         memberId: [
           { required: true, message: "会员ID不能为空", trigger: "blur" }
         ],
-      }
+      },
+      // E4: 推客太阳码预览
+      qrcodeOpen: false,
+      qrcodeLoading: false,
+      qrcodeUrl: '',
+      qrcodeScene: '',
+      qrcodeCached: false
     }
   },
   created() {
     this.getList()
   },
+    /** E4: 推客太阳码预览 */
+    handleQrcode(row) {
+      this.qrcodeOpen = true
+      this.qrcodeLoading = true
+      this.qrcodeUrl = ''
+      this.qrcodeScene = ''
+      this.qrcodeCached = false
+      getDistributorQrcode(row.distributorId).then(res => {
+        this.qrcodeLoading = false
+        this.qrcodeUrl = res.url || ''
+        this.qrcodeScene = res.scene || ''
+        this.qrcodeCached = res.cached === true
+      }).catch(() => {
+        this.qrcodeLoading = false
+        this.$message.error('获取二维码失败')
+      })
+    },
   methods: {
     isShowMerchantFilter() {
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''

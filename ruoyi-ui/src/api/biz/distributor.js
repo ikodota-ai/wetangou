@@ -42,3 +42,11 @@ export function delDistributor(distributorId) {
     method: 'delete'
   })
 }
+
+// 推客太阳码（admin 端预览）
+export function getDistributorQrcode(distributorId) {
+  return request({
+    url: '/biz/distributor/qrcode', params: { distributorId: distributorId },
+    method: 'get'
+  })
+}

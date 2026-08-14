@@ -455,3 +455,31 @@ git push origin master
 - 推客「我的海报」每次海报渲染不重复调 wxacode 接口，节省微信侧配额
 - 同一 member 跨设备/跨请求稳定返同一 URL，海报缓存可生效
 - 文件层（不上 Redis）零额外依赖
+
+## E4 推进（2026-08-14 · 20:55 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E4
+- **新后端端点**：`ruoyi-admin/.../BizDistributorController.qrcode(Long distributorId)` —— `GET /biz/distributor/qrcode?distributorId=...`
+  - 用 query string 而非 path 变量，避开 `/{distributorId}` 与已有 `DistributorController` 冲突
+  - 完全复用 E10 文件层缓存逻辑（按 `qr_<memberId>_*.png` 命中复用）
+  - 响应体增 `cached:boolean`，前端可显示「缓存命中」标记
+- **新前端 API**：`ruoyi-ui/src/api/biz/distributor.js` 加 `getDistributorQrcode(distributorId)`，path `/biz/distributor/qrcode?distributorId=...`
+- **前端页面**：`ruoyi-ui/src/views/biz/distributor/index.vue`
+  - 操作列加「二维码」按钮（`v-hasPermi="biz:distributor:query"`）
+  - 新增「推客太阳码」el-dialog 弹窗（el-image + scene + cached 标记 + 新窗口打开）
+  - data + method 加 `qrcodeOpen / qrcodeLoading / qrcodeUrl / qrcodeScene / qrcodeCached` + `handleQrcode(row)`
+
+### 调试 1 个坑
+- 第一版把端点放 `ruoyi-system/.../DistributorController`，编译 OK 但启动报 `Ambiguous mapping` —— 该 controller 已有 `GET /{distributorId}`，新的 `GET /qrcode/{id}` 被识别为 `/{distributorId}=qrcode` 冲突。改用 query string 后 OK。
+- `ruoyi-system` 模块也引不到 `ruoyi-framework.config.ServerConfig`（跨模块依赖隔离），所以放回 `ruoyi-admin` 加新 controller。
+
+### 验证（jar PID 58832）
+- `.github/scripts/smoke-e4.sh`: 4/4 PASSED
+  - A 首次：admin token + distributorId=1000 返 cached=false + 落盘 qr_1001_*.png + scene=distributor:1:1001
+  - B 二次：cached=true + URL 完全一致 + 文件数稳定
+  - C no auth: body.code=401
+- 回归：smoke-c1 3/3 / smoke-subitem 4/4 / smoke-e10 4/4 / lint-mybatis 0 errors
+
+### 业务价值
+- 运营可在 admin 端看任一推客的太阳码，截图下发到推广群
+- admin 与小程序端共用同组 qr_*.png 文件，缓存命中避免重复调 wxacode
