@@ -387,3 +387,19 @@ git push origin master
 - 70/30 平台抽佣比例（典型 SaaS 模式）
 - 3 种 receiver_type（MERCHANT_ID / PLATFORM / DISTRIBUTOR_ID）
 - 3 种 status（1 成功 / 0 处理中 / 2 失败）
+
+## E8 推进（2026-08-14 · 20:26 · commit dd858b42）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E8
+- 新增 .github/scripts/lint-mybatis.sh（71 行 / 0.3s 扫 49 个 xml）
+- 集成到 CI build job（mvn package 之前）
+
+### 4 类检测
+1. ElementTree 解析（非法 XML 立即 fail）
+2. </mapper> 后是否还有非空白内容（**e5fc6735 类 bug 根因**）
+3. namespace 唯一性
+4. 缺 </mapper> 结束标签
+
+### 验证
+- 当前 49 个 xml: errors=0
+- 注入孤立 left join: PARSE_ERROR detected → exit 1
