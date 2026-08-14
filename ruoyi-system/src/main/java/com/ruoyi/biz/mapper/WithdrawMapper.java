@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Withdraw;
 
 /**
@@ -17,6 +18,7 @@ public interface WithdrawMapper
      * @param withdrawId 提现记录主键
      * @return 提现记录
      */
+    @IgnoreTenant
     public Withdraw selectWithdrawByWithdrawId(Long withdrawId);
 
     /**

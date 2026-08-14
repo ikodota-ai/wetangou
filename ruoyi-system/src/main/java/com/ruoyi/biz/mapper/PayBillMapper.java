@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.PayBill;
 
 /**
@@ -17,6 +18,7 @@ public interface PayBillMapper
      * @param billId 买单流水主键
      * @return 买单流水
      */
+    @IgnoreTenant
     public PayBill selectPayBillByBillId(Long billId);
 
     /**

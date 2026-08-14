@@ -78,7 +78,12 @@ public class WithdrawController extends BaseController
     @GetMapping(value = "/{withdrawId}")
     public AjaxResult getInfo(@PathVariable("withdrawId") Long withdrawId)
     {
-        return success(withdrawService.selectWithdrawByWithdrawId(withdrawId));
+        Withdraw withdraw = withdrawService.selectWithdrawByWithdrawId(withdrawId);
+        if (withdraw != null)
+        {
+            TenantFilterHelper.assertDataScope(withdraw.getMerchantId());
+        }
+        return success(withdraw);
     }
 
     /**

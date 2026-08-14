@@ -19,6 +19,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.SettleAccount;
 import com.ruoyi.biz.service.ISettleAccountService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -66,7 +67,12 @@ public class SettleAccountController extends BaseController
     @GetMapping(value = "/{accountId}")
     public AjaxResult getInfo(@PathVariable("accountId") Long accountId)
     {
-        return success(settleAccountService.selectSettleAccountByAccountId(accountId));
+        SettleAccount settleAccount = settleAccountService.selectSettleAccountByAccountId(accountId);
+        if (settleAccount != null)
+        {
+            TenantFilterHelper.assertDataScope(settleAccount.getMerchantId());
+        }
+        return success(settleAccount);
     }
 
     /**

@@ -77,7 +77,12 @@ public class PayBillController extends BaseController
     @GetMapping(value = "/{billId}")
     public AjaxResult getInfo(@PathVariable("billId") Long billId)
     {
-        return success(payBillService.selectPayBillByBillId(billId));
+        PayBill payBill = payBillService.selectPayBillByBillId(billId);
+        if (payBill != null)
+        {
+            TenantFilterHelper.assertDataScope(payBill.getMerchantId());
+        }
+        return success(payBill);
     }
 
     /**

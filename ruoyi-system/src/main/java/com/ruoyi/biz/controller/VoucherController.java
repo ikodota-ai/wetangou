@@ -74,7 +74,12 @@ public class VoucherController extends BaseController
     @GetMapping(value = "/{voucherId}")
     public AjaxResult getInfo(@PathVariable("voucherId") Long voucherId)
     {
-        return success(voucherService.selectVoucherByVoucherId(voucherId));
+        Voucher voucher = voucherService.selectVoucherByVoucherId(voucherId);
+        if (voucher != null)
+        {
+            TenantFilterHelper.assertDataScope(voucher.getMerchantId());
+        }
+        return success(voucher);
     }
 
     /**

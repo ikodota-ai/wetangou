@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.SettleAccount;
 
 /**
@@ -17,6 +18,7 @@ public interface SettleAccountMapper
      * @param accountId 分账接收方主键
      * @return 分账接收方
      */
+    @IgnoreTenant
     public SettleAccount selectSettleAccountByAccountId(Long accountId);
 
     /**

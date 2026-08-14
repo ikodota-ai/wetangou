@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.Voucher;
 
 /**
@@ -17,6 +18,7 @@ public interface VoucherMapper
      * @param voucherId 代金券模板主键
      * @return 代金券模板
      */
+    @IgnoreTenant
     public Voucher selectVoucherByVoucherId(Long voucherId);
 
     /**

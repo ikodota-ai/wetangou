@@ -696,3 +696,46 @@ E13 OrderController 越权显式 guard:
 - 优先级：MemberController（手机号/余额）/ PayBillController（支付凭证）/ VoucherController（卡密）
 - 模式固定：mapper 加 @IgnoreTenant + service/controller 调 `assertDataScope` + smoke 验证
 - 收尾 21 个 advisory 后，删除 `audit-controller-scope.sh`（使命完成）
+
+## E14 收口（2026-08-14 · 22:55 · commit <待定>）
+
+### 背景
+E13 验证「`@IgnoreTenant` + `assertDataScope` 显式 guard」模式可推广。E12 advisory 还剩 20 个 ⚠️ controller，按数据敏感度分 4 批推进。本批 P0 = 5 个资金/凭证/卡密类。
+
+### P0 batch 1 — 5 controller（10 文件 / +37 行）
+| Controller | 资源 | 风险 |
+|---|---|---|
+| PayBillController | 买单流水 | 💰 金额/订单关联 |
+| VoucherController | 代金券模板 | 🎟️ 券面额/库存 |
+| WithdrawController | 提现记录 | 💸 提现金额/账户 |
+| SettleRecordController | 分账明细 | 💰 分账金额 |
+| SettleAccountController | 分账接收方 | 🏦 账户号/比例 |
+
+### 改动模式（完全对齐 E13）
+1. mapper `selectXxxByYyyId` 加 `@IgnoreTenant`（让 SQL 不被自动改写，能取到原始 merchantId）
+2. controller getInfo 取 obj + `TenantFilterHelper.assertDataScope(obj.getMerchantId())` + 返 success(obj)
+3. SettleRecord/SettleAccount 需补 `import com.ruoyi.biz.tenant.TenantFilterHelper;`（PayBill/Voucher/Withdraw 已有）
+
+### 验证（15/15 PASS）
+```
+E14 P0 batch (5 controllers: PayBill/Voucher/Withdraw/SettleRecord/SettleAccount):
+  ✅ PayBill/Voucher/Withdraw/SettleRecord/SettleAccount
+     agent001 -> 别人 999101: 500 没有权限
+     agent001 -> 自己 999102: 200 操作成功
+     admin    -> 别人 999101: 200 操作成功 (平台 bypass)
+```
+
+### 全套回归（7/7 PASS）
+- smoke-c1 3/3 · smoke-subitem 4/4 · smoke-e10 4/4 · smoke-e4 4/4 · smoke-e11 6/6 · smoke-e13 5/5 · **smoke-e14 15/15**
+- mvn test -pl ruoyi-system 10/10
+
+### 业务价值
+- P0 5 个高敏数据 controller 越权行为从「200+空 data」变「500 没有权限」
+- 模式已稳定，剩余 15 个 P1~P3 controller 可批量套用（每次 ~10 min）
+- 模板：`smoke-e14.sh` 复制后改 spec 即可
+
+### 后续 batch 计划
+- **E15 P1（6 controller）**: Member / MerchantFee / AgentFee / Distributor / Commission / CommissionRule
+- **E16 P2（6 controller）**: Product / Category / Store / StoreAlbum / Booking / Banner
+- **E17 P3（3 controller）**: Agreement / MpAuth / MpRelease
+- 收尾后删 `.github/scripts/audit-controller-scope.sh`（使命完成）

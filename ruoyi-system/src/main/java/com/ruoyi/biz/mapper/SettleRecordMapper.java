@@ -1,6 +1,7 @@
 package com.ruoyi.biz.mapper;
 
 import java.util.List;
+import com.ruoyi.common.annotation.IgnoreTenant;
 import com.ruoyi.biz.domain.SettleRecord;
 
 /**
@@ -17,6 +18,7 @@ public interface SettleRecordMapper
      * @param recordId 分账明细主键
      * @return 分账明细
      */
+    @IgnoreTenant
     public SettleRecord selectSettleRecordByRecordId(Long recordId);
 
     /**
