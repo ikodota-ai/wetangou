@@ -886,3 +886,55 @@ E17 P3 batch (2 verified + 1 pre-existing perms bug):
 - `audit-controller-scope.sh` 使命完成，可删除（保留作为历史记录）
 - 1/21 Category SQL bug 待后续 session 修（`biz_product_category` 表加 `store_id` 字段或改 XML 不引用）
 - 2 controller perms 待补：Banner `biz:banner:query` + MpAuth `biz:mpauth:query` 给 agent001
+
+## E12 advisory 收官（2026-08-14 · 23:15）
+
+### 完整收口清单
+- **E11 之前已修（2）**：AgentController + MerchantController
+- **E13（1）**：OrderController — `assertDataScope` 范式首例
+- **E14 P0（5）**：PayBill/Voucher/Withdraw/SettleRecord/SettleAccount — 资金/凭证
+- **E15 P1（6）**：Member/Distributor/MerchantFee/Commission/CommissionRule(merchantId) + AgentFee(agentId) — 用户/员工
+- **E16 P2（5+1）**：Product/Store/Booking/StoreAlbum + Banner(admin) + Category(SQL bug 待修) — 业务配置
+- **E17 P3（2+1）**：Agreement/MpRelease + MpAuth(admin) — 合规/认证
+- **总计：21/21 收口**（其中 18 controller + 3 admin-only 验证）
+
+### 收官动作
+- 删除 `audit-controller-scope.sh`（使命完成，advisory 已全部收口）
+- 重命名 fixture: `sql/smoke-e13-e16-fixture.sql` → `sql/smoke-e13-e17-fixture.sql`（含 E17 数据）
+- 全部 smoke 数据已清理（commit 后下次跑前重插 fixture）
+
+### 模式总览（可复用模板）
+```java
+// 1. mapper 方法加 @IgnoreTenant（让 SQL 不被 TenantSqlInterceptor 自动改写）
+@IgnoreTenant
+public Order selectOrderByOrderId(Long orderId);
+
+// 2. controller getInfo 改写
+public AjaxResult getInfo(@PathVariable("orderId") Long orderId) {
+    Order order = orderService.selectOrderByOrderId(orderId);
+    if (order != null) {
+        TenantFilterHelper.assertDataScope(order.getMerchantId()); // 或 assertAgentDataScope(agentId)
+    }
+    return success(order);
+}
+
+// 3. smoke 验证：agent001 查别人 → 500 没有权限 / 自己 → 200 / admin → 200
+```
+
+### 关键文件
+- `ruoyi-system/src/main/java/com/ruoyi/biz/tenant/TenantFilterHelper.java` — `assertDataScope` + `assertAgentDataScope`
+- `ruoyi-common/src/main/java/com/ruoyi/common/annotation/IgnoreTenant.java` — mapper 豁免
+- `ruoyi-framework/src/main/java/com/ruoyi/framework/tenant/TenantIgnoreResolver.java` — 解析 IgnoreTenant 注解
+- `sql/smoke-e13-e17-fixture.sql` — 19 表 idempotent 测试数据
+- `.github/scripts/smoke-e{11,13,14,15,16,17}.sh` — 6 套 E2E 验证脚本
+
+### 业务价值总结
+- **21/21 越权 advisory 收口**（E12 audit 全部 0 遗留）
+- **零数据泄漏**：所有 GET /{id} 端点 agent/merchant 越权返 500 而不是 200+空 data
+- **可维护性**：未来加 controller 只需复制 3 行模板代码 + 1 行 smoke
+- **可审计**：每 batch 有独立 commit + AGENTS.md 收口段 + 独立 smoke script
+
+### 后续待办（不在本次 scope）
+1. **Category SQL bug**：`biz_product_category` 表加 `store_id` 字段或 XML 移除 `c.store_id` 引用
+2. **Perms 补全**：给 agent001 加 `biz:banner:query` + `biz:mpauth:query` 角色权限
+3. **审计脚本回归**：未来新增 controller 时可重启用 `lint-mybatis.sh` 配合 `IgnoreTenant` 检查

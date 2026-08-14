@@ -98,3 +98,19 @@ INSERT INTO biz_banner (banner_id, merchant_id, title, image_url, position, stat
 ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
 
 SELECT 'all smoke data inserted (idempotent)' AS step;
+
+-- E17: 3 controllers (mid=2 别人 / mid=1 自己)
+INSERT INTO biz_agreement (agreement_id, agreement_type, merchant_id, title, content, status, create_time) VALUES
+  (999401, 'SERVICE', 2, 'SMOKE_AGR_999401', 'content 999401', '0', NOW()),
+  (999402, 'SERVICE', 1, 'SMOKE_AGR_999402', 'content 999402', '0', NOW())
+ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
+
+INSERT INTO biz_mp_auth (auth_id, merchant_id, appid, nick_name, auth_status, create_time) VALUES
+  (999401, 2, 'smoke_app_999401', 'SMOKE_AUTH_999401', '0', NOW()),
+  (999402, 1, 'smoke_app_999402', 'SMOKE_AUTH_999402', '0', NOW())
+ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
+
+INSERT INTO biz_mp_release (release_id, merchant_id, appid, user_version, release_status, create_time) VALUES
+  (999401, 2, 'smoke_app_999401', 'v1.0', '0', NOW()),
+  (999402, 1, 'smoke_app_999402', 'v1.0', '0', NOW())
+ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
