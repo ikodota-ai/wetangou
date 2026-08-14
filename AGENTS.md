@@ -132,3 +132,56 @@ c0127c64 feat(admin): v2 admin 端 controller + 部署配置
 4e071924 feat(sql): v2 商品模型 + 商家员工表迁移脚本（业务）
 5f435ace chore: ignore 抖音来客参考素材 + node_modules 等不入库产物
 ```
+
+## 下一轮迭代清单 15 项收口（2026-08-14 · 25 commit）
+
+> 来源：`doc/下一轮迭代清单-2026-08-05.md` 状态审计表。
+
+### 最终状态
+- **12 项 doc 误判**（A3/A4/A5/B1/B2/B3/C1/C2/D1/D2/D3 + 部分 A2）：实际已实装或采用不同方案
+- **5 项本轮闭环**（A1 / A2 / A3 / C1 / D4）：A1 12 Service 切片、A2 frozen 联动、A3 release UI 8 端点、C1 admin UI 容器、D4 CI
+- **0 项未做**：15 项 doc 全部闭环 🎉
+
+### 25 commit 速查（本 session）
+```
+7daf9f60 fix(biz): C1 端点 snake→camel + IFNULL 兜底
+1566425f docs(plan): C1 admin UI 容器实装后状态收口
+8135060e feat(biz): C1 代理商佣金概览 admin 端 UI 容器
+8b7f794b docs(plan): B2/B3/C1/C2/D2 状态审计纠错
+11cca693 feat(ui): BizSelect 改用 webpack require.context 自动注册
+7d31ef3d feat(api): 代理商佣金概览端点
+9b9eb59d docs(plan): doc 状态审计表
+612c5b7d ci(github): Build & Verify 流水线
+305ba002 feat(biz): Member/Voucher/Store/Agreement/CommissionRule 租户过滤
+f89b038f docs(agents): A2 联动闭环 + A3 release UI 误判
+2701f1e7 fix(biz): 佣金 frozen 联动
+cb2e27ad docs(agents): A1 段
+a542ff9d feat(biz): Commission+Product 租户过滤
+86676864 feat(biz): PayBill+Distributor+Withdraw 租户过滤
+46fe6616 feat(biz): TenantFilterHelper + Booking
+5f17bd5a feat(biz): Order 租户过滤
+42a57f5c docs(agents): 修正登录分流话术
+42d24ac1 feat(miniprogram): 商家端-创建商品 page
+088e7b89 feat(api): ApiProductController.add
+985ccc26 docs(PRD): v2.1 对齐 11 种商品类型
+33ecedca feat(ui+sql): admin v2 字典/子品/权限
+09088ba0 feat(ui): typeCode 下拉字典化
+e5fc6735 fix(biz): ProductMapper.xml 孤立 left join
+8704a7eb fix(sql): 适配 RuoYi 默认表结构
+30c9ea6e fix(sql): 拆出 v2 seed 独立文件
+```
+（合并前 5 commit v2 收口，省略）
+
+### 关键 C1 闭环证据
+- 后端：`BizAgentCommissionController` 67 行 + `CommissionMapper.xml` 修 Date 比较 + IFNULL 兜底
+- 前端：`agentCommission.js` API + `agent/index.vue` 加 4 卡（总/已结/待结/商户）+ 名下商户佣金明细表
+- SQL：`sql/biz_agent_commission_c1.sql` 33 行幂等脚本（menu_id=2281, perms=biz:agent:commission:summary）
+- E2E：`GET /biz/agent/commission/summary?agentId=1` → `{totalAmount:62.80, settledAmount:62.80, pendingAmount:0.00, commissionCount:3, byMerchant:[1个商户]}`
+
+### 当前后端进程
+- PID 48484 (java -jar ruoyi-admin/target/ruoyi-admin.jar)
+- 启动 ~1:42，profile=druid，端口 8080
+- 验证：`GET /captchaImage` → 200 (127ms)
+
+### 下一轮起点
+- `doc/下一轮迭代清单-2026-08-14.md`（如已建）or 重新规划
