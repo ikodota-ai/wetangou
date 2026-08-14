@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="big-btn" bindtap="onScan">
+    <view class="ic"></view>
+    <text>扫描员工邀请码</text>
+  </view>
+  <view class="hint">扫描店长分享的二维码后会自动加入商家并跳转到工作台</view>
+</view>

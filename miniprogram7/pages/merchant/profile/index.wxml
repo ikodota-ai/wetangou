@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="hint">扫码加入时已自动读取微信昵称头像；如需补录真实姓名与手机号请填写下面表单。</view>
+  <view class="card">
+    <view class="form-item">
+      <text class="lab">真实姓名</text>
+      <input class="ipt" type="text" placeholder="请输入真实姓名" value="{{realName}}" bindinput="onRealName" maxlength="32" />
+    </view>
+    <view class="form-item">
+      <text class="lab">手机号</text>
+      <input class="ipt" type="number" placeholder="请输入手机号" value="{{phone}}" bindinput="onPhone" maxlength="11" />
+    </view>
+    <view class="form-item">
+      <text class="lab">员工编号</text>
+      <input class="ipt" type="text" placeholder="选填" value="{{staffNo}}" bindinput="onStaffNo" maxlength="32" />
+    </view>
+  </view>
+
+  <view class="btns">
+    <button class="btn-primary" bindtap="onSave" loading="{{loading}}" disabled="{{loading}}" hover-class="none">保 存</button>
+  </view>
+</view>

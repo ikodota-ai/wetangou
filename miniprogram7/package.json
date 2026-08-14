@@ -1,0 +1,13 @@
+{
+  "name": "dytuangou-miniprogram7",
+  "version": "1.0.0",
+  "private": true,
+  "description": "洞天团购小程序（miniprogram7）。WeChat MP 端代码；vitest 仅用于纯函数工具单测。",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}

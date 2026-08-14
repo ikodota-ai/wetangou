@@ -1,0 +1,39 @@
+<view class="page">
+  <view class="top"></view>
+  <view class="title">商家员工登录</view>
+  <view class="sub">扫码加入商家 / 用账号密码登录，登录后可核销与处理预约</view>
+
+  <!-- 扫码加入 -->
+  <view class="scan-card" bindtap="onScan">
+    <view class="scan-ic"></view>
+    <view class="scan-text">
+      <text class="scan-t">扫码加入商家</text>
+      <text class="scan-d">扫描店长分享的「员工邀请码」自动创建账号并绑定门店</text>
+    </view>
+    <view class="arr"></view>
+  </view>
+
+  <view class="divider"><text>或用账号密码登录</text></view>
+
+  <view class="card">
+    <view class="form-item">
+      <text class="lab">账号</text>
+      <input class="ipt" type="text" placeholder="请输入账号" value="{{username}}" bindinput="onUsername" maxlength="32" />
+    </view>
+    <view class="form-item">
+      <text class="lab">密码</text>
+      <input class="ipt" password type="text" placeholder="请输入密码" value="{{password}}" bindinput="onPassword" maxlength="64" />
+    </view>
+  </view>
+
+  <view class="btns">
+    <button class="btn-primary" bindtap="onLogin" loading="{{loading}}" disabled="{{loading}}" hover-class="none">账号密码登录</button>
+  </view>
+
+  <view class="hint">
+    <text>如未绑定微信，登录后会自动引导绑定。账号由店长在后台生成邀请码后扫码分发。</text>
+  </view>
+  <view class="back-home" bindtap="goBackHome">
+    <text>← 返回会员端</text>
+  </view>
+</view>
