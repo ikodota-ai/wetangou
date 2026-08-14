@@ -561,3 +561,26 @@ git push origin master
 - 详情子品 CRUD：之前已实装 ✅
 - 后端 API：上一轮 session `f874259a` 已实装 ✅
 - 后端 E2E smoke：`smoke-subitem.sh` 4/4 PASSED ✅
+
+## E1 收口（2026-08-14 · 21:18 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E1
+- 之前 commit `e495896a` 写了兼容双写（顶层 + data 子对象冗余）
+- 本次删 `ApiProductController` 中 `r.put("data", {product, subitemGroups})` 冗余
+- 现在 subitemGroups **只在顶层**，API 干净
+- 客户端兼容核对：
+  - admin 商品详情用 `listGroups` 端点（不受影响）
+  - 小程序 `miniprogram7/pages/goods/detail/index.js:50` `const groups = d && d.subitemGroups ? d.subitemGroups : (p && p.subitemGroups) || []` 优先读顶层
+  - commit `4209e256` 写的兼容回退（`d.data.subitemGroups`）现在永远走不到（data 里没这字段），但保留也无害
+
+### 验证（jar PID 61350）
+- 直接调 `GET /api/product/2000`（GROUPON）：
+  - `subitemGroups` 在顶层、长度 1、含 groupId/pickRule/subitems 等完整字段
+  - `data.subitemGroups` 字段已不存在（has data.subitemGroups? = False）
+  - `data.product` 也已不存在（has data.product? = False）
+- 回归：lint-mybatis 0 errors / smoke-c1 3/3 / smoke-subitem 4/4 / smoke-e10 4/4 / smoke-e4 4/4 / mvn test 3/3
+
+### 业务价值
+- API 响应体从「双写 + 重复数据」瘦身：原本返 2 份 subitemGroups（顶层 + data 内），现在只 1 份
+- 前端兼容代码（`d.subitemGroups || d.data.subitemGroups`）可后续清理
+- 彻底消除"data 子对象"歧义：响应顶层 = 业务字段，data = AjaxResult 标准包装

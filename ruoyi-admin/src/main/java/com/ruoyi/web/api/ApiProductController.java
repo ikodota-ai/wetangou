@@ -70,23 +70,20 @@ public class ApiProductController
             p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
             p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
         }
-        AjaxResult r = AjaxResult.success(p);
+        // E1 收口：统一 subitemGroups 放顶层。历史曾有 data 子对象冗余，
+        // 现已确认无客户端依赖（admin 用 listGroups 端点，小程序 pages/goods/detail/index.js
+        // 第 50 行读 d.subitemGroups 顶层），删 dataMap 冗余让 API 干净。
+        AjaxResult result = AjaxResult.success(p);
         if (p != null)
         {
             String t = p.getTypeCode() == null ? "" : p.getTypeCode();
             if ("GROUPON".equals(t) || "COMBO".equals(t))
             {
                 List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
-                // 兼容：顶层 + data 子对象都放（前端 miniprogram7/pages/goods/detail/index.js
-                // 先查 d.subitemGroups，老逻辑；新版可查 d.data.subitemGroups）
-                r.put("subitemGroups", groups);
-                java.util.Map<String, Object> dataMap = new java.util.LinkedHashMap<>();
-                dataMap.put("product", p);
-                dataMap.put("subitemGroups", groups);
-                r.put("data", dataMap);
+                result.put("subitemGroups", groups);
             }
         }
-        return r;
+        return result;
     }
 
     /**
