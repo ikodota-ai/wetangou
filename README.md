@@ -422,11 +422,30 @@ mysql -uroot -p ry-vue < sql/biz_commission_settle_job.sql  # 佣金冷静期 Jo
 
 ### 2. 启动后端
 
+两种方式任选其一：
+
+**A. 打包后跑 jar（推荐，接近生产）**
+
 ```bash
 mvn clean package -DskipTests
 java -jar ruoyi-admin/target/ruoyi-admin.jar
 # 默认端口 8080，账号 admin/admin123
+# 第一次 install 可能 BOOT-INF/lib 缺包，再跑一次 mvn install 即可
 ```
+
+**B. spring-boot:run（开发态，IDE 友好，自动热加载 classes）**
+
+```bash
+mvn spring-boot:run -pl ruoyi-admin -am
+# 或显式指定 profile（项目主用 druid）：
+mvn spring-boot:run -pl ruoyi-admin -am -Dspring-boot.run.profiles=druid
+```
+
+> macOS 后台守护写法（PTY 关闭时 SIGHUP 不会杀进程）：
+> ```bash
+> nohup java -jar ruoyi-admin/target/ruoyi-admin.jar > /tmp/ruoyi.log 2>&1 &|
+> disown
+> ```
 
 ### 3. 启动后台
 

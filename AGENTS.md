@@ -420,3 +420,15 @@ git push origin master
 - subitem smoke cleanup（trap）: DELETE 返 200，不再 500
 - DB 状态保持 11/14/7/7 无污染
 - 回归: smoke-c1.sh 3/3 PASSED, lint-mybatis.sh 0 errors
+
+## E7 推进（2026-08-14 · 20:42 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E7
+- README.md「2. 启动后端」拆 A/B 两种方式：
+  - A. `mvn clean package + java -jar`（推荐，接近生产）
+  - B. `mvn spring-boot:run -pl ruoyi-admin -am -Dspring-boot.run.profiles=druid`（开发态）
+- 补 macOS 守护写法：`nohup ... &| disown`（PTY 关闭时 SIGHUP 不会杀 jar，zsh `&|` 配合 nohup 把进程移出 jobs 表）
+
+### 验证
+- 当前 jar PID 57061 由该模板起：captcha 200 / smoke-c1 3/3 / smoke-subitem 4/4
+- 文档一致：与 AGENTS.md「v2 升级交付」段提到的「spring-boot 4.0.6 + Java 25，profile=druid」匹配
