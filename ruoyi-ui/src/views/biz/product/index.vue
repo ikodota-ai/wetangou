@@ -152,15 +152,7 @@
           <el-col :span="24">
             <el-form-item label="商品类型" prop="typeCode">
               <el-select v-model="form.typeCode" placeholder="请选择商品类型" style="width: 100%" @change="onTypeCodeChange">
-                <el-option label="团购套餐" value="GROUPON" />
-                <el-option label="代金券" value="VOUCHER" />
-                <el-option label="次卡" value="TIMECARD" />
-                <el-option label="储值卡" value="STORED_CARD" />
-                <el-option label="周期卡" value="PERIOD_CARD" />
-                <el-option label="惠享卡" value="HUIXIANG_CARD" />
-                <el-option label="组合券包" value="COMBO" />
-                <el-option label="到店买单" value="BILL" />
-                <el-option label="预约服务" value="BOOKING" />
+                <el-option v-for="t in typeList" :key="t.typeCode" :label="t.typeName" :value="t.typeCode" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -369,6 +361,7 @@
 
 <script>
 import { listProduct, getProduct, delProduct, addProduct, updateProduct } from "@/api/biz/product"
+import { selectProductTypeList } from "@/api/biz/productType"
 import { listGroups, addGroup, delGroup, addSubitem, updateSubitem, delSubitem } from "@/api/biz/productSubitem"
 
 export default {
@@ -382,6 +375,8 @@ export default {
       showSearch: true,
       total: 0,
       productList: [],
+      // v2 商品类型字典（v-for 渲染 typeCode 下拉）
+      typeList: [],
       title: "",
       open: false,
       queryParams: {
@@ -421,8 +416,15 @@ export default {
   },
   created() {
     this.getList();
+    this.loadTypeList();
   },
   methods: {
+    /** v2 字典：拉取商品类型列表（v-for 下拉数据源） */
+    loadTypeList() {
+      selectProductTypeList().then(res => {
+        this.typeList = (res.rows || []).filter(t => t.status === '0' || t.status === 0)
+      })
+    },
     isShowMerchantFilter() {
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
       return userType !== '2'
@@ -443,12 +445,9 @@ export default {
       this.form.requireXiaoxin = this.needsXiaoxin() ? 1 : 0
     },
     typeText(code) {
-      return ({
-        GROUPON: '团购套餐', VOUCHER: '代金券', TIMECARD: '次卡',
-        STORED_CARD: '储值卡', PERIOD_CARD: '周期卡', HUIXIANG_CARD: '惠享卡',
-        COMBO: '组合券包', BILL: '到店买单', BOOKING: '预约服务',
-        PRESALE: '预售券', PICKUP_VOUCHER: '提货券'
-      })[code] || (code || '-')
+      // v2 字典化：从 typeList 查 typeName（替代原 hardcode map）
+      const t = (this.typeList || []).find(x => x.typeCode === code)
+      return t ? t.typeName : (code || '-')
     },
     typeTag(code) {
       return ({
