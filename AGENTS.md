@@ -1062,3 +1062,53 @@ E18 list 端点 SQL 拦截器覆盖 (8 张表注册后):
 - `ruoyi-framework/src/main/java/com/ruoyi/framework/tenant/TenantInsertInterceptor.java:104` — `无权向非名下商户写入数据`
 - `ruoyi-admin/src/main/java/com/ruoyi/web/api/ApiOrderController.java:detail` — 新增 member guard
 - `ruoyi-admin/src/main/java/com/ruoyi/web/api/ApiBillController.java:detail/pay` — 新增 member guard
+
+## v2 升级闭环交付（2026-08-15 · 6 轮 15 commit）
+
+> 详见 `doc/2026-08-15本轮工作总结.md`。基于 8-14 audit 标 72% 的 3 个 P1 缺口 + 期间暴露的真实业务缺陷做闭环。
+
+### 本轮交付
+- **smoke 5 个**：C9 commission 冷静期 Quartz / C10 voucher 列表 / C11 商家端商品创建 / C12 /api/ping / E21 字典化
+- **CI 2 个 lint**：smoke script lint (25) + SQL seed lint (17)
+- **CI workflow**：test.yml 3 job (lint / backend-test / mini-test)
+- **SQL 1 个**：biz_product_dict_charset_fix.sql (字典字符集修复)
+
+### 7 个真实业务缺陷修复
+1. **G6** `memberId0` stub 死代码，新会员可自邀（memberId 真查询实现）
+2. **C10** 小程序可领列表无 `voucherName` 搜索参数
+3. **C10** 我的券返缺 `voucherName` 字段（mapper join + where 加 `mv.` 前缀）
+4. **E21** 字典 typeName/typeDesc 双重 UTF-8 编码乱码（v2 升级 SQL 字符集 bug）
+5. **C11** `/api/merchant/staff/me` 多门店员工报 500（mapper LIMIT 1）
+6. **C11** `/biz/productType/appCreatable` mini 端返 401（加 @Anonymous）
+7. **C12** mini 启动期用 `/captchaImage` 慢且依赖 Redis（改 `/api/ping`）
+
+### 三重回归 + CI lint 全部 PASS（156/156）
+| 维度 | 数量 | 状态 |
+|---|---|---|
+| business smoke | 12 (c1~c12) | 12/12 |
+| E2E smoke | 13 (e4/e10/e11/e13~e19/e21 + g6 + subitem) | 13/13 |
+| JUnit | 10 | 10/10 |
+| vitest | 30 | 30/30 |
+| mybatis XML lint | 49 | 49/49 |
+| smoke script lint | 25 | 25/25 |
+| SQL seed lint | 17 | 17/17 |
+
+### 8-14 audit 闭环
+| 8-14 标 P1 缺口 | 8-15 状态 |
+|---|---|
+| admin 端下拉写死 vs 字典化 | ✅ E21 已字典化（字符集已修） |
+| biz_product_type API 前端 | ✅ C11 验证已就绪 |
+| 商家端商品创建 0 个 page | ✅ C11 端到端 PASS（14/14） |
+
+**v2 完整度现 100%**。
+
+### 15 commit 速查
+```
+8a932559 ci(workflow)+test: test.yml 3 job CI + 2 个新 lint 脚本
+01546a95 fix(mini)+test(smoke): /api/ping health check 接入 + C12 10/10 PASS
+a173de17 fix(api)+test(smoke): 商家端商品创建端到端 + 3 P1 缺陷 + C11 14/14 PASS
+539edb69 fix(sql)+test(smoke): biz_product_type 字典字符集修复 + E21 21/21 PASS
+53fa8079 feat(api)+fix(mapper)+test(smoke): voucher 列表/搜索/我的券 + 2 业务缺陷 + C10 19/19 PASS
+2df2c6a4 test(smoke): C9 commission 冷静期真实 Quartz 链路 8/8 PASS
+12780380 fix(api)+test(smoke): memberId0 真实现新会员自邀防御 + G6 5/5 PASS
+```
