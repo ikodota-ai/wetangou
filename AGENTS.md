@@ -214,3 +214,28 @@ e5fc6735 fix(biz): ProductMapper.xml 孤立 left join
 ### 前端 dist 状态
 - 18:55 build 含 C1 改动（agentCommission.js + 4 卡）
 - 后续 5 commit 全是后端 / doc，无前端改动，dist 无需重 build
+
+## Session 收口（2026-08-14 · 19:18）
+
+### 最终验证（19:18 时刻）
+- 后端 PID 49205 运行 3:02，captcha 200 (11ms)
+- C1 端点双 case 全对：
+  - agentId=1 → total=62.80, settled=62.80, pending=0, count=3, merchants=1, byMerchant=1 行
+  - agentId=999 → total=0, settled=0, pending=0, count=0, merchants=0, byMerchant=0 行（防跨租户 ✓）
+- dist 18:55 build 真含 C1：app.c0373b65.js 含 `biz/agent/commission`，chunk-7d1735ea 含「本月总佣金」
+- 38 张抖音来客截图全部被 .gitignore L76-77 拦截，git ls-files 0
+- 工作区 clean，ahead of origin 46 commit
+
+### 本 session 累计
+- v2 收口 13 commit（前置 session）
+- 15 项 doc 闭环 25 commit
+- C1 admin UI 容器 5 commit
+- C1 跨租户修复 1 commit（7a0299d4）
+- C1 状态审计 1 commit（4ec7d5c6）
+- C1 E2E 验证 + P3 误判澄清 1 commit（71f7ff23）
+- 共 46 commit
+- doc 15 项全部闭环 / 后端 5/5 API 健康 / 前端 dist 含 C1 / P3 doc 误判澄清（ApiPingController 是生产用、miniprogram tests 是真单测）
+
+### 后端进程保护
+- 后端 49205 还在跑，session 结束后会随 PTY 父进程关闭而结束
+- 重新启动：`nohup java -jar ruoyi-admin/target/ruoyi-admin.jar > /tmp/jrun.log 2>&1 &`（注：当前 sandbox 会 SIGHUP，需要在 PTY 里活守护 ~80s）
