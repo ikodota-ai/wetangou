@@ -620,3 +620,39 @@ git push origin master
 - 防越权读代理商信息（其他代理商的 contact / phone / paidAmount 等敏感字段）
 - 同源防御模型（merchant 端 + agent 端）一致
 - 单测 + E2E smoke 双层防护：service 层改坏 → 单测红；controller 改坏 → smoke 红
+
+## E12 推进（2026-08-14 · 21:55 · commit <待定>）
+
+### 主动审计发现
+E11 修完 AgentController 越权后，深一层审计发现：21 个 controller 的 GET /{id} 端点无显式 guard（仅 AgentController E11 + MerchantController 已有）。
+
+### 关键洞察：TenantSqlInterceptor 兜底
+跟踪日志发现：MyBatis 拦截器 `TenantSqlInterceptor` 在运行时自动改写 SQL，加 `AND (o.merchant_id IN (1))` 等 IN 子句。
+- 实测：agent001 (名下 merchantId=[1]) 查 order 999001 (merchantId=2) → SQL 自动加 `IN (1)` → 0 行 → 返 200 + 空 data
+- 所以**不是裸越权**（不会真读到别人数据），但 UX 差（客户端无法区分「不存在」vs「无权限」）
+
+### 21 个潜在越权点（advisory 列表）
+| Controller | Endpoint | 实际风险 |
+|---|---|---|
+| AgentController | /{agentId} | ✅ E11 已修（service + controller 双 guard）|
+| MerchantController | /{merchantId} | ✅ 已有 checkMerchantDataScope |
+| AgentFee / Agreement / Banner / Booking / Category / Commission / CommissionRule / Distributor / Member / MerchantFee / MpAuth / MpRelease / Order / PayBill / Product / SettleAccount / SettleRecord / StoreAlbum / Store / Voucher / Withdraw | /{id} | ⚠️ 无显式 guard（依赖 TenantSqlInterceptor 兜底）|
+
+### 解决方案
+**短期（已完成）**：
+- 新增 `.github/scripts/audit-controller-scope.sh`：自动扫所有 controller 列出 guard 状态
+- 21 个 advisory 已知，便于后续按需补 guard
+
+**长期（未做，建议后续 session 推进）**：
+- 给 21 个 ⚠️ controller 逐个加显式 guard
+- 或在 `BaseController` 加统一 `assertGetInfoScope(Long id, Function<Order, Long> getMerchantId)` helper
+- 或自定义注解 `@RequireDataScope` + AOP 切面
+
+### 验证
+- `bash .github/scripts/audit-controller-scope.sh` 跑通：21 ⚠️ / 2 ✅
+- 实测 order 999001 agent001 查不到（TenantSqlInterceptor 改写 SQL）— 不是裸越权
+
+### 业务价值
+- 把"21 个潜在越权"从隐性知识变显性审计报告
+- 每个 PR 可看 audit 输出增量
+- 真修复交给后续 session（按优先级一个一个补）
