@@ -45,6 +45,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ruoyi-ui/package-lock.json
 
+      - name: Lint mybatis mapper XML
+        run: bash .github/scripts/lint-mybatis.sh
+
       - name: Backend - mvn package
         run: mvn -B -e -ntp clean package
         env:
