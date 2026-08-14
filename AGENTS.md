@@ -185,3 +185,32 @@ e5fc6735 fix(biz): ProductMapper.xml 孤立 left join
 
 ### 下一轮起点
 - `doc/下一轮迭代清单-2026-08-14.md`（如已建）or 重新规划
+
+## C1 端到端验证（2026-08-14 · 19:14）
+
+### 后端健康
+- PID 49205（java -jar ruoyi-admin/target/ruoyi-admin.jar），port 8080
+- profile=druid，启动 1:10 后 captcha 200 OK
+- 5/5 关键 API 全 200：
+  - GET /getInfo
+  - GET /biz/agent/commission/summary?agentId=1
+  - GET /biz/merchant/list
+  - GET /biz/distributor/list
+  - GET /biz/commission/list
+
+### C1 跨租户泄漏修复（commit 7a0299d4）
+- Bug：agentId=999（无商户）→ 返 agentId=1 的 ¥62.80
+- 根因：sumByMerchantIds mapper `<where>` 在 merchantIds=[] 时只保 beginTime/endTime
+- 修：mapper 加 `<if merchantIdsEmpty==true> and 1=0 </if>` + service 传 merchantIdsEmpty
+- E2E：
+  - agentId=999 → {merchantCount:0, totalAmount:0, byMerchant:[]} ✓
+  - agentId=1 → {merchantCount:1, totalAmount:62.80, byMerchant:[1条]} ✓
+
+### P3 待清理 doc 误判
+- ApiPingController：实际是生产健康检查端点（小程序启动探测用），非调试代码，保留
+- miniprogram7/tests/：3 个真实 vitest 单测（util/request/pickNearestStore），保留
+- 不需要清理
+
+### 前端 dist 状态
+- 18:55 build 含 C1 改动（agentCommission.js + 4 卡）
+- 后续 5 commit 全是后端 / doc，无前端改动，dist 无需重 build
