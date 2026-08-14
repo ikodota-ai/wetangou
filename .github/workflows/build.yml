@@ -1,0 +1,77 @@
+name: Build & Verify
+
+# dytuangou 项目 CI 流水线（D4）
+# 触发：master 分支 push / pull_request
+# 步骤：
+# 1) 拉取代码
+# 2) 设置 JDK 17 (Maven) + Node 18 (前端)
+# 3) 缓存 Maven ~/.m2 + npm ~/.npm
+# 4) mvn -B clean package（后端 7 模块编译 + 单元测试）
+# 5) ruoyi-ui npm ci + npm run build:prod（前端产物到 dist/）
+# 6) 上传 ruoyi-admin/target/*.jar + ruoyi-ui/dist 作为 artifact
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2-
+
+      - name: Set up Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ruoyi-ui/package-lock.json
+
+      - name: Backend - mvn package
+        run: mvn -B -e -ntp clean package
+        env:
+          MAVEN_OPTS: -Xmx2g
+
+      - name: Frontend - npm ci + build
+        working-directory: ruoyi-ui
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npm run build:prod
+
+      - name: Upload backend jar
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruoyi-admin-jar
+          path: ruoyi-admin/target/ruoyi-admin.jar
+          if-no-files-found: error
+
+      - name: Upload frontend dist
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruoyi-ui-dist
+          path: ruoyi-ui/dist
+          if-no-files-found: warn
