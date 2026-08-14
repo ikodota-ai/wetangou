@@ -43,6 +43,8 @@
     <select id="selectByUserId" resultMap="StaffResult">
         <include refid="selectVo"/>
         where ms.user_id = #{userId}
+        order by ms.id asc
+        limit 1
     </select>
 
     <select id="selectList" parameterType="MerchantStaff" resultMap="StaffResult">

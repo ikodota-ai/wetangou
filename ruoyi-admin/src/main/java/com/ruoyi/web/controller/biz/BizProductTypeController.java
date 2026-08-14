@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
+import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -49,7 +50,9 @@ public class BizProductTypeController extends BaseController
         return success(typeService.selectByCode(typeCode));
     }
 
-    /** 小程序拉取可选类型（按 PRD 8.2 "商品类型" tab 用） */
+    /** 小程序拉取可选类型（按 PRD 8.2 "商品类型" tab 用）
+     * 字典类公开数据，加 @Anonymous 允许未登录访问（H5/小程序均可匿名拿） */
+    @Anonymous
     @GetMapping("/appCreatable")
     public AjaxResult appCreatable()
     {
