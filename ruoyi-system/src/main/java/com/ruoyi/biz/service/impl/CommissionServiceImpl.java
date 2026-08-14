@@ -44,7 +44,17 @@ public class CommissionServiceImpl implements ICommissionService
     public int insertCommission(Commission commission)
     {
         commission.setCreateTime(DateUtils.getNowDate());
-        return commissionMapper.insertCommission(commission);
+        int rows = commissionMapper.insertCommission(commission);
+        // A2 修复：佣金产生时同步推客 frozen_amount += amount
+        // （冷静期到期由 SettleCommissionTask 把 frozen → available）
+        if (rows > 0 && commission.getDistributorId() != null && commission.getAmount() != null)
+        {
+            java.util.Map<String, Object> p = new java.util.HashMap<>();
+            p.put("distributorId", commission.getDistributorId());
+            p.put("delta", commission.getAmount());
+            distributorMapper.incFrozenAmount(p);
+        }
+        return rows;
     }
 
     @Override
