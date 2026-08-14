@@ -57,10 +57,11 @@ public class BizAgentCommissionController extends BaseController
         data.put("merchantCount", merchantIds == null ? 0 : merchantIds.size());
         data.put("beginTime", begin);
         data.put("endTime", end);
-        data.put("totalAmount", overview.get("totalAmount"));
-        data.put("settledAmount", overview.get("settledAmount"));
-        data.put("pendingAmount", overview.get("pendingAmount"));
-        data.put("commissionCount", overview.get("commissionCount"));
+        // mapper alias 用 snake_case，service 已把 null 兜成 BigDecimal.ZERO / 0L
+        data.put("totalAmount", overview.get("total_amount"));
+        data.put("settledAmount", overview.get("settled_amount"));
+        data.put("pendingAmount", overview.get("pending_amount"));
+        data.put("commissionCount", overview.get("commission_count"));
         data.put("byMerchant", byMerchant);
         return success(data);
     }

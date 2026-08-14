@@ -144,9 +144,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="sumAgentOverview" parameterType="map" resultType="map">
-        select sum(case when status='0' then amount else 0 end) as pending_amount,
-               sum(case when status='1' then amount else 0 end) as settled_amount,
-               sum(amount) as total_amount,
+        select ifnull(sum(case when status='0' then amount else 0 end), 0) as pending_amount,
+               ifnull(sum(case when status='1' then amount else 0 end), 0) as settled_amount,
+               ifnull(sum(amount), 0) as total_amount,
                count(*) as commission_count
         from biz_commission
         <where>
