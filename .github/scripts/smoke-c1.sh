@@ -47,4 +47,15 @@ CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/biz/agent/commission/su
 [ "$CODE" = "401" ] || { echo "FAIL: no auth got $CODE (expect 401)"; exit 1; }
 echo "  [C] OK: no auth -> 401"
 
+# 5) 恢复 E15/E16 fixture（c1 开头删了 commission 999x 防止污染 c1 总额断言）
+#    c1 测完把 commission fixture 还回去，让 E15 后续可正常跑
+if command -v /usr/local/mysql/bin/mysql >/dev/null 2>&1; then
+  /usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue <<'SQL' 2>/dev/null || true
+INSERT INTO biz_commission (commission_id, merchant_id, distributor_id, order_id, store_id, amount, rate, status, create_time) VALUES
+  (999201, 2, 1, 1, 1, 50.00, 0.10, '0', NOW()),
+  (999202, 1, 1, 1, 1, 80.00, 0.10, '0', NOW())
+ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id), amount=VALUES(amount), status=VALUES(status);
+SQL
+fi
+
 echo "C1 smoke test PASSED"
