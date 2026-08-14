@@ -403,3 +403,20 @@ git push origin master
 ### 验证
 - 当前 49 个 xml: errors=0
 - 注入孤立 left join: PARSE_ERROR detected → exit 1
+
+## E6 推进（2026-08-14 · 20:36 · commit <待定>）
+
+### 推进 doc/下一轮迭代清单-2026-08-14.md E6
+- 新增 .github/scripts/smoke-subitem.sh（86 行 / 4 步端到端：login → POST group → POST subitem → GET /api/product/{id} 验 subitemGroups → no-auth 401）
+- **顺手修 DELETE 500 真 bug**：`BizProductSubitemController.removeGroup/removeSubitem` 原本 `return toAjax(groupService.deleteById(id))`，当 rows=0（id 不存在 / 已删）时 `toAjax` 返 error → 500。改为幂等 `service.deleteById(id); return success();` —— RESTful DELETE 语义应为 idempotent。
+
+### 根因
+- 前一次删除时 `subitemMapper.deleteByGroupId` 已 Updates: N
+- 紧接的 `groupMapper.deleteById` 若 group_id 已被前次 delete 删完，Updates: 0
+- `toAjax(0)` 返 `{"code":500,"msg":"操作失败"}` —— 但客户端期望 200/204
+
+### 验证（jar 57061 跑通）
+- smoke-subitem.sh: A/B/C/E 4/4 PASSED
+- subitem smoke cleanup（trap）: DELETE 返 200，不再 500
+- DB 状态保持 11/14/7/7 无污染
+- 回归: smoke-c1.sh 3/3 PASSED, lint-mybatis.sh 0 errors

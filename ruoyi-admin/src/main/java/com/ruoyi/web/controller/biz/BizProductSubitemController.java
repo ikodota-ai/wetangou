@@ -77,7 +77,8 @@ public class BizProductSubitemController extends BaseController
     @DeleteMapping("/group/{groupId}")
     public AjaxResult removeGroup(@PathVariable("groupId") Long groupId)
     {
-        return toAjax(groupService.deleteById(groupId));
+        groupService.deleteById(groupId);
+        return success();
     }
 
     // ==================== 子品 ====================
@@ -114,6 +115,7 @@ public class BizProductSubitemController extends BaseController
     @DeleteMapping("/subitem/{subitemId}")
     public AjaxResult removeSubitem(@PathVariable("subitemId") Long subitemId)
     {
-        return toAjax(subitemService.deleteById(subitemId));
+        subitemService.deleteById(subitemId);
+        return success();
     }
 }
