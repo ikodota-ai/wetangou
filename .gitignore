@@ -71,3 +71,17 @@ logs/
 
 # 5. build 产物
 /bin/
+
+# 6. v2 升级参考素材（仅本地参考，不入库）
+doc/抖音来客/
+doc/抖音来客/*
+# 兜底：匹配具体文件名前缀（防止中文路径匹配失败）
+微信图片_*.jpg
+
+# 7. 工具/依赖产物（不入库）
+miniprogram7/node_modules/
+miniprogram7/package-lock.json
+miniprogram7/tests/
+.agents/
+.playwright-cli/
+skills-lock.json
