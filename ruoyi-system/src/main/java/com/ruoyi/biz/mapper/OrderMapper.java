@@ -2,6 +2,7 @@ package com.ruoyi.biz.mapper;
 
 import java.util.List;
 import com.ruoyi.biz.domain.Order;
+import com.ruoyi.common.annotation.IgnoreTenant;
 
 /**
  * 订单Mapper接口
@@ -17,6 +18,7 @@ public interface OrderMapper
      * @param orderId 订单主键
      * @return 订单
      */
+    @IgnoreTenant
     public Order selectOrderByOrderId(Long orderId);
 
     /**

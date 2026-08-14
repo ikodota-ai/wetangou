@@ -100,4 +100,41 @@ public class TenantFilterHelper
     {
         void set(String key, Object value);
     }
+
+    /**
+     * E13: 显式断言当前账号可访问该 merchantId 资源（用于 GET /{id} 端点）
+     * 与 apply 区别：apply 用于 list 改写 SQL；assertDataScope 用于单条读 — 直接抛 403 让客户端明确无权限
+     *
+     * <p>行为：
+     * <ul>
+     *   <li>平台账号 / 未登录 / merchantId 为空 → 放行</li>
+     *   <li>代理商账号：merchantId 在名下 merchantIds 集合内 → 放行；否则抛 ServiceException</li>
+     *   <li>商户账号：merchantId == context.merchantId → 放行；否则抛 ServiceException</li>
+     * </ul>
+     * </p>
+     */
+    public static void assertDataScope(Long merchantId)
+    {
+        TenantContext ctx = TenantContextHolder.get();
+        if (ctx == null || ctx.isPlatform() || merchantId == null)
+        {
+            return;
+        }
+        if (ctx.isAgent())
+        {
+            java.util.List<Long> ids = ctx.getMerchantIds();
+            if (ids == null || !ids.contains(merchantId))
+            {
+                throw new ServiceException("没有权限访问该资源");
+            }
+            return;
+        }
+        if (ctx.isMerchant())
+        {
+            if (!merchantId.equals(ctx.getMerchantId()))
+            {
+                throw new ServiceException("没有权限访问该资源");
+            }
+        }
+    }
 }

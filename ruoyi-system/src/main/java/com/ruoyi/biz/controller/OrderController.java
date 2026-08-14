@@ -79,7 +79,13 @@ public class OrderController extends BaseController
     @GetMapping(value = "/{orderId}")
     public AjaxResult getInfo(@PathVariable("orderId") Long orderId)
     {
-        return success(orderService.selectOrderByOrderId(orderId));
+        // E13: 显式 guard（之前依赖 TenantSqlInterceptor 自动改写 SQL 兜底，UX 差返 200+空 data）
+        com.ruoyi.biz.domain.Order order = orderService.selectOrderByOrderId(orderId);
+        if (order != null)
+        {
+            TenantFilterHelper.assertDataScope(order.getMerchantId());
+        }
+        return success(order);
     }
 
     /**

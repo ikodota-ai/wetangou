@@ -656,3 +656,43 @@ E11 修完 AgentController 越权后，深一层审计发现：21 个 controller
 - 把"21 个潜在越权"从隐性知识变显性审计报告
 - 每个 PR 可看 audit 输出增量
 - 真修复交给后续 session（按优先级一个一个补）
+
+## E13 收口（2026-08-14 · 22:45 · commit <待定>）
+
+### 背景
+E12 审计发现 21 个 ⚠️ controller 依赖 `TenantSqlInterceptor` 兜底（SQL 改写 + IN 子句返 0 行）。**不是裸越权，但 UX 差** — 客户端无法区分「不存在」vs「无权限」。
+
+### 选 OrderController 作首个真修复示范
+理由：Order 包含金额/会员/商户等敏感字段；E2E 测试数据齐全（agent001 / 999001 / 999002）。
+
+### 改动（3 个文件 / +46/-1）
+1. **`OrderMapper.selectOrderByOrderId` 加 `@IgnoreTenant`** — 让 mapper 不被自动改写 SQL，能取到原始 merchantId
+2. **`TenantFilterHelper.assertDataScope(Long merchantId)` 新增静态方法** — 显式断言：
+   - 平台 / 未登录 / merchantId 为空 → 放行
+   - agent：merchantId ∈ ctx.merchantIds → 放行，否则抛 `没有权限访问该资源`
+   - merchant：merchantId == ctx.merchantId → 放行，否则抛
+3. **`OrderController.getInfo`** — 取 order 后 `assertDataScope(order.getMerchantId())`，无权限返 500+明确消息
+
+### 验证（5/5 PASS）
+```
+E13 OrderController 越权显式 guard:
+  ✅ 1) agent001 -> 别人 999001 拒访 (500 没有权限)
+  ✅ 2) agent001 -> 自己 999002 放行 (200 + data)
+  ✅ 3) agent001 -> 不存在 999999 200 (200 + null)
+  ✅ 4) admin    -> 任何 order 放行 (200 + data, 平台 bypass)
+  ✅ 5) no auth  -> 401
+```
+
+### 全套回归（6/6 PASS）
+- `smoke-c1` 3/3 · `smoke-subitem` 4/4 · `smoke-e10` 4/4 · `smoke-e4` 4/4 · `smoke-e11` 6/6 · `smoke-e13` 5/5
+- `mvn test -pl ruoyi-system` 10/10 (3 CommissionMapperTest + 7 AgentServiceImplTest)
+
+### 业务价值
+- 越权行为从「隐性 200+空」变「显性 500+明确消息」，UX 改善
+- 同模式可推广到 E12 advisory 表其余 20 个 ⚠️ controller（每次 3 文件 + smoke）
+- Mapper 加 `@IgnoreTenant` 是关键 — 没有它，merchantId 永远拿不到（SQL 被改写为 IN 子句返 0 行）
+
+### 后续建议
+- 优先级：MemberController（手机号/余额）/ PayBillController（支付凭证）/ VoucherController（卡密）
+- 模式固定：mapper 加 @IgnoreTenant + service/controller 调 `assertDataScope` + smoke 验证
+- 收尾 21 个 advisory 后，删除 `audit-controller-scope.sh`（使命完成）
