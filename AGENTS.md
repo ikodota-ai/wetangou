@@ -239,3 +239,30 @@ e5fc6735 fix(biz): ProductMapper.xml 孤立 left join
 ### 后端进程保护
 - 后端 49205 还在跑，session 结束后会随 PTY 父进程关闭而结束
 - 重新启动：`nohup java -jar ruoyi-admin/target/ruoyi-admin.jar > /tmp/jrun.log 2>&1 &`（注：当前 sandbox 会 SIGHUP，需要在 PTY 里活守护 ~80s）
+
+## 47 commit 推送完成（2026-08-14 · 19:21）
+
+```
+git push origin master
+→ To github.com:ikodota-ai/wetangou.git
+  40610a5b..f16370f1  master -> master
+```
+
+远端 `master` HEAD = `f16370f1`，本地一致（`git log origin/master..HEAD` 0 commit）。
+
+### CI 触发
+- `.github/workflows/build.yml`（commit 612c5b7d）：master push 自动触发
+- macos-14 runner / JDK 17 / Node 18 / mvn clean package / npm run build:prod
+- 沙箱内 `gh` CLI 不可用，无法实时查 run status；GitHub Actions 会在 push 后 1-2 分钟内自动起跑
+- 用户可在 https://github.com/ikodota-ai/wetangou/actions 查看 Build & Verify 流水线结果
+
+### 后端最终状态
+- PID 49205 运行 3:48
+- captcha 200 (6ms)
+- C1 端点双 case 全对
+
+### Session 真正收口
+- 47 commit 全部已落 origin
+- 工作区 clean
+- 后端进程健康（push 不影响运行）
+- doc 15 项 100% 闭环
