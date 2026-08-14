@@ -41,7 +41,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectPayBillList" parameterType="PayBill" resultMap="PayBillResult">
         <include refid="selectPayBillVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and b.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and b.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+            <if test="merchantId != null "> and b.merchant_id = #{merchantId}</if>
             <if test="billNo != null  and billNo != ''"> and b.bill_no like concat('%', #{billNo}, '%')</if>
             <if test="orderId != null "> and b.order_id = #{orderId}</if>
             <if test="storeId != null "> and b.store_id = #{storeId}</if>

@@ -22,6 +22,8 @@ import com.ruoyi.biz.service.IPayBillService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -44,6 +46,9 @@ public class PayBillController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(PayBill payBill)
     {
+        TenantFilterHelper.apply((BaseEntity) payBill,
+                                  (e, v) -> ((com.ruoyi.biz.domain.PayBill) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.PayBill) e).getMerchantId());
         startPage();
         List<PayBill> list = payBillService.selectPayBillList(payBill);
         return getDataTable(list);
@@ -57,6 +62,9 @@ public class PayBillController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, PayBill payBill)
     {
+        TenantFilterHelper.apply((BaseEntity) payBill,
+                                  (e, v) -> ((com.ruoyi.biz.domain.PayBill) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.PayBill) e).getMerchantId());
         List<PayBill> list = payBillService.selectPayBillList(payBill);
         ExcelUtil<PayBill> util = new ExcelUtil<PayBill>(PayBill.class);
         util.exportExcel(response, list, "买单流水数据");

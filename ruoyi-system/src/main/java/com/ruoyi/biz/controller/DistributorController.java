@@ -19,6 +19,8 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Distributor;
 import com.ruoyi.biz.service.IDistributorService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -41,6 +43,9 @@ public class DistributorController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Distributor distributor)
     {
+        TenantFilterHelper.apply((BaseEntity) distributor,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Distributor) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Distributor) e).getMerchantId());
         startPage();
         List<Distributor> list = distributorService.selectDistributorList(distributor);
         return getDataTable(list);
@@ -54,6 +59,9 @@ public class DistributorController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Distributor distributor)
     {
+        TenantFilterHelper.apply((BaseEntity) distributor,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Distributor) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Distributor) e).getMerchantId());
         List<Distributor> list = distributorService.selectDistributorList(distributor);
         ExcelUtil<Distributor> util = new ExcelUtil<Distributor>(Distributor.class);
         util.exportExcel(response, list, "推客数据");

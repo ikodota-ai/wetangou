@@ -32,7 +32,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectWithdrawList" parameterType="Withdraw" resultMap="WithdrawResult">
         <include refid="selectWithdrawVo"/>
         <where>
-            <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+            <if test="merchantId != null ">
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() > 0"> and w.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and w.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+ and w.merchant_id = #{merchantId}</if>
             <if test="withdrawNo != null  and withdrawNo != ''"> and w.withdraw_no like concat('%', #{withdrawNo}, '%')</if>
             <if test="distributorId != null "> and w.distributor_id = #{distributorId}</if>
             <if test="withdrawType != null  and withdrawType != ''"> and w.withdraw_type = #{withdrawType}</if>

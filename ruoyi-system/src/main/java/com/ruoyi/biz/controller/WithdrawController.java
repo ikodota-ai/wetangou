@@ -20,6 +20,8 @@ import com.ruoyi.biz.domain.Withdraw;
 import com.ruoyi.biz.service.IWithdrawService;
 import com.ruoyi.biz.api.service.SettlementService;
 import com.ruoyi.common.utils.poi.ExcelUtil;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
@@ -45,6 +47,9 @@ public class WithdrawController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(Withdraw withdraw)
     {
+        TenantFilterHelper.apply((BaseEntity) withdraw,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Withdraw) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Withdraw) e).getMerchantId());
         startPage();
         List<Withdraw> list = withdrawService.selectWithdrawList(withdraw);
         return getDataTable(list);
@@ -58,6 +63,9 @@ public class WithdrawController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, Withdraw withdraw)
     {
+        TenantFilterHelper.apply((BaseEntity) withdraw,
+                                  (e, v) -> ((com.ruoyi.biz.domain.Withdraw) e).setMerchantId(v),
+                                  e -> ((com.ruoyi.biz.domain.Withdraw) e).getMerchantId());
         List<Withdraw> list = withdrawService.selectWithdrawList(withdraw);
         ExcelUtil<Withdraw> util = new ExcelUtil<Withdraw>(Withdraw.class);
         util.exportExcel(response, list, "提现记录数据");
