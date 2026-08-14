@@ -24,6 +24,10 @@ public class MemberVoucher extends BaseEntity
     /** 主键 */
     private Long id;
 
+    /** 代金券名称（join biz_voucher.voucher_name，非持久化字段） */
+    @Excel(name = "代金券名称")
+    private String voucherName;
+
     /** 代金券模板ID */
     @Excel(name = "代金券模板ID")
     private Long voucherId;
@@ -156,6 +160,16 @@ public class MemberVoucher extends BaseEntity
     public void setUseTime(Date useTime) 
     {
         this.useTime = useTime;
+    }
+
+    public void setVoucherName(String voucherName)
+    {
+        this.voucherName = voucherName;
+    }
+
+    public String getVoucherName()
+    {
+        return voucherName;
     }
 
     public Date getUseTime() 

@@ -16,24 +16,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="expireTime"    column="expire_time"    />
         <result property="getTime"    column="get_time"    />
         <result property="useTime"    column="use_time"    />
+        <result property="voucherName"    column="voucher_name"    />
     </resultMap>
 
     <sql id="selectMemberVoucherVo">
-        select id, voucher_id, member_id, face_value, threshold, status, use_order_id, expire_time, get_time, use_time, merchant_id from biz_member_voucher
+        select mv.id, mv.voucher_id, mv.member_id, mv.face_value, mv.threshold, mv.status, mv.use_order_id,
+               mv.expire_time, mv.get_time, mv.use_time, mv.merchant_id, v.voucher_name
+        from biz_member_voucher mv
+        left join biz_voucher v on mv.voucher_id = v.voucher_id
     </sql>
 
     <select id="selectMemberVoucherList" parameterType="MemberVoucher" resultMap="MemberVoucherResult">
         <include refid="selectMemberVoucherVo"/>
         <where>  
-            <if test="voucherId != null "> and voucher_id = #{voucherId}</if>
-            <if test="memberId != null "> and member_id = #{memberId}</if>
-            <if test="faceValue != null "> and face_value = #{faceValue}</if>
-            <if test="threshold != null "> and threshold = #{threshold}</if>
-            <if test="status != null  and status != ''"> and status = #{status}</if>
-            <if test="useOrderId != null "> and use_order_id = #{useOrderId}</if>
-            <if test="expireTime != null "> and expire_time = #{expireTime}</if>
-            <if test="getTime != null "> and get_time = #{getTime}</if>
-            <if test="useTime != null "> and use_time = #{useTime}</if>
+            <if test="voucherId != null "> and mv.voucher_id = #{voucherId}</if>
+            <if test="memberId != null "> and mv.member_id = #{memberId}</if>
+            <if test="faceValue != null "> and mv.face_value = #{faceValue}</if>
+            <if test="threshold != null "> and mv.threshold = #{threshold}</if>
+            <if test="status != null  and status != ''"> and mv.status = #{status}</if>
+            <if test="useOrderId != null "> and mv.use_order_id = #{useOrderId}</if>
+            <if test="expireTime != null "> and mv.expire_time = #{expireTime}</if>
+            <if test="getTime != null "> and mv.get_time = #{getTime}</if>
+            <if test="useTime != null "> and mv.use_time = #{useTime}</if>
         </where>
     </select>
     

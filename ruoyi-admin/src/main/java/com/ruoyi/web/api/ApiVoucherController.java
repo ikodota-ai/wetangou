@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.util.MemberContextHolder;
@@ -41,11 +42,17 @@ public class ApiVoucherController
      * 可领代金券列表
      */
     @GetMapping("/list")
-    public AjaxResult list(@RequestParam(required = false) Long storeId)
+    public AjaxResult list(@RequestParam(required = false) Long storeId,
+                           @RequestParam(required = false) String voucherName)
     {
         Voucher query = new Voucher();
         query.setStatus("0");
         query.setStoreId(storeId);
+        // 模糊搜索：与 admin /biz/voucher/list 行为对齐（VoucherMapper 已支持 LIKE）
+        if (StringUtils.isNotEmpty(voucherName))
+        {
+            query.setVoucherName(voucherName);
+        }
         return AjaxResult.success(voucherService.selectVoucherList(query));
     }
 
