@@ -122,6 +122,7 @@ public class CommissionServiceImpl implements ICommissionService
     {
         java.util.Map<String, Object> params = new java.util.HashMap<>();
         params.put("merchantIds", merchantIds);
+        params.put("merchantIdsEmpty", merchantIds == null || merchantIds.isEmpty());
         params.put("beginTime", beginTime);
         params.put("endTime", endTime);
         return commissionMapper.sumByMerchantIds(params);
