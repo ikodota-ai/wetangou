@@ -266,3 +266,27 @@ git push origin master
 - 工作区 clean
 - 后端进程健康（push 不影响运行）
 - doc 15 项 100% 闭环
+
+## C1 Smoke Test 集成 CI（2026-08-14 · 19:22 · commit c9875d76）
+
+### 新增
+- `.github/scripts/smoke-c1.sh` 2.3KB · 3 个 case：
+  1. agentId=1（1 商户）→ total=62.8 / byMerchant=1 行
+  2. agentId=999（无商户）→ total=0 / byMerchant=0 行（防跨租户）
+  3. no auth → 401
+  本地手跑 3/3 PASSED
+- `.github/workflows/build.yml` 加 `smoke` job：
+  - `needs: build`（等编译）
+  - `if: github.event_name == 'push'`（PR 不跑避免改 DB）
+  - `services.mysql:5.7`（root/133301, db=ry-vue）
+  - 启动后端 druid profile 跑 smoke，timeout 10 min
+  - Python yaml.safe_load 通过
+
+### 价值
+任何 commit 改了 `CommissionMapper.xml` 漏掉 `merchantIdsEmpty` guard、或改了 C1 controller 漏掉 `.get('total_amount')` 驼峰对齐、或改了 service 漏 IFNULL，**CI 会在 PR 合并前 fail**。这是跨租户 fix 的回归保护。
+
+### 状态
+- 远端 master HEAD = c9875d76
+- 本地与远端一致（0 commit ahead）
+- 后端 PID 49205 5:39 健康
+- 49 commit 累计
