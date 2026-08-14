@@ -91,6 +91,25 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 ### 剩余（非 P0）
 - Member/Voucher/Store/MerchantStaff/MpRelease 等 ~10 个 Service 按需补 helper（模板已固化，5-10 分钟/个）
 
+## 8-02 登录分流 doc 误判澄清（2026-08-14 · 21:12）
+
+**核对结论**：8-02 计划「登录入口按 userType 路由分流」**已全部实装**（0.6d 实际剩余 = 0）。
+
+### 实装证据
+- `SysLoginController.getInfo` (line 93-95) 返 `userType / agentId / merchantId`
+- `ruoyi-ui/src/store/modules/user.js` SET_USER_TYPE / SET_AGENT_ID / SET_MERCHANT_ID mutations + getters
+- `ruoyi-ui/src/views/login.vue` 顶部「平台 / 代理商 / 商户」el-tabs（line 5-9）
+- `login.vue` handleLogin 成功按 userType 路由分流：
+  - 0 平台 → `/index`
+  - 1 代理商 → `/agent/index`
+  - 2 商户 → `/merchant/index`
+- `ruoyi-ui/src/router/index.js` 78-102 行：`/agent` 和 `/merchant` 路由 + `/views/agent/index.vue` `/views/merchant/index.vue` 工作台页面
+- `ruoyi-ui/src/layout/components/Navbar.vue` 显示当前身份标签（identity-platform/agent/merchant 颜色区分）
+- 多页面按 userType 隐藏控件（order/commission/record `showMerchantFilter = userType !== '2'`）
+
+### 误判结论
+原 doc 8-02 段说「剩余项：登录入口按 userType 路由分流未做」是 **session 启动时的「未做」误判**，后续 session（基于 commit `530c5a3b` 53cc5ab 系列）已实装但 doc 未更新状态。
+
 ## v2 升级交付（2026-08-14 · 13 commit）
 
 > 详见 `doc/v2升级一致性审计-2026-08-14.md`（289 行）。基于抖音来客商品模型 PRD（`doc/PRD-抖音来客商品模型.md` 437 行）实施。
