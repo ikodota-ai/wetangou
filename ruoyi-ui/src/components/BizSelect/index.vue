@@ -23,54 +23,12 @@
 </template>
 
 <script>
-import { listStore, getStore } from '@/api/biz/store'
-import { listMember, getMember } from '@/api/biz/member'
-import { listProduct, getProduct } from '@/api/biz/product'
-import { listDistributor, getDistributor } from '@/api/biz/distributor'
-import { listMerchant, getMerchant } from '@/api/biz/merchant'
+// D2：业务 API 自动注册——加新业务类型无需改本文件
+// （在 src/api/biz/<type>.js 暴露 listX/getX 即可被 BizSelect 自动支持）
+import BIZ_API_REGISTRY from '@/api/biz/registry'
 
-const CONFIG = {
-  store: {
-    api: listStore,
-    getById: getStore,
-    idField: 'storeId',
-    queryField: 'storeName',
-    label: row => row.storeName,
-    placeholder: '请选择门店'
-  },
-  member: {
-    api: listMember,
-    getById: getMember,
-    idField: 'memberId',
-    queryField: 'nickname',
-    label: row => (row.nickname || ('会员' + row.memberId)) + (row.phone ? ('（' + row.phone + '）') : ''),
-    placeholder: '请选择会员'
-  },
-  product: {
-    api: listProduct,
-    getById: getProduct,
-    idField: 'productId',
-    queryField: 'productName',
-    label: row => row.productName,
-    placeholder: '请选择商品'
-  },
-  distributor: {
-    api: listDistributor,
-    getById: getDistributor,
-    idField: 'distributorId',
-    queryField: 'memberId',
-    label: row => (row.memberName || ('会员' + row.memberId)) + '（推客' + row.distributorId + '）',
-    placeholder: '请选择推客'
-  },
-  merchant: {
-    api: listMerchant,
-    getById: getMerchant,
-    idField: 'merchantId',
-    queryField: 'merchantName',
-    label: row => row.merchantName || ('商户' + row.merchantId),
-    placeholder: '请选择商户'
-  }
-}
+// 向后兼容：保留 5 个原 CONFIG 字段供外部直接引用
+export const CONFIG = BIZ_API_REGISTRY
 
 export default {
   name: 'BizSelect',
