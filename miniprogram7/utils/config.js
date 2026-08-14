@@ -27,8 +27,9 @@ const BASE_URL_FALLBACKS = [
   'http://127.0.0.1:8080',    // 仅模拟器
 ];
 
-// 健康检查端点（已存在、轻量、无鉴权）
-const HEALTH_PATH = '/captchaImage';
+// 健康检查端点：用 /api/ping (ApiPingController 已实装, 纯 JSON 不渲染图片, 0.5ms)
+// 之前用 /captchaImage (RuoYi 内置图片验证码, 50~100ms 且有 Redis 依赖)
+const HEALTH_PATH = '/api/ping';
 const HEALTH_TIMEOUT_MS = 2500;
 
 /** 编译期 project.config.json.appid（开发者工具里能直接读到） */
