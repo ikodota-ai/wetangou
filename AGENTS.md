@@ -42,6 +42,29 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 - 配套：`LoginUser`/`getInfo` 已返 `userType / agentId / merchantId`（`530c5a3b` commit）；路由 + 菜单按 `userType` 过滤（同 fade76ff）。
 - 详情见 doc/多商户与代理商改造方案.md 6. 实施顺序表（12 项 ✅）
 
+
+## A1 业务表租户过滤闭环（2026-08-14 · 5 commit）
+
+> 背景（doc/下一轮迭代清单-2026-08-05.md A1）：代理商/商户账号调 /biz/order/list 等业务表
+> 没强制 tenant 过滤，会看到别家订单 → 跨租户数据泄漏。
+
+### 已闭环
+- **公共工具** `ruoyi-system/biz/tenant/TenantFilterHelper.java`：apply(BaseEntity, setter, getter)
+  - 平台（userType=0）：不强制
+  - 代理商（userType=1）：强制限定到名下商户 IN(...)
+  - 商户（userType=2）：强制 merchantId，前端越权传值 → 500 '无权查询其他商户的数据'
+- **7 个核心 Service 切片**（5 commit）：
+  - Order（5f17bd5a）→ Booking（46fe6616）→ PayBill/Distributor/Withdraw（86676864）→ Commission/Product（a542ff9d）
+- **5 个 mapper XML** 加 `params.merchantIdsIn` 过滤（IN/单值/空集三种形态）
+
+### 端到端验证（每表 3-10 测试行 + M1/M2 分布）
+- 平台 admin：全平台视角（不限制）
+- 代理商：只看名下商户
+- 商户：只自己；越权 → 500 拒
+
+### 剩余（非 P0）
+- Member/Voucher/Store/MerchantStaff/MpRelease 等 ~10 个 Service 按需补 helper（模板已固化，5-10 分钟/个）
+
 ## v2 升级交付（2026-08-14 · 13 commit）
 
 > 详见 `doc/v2升级一致性审计-2026-08-14.md`（289 行）。基于抖音来客商品模型 PRD（`doc/PRD-抖音来客商品模型.md` 437 行）实施。
