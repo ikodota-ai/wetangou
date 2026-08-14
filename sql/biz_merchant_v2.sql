@@ -5,12 +5,51 @@
 -- 3) biz_merchant_staff_invite 邀请码表
 -- =====================================================================
 
--- 1) sys_user 加 openid（兼容 RuoYi 默认账号，openid 默认为空）
-ALTER TABLE sys_user
-  ADD COLUMN openid        varchar(64)  DEFAULT ''                COMMENT '微信 openid（绑定后唯一）' AFTER avatar,
-  ADD COLUMN openid_bound  tinyint(1)   DEFAULT 0                 COMMENT 'openid 绑定状态 0未绑 1已绑' AFTER openid,
-  ADD UNIQUE KEY uk_sys_user_openid (openid);
+-- 1) sys_user 加 openid（idempotent：已存在则跳过）
+-- 改用 DEFAULT NULL 而非 ''：MySQL UNIQUE KEY 允许多个 NULL，但不允许多个空字符串
+-- 业务代码 selectUserByOpenId 已兼容 NULL（if (openid == null || openid.isEmpty()) return null;）
 
+-- 1.1 加 openid 列（若已存在则跳过）
+SET @col_exists := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'sys_user'
+                      AND COLUMN_NAME = 'openid');
+SET @sql := IF(@col_exists = 0,
+  'ALTER TABLE sys_user ADD COLUMN openid varchar(64) DEFAULT NULL COMMENT ''微信 openid（绑定后唯一）'' AFTER avatar',
+  'SELECT ''openid 列已存在，跳过'' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 1.2 加 openid_bound 列（若已存在则跳过）
+SET @col_exists := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'sys_user'
+                      AND COLUMN_NAME = 'openid_bound');
+SET @sql := IF(@col_exists = 0,
+  'ALTER TABLE sys_user ADD COLUMN openid_bound tinyint(1) DEFAULT 0 COMMENT ''openid 绑定状态 0未绑 1已绑'' AFTER openid',
+  'SELECT ''openid_bound 列已存在，跳过'' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 1.3 修已有 openid 列的默认值为 NULL（若已是 NULL 跳过）
+SET @col_default := (SELECT COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = 'sys_user'
+                       AND COLUMN_NAME = 'openid');
+SET @sql := IF(@col_default IS NULL OR @col_default != 'NULL',
+  'ALTER TABLE sys_user MODIFY COLUMN openid varchar(64) DEFAULT NULL COMMENT ''微信 openid（绑定后唯一）''',
+  'SELECT ''openid 默认值已是 NULL，跳过'' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 1.4 加 UNIQUE KEY uk_sys_user_openid（若已存在则跳过）
+SET @idx_exists := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'sys_user'
+                      AND INDEX_NAME = 'uk_sys_user_openid');
+SET @sql := IF(@idx_exists = 0,
+  'ALTER TABLE sys_user ADD UNIQUE KEY uk_sys_user_openid (openid)',
+  'SELECT ''uk_sys_user_openid 索引已存在，跳过'' AS msg');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2) 新建 biz_merchant_staff 表（商家员工关联）
 -- 2) 新建 biz_merchant_staff 表（商家员工关联）
 DROP TABLE IF EXISTS biz_merchant_staff;
 CREATE TABLE biz_merchant_staff (
