@@ -77,7 +77,13 @@ public class ApiProductController
             if ("GROUPON".equals(t) || "COMBO".equals(t))
             {
                 List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
+                // 兼容：顶层 + data 子对象都放（前端 miniprogram7/pages/goods/detail/index.js
+                // 先查 d.subitemGroups，老逻辑；新版可查 d.data.subitemGroups）
                 r.put("subitemGroups", groups);
+                java.util.Map<String, Object> dataMap = new java.util.LinkedHashMap<>();
+                dataMap.put("product", p);
+                dataMap.put("subitemGroups", groups);
+                r.put("data", dataMap);
             }
         }
         return r;
