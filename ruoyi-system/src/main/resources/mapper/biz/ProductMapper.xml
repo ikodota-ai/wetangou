@@ -59,6 +59,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"    column="update_by"    />
         <result property="updateTime"    column="update_time"    />
         <result property="remark"    column="remark"    />
+            <association property="ext" javaType="ProductExt" columnPrefix="ext_">
+            <result property="productId"          column="product_id"          />
+            <result property="voucherAutoName"    column="voucher_auto_name"    />
+            <result property="voucherMinConsume"  column="voucher_min_consume"  />
+            <result property="voucherScopeType"   column="voucher_scope_type"   />
+            <result property="voucherScopeIds"    column="voucher_scope_ids"    />
+            <result property="comboTotalValue"    column="combo_total_value"    />
+            <result property="comboSaleType"      column="combo_sale_type"      />
+            <result property="comboAutoExtendDays" column="combo_auto_extend_days" />
+            <result property="outerSubitemId"     column="outer_subitem_id"     />
+            <result property="comboItemsJson"     column="combo_items_json"     />
+            <result property="grouponPickRule"    column="groupon_pick_rule"    />
+            <result property="grouponActualCount" column="groupon_actual_count" />
+            <result property="dailyUseLimit"      column="daily_use_limit"      />
+            <result property="refundRuleType"     column="refund_rule_type"     />
+        </association>
     </resultMap>
 
     <sql id="selectProductVo">
@@ -73,10 +89,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                p.mutex_with_store_promotion, p.extra_fee_desc, p.other_notice,
                p.commission_rate, p.total_value, p.subitem_pick_rule, p.require_xiaoxin,
                p.detail, p.notice, p.sort, p.status, p.del_flag, p.create_by, p.create_time, p.update_by,
-               p.update_time, p.remark
+               p.update_time, p.remark,
+               e.product_id           as ext_product_id,
+               e.voucher_auto_name    as ext_voucher_auto_name,
+               e.voucher_min_consume  as ext_voucher_min_consume,
+               e.voucher_scope_type   as ext_voucher_scope_type,
+               e.voucher_scope_ids    as ext_voucher_scope_ids,
+               e.combo_total_value    as ext_combo_total_value,
+               e.combo_sale_type      as ext_combo_sale_type,
+               e.combo_auto_extend_days as ext_combo_auto_extend_days,
+               e.outer_subitem_id     as ext_outer_subitem_id,
+               e.combo_items_json     as ext_combo_items_json,
+               e.groupon_pick_rule    as ext_groupon_pick_rule,
+               e.groupon_actual_count as ext_groupon_actual_count,
+               e.daily_use_limit      as ext_daily_use_limit,
+               e.refund_rule_type     as ext_refund_rule_type
         from biz_product p
         left join biz_store s on s.store_id = p.store_id
         left join biz_category c on c.category_id = p.category_id
+        left join biz_product_ext e on e.product_id = p.product_id
     </sql>
 
     <select id="selectProductList" parameterType="Product" resultMap="ProductResult">
@@ -107,7 +138,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     
     <select id="selectProductByProductId" parameterType="Long" resultMap="ProductResult">
         <include refid="selectProductVo"/>
-        where product_id = #{productId}
+        where p.product_id = #{productId}
     </select>
 
     <insert id="insertProduct" parameterType="Product" useGeneratedKeys="true" keyProperty="productId">
@@ -284,7 +315,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateTime != null">update_time = #{updateTime},</if>
             <if test="remark != null">remark = #{remark},</if>
         </trim>
-        where product_id = #{productId}
+        where p.product_id = #{productId}
     </update>
 
     <delete id="deleteProductByProductId" parameterType="Long">

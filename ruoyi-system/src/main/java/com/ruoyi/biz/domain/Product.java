@@ -5,6 +5,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
 import com.ruoyi.common.core.domain.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * 商品对象 biz_product
@@ -96,20 +97,7 @@ public class Product extends BaseEntity
 
     /** 总次数（次卡用） */
     private Long totalTimes;
-    // 续篇 9 · 主表加列覆盖 3 类型差异 + 6 tab 详细字段
-    private Integer voucherAutoName;
-    private java.math.BigDecimal voucherMinConsume;
-    private java.math.BigDecimal comboTotalValue;
-    private String comboSaleType;
-    private Integer comboAutoExtendDays;
-    private String outerSubitemId;
-    private String comboItemsJson;
-    private String voucherScopeType;
-    private String voucherScopeIds;
-    private String grouponPickRule;
-    private Integer grouponActualCount;
-    private Integer dailyUseLimit;
-    private String refundRuleType;
+
 
     /** 周期类型 MONTH/QUARTER/YEAR */
     private String periodType;
@@ -400,32 +388,7 @@ public class Product extends BaseEntity
     public void setMinConsume(java.math.BigDecimal minConsume) { this.minConsume = minConsume; }
     public Long getTotalTimes() { return totalTimes; }
     public void setTotalTimes(Long totalTimes) { this.totalTimes = totalTimes; }
-    public Integer getVoucherAutoName() { return voucherAutoName; }
-    public void setVoucherAutoName(Integer voucherAutoName) { this.voucherAutoName = voucherAutoName; }
-    public java.math.BigDecimal getVoucherMinConsume() { return voucherMinConsume; }
-    public void setVoucherMinConsume(java.math.BigDecimal voucherMinConsume) { this.voucherMinConsume = voucherMinConsume; }
-    public java.math.BigDecimal getComboTotalValue() { return comboTotalValue; }
-    public void setComboTotalValue(java.math.BigDecimal comboTotalValue) { this.comboTotalValue = comboTotalValue; }
-    public String getComboSaleType() { return comboSaleType; }
-    public void setComboSaleType(String comboSaleType) { this.comboSaleType = comboSaleType; }
-    public Integer getComboAutoExtendDays() { return comboAutoExtendDays; }
-    public void setComboAutoExtendDays(Integer comboAutoExtendDays) { this.comboAutoExtendDays = comboAutoExtendDays; }
-    public String getOuterSubitemId() { return outerSubitemId; }
-    public void setOuterSubitemId(String outerSubitemId) { this.outerSubitemId = outerSubitemId; }
-    public String getComboItemsJson() { return comboItemsJson; }
-    public void setComboItemsJson(String comboItemsJson) { this.comboItemsJson = comboItemsJson; }
-    public String getVoucherScopeType() { return voucherScopeType; }
-    public void setVoucherScopeType(String voucherScopeType) { this.voucherScopeType = voucherScopeType; }
-    public String getVoucherScopeIds() { return voucherScopeIds; }
-    public void setVoucherScopeIds(String voucherScopeIds) { this.voucherScopeIds = voucherScopeIds; }
-    public String getGrouponPickRule() { return grouponPickRule; }
-    public void setGrouponPickRule(String grouponPickRule) { this.grouponPickRule = grouponPickRule; }
-    public Integer getGrouponActualCount() { return grouponActualCount; }
-    public void setGrouponActualCount(Integer grouponActualCount) { this.grouponActualCount = grouponActualCount; }
-    public Integer getDailyUseLimit() { return dailyUseLimit; }
-    public void setDailyUseLimit(Integer dailyUseLimit) { this.dailyUseLimit = dailyUseLimit; }
-    public String getRefundRuleType() { return refundRuleType; }
-    public void setRefundRuleType(String refundRuleType) { this.refundRuleType = refundRuleType; }
+
     public String getPeriodType() { return periodType; }
     public void setPeriodType(String periodType) { this.periodType = periodType; }
     public Integer getPeriodCount() { return periodCount; }
@@ -478,6 +441,12 @@ public class Product extends BaseEntity
     {
         this.merchantId = merchantId;
     }
+
+    /** 扩展属性（类型差异 13 列 + 6 tab 详细字段，1:1 关联 biz_product_ext） */
+    private ProductExt ext;
+
+    public ProductExt getExt() { return ext; }
+    public void setExt(ProductExt ext) { this.ext = ext; }
 
     @Override
     public String toString() {

@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.util.MemberContextHolder;
+import com.ruoyi.biz.domain.ProductExt;
+import com.ruoyi.biz.service.IProductExtService;
 import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.domain.Category;
 import com.ruoyi.biz.domain.ProductSubitemGroup;
@@ -35,6 +37,8 @@ public class ApiProductController
 {
     @Autowired
     private IProductService productService;
+    @Autowired
+    private IProductExtService extService;
 
     @Autowired
     private ICategoryService categoryService;
@@ -166,6 +170,8 @@ public class ApiProductController
         if (rows <= 0) {
             return AjaxResult.error("保存失败");
         }
+        // 同步保存扩展属性(类型差异+6tab详细字段)
+        saveExtByTypeCode(body);
         AjaxResult r = AjaxResult.success();
         r.put("productId", body.getProductId());
         r.put("merchantId", body.getMerchantId());
@@ -196,7 +202,33 @@ public class ApiProductController
         }
         body.setMerchantId(me.getMerchantId());
         int rows = productService.updateProduct(body);
+        if (rows > 0) saveExtByTypeCode(body);
         return rows > 0 ? AjaxResult.success() : AjaxResult.error("保存失败");
+    }
+
+    /**
+     * 按 typeCode 分流保存到 biz_product_ext
+     */
+    private void saveExtByTypeCode(Product body) {
+        if (body == null || body.getProductId() == null) return;
+        ProductExt ext = new ProductExt();
+        ext.setProductId(body.getProductId());
+        // 公共
+        ext.setDailyUseLimit(0);
+        ext.setRefundRuleType("ANYTIME");
+        String tc = body.getTypeCode();
+        if (tc == null) return;
+        if ("VOUCHER".equals(tc)) {
+            ext.setVoucherAutoName(1);
+            ext.setVoucherMinConsume(body.getMinConsume());
+        } else if ("COMBO".equals(tc)) {
+            ext.setComboTotalValue(body.getTotalValue());
+            ext.setComboSaleType("LIMIT");
+            ext.setComboAutoExtendDays(30);
+        } else if ("GROUPON".equals(tc)) {
+            ext.setGrouponPickRule("ALL");
+        }
+        extService.save(ext);
     }
 
     /**
