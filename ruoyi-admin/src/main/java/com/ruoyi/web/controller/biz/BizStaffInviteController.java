@@ -190,4 +190,39 @@ public class BizStaffInviteController extends BaseController
     {
         return toAjax(staffService.deleteById(id));
     }
+
+    // ==================== 员工审核（V6-3）====================
+    // 员工通过邀请码扫入后默认 status=3（待审核），OWNER/MANAGER 在此审批：
+    //  - approve=true  → status=0（在职）
+    //  - approve=false → 物理删除关联（员工账号保留可重发邀请）
+
+    @PreAuthorize("@ss.hasPermi('biz:staffInvite:list')")
+    @GetMapping("/staff/audit")
+    public AjaxResult auditList()
+    {
+        MerchantStaff q = new MerchantStaff();
+        q.setStatus("3");
+        return success(staffService.selectList(q));
+    }
+
+    @Log(title = "员工审核", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('biz:staffInvite:edit')")
+    @PostMapping("/staff/audit")
+    public AjaxResult audit(@RequestBody MerchantStaff body)
+    {
+        if (body.getId() == null) return error("缺少 id");
+        MerchantStaff db = staffService.selectById(body.getId());
+        if (db == null) return error("员工关联不存在");
+        if (!"3".equals(db.getStatus())) return error("该员工不在待审核状态");
+        Boolean approve = body.getApprove();
+        if (approve == null) return error("缺少 approve 字段");
+        if (approve) {
+            db.setStatus("0");
+            db.setUpdateBy(getUsername());
+            return toAjax(staffService.update(db));
+        } else {
+            // 拒绝：物理删除关联
+            return toAjax(staffService.deleteById(db.getId()));
+        }
+    }
 }

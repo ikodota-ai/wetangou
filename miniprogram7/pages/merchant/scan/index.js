@@ -16,6 +16,13 @@ Page({
     scanning: false
   },
 
+  onLoad(options) {
+    // 微信扫一扫 / 分享入口直达：path?scene=invite:1:100:ABC
+    if (options && options.scene) {
+      this._handleScanResult(decodeURIComponent(options.scene))
+    }
+  },
+
   onScan() {
     if (this.data.scanning) return  // 防重
     this.setData({ scanning: true })

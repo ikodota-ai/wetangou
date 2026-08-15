@@ -1760,3 +1760,25 @@ c43 25/25 + c45 12/12 + c46 11/11 + c47 13/13 + c48 14/14 + c49 8/8
 **修正记录**：
 - 之前 v2.5 续篇 13 写的"需要小程序绑定开放平台账号（一般小程序已自动绑）"**有误**
 - 正确说法：Scheme 唤起**不依赖**开放平台；开放平台绑定是为了 UnionID 打通
+
+## V2.6 续篇 14 (2026-08-15 · V6 关键项)
+
+### V6-1/2/3 实装完成
+- **V6-1** 小程序 `pages/merchant/scan/index.js` 加 `onLoad(options)` 解析 `scene`，自动走与扫码一致的「加入弹窗 → 接受邀请」流程
+- **V6-2** `ApiMerchantStaffController.acceptInvite` 接 `phoneCode`（可选）→ `WxMaService.getPhoneNumberByCode` 拿手机号 → 写回 `sys_user.phonenumber`（失败不阻塞，非必填）；响应新增 `needPhone` 字段，前端可弹「补全手机号」入口
+- **V6-3** 员工待审核工作流：
+  - `acceptInvite` 新建员工关联时 `status='3'`（待审核）
+  - `/login` 和 `/wxLogin` 过滤掉 status=3 关联，未审核登录返"员工待商家审核通过后才能登录"
+  - PC 后台 `GET /biz/staffInvite/staff/audit` 列表 + `POST /biz/staffInvite/staff/audit` 审核（approve=true→status=0, approve=false→物理删除）
+  - smoke-c50 7/7 PASS
+
+### V6-5 决策：不实装 sys_biz_role_menu 关联表
+- **原因**：5 角色（PLATFORM/AGENT/OWNER/MANAGER/STAFF）只用于**小程序/小程序端 API 鉴权**（V5-1 `@RequireRole` + `RoleAuthInterceptor` 已实装完整覆盖）
+- **PC 后台菜单权限**继续走 RuoYi 既有 3 角色体系（`sys_user_role` + `sys_role_menu`），由 admin 在「角色管理」按需分配
+- **避免双系统**：5 角色 + 3 角色同时驱动同一菜单树会造成数据不一致（OWNER 到底对应 merchant 还是 common？）
+- **折中**：在 PC 后台 `角色管理` 增加 3 个预置模板（OWNER 模板 / MANAGER 模板 / STAFF 模板），admin 可一键套用到对应角色
+- 此决策记入，避免后续 session 重复纠结
+
+### V6-6 权限矩阵 smoke（c44）
+- V6-5 不实装，c44 改为「3 角色 × 5 端点 RBAC 矩阵」覆盖：login → 调端点 → 期望 200/403
+- 已实装

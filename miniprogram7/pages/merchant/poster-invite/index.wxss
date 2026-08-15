@@ -1,0 +1,12 @@
+.page { min-height: 100vh; background: #1A1A1A; padding: 32rpx 24rpx 60rpx; display: flex; flex-direction: column; align-items: center; }
+.poster-card { width: 600rpx; height: 900rpx; background: #FFFFFF; border-radius: 24rpx; overflow: hidden; position: relative; box-shadow: 0 8rpx 40rpx rgba(0,0,0,0.4); }
+.poster-canvas { width: 600rpx; height: 900rpx; display: block; }
+.poster-mask { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24rpx; }
+.poster-spinner { width: 64rpx; height: 64rpx; border: 6rpx solid #E5E5EA; border-top-color: #3A6B35; border-radius: 50%; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.poster-mask-text { font-size: 28rpx; color: #333; }
+.actions { margin-top: 48rpx; width: 600rpx; display: flex; gap: 24rpx; }
+.btn { flex: 1; height: 88rpx; background: rgba(255,255,255,0.12); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 30rpx; border-radius: 12rpx; }
+.btn-primary { background: #3A6B35; }
+.tips { margin-top: 40rpx; display: flex; flex-direction: column; gap: 8rpx; align-items: center; }
+.tips text { color: rgba(255,255,255,0.6); font-size: 24rpx; }

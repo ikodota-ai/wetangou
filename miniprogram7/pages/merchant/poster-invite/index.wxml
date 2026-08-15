@@ -1,0 +1,17 @@
+<view class="page">
+  <view class="poster-card">
+    <canvas class="poster-canvas" type="2d" id="posterCanvas" canvas-id="posterCanvas" style="width:600rpx;height:900rpx;"></canvas>
+    <view wx:if="{{generating}}" class="poster-mask">
+      <view class="poster-spinner"></view>
+      <text class="poster-mask-text">海报生成中…</text>
+    </view>
+  </view>
+  <view class="actions">
+    <view class="btn btn-primary" bindtap="onSave"><text>保存到相册</text></view>
+    <view class="btn" bindtap="onPreview"><text>预览大图</text></view>
+  </view>
+  <view class="tips">
+    <text>· 保存后可发给候选人微信 / 朋友圈</text>
+    <text>· 候选人扫码后自动接受邀请</text>
+  </view>
+</view>

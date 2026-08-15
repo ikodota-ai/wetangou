@@ -76,4 +76,10 @@ public class MerchantStaff extends BaseEntity
             .append("role", getRole())
             .toString();
     }
+
+    /** 仅审核接口使用：true=通过 false=拒绝（不入库） */
+    private transient Boolean approve;
+
+    public Boolean getApprove() { return approve; }
+    public void setApprove(Boolean approve) { this.approve = approve; }
 }
