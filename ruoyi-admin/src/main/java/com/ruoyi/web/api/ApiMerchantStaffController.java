@@ -20,6 +20,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.exception.ServiceException;
+import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.LoginRequired;
@@ -124,6 +125,18 @@ public class ApiMerchantStaffController
      * 入参: { code: 微信jscode, scene: invite:MID:SID:CODE, merchantId?, profile? }
      * 自动建账号（若 openid 未绑） + 绑门店 + 微信登录
      */
+    /**
+     * 接受邀请（小程序匿名端点）
+     *
+     * <p>业务流：scene 解析 → 邀请码状态校验（含过期自动转 status=2）→ 微信 code2Session
+     *   → openid 命中复用/未命中建账号 → 绑员工关联 → 邀请码置已用 → 自动登录
+     *
+     * <p>事务：全部 DB 写入（过期态更新 + 邀请码置已用 + 员工关联）放在同一事务。
+     * 任何一步失败则全部回滚，避免出现「邀请码已用但员工未绑」或「员工已绑但邀请码仍启用」的不一致态。
+     *
+     * <p>状态机：status 0→1（已用）/ 0→2（过期）/ 0→3（停用）单向迁移。
+     */
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/acceptInvite")
     public AjaxResult acceptInvite(@RequestBody JSONObject body)
     {
@@ -143,8 +156,9 @@ public class ApiMerchantStaffController
         if (invite == null) throw new ServiceException("邀请码不存在");
         if (!"0".equals(invite.getStatus())) throw new ServiceException("邀请码已失效");
         if (invite.getExpireAt() != null && invite.getExpireAt().before(new Date())) {
-            invite.setStatus("2");
-            inviteService.update(invite);
+            // 过期：调用 REQUIRES_NEW 事务独立提交 status=2，再抛错
+            // 避免外层 @Transactional 回滚把过期态也吃掉，导致下次再调仍走过期分支（永远卡 status=0）
+            inviteService.markExpired(invite.getInviteId());
             throw new ServiceException("邀请码已过期");
         }
         if (!mid.equals(invite.getMerchantId()) || !sid.equals(invite.getStoreId())) throw new ServiceException("邀请码与门店不匹配");

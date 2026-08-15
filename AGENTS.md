@@ -142,6 +142,16 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 - **回归**: 43 smoke / 10 JUnit / 30 vitest = **baseline 83/83 零退化**
 - 关键技术：SysUser DELETE 端点接收 `/{userIds}`（RuoYi 标准批量），单 id 要发 `id,id`；SysUser 删除是逻辑删除（`del_flag=2`）
 
+### v2 升级续篇 4 (产品质量 P0~P1 收口 · 2026-08-15)
+- **P0-a** `biz_product_type` 字典 11 行种子化（`sql/biz_product_seed.sql` 幂等重跑）
+- **P0-b/c** `acceptInvite` 加 `@Transactional` + `markExpired` REQUIRES_NEW 独立事务（修复事务回滚导致过期态卡 status=0 的真实 P0 缺陷）
+- **P1-a** 小程序 `pages/merchant/scan` 加固：parseInviteScene 抽出纯函数 / 防重点击 / 确认弹窗 / 业务错误码细分模态框
+- **P1-b** admin 端 staffInvite 二维码按钮对失效态 disabled + "已失效" 文案 + showQrcode 前置 msgWarning + 状态映射补 status=3 已停用
+- **P2-a** vitest 新增 22 个 `parseInviteScene` 单测（覆盖 4 段 / 数字段 / 短码长度 4-8 / 防 XSS）
+- **SQL** 新建 `biz_product_industry_sync_safe.sql` 兼容 MySQL 5.7（原 seed 的 UPDATE...JOIN 语法过不去）
+- **回归**: 44 smoke + 10 JUnit + 52 vitest = **baseline 106/106 零退化**（从 83→106）
+- **真实业务缺陷累计**: 24→25（新增 1 个 P0 事务回滚缺陷）
+
 ### 13 commit 速查
 ```
 3162bb8c refactor(system): 删除已拆分的旧 ApiOrderService（234 行）

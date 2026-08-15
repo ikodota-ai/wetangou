@@ -4,6 +4,8 @@ import java.security.SecureRandom;
 import java.util.Date;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import com.ruoyi.biz.domain.MerchantStaffInvite;
 import com.ruoyi.biz.mapper.MerchantStaffInviteMapper;
@@ -52,6 +54,16 @@ public class MerchantStaffInviteServiceImpl implements IMerchantStaffInviteServi
     public int update(MerchantStaffInvite entity)
     {
         return inviteMapper.update(entity);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void markExpired(Long inviteId)
+    {
+        MerchantStaffInvite inv = inviteMapper.selectById(inviteId);
+        if (inv == null || !"0".equals(inv.getStatus())) return;
+        inv.setStatus("2");
+        inviteMapper.update(inv);
     }
 
     @Override

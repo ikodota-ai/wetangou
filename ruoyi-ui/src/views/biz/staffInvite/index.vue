@@ -19,6 +19,7 @@
             <el-option label="有效" value="0" />
             <el-option label="已用" value="1" />
             <el-option label="已过期" value="2" />
+            <el-option label="已停用" value="3" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -70,7 +71,10 @@
         <el-table-column label="备注" align="center" prop="remark" show-overflow-tooltip />
         <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
           <template slot-scope="scope">
-            <el-button size="mini" type="text" icon="el-icon-qrcode" @click="showQrcode(scope.row)" v-hasPermi="['biz:staffInvite:query']">二维码</el-button>
+            <el-button size="mini" type="text" icon="el-icon-qrcode"
+              @click="showQrcode(scope.row)"
+              :disabled="scope.row.status !== '0'"
+              v-hasPermi="['biz:staffInvite:query']">{{ scope.row.status === '0' ? '二维码' : '已失效' }}</el-button>
             <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDeleteInvite(scope.row)" v-hasPermi="['biz:staffInvite:remove']">删除</el-button>
           </template>
         </el-table-column>
@@ -331,6 +335,10 @@ export default {
       }).catch(() => {})
     },
     showQrcode(row) {
+      if (row.status !== '0') {
+        this.$modal.msgWarning('该邀请码已' + this.inviteStatusText(row.status) + '，无法生成二维码')
+        return
+      }
       this.qrcodeRow = row
       this.qrcodeUrl = row.wxacodeUrl || ''
       this.qrcodeOpen = true

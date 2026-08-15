@@ -7,6 +7,17 @@ import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
  * 商家员工邀请码 biz_merchant_staff_invite
+ *
+ * <p>status 业务态机：
+ * <ul>
+ *   <li>0 启用 - 可被 acceptInvite 消费</li>
+ *   <li>1 已用 - 已有员工扫码绑定，自动置位（usedBy 记录使用者 user_id）</li>
+ *   <li>2 过期 - 超过 expireAt 后首次 accept 触发，自动置位</li>
+ *   <li>3 停用 - 商家后台手动作废（删除或禁用）</li>
+ * </ul>
+ *
+ * <p>scene 编码：invite:{merchantId}:{storeId}:{inviteCode}
+ * <br>消费时强校验 mid/sid 与 invite 一致，防止钓鱼链接串号。
  */
 public class MerchantStaffInvite extends BaseEntity
 {
