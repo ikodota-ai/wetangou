@@ -36,6 +36,7 @@ public class AgentServiceImpl implements IAgentService
         {
             a.setUsedStoreCount(agentMapper.countStoresByAgentId(agentId));
         }
+
         return a;
     }
 
@@ -154,5 +155,11 @@ public class AgentServiceImpl implements IAgentService
             return;
         }
         throw new ServiceException("没有权限访问该代理商数据");
+    }
+
+    @Override
+    public Agent selectAgentByUserId(Long userId)
+    {
+        return agentMapper.selectAgentByUserId(userId);
     }
 }

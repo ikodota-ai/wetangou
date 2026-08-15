@@ -55,4 +55,5 @@ public interface IAgentService
      * 平台 / 未登录 / agentId 为空 → 放行；代理商账号只能访问自己
      */
     public void checkAgentDataScope(Long agentId);
+    public Agent selectAgentByUserId(Long userId);
 }

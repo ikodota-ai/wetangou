@@ -23,6 +23,7 @@ public class Agent extends BaseEntity
 
     /** 代理商ID */
     private Long agentId;
+    private Long userId;
 
     /** 代理商编号 */
     @Excel(name = "代理商编号")
@@ -86,6 +87,16 @@ public class Agent extends BaseEntity
     public void setAgentId(Long agentId)
     {
         this.agentId = agentId;
+    }
+
+    public Long getUserId()
+    {
+        return userId;
+    }
+
+    public void setUserId(Long userId)
+    {
+        this.userId = userId;
     }
 
     public String getAgentNo()
@@ -232,6 +243,7 @@ public class Agent extends BaseEntity
     {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
             .append("agentId", getAgentId())
+            .append("userId", getUserId())
             .append("agentNo", getAgentNo())
             .append("agentName", getAgentName())
             .append("merchantQuota", getMerchantQuota())

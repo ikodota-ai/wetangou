@@ -79,4 +79,9 @@ public interface AgentMapper
      */
     public int applyFee(@Param("agentId") Long agentId, @Param("quotaAdd") Integer quotaAdd,
             @Param("months") Integer months, @Param("amount") BigDecimal amount);
+
+    /**
+     * 通过登录用户ID查询代理商档案
+     */
+    public Agent selectAgentByUserId(Long userId);
 }

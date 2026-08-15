@@ -27,6 +27,7 @@ import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.annotation.RequireRole;
 import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.domain.LoginMember;
+import com.ruoyi.biz.domain.Agent;
 import com.ruoyi.biz.api.service.WxMaService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.api.util.MemberTokenService;
@@ -39,6 +40,7 @@ import com.ruoyi.biz.domain.Order;
 import com.ruoyi.biz.domain.PayBill;
 import com.ruoyi.biz.service.IMerchantStaffInviteService;
 import com.ruoyi.biz.service.IMerchantStaffService;
+import com.ruoyi.biz.service.IAgentService;
 import com.ruoyi.biz.service.IOrderService;
 import com.ruoyi.biz.service.IPayBillService;
 import com.ruoyi.biz.service.IBookingService;
@@ -63,6 +65,8 @@ public class ApiMerchantStaffController
 {
     @Autowired private ISysUserService userService;
     @Autowired private IMerchantStaffService staffService;
+    @Autowired
+    private IAgentService agentService;
     @Autowired private IMerchantStaffInviteService inviteService;
     @Autowired private MemberTokenService memberTokenService;
     @Autowired private WxMaService wxMaService;
@@ -464,9 +468,14 @@ public class ApiMerchantStaffController
             }
         }
         // 代理商/城市合伙人 叠加身份（user_type=01）
+        Long agentId = null;
         if ("01".equals(user.getUserType())) {
             roles.add(BizRole.AGENT);
             resolvedUserType = "agent";
+            try {
+                Agent agent = agentService.selectAgentByUserId(user.getUserId());
+                if (agent != null) agentId = agent.getAgentId();
+            } catch (Exception ignore) { }
         }
         // 平台账号 也能登录小程序（user_type=00，外出查跨店数据）
         if ("00".equals(user.getUserType())) {
@@ -481,7 +490,7 @@ public class ApiMerchantStaffController
         lm.setStoreId(currentStoreId);
         lm.setStoreIds(storeIds);
         lm.setMerchantId(merchantId);
-        // lm.setAgentId() 不从 SysUser 取，需从 biz_merchant_user 反查（小程序端场景下用 TenantIdentityResolver 已注入过）
+        lm.setAgentId(agentId);
         lm.setMemberId(user.getUserId());
         lm.setOpenid(user.getOpenid() == null ? "staff:" + user.getUserId() : user.getOpenid());
         return lm;

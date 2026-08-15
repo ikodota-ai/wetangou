@@ -150,4 +150,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where agent_id = #{agentId}
     </update>
 
+
+    <select id="selectAgentByUserId" parameterType="Long" resultMap="AgentResult">
+        <include refid="selectAgentVo"/>
+        where user_id = #{userId} and del_flag = '0' limit 1
+    </select>
 </mapper>
