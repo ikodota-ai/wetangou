@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
+import com.ruoyi.biz.api.annotation.DistributorRequired;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.core.domain.AjaxResult;
@@ -37,9 +38,10 @@ import com.ruoyi.framework.config.ServerConfig;
  *
  * @author dytuangou
  */
-@Anonymous
 @RestController
 @RequestMapping("/api/distributor")
+@LoginRequired
+@DistributorRequired
 public class ApiDistributorController
 {
     @Autowired
@@ -63,13 +65,14 @@ public class ApiDistributorController
     @Autowired
     private ServerConfig serverConfig;
 
+    /**
+     * 当前请求关联的推客档案（业务方法内部用，推客身份校验由 DistributorAuthInterceptor 完成）
+     */
     private Distributor currentDistributor()
     {
         Long memberId = MemberContextHolder.getMemberId();
-        Distributor query = new Distributor();
-        query.setMemberId(memberId);
-        List<Distributor> list = distributorService.selectDistributorList(query);
-        return list.isEmpty() ? null : list.get(0);
+        if (memberId == null) return null;
+        return distributorService.findByMemberId(memberId);
     }
 
     /**
@@ -83,7 +86,6 @@ public class ApiDistributorController
      * 入参：无（从 token 拿 agentId，再查名下 merchantIds）
      * 返回：{ totalAmount, settledAmount, pendingAmount, commissionCount, merchants: [...] }
      */
-    @LoginRequired
     @GetMapping("/agent/summary")
     public AjaxResult agentSummary()
     {
@@ -125,7 +127,6 @@ public class ApiDistributorController
         return AjaxResult.success(data);
     }
 
-    @LoginRequired
     @GetMapping("/center")
     public AjaxResult center()
     {
@@ -172,18 +173,49 @@ public class ApiDistributorController
 
     /**
      * 成为推客
+     *
+     * <p>业务逻辑：</p>
+     * <ol>
+     *   <li>已登录 + openid → 反查 biz_member.memberId（员工 token：openid = wx openid；会员 token：直接 LoginMember.memberId）</li>
+     *   <li>如果 biz_member 不存在（员工首次申请），自动创建一条 biz_member 记录</li>
+     *   <li>如果 biz_distributor 已存在，直接返回；否则创建</li>
+     * </ol>
      */
-    @LoginRequired
+    @Anonymous
     @PostMapping("/join")
     public AjaxResult join()
     {
-        Distributor exist = currentDistributor();
-        if (exist != null)
+        com.ruoyi.biz.api.domain.LoginMember lm = MemberContextHolder.get();
+        if (lm == null) throw new ServiceException("请先登录");
+
+        // 解析真实 biz_member.memberId
+        Long memberId = null;
+        String openid = lm.getOpenid();
+        if (openid == null || openid.startsWith("staff:") || openid.isEmpty())
         {
-            return AjaxResult.success(exist);
+            throw new ServiceException("请先绑定微信");
         }
+        Long merchantId = lm.getMerchantId() == null ? 1L : lm.getMerchantId();
+        com.ruoyi.biz.domain.Member m = memberService.selectByOpenidAcrossMerchant(merchantId, openid);
+        if (m == null)
+        {
+            // 自动注册
+            m = new com.ruoyi.biz.domain.Member();
+            m.setMerchantId(merchantId);
+            m.setOpenid(openid);
+            m.setNickname("推客新用户" + openid.substring(0, Math.min(6, openid.length())));
+            m.setStatus("0");
+            m.setUserType("0");
+            memberService.insertMember(m);
+        }
+        memberId = m.getMemberId();
+
+        // 已存在？
+        Distributor exist = distributorService.findByMemberId(memberId);
+        if (exist != null) return AjaxResult.success(exist);
+
         Distributor distributor = new Distributor();
-        distributor.setMemberId(MemberContextHolder.getMemberId());
+        distributor.setMemberId(memberId);
         distributor.setLevel(1);
         distributor.setTotalCommission(BigDecimal.ZERO);
         distributor.setAvailableAmount(BigDecimal.ZERO);
@@ -198,7 +230,6 @@ public class ApiDistributorController
     /**
      * 佣金明细
      */
-    @LoginRequired
     @GetMapping("/commission/list")
     public AjaxResult commissionList()
     {
@@ -215,7 +246,6 @@ public class ApiDistributorController
     /**
      * 提现记录
      */
-    @LoginRequired
     @GetMapping("/withdraw/list")
     public AjaxResult withdrawList()
     {
@@ -232,7 +262,6 @@ public class ApiDistributorController
     /**
      * 申请提现
      */
-    @LoginRequired
     @PostMapping("/withdraw")
     @Transactional
     public AjaxResult withdraw(@RequestBody JSONObject body)
@@ -277,7 +306,6 @@ public class ApiDistributorController
      * 太阳码图片保存到本地 upload/distributor/ 目录，返回相对 URL，前端可直接用于
      * 海报 canvas 绘制 + wx.saveImageToPhotosAlbum。</p>
      */
-    @LoginRequired
     @GetMapping("/qrcode")
     public AjaxResult qrcode() throws Exception
     {
@@ -346,7 +374,6 @@ public class ApiDistributorController
      * <p>基于 biz_member.invite_by = 当前 member_id 查询，仅返回昵称 / 头像 / 绑定时间。
      * 推客可在推客中心「我的粉丝」入口查看，引导裂变。</p>
      */
-    @LoginRequired
     @GetMapping("/fans")
     public AjaxResult fans()
     {

@@ -108,4 +108,10 @@ public class MemberServiceImpl implements IMemberService
     {
         return memberMapper.deleteMemberByMemberId(memberId);
     }
+
+    @Override
+    public Member selectByOpenidAcrossMerchant(Long merchantId, String openid)
+    {
+        return memberMapper.selectByOpenidAcrossMerchant(merchantId, openid);
+    }
 }

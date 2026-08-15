@@ -70,4 +70,9 @@ public interface MemberMapper
      * @return 结果
      */
     public int deleteMemberByMemberIds(Long[] memberIds);
+
+    /**
+     * 跨商户按 openid 查会员（代理商/平台场景，merchantId=null 时全表查）
+     */
+    public Member selectByOpenidAcrossMerchant(@Param("merchantId") Long merchantId, @Param("openid") String openid);
 }

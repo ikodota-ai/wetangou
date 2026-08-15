@@ -64,4 +64,5 @@ public interface IMemberService
      * @return 结果
      */
     public int deleteMemberByMemberId(Long memberId);
+    public Member selectByOpenidAcrossMerchant(Long merchantId, String openid);
 }

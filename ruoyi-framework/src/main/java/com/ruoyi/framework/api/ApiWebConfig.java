@@ -19,10 +19,14 @@ public class ApiWebConfig implements WebMvcConfigurer
     @Autowired
     private RoleAuthInterceptor roleAuthInterceptor;
 
+    @Autowired
+    private DistributorAuthInterceptor distributorAuthInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry)
     {
         registry.addInterceptor(memberAuthInterceptor).addPathPatterns("/api/**");
         registry.addInterceptor(roleAuthInterceptor).addPathPatterns("/api/**");
+        registry.addInterceptor(distributorAuthInterceptor).addPathPatterns("/api/distributor/**");
     }
 }

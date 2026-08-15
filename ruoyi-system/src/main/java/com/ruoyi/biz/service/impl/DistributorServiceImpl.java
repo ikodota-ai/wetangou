@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.biz.mapper.DistributorMapper;
 import com.ruoyi.biz.domain.Distributor;
+import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.service.IDistributorService;
+import com.ruoyi.biz.service.IMemberService;
 
 /**
  * 推客Service业务层处理
@@ -92,5 +94,18 @@ public class DistributorServiceImpl implements IDistributorService
     public int deleteDistributorByDistributorId(Long distributorId)
     {
         return distributorMapper.deleteDistributorByDistributorId(distributorId);
+    }
+
+    @Autowired
+    private IMemberService memberService;
+
+    @Override
+    public Distributor findByMemberId(Long memberId)
+    {
+        if (memberId == null) return null;
+        Distributor q = new Distributor();
+        q.setMemberId(memberId);
+        List<Distributor> list = distributorMapper.selectDistributorList(q);
+        return list.isEmpty() ? null : list.get(0);
     }
 }

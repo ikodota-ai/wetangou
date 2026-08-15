@@ -58,4 +58,11 @@ public interface IDistributorService
      * @return 结果
      */
     public int deleteDistributorByDistributorId(Long distributorId);
+
+    /**
+     * 通过会员 ID 查询推客档案（拦截器/通用查询用）
+     * @param memberId 会员 ID
+     * @return Distributor 或 null
+     */
+    public Distributor findByMemberId(Long memberId);
 }

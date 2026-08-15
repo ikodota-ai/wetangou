@@ -1624,3 +1624,51 @@ vitest 14/14 (V5-4 utils/role.js)
 ### 下一步建议
 - V2.6 候选：商品创建 P0 收口（按 3 类型分别建商品 + 字段动态化）、PC 后台角色-菜单映射
 - V3 候选：分销商独立角色模型、桌卡 / 优惠券 / 组合券包、抖音来客 38 截图逐张还原
+
+## v2.5 续篇 12（2026-08-15 20:50 · V5-11 推客身份 3 层模型收口 · 1 commit）
+
+> 详见本段。基于"推客身份是会员且有推客标记"+"店员和商家其实也可以是会员"+"通过 openid 自动识别其他身份"三轮讨论落地 3 层身份模型。
+
+### 3 层身份模型（v2.5 P2 核心抽象）
+
+| 层级 | 判定依据 | 表 | 例子 |
+|---|---|---|---|
+| 第一身份：会员 | `openid` 存在且非 `staff:` 占位 | `biz_member` | 任何绑微信的人 |
+| 第二身份：推客 | `biz_distributor.member_id` 命中（含跨商户 openid 反查） | `biz_distributor` | 申请成为推客的会员 |
+| 第三身份：员工 | `biz_merchant_staff` 关联 + 角色 | `biz_merchant_staff` | OWNER/MANAGER/STAFF |
+
+> **一个人可以同时拥有全部 3 个身份**。判别顺序：第一层 → 第二层 → 第三层，每层独立判定不互斥。
+> 商家端（OWNER/MANAGER/STAFF）必须**同一 merchantId**（同 appid），代理商和平台可以**跨商户**。
+
+### 已实装
+- **新注解** `DistributorRequired` (`@com.ruoyi.biz.api.annotation.DistributorRequired`)
+- **新拦截器** `DistributorAuthInterceptor` (`ruoyi-framework/.../DistributorAuthInterceptor.java`)
+  - 判别顺序：@Anonymous → 已登录 → openid 非空非 staff: → biz_distributor 命中
+  - 双策略：① 直接按 `LoginMember.memberId` 查 ② 按 openid 反查 biz_member（员工 token 场景）
+- **service 扩展** `IDistributorService.findByMemberId(memberId)` + `IMemberService.selectByOpenidAcrossMerchant(merchantId, openid)`
+- **controller 改造** `ApiDistributorController`
+  - 类级 `@LoginRequired + @DistributorRequired`
+  - `/join` 单独 `@Anonymous`（申请加入时还不是推客）
+  - `/join` 业务 bug 修复：不再用 `LoginMember.memberId`（员工 token 下 = userId ≠ biz_member.memberId），改用 openid 反查 biz_member，自动注册
+- **ApiWebConfig** 注册 `DistributorAuthInterceptor` 到 `/api/distributor/**`
+
+### SQL
+- `sql/smoke_v25_distributor_setup.sql`：smoke 测试数据注入（staff_c43 绑 openid + 推客 999901）
+- 真实生产不需要，smoke 前置脚本读这个 SQL
+
+### smoke
+- **c49 8/8 PASS**（3 层身份模型验证）
+  - staff_c43 已绑 openid → `/center` 200
+  - 平台/代理商 → 403 "仅会员可访问"
+  - owner_c43 没绑 openid → 403
+  - `/join` 放行（@Anonymous）+ 自动注册 biz_member
+  - 未登录 → 401
+
+### 累计 smoke
+```
+c43 25/25 + c45 12/12 + c46 11/11 + c47 13/13 + c48 14/14 + c49 8/8
+= 83 case 全 PASS
+```
+
+### commit
+- 待 commit（feat(v2.5): V5-11 推客身份 3 层身份模型 · 3 层身份识别)

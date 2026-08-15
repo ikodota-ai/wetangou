@@ -141,4 +141,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{memberId}
         </foreach>
     </delete>
+
+    <select id="selectByOpenidAcrossMerchant" resultMap="MemberResult">
+        <include refid="selectMemberVo"/>
+        where openid = #{openid}
+        <if test="merchantId != null "> and merchant_id = #{merchantId}</if>
+        limit 1
+    </select>
 </mapper>
