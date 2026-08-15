@@ -15,6 +15,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="gender"    column="gender"    />
         <result property="birthday"    column="birthday"    />
         <result property="status"    column="status"    />
+        <result property="userType"    column="user_type"    />
+        <result property="agentId"    column="agent_id"    />
         <result property="lastLoginTime"    column="last_login_time"    />
         <result property="inviteBy"    column="invite_by"    />
         <result property="inviteTime"    column="invite_time"    />
@@ -24,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMemberVo">
-        select member_id, merchant_id, openid, unionid, nickname, avatar, phone, gender, birthday, status, last_login_time, invite_by, invite_time, create_time, update_time, remark from biz_member
+        select member_id, merchant_id, openid, unionid, nickname, avatar, phone, gender, birthday, status, user_type, agent_id, last_login_time, invite_by, invite_time, create_time, update_time, remark from biz_member
     </sql>
 
     <select id="selectMemberList" parameterType="Member" resultMap="MemberResult">

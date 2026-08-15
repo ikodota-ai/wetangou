@@ -94,9 +94,8 @@ public class ApiDistributorController
         if (!"1".equals(me.getUserType())) {
             throw new ServiceException("仅代理商账号可调用");
         }
-        // 从 tenant context 反查 agentId（LoginMember 没存 agentId 字段）
-        com.ruoyi.common.core.domain.model.TenantContext ctx = com.ruoyi.common.utils.TenantContextHolder.get();
-        Long agentId = ctx == null ? null : ctx.getAgentId();
+        // 从 LoginMember 直接读 agentId (C26 解锁 dead-end)
+        Long agentId = me.getAgentId();
         if (agentId == null) {
             throw new ServiceException("账号未绑定代理商");
         }

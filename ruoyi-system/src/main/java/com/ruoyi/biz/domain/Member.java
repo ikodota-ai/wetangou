@@ -59,6 +59,14 @@ public class Member extends BaseEntity
     @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
     private String status;
 
+    /** 用户类型 (0普通会员 1代理商 2员工) */
+    @Excel(name = "用户类型")
+    private String userType;
+
+    /** 代理商ID (userType=1 时有值) */
+    @Excel(name = "代理商ID")
+    private Long agentId;
+
     /** 最后登录时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "最后登录时间", width = 30, dateFormat = "yyyy-MM-dd")
@@ -193,6 +201,26 @@ public class Member extends BaseEntity
         return inviteTime;
     }
 
+    public String getUserType()
+    {
+        return userType;
+    }
+
+    public void setUserType(String userType)
+    {
+        this.userType = userType;
+    }
+
+    public Long getAgentId()
+    {
+        return agentId;
+    }
+
+    public void setAgentId(Long agentId)
+    {
+        this.agentId = agentId;
+    }
+
     public Long getMerchantId()
     {
         return merchantId;
@@ -221,6 +249,8 @@ public class Member extends BaseEntity
             .append("createTime", getCreateTime())
             .append("updateTime", getUpdateTime())
             .append("remark", getRemark())
+            .append("userType", getUserType())
+            .append("agentId", getAgentId())
             .toString();
     }
 }

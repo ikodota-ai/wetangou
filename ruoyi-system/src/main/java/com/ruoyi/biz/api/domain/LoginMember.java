@@ -41,6 +41,9 @@ public class LoginMember implements Serializable
      */
     private String userType;
 
+    /** 代理商ID (userType=1 时) */
+    private Long agentId;
+
     /**
      * 门店员工身份时可管理的门店 ID 集合（多门店权限）
      */
@@ -61,6 +64,8 @@ public class LoginMember implements Serializable
         this.memberId = member.getMemberId();
         this.openid = member.getOpenid();
         this.merchantId = member.getMerchantId();
+        this.userType = member.getUserType();
+        this.agentId = member.getAgentId();
     }
 
     public Long getMerchantId()
@@ -81,6 +86,15 @@ public class LoginMember implements Serializable
     public void setUserType(String userType)
     {
         this.userType = userType;
+    }
+    public Long getAgentId()
+    {
+        return agentId;
+    }
+
+    public void setAgentId(Long agentId)
+    {
+        this.agentId = agentId;
     }
 
     public Long getStoreId()
