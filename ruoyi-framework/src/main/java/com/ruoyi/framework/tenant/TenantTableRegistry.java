@@ -36,7 +36,6 @@ public class TenantTableRegistry
             "biz_mp_auth",
             "biz_mp_release",
             "biz_merchant_fee",
-            "biz_banner",
             "biz_merchant",
             "biz_merchant_staff",
             "biz_merchant_staff_invite",
@@ -48,7 +47,10 @@ public class TenantTableRegistry
             "biz_product_category",
             "biz_voucher",
             "biz_agreement",
-            "biz_commission_rule")));
+            "biz_commission_rule",
+            // biz_banner: 平台 banner (merchant_id=0) + 各商户自有 banner 都要能拉取
+            // 小程序 ApiBannerController 是 anonymous 端点，按共享表语义走 merchant_id IN (0, ctx.merchantId)
+            "biz_banner")));
 
     /**
      * 该表是否需要租户过滤
