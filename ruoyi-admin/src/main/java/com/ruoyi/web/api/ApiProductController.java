@@ -49,16 +49,21 @@ public class ApiProductController
     private IProductSubitemGroupService subitemGroupService;
 
     /**
-     * 商品列表（按门店、分类、类型筛选，仅上架）
+     * 商品列表（按商户 / 门店 / 分类 / 类型筛选，仅上架）
+     *   - merchantId 不传：按 storeId 查单店商品
+     *   - merchantId 传了 + storeId 缺：返回该商户下所有自取/跨店商品
+     *   - 两个都传：商户范围 + 门店范围
      */
     @GetMapping("/list")
     public AjaxResult list(@RequestParam(required = false) Long storeId,
+                           @RequestParam(required = false) Long merchantId,
                            @RequestParam(required = false) Long categoryId,
                            @RequestParam(required = false) String productType)
     {
         Product query = new Product();
         query.setStatus("0");
         query.setStoreId(storeId);
+        query.setMerchantId(merchantId);
         query.setCategoryId(categoryId);
         query.setProductType(productType);
         List<Product> list = productService.selectProductList(query);

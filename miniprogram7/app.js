@@ -87,6 +87,43 @@ App({
    * force=true 时跳过缓存直接 storeList（页面下拉刷新用）
    */
   /**
+   * 启动时拉商家公开信息到 globalData.merchant（店名/logo/客服/营业时间）
+   * 失败仅 log，UI 走「默认」文案
+   */
+  bootMerchant() {
+    try {
+      api.merchantInfo().then((res) => {
+        const d = (res && (res.data || res)) || {}
+        if (d && d.merchantId) {
+          this.globalData.merchant = Object.assign({}, this.globalData.merchant || {}, d)
+        }
+      }).catch((e) => console.warn('[app] bootMerchant FAIL', e))
+    } catch (e) {
+      console.warn('[app] bootMerchant SYNC FAIL', e)
+    }
+  },
+  /**
+   * 启动时拉会员资料（如已登录），让「我的」页直接显示真实头像/昵称
+   */
+  bootUser() {
+    try {
+      const token = wx.getStorageSync('token')
+      if (!token) return
+      api.getUserInfo().then((res) => {
+        const d = (res && (res.data || res)) || {}
+        if (d && d.memberId) {
+          this.globalData.user = Object.assign({}, this.globalData.user || {}, d, {
+            logged: true,
+            token: token
+          })
+          try { this.notifyUserUpdate && this.notifyUserUpdate(this.globalData.user) } catch (e) {}
+        }
+      }).catch((e) => console.warn('[app] bootUser FAIL', e))
+    } catch (e) {
+      console.warn('[app] bootUser SYNC FAIL', e)
+    }
+  },
+  /**
    * 启动时静默预加载默认门店到 globalData.store（不弹位置授权，不阻塞）
    * 失败也无所谓：业务页面有自带的降级（取第一个店）
    */
@@ -255,6 +292,33 @@ App({
         reject(e);
       });
     });
+  },
+  /**
+   * 加载"到店自取"商品（跨店，按 merchantId 拉取，不绑 storeId）
+   * 失败返回空数组（不抛错），UI 走「暂无商品」空态
+   */
+  loadAllPickupGoods() {
+    return new Promise((resolve) => {
+      const merchant = (this.globalData && this.globalData.merchant) || {}
+      const mid = merchant.merchantId
+      if (!mid) { resolve([]); return }
+      api.productList({ merchantId: mid, page: 1, pageSize: 20 }).then((res) => {
+        const rows = (res && (res.rows || res.data || res)) || []
+        const list = Array.isArray(rows) ? rows.map((p) => ({
+          productId: p.productId || p.id,
+          name: p.productName || p.name,
+          productName: p.productName || p.name,
+          price: p.price != null ? String(p.price) : '0.00',
+          marketPrice: p.marketPrice != null ? String(p.marketPrice) : '',
+          subtitle: p.subtitle || '',
+          sold: p.sales || p.sold || 0,
+          cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png'
+        })) : []
+        this.globalData.goods = list
+        this._refreshHomeGoods()
+        resolve(list)
+      }).catch(() => resolve([]))
+    })
   },
   _refreshHomeGoods() {
     try {
