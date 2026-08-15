@@ -1539,3 +1539,88 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 > - V5-4/V5-5/V5-6 UI 角色化（按 staffUser.roles 显隐 tab/卡片，1.5d）
 > - V5-7 角色-菜单映射（0.5d）
 > - V5-8 smoke-c44 权限矩阵验证（0.5d）
+
+## v2.5 续篇 11（2026-08-15 20:20 · V5-1~V5-6 收口 · 3 commit）
+
+> 详见 `doc/2026-08-15续篇-v25-p1收口.md`（待写）。本轮完成 V5-1/V5-2/V5-3/V5-4/V5-5/V5-6 共 6 项，V5-7/V5-8/V5-9/V5-10 推后到 V2.6。
+
+### 已实装（5 commit 候选 / 实际 3 commit）
+
+#### V5-1 ApiController @RequireRole 拦截 + ApiPlatformController 平台 dashboard
+- `commit 6524f6d3` (push)
+- 后端：5 个 ApiController（Product/Order/Bill/Booking/MerchantStaff）加 `@RequireRole` 注解
+  - `/api/product/add|edit|status` → `@RequireRole({OWNER,MANAGER})`
+  - `/api/order/add|prepay|pay|_e2e_paySuccess|list|{id}|verify` → `@RequireRole({OWNER,MANAGER,STAFF})`
+  - `/api/bill/*` + `/api/booking/*` 同样 `{OWNER,MANAGER,STAFF}`
+  - `/api/merchant/staff/me|profile|bindWx|logout` → `{OWNER,MANAGER,STAFF}`
+  - `/api/merchant/staff/home|today/orders|today/bills|today/bookings` → `@RequireRole(value=STAFF, includeHigher=false)`（仅纯 STAFF，因为按 storeId 查）
+  - `/api/merchant/staff/platform/finance/summary` → `@RequireRole(PLATFORM)`
+  - `/api/merchant/staff/finance/summary` → `@RequireRole({OWNER,MANAGER})`
+- 新建 `ruoyi-admin/.../ApiPlatformController.java` (142→280 行)
+  - 3 端点：`/api/platform/stats` + `/api/platform/merchant/list` + `/api/platform/agent/list`
+  - 全部 `@LoginRequired + @RequireRole(PLATFORM)`
+- 4 补：商品高级编辑路由 + 平台 dashboard tab 入口
+- smoke：c45 12/12 + c46 11/11
+
+#### V5-2 平台 dashboard 扩展 跨店订单/员工
+- `commit 73eb1a4c` (push)
+- `ApiPlatformController` 新增 2 端点：
+  - `/api/platform/order/list?agentId=&scope=&status=&limit=` — 跨店订单流水（按 `params.merchantIdsIn` 过滤）
+  - `/api/platform/staff/list?agentId=&merchantId=&role=&limit=` — 跨店员工总览
+- smoke：c47 13/13
+
+#### V5-3 代理商 dashboard
+- `commit 928f3123` (push)
+- `Agent` 域加 `userId` 列（`sql/biz_agent_v25.sql`，3 个 backfill）
+- `AgentMapper.xml` + `IAgentService` + `AgentServiceImpl` 加 `selectAgentByUserId`
+- `buildLoginMember` 改：当 `user_type=01` 时按 userId 查 biz_agent 取 agentId 填到 LoginMember.agentId
+- 新建 `ApiAgentController.java` (212 行) 4 端点：
+  - `/api/agent/info` — 当前代理商档案
+  - `/api/agent/merchant/list` — 名下商家列表
+  - `/api/agent/order/list` — 名下商家订单流水
+  - `/api/agent/stats` — 今日订单/GMV
+- 全部 `@RequireRole(AGENT)`，平台超管永远放行（调试用）
+- smoke：c48 14/14
+
+#### V5-4/5/6 UI 角色化
+- 新建 `miniprogram7/utils/role.js` (60 行)
+  - 5 角色常量 + `getMember/getRoles/getUserType`
+  - `isPlatform/isAgent/isOwner/isManager/isStaff/isManagerOrAbove/isMerchantSide`
+- merchant home 改造：
+  - `showGmv/showCreateProduct/showBill/isStaffOnly` 4 标志位
+  - wxml：`今日营业额` 卡片（仅 OWNER/MANAGER）、`待确认买单` 卡片（仅 MANAGER+）、`创建商品` 入口（仅 MANAGER+）
+  - 解释：STAFF 不能看营业数据是产品要求（见 PRD §9.2.3）
+- agent / platform home：本身已按 userType 路由分流（miniprogram7/pages/agent/home + platform/home），无 UI 改动
+- vitest：新增 `tests/role.test.js` 14 case，全 PASS（含 isMerchantSide 边界）
+
+### smoke 累计
+```
+c43 25/25 (5 角色登录 + /finance/summary + /platform/finance/summary)
+c45 12/12 (平台 dashboard 基础)
+c46 11/11 (V5-1 ApiController @RequireRole)
+c47 13/13 (V5-2 平台订单/员工)
+c48 14/14 (V5-3 代理商 dashboard)
+vitest 14/14 (V5-4 utils/role.js)
+────────────────────────
+合计 89 case 全 PASS
+```
+
+### V5-11 纠偏（与 handoff 摘要差异）
+- 原 handoff 摘要："V5-11 ApiDistributorController `/withdraw` 加 `@RequireRole({OWNER,MANAGER})`"
+- 实际：`/withdraw` 走 `currentDistributor()`（C 端会员推客身份，**与 5 角色 BizRole 正交**）
+- 处理：**不**在 `/withdraw` 加 `@RequireRole`（保持 `@LoginRequired` 即可），避免误拦推客场景
+- 备注：要强化推客场景，可加 `DISTRIBUTOR` 第 6 角色，但会扩张 5 角色模型。建议推到 V3。
+
+### 推后到 V2.6 / V3
+- **V5-7 角色-菜单映射（PC admin 后台）**
+  - 现 sys_menu 齐全（商品 2062、员工邀请 2265、代理商 2216 等）
+  - 但走 RuoYi 框架 sys_user_role → sys_role → sys_role_menu 链路，**没按 5 角色 BizRole 过滤**
+  - 需要新建 `sys_biz_role_menu` 关联表 + 改 getRouters + 数据迁移（预计 2-3h）
+  - 决定：推后 V2.6，PC admin 端先用 sys_role 区分
+- **V5-8 smoke-c44 权限矩阵**：等 V5-7 完成后写
+- **V5-9/10**：V5-1 已覆盖商品/员工的核心拦截，V5-9/10 不重复
+- **V5-11**：见上纠偏
+
+### 下一步建议
+- V2.6 候选：商品创建 P0 收口（按 3 类型分别建商品 + 字段动态化）、PC 后台角色-菜单映射
+- V3 候选：分销商独立角色模型、桌卡 / 优惠券 / 组合券包、抖音来客 38 截图逐张还原

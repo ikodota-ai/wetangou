@@ -1,5 +1,6 @@
 const app = getApp()
 const { api } = require('../../../utils/request.js')
+const role = require('../../../utils/role.js')
 
 Page({
   data: {
@@ -13,7 +14,11 @@ Page({
     todayOrderCount: 0,
     pendingBillCount: 0,
     todayBookingCount: 0,
-    recentOrders: []
+    recentOrders: [],
+    showGmv: false,
+    showCreateProduct: false,
+    showBill: true,
+    isStaffOnly: false
   },
 
   onShow() {
@@ -37,7 +42,11 @@ Page({
       storeName: staff.storeName || ('门店' + staff.storeId),
       realName: staff.realName || '',
       merchantId: staff.merchantId,
-      needBindWx: !!staff.needBindWx
+      needBindWx: !!staff.needBindWx,
+      showGmv: role.isManagerOrAbove(),
+      showCreateProduct: role.isManagerOrAbove(),
+      showBill: role.isManagerOrAbove(),
+      isStaffOnly: role.isStaff() && !role.isManager() && !role.isOwner()
     })
   },
 
@@ -64,7 +73,11 @@ Page({
           todayOrderCount: d.todayOrderCount || 0,
           pendingBillCount: d.pendingBillCount || 0,
           todayBookingCount: d.todayBookingCount || 0,
-          recentOrders: d.recentOrders || []
+          recentOrders: d.recentOrders || [],
+          showGmv: role.isManagerOrAbove(),
+          showCreateProduct: role.isManagerOrAbove(),
+          showBill: role.isManagerOrAbove(),
+          isStaffOnly: role.isStaff() && !role.isManager() && !role.isOwner()
         })
       })
   },
