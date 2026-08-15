@@ -86,6 +86,17 @@ App({
    *
    * force=true 时跳过缓存直接 storeList（页面下拉刷新用）
    */
+  /**
+   * 启动时静默预加载默认门店到 globalData.store（不弹位置授权，不阻塞）
+   * 失败也无所谓：业务页面有自带的降级（取第一个店）
+   */
+  bootDefaultStore() {
+    try {
+      this.pickNearestStore(() => {}, { silent: true })
+    } catch (e) {
+      console.warn('[app] bootDefaultStore FAIL', e)
+    }
+  },
   pickNearestStore(callback, opts) {
     const useStore = (s, source) => {
       if (!s || !s.storeId) {
