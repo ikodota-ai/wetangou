@@ -1132,3 +1132,15 @@ a173de17 fix(api)+test(smoke): 商家端商品创建端到端 + 3 P1 缺陷 + C1
 - 20 commit / 12 doc / 10 smoke / 2 lint
 - 11 个真实缺陷 + 1 个隐藏风险
 - 29/29 smoke + 10/10 JUnit + 30/30 vitest + 91 静默 lint = **160 全 PASS**
+
+## v2 升级续篇 (2026-08-15 续篇 2 · C19~C29 · 11 commit)
+
+> 详见 `doc/2026-08-15续篇-c19至c22总览.md` + `doc/2026-08-15续篇-c23至c24总览.md` + `doc/2026-08-15续篇-c25总览.md` + `doc/2026-08-15续篇-c26总览.md` + `doc/2026-08-15续篇-c27c28总览.md` + `doc/C29修405smoke-2026-08-15.md`。本轮交付:
+
+### 本轮交付
+- **smoke 11 个**: C19 (跳过/c4 已覆盖) / C20 员工工作台 21/21 / C21 推客端 12/12 / C22 报名详情 13/13 / C23 agent/summary dead-end 5/5 / C24 withdraw 成功 12/12 / C25 全局脱敏 4/4 / C26 dead-end 解锁 10/10 / C27 跳过 / C28 pay/notify 7/7 / C29 修 405 8/8
+- **5 文件脱敏修复** (C22+C25): ApiBookingController + ApiMemberController + ApiMerchantStaffController + ApiStoreStaffDashboardController 共 5 处 `put("phone", getPhone())` 改 `DesensitizedType.PHONE.desensitizer().apply()`
+- **4 文件 + 1 SQL 解锁 dead-end** (C26): biz_member 加 user_type + agent_id 列 + Member/LoginMember domain + MemberMapper XML + ApiDistributorController.agentSummary 改读 LoginMember.agentId
+- **GlobalExceptionHandler 修 405** (C29): handleHttpRequestMethodNotSupported 改返 ResponseEntity.status(405), 全局错方法返正确 HTTP 语义
+- **真实业务缺陷**: 5+1+1 = 7 个 (累计 27 个含 v2 主体)
+- **回归基线**: 40/40 smoke + 10/10 JUnit + 30/30 vitest = **80 全 PASS**
