@@ -15,6 +15,10 @@ import com.ruoyi.biz.domain.Agent;
 import com.ruoyi.biz.domain.Merchant;
 import com.ruoyi.biz.service.IAgentService;
 import com.ruoyi.biz.service.IMerchantService;
+import com.ruoyi.biz.service.IMerchantStaffService;
+import com.ruoyi.biz.service.IOrderService;
+import com.ruoyi.biz.domain.MerchantStaff;
+import com.ruoyi.biz.domain.Order;
 import com.ruoyi.common.core.domain.AjaxResult;
 
 /**
@@ -36,6 +40,12 @@ public class ApiPlatformController
 
     @Autowired
     private IAgentService agentService;
+
+    @Autowired
+    private IOrderService orderService;
+
+    @Autowired
+    private IMerchantStaffService staffService;
 
     /**
      * 商家列表（PLATFORM 角色专属）
@@ -139,4 +149,129 @@ public class ApiPlatformController
         data.put("agentActive", agentActive);
         return AjaxResult.success(data);
     }
+
+    /**
+     * 平台订单流水（按 agentId 或 scope=SELF_MANAGED 限定商家范围）
+     * @param agentId 限定该代理商名下商家
+     * @param scope SELF_MANAGED 仅自营
+     * @param status 订单状态过滤
+     * @param limit 默认 50，最大 200
+     */
+    @LoginRequired
+    @RequireRole(BizRole.PLATFORM)
+    @GetMapping("/order/list")
+    public AjaxResult orderList(@RequestParam(required = false) Long agentId,
+                                @RequestParam(required = false) String scope,
+                                @RequestParam(required = false) String status,
+                                @RequestParam(required = false, defaultValue = "50") Integer limit)
+    {
+        int cap = Math.min(Math.max(limit == null ? 50 : limit, 1), 200);
+        Order q = new Order();
+        if (status != null && !status.isEmpty()) {
+            q.setStatus(status);
+        }
+        // 收集限定商家 id
+        Merchant qm = new Merchant();
+        if (agentId != null && agentId > 0) {
+            qm.setAgentId(agentId);
+        }
+        List<Merchant> merchants = merchantService.selectMerchantList(qm);
+        java.util.List<Long> ids = new java.util.ArrayList<>();
+        for (Merchant m : merchants) {
+            if ("SELF_MANAGED".equalsIgnoreCase(scope)) {
+                if (m.getAgentId() != null && m.getAgentId() > 0) continue;
+            }
+            ids.add(m.getMerchantId());
+        }
+        if (ids.isEmpty()) {
+            JSONObject empty = new JSONObject();
+            empty.put("total", 0);
+            empty.put("rows", new java.util.ArrayList<>());
+            return AjaxResult.success(empty);
+        }
+        q.getParams().put("merchantIdsIn", ids);
+        q.getParams().put("beginTime", null);
+        java.util.List<Order> all = orderService.selectOrderList(q);
+        java.util.List<JSONObject> rows = new java.util.ArrayList<>();
+        int total = all.size();
+        for (int i = 0; i < Math.min(cap, all.size()); i++) {
+            Order o = all.get(i);
+            JSONObject r = new JSONObject();
+            r.put("orderId", o.getOrderId());
+            r.put("orderNo", o.getOrderNo());
+            r.put("merchantId", o.getMerchantId());
+            r.put("storeId", o.getStoreId());
+            r.put("storeName", o.getStoreName());
+            r.put("memberId", o.getMemberId());
+            r.put("memberName", o.getMemberName());
+            r.put("productId", o.getProductId());
+            r.put("productName", o.getProductName());
+            r.put("totalAmount", o.getTotalAmount());
+            r.put("payAmount", o.getPayAmount());
+            r.put("status", o.getStatus());
+            r.put("payTime", o.getPayTime());
+            r.put("createTime", o.getCreateTime());
+            rows.add(r);
+        }
+        JSONObject data = new JSONObject();
+        data.put("total", total);
+        data.put("rows", rows);
+        return AjaxResult.success(data);
+    }
+
+    /**
+     * 平台员工总览（按 agentId / merchantId 过滤）
+     * 限制返回条数，避免全表直出
+     */
+    @LoginRequired
+    @RequireRole(BizRole.PLATFORM)
+    @GetMapping("/staff/list")
+    public AjaxResult staffList(@RequestParam(required = false) Long agentId,
+                                @RequestParam(required = false) Long merchantId,
+                                @RequestParam(required = false) String role,
+                                @RequestParam(required = false, defaultValue = "100") Integer limit)
+    {
+        int cap = Math.min(Math.max(limit == null ? 100 : limit, 1), 500);
+        java.util.List<Merchant> merchants;
+        if (agentId != null && agentId > 0) {
+            Merchant qm = new Merchant();
+            qm.setAgentId(agentId);
+            merchants = merchantService.selectMerchantList(qm);
+        } else {
+            merchants = merchantService.selectMerchantList(new Merchant());
+        }
+        java.util.Map<Long, Merchant> mMap = new java.util.HashMap<>();
+        for (Merchant m : merchants) mMap.put(m.getMerchantId(), m);
+
+        java.util.List<JSONObject> rows = new java.util.ArrayList<>();
+        int total = 0;
+        for (Merchant m : merchants) {
+            if (merchantId != null && merchantId > 0 && !merchantId.equals(m.getMerchantId())) continue;
+            MerchantStaff qs = new MerchantStaff();
+            qs.setMerchantId(m.getMerchantId());
+            if (role != null && !role.isEmpty()) qs.setRole(role);
+            List<MerchantStaff> staffList = staffService.selectList(qs);
+            for (MerchantStaff s : staffList) {
+                if (rows.size() >= cap) break;
+                JSONObject r = new JSONObject();
+                r.put("id", s.getId());
+                r.put("merchantId", s.getMerchantId());
+                r.put("merchantName", m.getMerchantName());
+                r.put("userId", s.getUserId());
+                r.put("nickName", s.getNickName());
+                r.put("phone", s.getPhone());
+                r.put("role", s.getRole());
+                r.put("status", s.getStatus());
+                r.put("createTime", s.getCreateTime());
+                rows.add(r);
+                total++;
+            }
+            if (rows.size() >= cap) break;
+        }
+        JSONObject data = new JSONObject();
+        data.put("total", total);
+        data.put("rows", rows);
+        return AjaxResult.success(data);
+    }
 }
+
