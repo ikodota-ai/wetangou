@@ -22,11 +22,26 @@ Page({
   _firstLoadDone: false,
   _slowTimer: null,
   onLoad() {
-    // 3.5s 内还没拿到 store → 触发降级（避免白板卡死）
+    // 3.5s 内还没拿到 store → 触发降级 + 主动再 fetch 一次（避免白板卡死）
     this._slowTimer = setTimeout(() => {
       if (!this.data.store || !this.data.store.storeId) {
         console.warn('[home] 3.5s 仍无 store，触发降级');
-        this.setData({ store: { name: '门店加载中…' } });
+        this.setData({
+          store: {
+            name: '门店加载中…',
+            hours: '',
+            address: '',
+            distanceText: '距离未知'
+          }
+        });
+        // 主动兜底：直接调 storeList 拿一个店（不走位置），保证有真实店名
+        api.storeList({ page: 1, pageSize: 1 }).then((res) => {
+          const rows = (res && (res.rows || res.data || res)) || [];
+          if (Array.isArray(rows) && rows.length && rows[0].storeId) {
+            const viewStore = this._compatStoreView(rows[0]);
+            this.setData({ store: viewStore });
+          }
+        }).catch(() => {});
       }
     }, 3500);
     try {
