@@ -1399,20 +1399,20 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 - admin `create.vue` 修正：tab 数量统一 5；商家信息 tab label 改为动态（团购/代金=商家信息，组合券包=信息）；组合券包去掉了"商品信息"独立 tab（因为组合搭配在商品资质 tab 里）
 - doc/抖音来客/INDEX.md 同步更新
 
-## 续篇 9（2026-08-15 16:55）
+## 续篇 9（2026-08-15 17:35）
 
-> 主表加列覆盖 3 类型差异 + 6 tab 详细字段
+> 主表瘦身 + biz_product_ext 1:1 扩展表（方案 C 落地）
 
-### 设计决策
-- **放弃方案 B**（3 张 _ext 子表 join）：类型扩展会让 join 越来越复杂（团购+代金+组合券包 3 张，未来次卡/储值卡/周期卡/惠享卡再加 4 张 → 7 张表 join）
-- **采用方案 A**（主表加列）：13 列扩展字段全部加到 `biz_product`，按 typeCode 切换前端显示
-- 命名规则：`<typeCode 缩写>_<字段名>` 避免冲突
-  - 代金券：voucher_*
-  - 组合券包：combo_* + outer_subitem_id
-  - 团购：groupon_*
-  - 通用：daily_use_limit / refund_rule_type
+### 设计演进
+1. **方案 A**（主表加列）：13 列全加 biz_product，缺点是宽表列多
+2. **方案 B**（3 张 _ext 子表 join）：每类型一张子表，缺点是 join 复杂、未来再加类型要继续加表
+3. **方案 C**（主表 + 1 张 ext 扩展表）✅ **采用**：
+   - `biz_product` 主表保留公共字段（51 列）+ 嵌套 `ext` 对象
+   - `biz_product_ext` 1:1 扩展表 14 列（13 业务 + create/update time）
+   - MyBatis `<association property="ext" columnPrefix="ext_">` 嵌套 1:1
+   - `saveExtByTypeCode()` 按 typeCode 分流写入 ext
 
-### 13 列扩展
+### 13 列分布
 | 列名 | 类型 | 用途 | 适用类型 |
 |---|---|---|---|
 | voucher_auto_name | TINYINT(1) | 自动按面值生成名称 | VOUCHER |
@@ -1426,23 +1426,39 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 | combo_items_json | TEXT | 搭配明细 JSON | COMBO |
 | groupon_pick_rule | VARCHAR(50) | 搭配规则(ALL/PICK_1/...) | GROUPON |
 | groupon_actual_count | INT | 实际可享数缓存 | GROUPON |
-| daily_use_limit | INT | 每天使用限制 | COMBO (独有) |
-| refund_rule_type | VARCHAR(50) | 退款规则 | COMBO (独有) |
+| daily_use_limit | INT | 每天使用限制 | 通用 |
+| refund_rule_type | VARCHAR(50) | 退款规则 | 通用 |
 
-### 售前/交易/消费 字段差异（你已明确）
-- **团购套餐售卖信息** vs **代金券** vs **组合券包** 字段确实不同：
-  - 组合券包独有：售价只读 + 限时售卖 + 商家平台子品ID
-  - 团购+代金 没券码类型（实际在交易规则里）
-- admin create.vue 改造：3 类型 tab 内容独立 v-if 分支，**不共享 tab name**
+### MySQL 5.7 性能考虑
+- 5.7 不支持 JSON 函数索引和 generated column 索引，所以选宽表(列存)而非 JSON 列
+- ext 表 LEFT JOIN：商品详情/列表都用同一个 selectVo，单次 SQL 拿全字段，性能可接受
+- 主表 + 1 张 ext 表 join 复杂度可控；未来加类型只需加 ext 列，**不需加主表列**
 
-### SQL
-- `sql/biz_product_columns_v3.sql` (13 列 ADD + 兜底 UPDATE)
+### Java/Mapper 改动
+- **新增**：`ProductExt.java` 14 字段（13+create/update time） + getter/setter
+- **新增**：`ProductExtMapper.java/xml` 标准 CRUD（selectById/insert/update/deleteById）
+- **新增**：`IProductExtService` + `ProductExtServiceImpl`
+- **改**：`Product.java` 删 13 业务字段 + 加 `private ProductExt ext` + getter/setter
+- **改**：`ProductMapper.xml`：
+  - selectVo 加 LEFT JOIN biz_product_ext e + 14 列 ext_ 前缀
+  - where product_id 改 p.product_id 避免 ambiguous
+  - 嵌套 association 解析 ext 字段
+- **改**：`ApiProductController.add/edit`：`saveExtByTypeCode(body)` 按 typeCode 分流写入 ext
+  - VOUCHER: voucher_auto_name=1, voucher_min_consume=body.minConsume
+  - COMBO: combo_total_value=body.totalValue, combo_sale_type=LIMIT, combo_auto_extend_days=30
+  - GROUPON: groupon_pick_rule=ALL
+  - 通用: daily_use_limit=0, refund_rule_type=ANYTIME
 
-### Java/Mapper
-- `Product.java` +13 字段 + getter/setter + toString
-- `ProductMapper.xml` +resultMap +selectVo +insert +update (全 13 列贯通)
+### smoke-c42 ✅ PASS
+- 999468 GROUPON → ext.groupon_pick_rule=ALL
+- 999469 VOUCHER → ext.voucher_min_consume=200, voucher_auto_name=1
+- 999470 COMBO  → ext.combo_total_value=500, combo_sale_type=LIMIT, combo_auto_extend_days=30
+- 列表详情均能拿到嵌套 ext 对象，MyBatis association 解析正常
+
+### commit
+- `f99942c0 feat(product): 主表瘦身 + biz_product_ext 1:1 扩展表(13列类型差异+公共2列)`
 
 ### 待办
-- smoke-c42 验证 3 类型各自独立 + 跑通新字段
-- admin create.vue 改造：tab name 独立（不共享）、3 类型 tab 内容差异完全分离
+- admin create.vue 改造：tab name 独立、3 类型 tab 内容差异完全分离
 - INDEX.md 同步 13 列说明
+- 登录路由分流实装（userType 路由 + 菜单过滤 + 3 测试账号）
