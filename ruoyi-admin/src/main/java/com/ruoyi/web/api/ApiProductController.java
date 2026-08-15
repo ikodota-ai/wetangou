@@ -14,6 +14,7 @@ import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.annotation.RequireRole;
 import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.util.MemberContextHolder;
+import com.ruoyi.biz.util.ProductValidator;
 import com.ruoyi.biz.domain.ProductExt;
 import com.ruoyi.biz.service.IProductExtService;
 import com.ruoyi.biz.domain.Product;
@@ -150,9 +151,8 @@ public class ApiProductController
         if (body.getPrice() == null) {
             throw new ServiceException("售价不能为空");
         }
-        if (body.getValidityDays() == null || body.getValidityDays() <= 0) {
-            throw new ServiceException("有效天数必须 > 0");
-        }
+        // 走通用类型必填校验（GROUPON/VOUCHER/COMBO 等）
+        ProductValidator.validate(body);
         // 类型特定必填
         if (("TIMECARD".equals(tc) || "HUIXIANG_CARD".equals(tc)) && (body.getTotalTimes() == null || body.getTotalTimes() <= 0)) {
             throw new ServiceException(tc + " 必须填写总次数");

@@ -83,6 +83,41 @@ public class ApiOrderServiceImpl implements IApiOrderService
             throw new ServiceException("商品库存不足");
         }
 
+        // === V2.6 P0：商品限制条件校验 ===
+        Date now = new Date();
+        // 1) 售卖时间段
+        if (product.getSaleStartDate() != null && now.before(product.getSaleStartDate()))
+        {
+            throw new ServiceException("商品尚未开始售卖，开始时间：" +
+                new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(product.getSaleStartDate()));
+        }
+        if (product.getSaleEndDate() != null && now.after(product.getSaleEndDate()))
+        {
+            throw new ServiceException("商品已过售卖期，结束时间：" +
+                new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(product.getSaleEndDate()));
+        }
+        // 2) 单次购买上限
+        if (product.getMaxPerOrder() != null && product.getMaxPerOrder() > 0 && quantity > product.getMaxPerOrder().longValue())
+        {
+            throw new ServiceException("单次最多购买 " + product.getMaxPerOrder() + " 件");
+        }
+        // 3) 每人累计限购（查该用户已支付 + 待支付的有效订单数）
+        if (product.getLimitPerUser() != null && product.getLimitPerUser() > 0)
+        {
+            int alreadyBought = countMemberProductBought(memberId, productId);
+            if (alreadyBought + quantity > product.getLimitPerUser().longValue())
+            {
+                int remain = (int) Math.max(0L, product.getLimitPerUser().longValue() - alreadyBought);
+                throw new ServiceException("每人限购 " + product.getLimitPerUser() + " 件，您已购买 " + alreadyBought + " 件，剩余可购 " + remain + " 件");
+            }
+        }
+        // 4) 预约类商品必须走预约流程（强提示；此处仅校验商品类型）
+        if ("BOOKING".equals(product.getTypeCode()) && product.getBookingRequired() == null)
+        {
+            product.setBookingRequired(1);
+        }
+        // === 限制条件校验完成 ===
+
         BigDecimal price = product.getPrice() == null ? BigDecimal.ZERO : product.getPrice();
         BigDecimal totalAmount = price.multiply(BigDecimal.valueOf(quantity));
         BigDecimal discount = BigDecimal.ZERO;
@@ -295,5 +330,29 @@ public class ApiOrderServiceImpl implements IApiOrderService
     private String genVerifyCode()
     {
         return IdUtils.fastSimpleUUID().substring(0, 12).toUpperCase();
+    }
+
+    /**
+     * 统计某会员对某商品的累计购买数（已支付 + 待支付都算，用于限购校验）
+     *  - status IN ('0', '1')：待付款、待使用都计入
+     *  - status = '2'（已核销）也计入（不能买了用、用了再买）
+     *  - status = '3'（已退款）不计入
+     */
+    private int countMemberProductBought(Long memberId, Long productId)
+    {
+        com.ruoyi.biz.domain.Order q = new com.ruoyi.biz.domain.Order();
+        q.setMemberId(memberId);
+        q.setProductId(productId);
+        List<com.ruoyi.biz.domain.Order> list = orderService.selectOrderList(q);
+        int total = 0;
+        for (com.ruoyi.biz.domain.Order o : list)
+        {
+            String s = o.getStatus();
+            if ("0".equals(s) || "1".equals(s) || "2".equals(s))
+            {
+                total += (o.getNum() == null ? 0 : o.getNum());
+            }
+        }
+        return total;
     }
 }

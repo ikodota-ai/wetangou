@@ -30,8 +30,31 @@
     <view class="info-row"><text class="lab">门店</text><text class="val">全部门店适用</text></view>
   </view>
 
-  <!-- 套餐详情 -->
-  <view class="card" wx:if="{{product.subitemGroups && product.subitemGroups.length}}">
+  <!-- 类型说明（V2.6 P1：每种 typeCode 一段简短说明） -->
+  <view class="card type-intro" wx:if="{{product.typeCode === 'GROUPON'}}">
+    <text class="block-title">团购套餐说明</text>
+    <text class="intro-text">下单后凭核销码到店使用，可选择套餐内不同子品搭配</text>
+  </view>
+  <view class="card type-intro" wx:if="{{product.typeCode === 'VOUCHER'}}">
+    <text class="block-title">代金券说明</text>
+    <text class="intro-text">现金抵扣券，到店买单时出示核销，符合门槛时直接抵扣</text>
+  </view>
+  <view class="card" wx:if="{{product.typeCode === 'VOUCHER' && product.minConsume && product.minConsume !== '0.00' && product.minConsume !== '0'}}">
+    <text class="block-title">使用示例</text>
+    <view class="nl-line">本券面值 ¥{{product.faceValue}}，最低消费 ¥{{product.minConsume}} 可用</view>
+    <view class="nl-sub">买单出示核销码，自动抵扣</view>
+  </view>
+  <view class="card type-intro" wx:if="{{product.typeCode === 'COMBO'}}">
+    <text class="block-title">组合券包说明</text>
+    <text class="intro-text">团购、代金券、实物自由组合，一次购买分次核销</text>
+  </view>
+  <view class="card type-intro" wx:if="{{product.typeCode === 'BOOKING'}}">
+    <text class="block-title">预约服务说明</text>
+    <text class="intro-text">下单后请到「我的订单」选择预约时段，凭预约凭证到店</text>
+  </view>
+
+  <!-- 套餐详情 (GROUPON / COMBO 显示) -->
+  <view class="card" wx:if="{{product.typeCode !== 'VOUCHER' && product.subitemGroups && product.subitemGroups.length}}">
     <text class="block-title">套餐详情</text>
     <view class="subitem-block" wx:for="{{product.subitemGroups}}" wx:key="groupId" wx:for-item="g">
       <view class="subitem-group-name">
@@ -60,24 +83,51 @@
   </view>
 
 
-  <!-- 购买须知 -->
+  <!-- 购买须知：按 typeCode 动态展示 -->
   <view class="card">
     <text class="block-title">购买须知</text>
-    <view class="nl-line"><text class="dot">·</text>可用日期</view>
-    <view class="nl-sub">有效期：购买后{{product.validDays || 365}}天内有效</view>
-    <view class="nl-line"><text class="dot">·</text>不可用日期</view>
-    <view class="nl-line"><text class="dot">·</text>可用时间</view>
-    <view class="nl-sub">{{product.availableTime || '10:30至21:00'}}</view>
-    <view class="nl-line"><text class="dot">·</text>购买限制</view>
-    <view class="nl-sub">{{product.purchaseLimit || '不限制购买数量'}}</view>
-    <view class="nl-line"><text class="dot">·</text>预约规则</view>
-    <view class="nl-sub">{{product.bookingRule || '到店消费：无需预约，高峰期可能需要排队'}}</view>
-    <view class="nl-line"><text class="dot">·</text>使用规则</view>
-    <view class="nl-sub">{{product.usageRule || '不与店内优惠同享'}}</view>
-    <view class="nl-line"><text class="dot">·</text>使用张数限制</view>
-    <view class="nl-sub">{{product.voucherLimit || '每人最多使用1张'}}</view>
-    <view class="nl-line"><text class="dot">·</text>使用人数限制</view>
-    <view class="nl-sub">{{product.peopleLimit || '不限制人数'}}</view>
+
+    <!-- 有效期（V2.6 P1：改用真实字段 validityDays） -->
+    <view class="nl-line"><text class="dot">·</text>有效期</view>
+    <view class="nl-sub">购买后 {{product.validityDays || 30}} 天内有效</view>
+
+    <!-- 售卖期 -->
+    <view class="nl-line" wx:if="{{product.saleStartDate || product.saleEndDate}}"><text class="dot">·</text>售卖期</view>
+    <view class="nl-sub" wx:if="{{product.saleStartDate}}">起：{{product.saleStartDate}}</view>
+    <view class="nl-sub" wx:if="{{product.saleEndDate}}">止：{{product.saleEndDate}}</view>
+
+    <!-- 单次限购（V2.6 P1：maxPerOrder） -->
+    <view class="nl-line" wx:if="{{product.maxPerOrder}}"><text class="dot">·</text>单次限购</view>
+    <view class="nl-sub" wx:if="{{product.maxPerOrder}}">单笔订单最多 {{product.maxPerOrder}} 件</view>
+
+    <!-- 每人限购（V2.6 P1：limitPerUser） -->
+    <view class="nl-line" wx:if="{{product.limitPerUser}}"><text class="dot">·</text>每人限购</view>
+    <view class="nl-sub" wx:if="{{product.limitPerUser}}">同一会员最多购买 {{product.limitPerUser}} 件</view>
+
+    <!-- 库存 -->
+    <view class="nl-line" wx:if="{{product.stock !== null && product.stock !== undefined}}"><text class="dot">·</text>库存</view>
+    <view class="nl-sub" wx:if="{{product.stock === 0}}">已售罄</view>
+    <view class="nl-sub" wx:elif="{{product.stock !== null && product.stock !== undefined}}">剩余 {{product.stock}} 件</view>
+
+    <!-- 使用须知（V2.6 P1：notice 字段） -->
+    <view class="nl-line" wx:if="{{product.notice}}"><text class="dot">·</text>使用须知</view>
+    <view class="nl-sub" wx:if="{{product.notice}}">{{product.notice}}</view>
+
+    <!-- 退改政策（refundPolicy） -->
+    <view class="nl-line" wx:if="{{product.refundPolicy}}"><text class="dot">·</text>退改政策</view>
+    <view class="nl-sub" wx:if="{{product.refundPolicy}}">{{product.refundPolicy}}</view>
+
+    <!-- 预约必填（BOOKING 才有） -->
+    <view class="nl-line" wx:if="{{product.bookingRequired == 1}}"><text class="dot">·</text>预约规则</view>
+    <view class="nl-sub" wx:if="{{product.bookingRequired == 1}}">需提前预约，到店出示预约凭证</view>
+
+    <!-- 附加费说明 -->
+    <view class="nl-line" wx:if="{{product.extraFeeDesc}}"><text class="dot">·</text>附加费</view>
+    <view class="nl-sub" wx:if="{{product.extraFeeDesc}}">{{product.extraFeeDesc}}</view>
+
+    <!-- 其他说明 -->
+    <view class="nl-line" wx:if="{{product.otherNotice}}"><text class="dot">·</text>其他说明</view>
+    <view class="nl-sub" wx:if="{{product.otherNotice}}">{{product.otherNotice}}</view>
   </view>
 
   <!-- 适用门店 -->
@@ -134,7 +184,7 @@
       <view class="bb-ic ic-order"></view>
       <text>订单</text>
     </view>
-    <view class="buy-btn" bindtap="onBuy">{{buyBtnText()}}</view>
+    <view class="buy-btn {{canBuy() ? 'enabled' : 'disabled'}}" bindtap="onBuy">{{buyBtnDisabledText()}}</view>
   </view>
 
   <!-- 分享卡弹窗 -->

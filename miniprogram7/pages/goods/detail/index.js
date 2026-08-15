@@ -102,6 +102,18 @@ Page({
       periodCount: p.periodCount || 0,
       totalValue: p.totalValue != null ? String(p.totalValue) : '',
       requireXiaoxin: p.requireXiaoxin || 0,
+      // V2.6 P1 限制条件字段
+      validityDays: p.validityDays || 0,
+      limitPerUser: p.limitPerUser || 0,
+      maxPerOrder: p.maxPerOrder || 0,
+      maxPersons: p.maxPersons || 0,
+      refundPolicy: p.refundPolicy || '',
+      notice: p.notice || '',
+      otherNotice: p.otherNotice || '',
+      bookingRequired: p.bookingRequired || 0,
+      saleStartDate: p.saleStartDate || '',
+      saleEndDate: p.saleEndDate || '',
+      extraFeeDesc: p.extraFeeDesc || '',
       subitemGroups: subitemGroups,
       sold: p.sales || p.sold || 0,
       cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',
@@ -118,6 +130,10 @@ Page({
   closeShare() { this.setData({ showShare: false }); },
   closeAuthPhone() { this.setData({ showAuthPhone: false }); },
   onBuy() {
+    if (!this.canBuy()) {
+      wx.showToast({ title: this.limitText() || '当前不可购买', icon: 'none' });
+      return;
+    }
     if (!app.globalData.user.logged) {
       wx.navigateTo({ url: '/pages/login/login' });
       return;
@@ -135,6 +151,57 @@ Page({
       COMBO: '组合券包', BILL: '到店买单', BOOKING: '预约服务',
       PRESALE: '预售券', PICKUP_VOUCHER: '提货券'
     })[code] || (code || '团购')
+  },
+  /**
+   * 限制条件展示文案（按优先级）
+   *  - 库存售罄 → "已售罄"
+   *  - 售卖期外 → "售卖期：xxxx 至 xxxx"
+   *  - 否则显示 默认限制
+   */
+  limitText() {
+    const p = this.data.product
+    if (!p) return ''
+    if (p.stock === 0) return '已售罄'
+    if (p.saleStartDate && this._dateInFuture(p.saleStartDate)) {
+      return '售卖期：' + this._fmtDate(p.saleStartDate) + ' 起'
+    }
+    if (p.saleEndDate && this._dateInPast(p.saleEndDate)) {
+      return '售卖期已过（' + this._fmtDate(p.saleEndDate) + ' 截止）'
+    }
+    return '可购买'
+  },
+  _dateInFuture(s) {
+    if (!s) return false
+    const t = new Date(String(s).replace(/-/g, '/')).getTime()
+    return t > Date.now()
+  },
+  _dateInPast(s) {
+    if (!s) return false
+    const t = new Date(String(s).replace(/-/g, '/')).getTime()
+    return t < Date.now()
+  },
+  _fmtDate(s) {
+    if (!s) return ''
+    const str = String(s)
+    return str.length >= 10 ? str.substring(0, 10) : str
+  },
+  /** 是否允许立即购买 */
+  canBuy() {
+    const p = this.data.product
+    if (!p) return false
+    if (p.stock === 0) return false
+    if (p.saleStartDate && this._dateInFuture(p.saleStartDate)) return false
+    if (p.saleEndDate && this._dateInPast(p.saleEndDate)) return false
+    return true
+  },
+  /** 购买按钮 disabled 文案 */
+  buyBtnDisabledText() {
+    const p = this.data.product
+    if (!p) return '加载中…'
+    if (p.stock === 0) return '已售罄'
+    if (p.saleStartDate && this._dateInFuture(p.saleStartDate)) return '未到售卖期'
+    if (p.saleEndDate && this._dateInPast(p.saleEndDate)) return '已过售卖期'
+    return this.buyBtnText()
   },
   buyBtnText() {
     const t = this.data.product && this.data.product.typeCode

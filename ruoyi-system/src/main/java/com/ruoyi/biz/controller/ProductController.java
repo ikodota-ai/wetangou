@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.service.IProductService;
+import com.ruoyi.biz.util.ProductValidator;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.biz.tenant.TenantFilterHelper;
@@ -93,6 +94,7 @@ public class ProductController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody Product product)
     {
+        ProductValidator.validate(product);
         return toAjax(productService.insertProduct(product));
     }
 
@@ -104,6 +106,7 @@ public class ProductController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody Product product)
     {
+        ProductValidator.validate(product);
         return toAjax(productService.updateProduct(product));
     }
 
