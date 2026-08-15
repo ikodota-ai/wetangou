@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.StoredCardTransactionMapper">
+
+    <resultMap id="BaseResult" type="com.ruoyi.biz.domain.StoredCardTransaction">
+        <id     property="txId"           column="tx_id"/>
+        <result property="cardId"         column="card_id"/>
+        <result property="merchantId"     column="merchant_id"/>
+        <result property="memberId"       column="member_id"/>
+        <result property="txType"         column="tx_type"/>
+        <result property="amount"         column="amount"/>
+        <result property="balanceBefore"  column="balance_before"/>
+        <result property="balanceAfter"   column="balance_after"/>
+        <result property="orderId"        column="order_id"/>
+        <result property="bizNo"          column="biz_no"/>
+        <result property="operatorType"   column="operator_type"/>
+        <result property="operatorId"     column="operator_id"/>
+        <result property="remark"         column="remark"/>
+        <result property="createTime"     column="create_time"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        tx_id, card_id, merchant_id, member_id, tx_type, amount, balance_before, balance_after,
+        order_id, biz_no, operator_type, operator_id, remark, create_time
+    </sql>
+
+    <select id="selectByBizNo" resultMap="BaseResult">
+        SELECT <include refid="Base_Column_List"/>
+        FROM biz_stored_card_transaction
+        WHERE biz_no = #{bizNo}
+    </select>
+
+    <select id="selectList" resultMap="BaseResult" parameterType="com.ruoyi.biz.domain.StoredCardTransaction">
+        SELECT <include refid="Base_Column_List"/>
+        FROM biz_stored_card_transaction
+        <where>
+            <if test="cardId != null">   AND card_id = #{cardId}</if>
+            <if test="memberId != null"> AND member_id = #{memberId}</if>
+            <if test="txType != null and txType != ''"> AND tx_type = #{txType}</if>
+            <if test="orderId != null">  AND order_id = #{orderId}</if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="insert" parameterType="com.ruoyi.biz.domain.StoredCardTransaction" useGeneratedKeys="true" keyProperty="txId">
+        INSERT INTO biz_stored_card_transaction (
+            card_id, merchant_id, member_id, tx_type, amount, balance_before, balance_after,
+            order_id, biz_no, operator_type, operator_id, remark, create_time
+        ) VALUES (
+            #{cardId}, #{merchantId}, #{memberId}, #{txType}, #{amount}, #{balanceBefore}, #{balanceAfter},
+            #{orderId}, #{bizNo}, #{operatorType}, #{operatorId}, #{remark}, NOW()
+        )
+    </insert>
+</mapper>
