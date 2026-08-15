@@ -1,0 +1,102 @@
+<view class="page">
+  <view class="head">
+    <view class="head-title">{{isCombo ? '组合商品搭配' : '商品搭配'}}</view>
+    <view class="head-tip">{{tipText}}</view>
+  </view>
+
+  <!-- 团购：商品组 -->
+  <block wx:if="{{!isCombo}}">
+    <view wx:for="{{groups}}" wx:key="groupId" wx:for-item="g" class="card group-card">
+      <view class="group-head">
+        <text class="g-name">{{g.groupName}}</text>
+        <view class="tag">{{g.pickRule || '全部可享'}}</view>
+        <view class="del" bindtap="onDelGroup" data-id="{{g.groupId}}">删除</view>
+      </view>
+      <view wx:for="{{g.subitems}}" wx:key="subitemId" wx:for-item="s" class="subitem">
+        <text class="s-name">{{s.subitemName}}</text>
+        <text class="s-qty">× {{s.quantity || 1}}</text>
+        <text class="s-price">¥{{s.price}}</text>
+        <text class="s-del" bindtap="onDelSub" data-gid="{{g.groupId}}" data-sid="{{s.subitemId}}">×</text>
+      </view>
+      <view class="add-sub" bindtap="onAddSub" data-gid="{{g.groupId}}" data-gname="{{g.groupName}}">+ 添加单品</view>
+    </view>
+    <view class="add-card" bindtap="onAddGroup">
+      <text>+ 添加商品组</text>
+    </view>
+    <view class="summary" wx:if="{{groups.length}}">
+      共 {{totalCount}} 个项目，实际可享 {{pickCount}} 个
+    </view>
+  </block>
+
+  <!-- 组合券包：4 种子品类型 -->
+  <block wx:if="{{isCombo}}">
+    <view wx:for="{{comboItems}}" wx:key="idx" wx:for-index="idx" class="card combo-row">
+      <view class="row-line">
+        <input class="c-name" placeholder="搭配名称（如亲子套餐）" value="{{item.name}}" data-idx="{{idx}}" bindinput="onComboName" />
+        <text class="del" bindtap="onDelCombo" data-idx="{{idx}}">×</text>
+      </view>
+      <view class="row-line">
+        <picker bindchange="onComboType" value="{{typeIdxOf(item.subitemType)}}" range="{{subitemTypeLabels}}" data-idx="{{idx}}">
+          <view class="picker"><text>{{item.subitemTypeLabel || '请选择类型'}}</text><text class="arrow">›</text></view>
+        </picker>
+        <view class="qty">
+          <text class="qty-lab">份数</text>
+          <input type="number" value="{{item.pickQuantity}}" data-idx="{{idx}}" bindinput="onComboQty" />
+        </view>
+      </view>
+      <view class="row-line">
+        <picker bindchange="onComboRule" value="{{ruleIdxOf(item.pickRule)}}" range="{{ruleLabels}}" data-idx="{{idx}}">
+          <view class="picker small"><text>{{item.pickRuleLabel || '全部可享'}}</text><text class="arrow">›</text></view>
+        </picker>
+        <view class="price-input">
+          <text class="qty-lab">单价 ¥</text>
+          <input type="digit" value="{{item.price}}" data-idx="{{idx}}" bindinput="onComboPrice" />
+        </view>
+      </view>
+    </view>
+    <view class="add-card" bindtap="onAddCombo">
+      <text>+ 添加搭配</text>
+    </view>
+    <view class="summary" wx:if="{{comboItems.length}}">
+      总价值（用户侧划线价）<text class="total-val">¥{{totalValue}}</text>
+    </view>
+  </block>
+
+  <view class="bottom-bar">
+    <view class="btn primary" bindtap="onSave">保存</view>
+  </view>
+
+  <!-- 弹窗：添加商品组 -->
+  <view class="modal" wx:if="{{showGroupModal}}">
+    <view class="modal-mask" bindtap="onCloseGroup"></view>
+    <view class="modal-body">
+      <view class="modal-title">添加商品组</view>
+      <view class="form-line"><text>组名称</text><input placeholder="如：主食" value="{{newGroup.groupName}}" bindinput="onGroupName" /></view>
+      <view class="form-line"><text>选择规则</text>
+        <picker bindchange="onGroupRule" value="{{groupRuleIdx}}" range="{{groupRuleLabels}}">
+          <view class="picker"><text>{{groupRuleLabels[groupRuleIdx]}}</text><text class="arrow">›</text></view>
+        </picker>
+      </view>
+      <view class="modal-footer">
+        <view class="btn plain" bindtap="onCloseGroup">取消</view>
+        <view class="btn primary" bindtap="onConfirmGroup">添加</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 弹窗：添加单品 -->
+  <view class="modal" wx:if="{{showSubModal}}">
+    <view class="modal-mask" bindtap="onCloseSub"></view>
+    <view class="modal-body">
+      <view class="modal-title">添加单品</view>
+      <view class="form-line"><text>所属组</text><text class="muted">{{newSub._groupName}}</text></view>
+      <view class="form-line"><text>名称</text><input placeholder="如：红烧肉" value="{{newSub.subitemName}}" bindinput="onSubName" /></view>
+      <view class="form-line"><text>数量</text><input type="number" value="{{newSub.quantity}}" bindinput="onSubQty" /></view>
+      <view class="form-line"><text>单价 ¥</text><input type="digit" value="{{newSub.price}}" bindinput="onSubPrice" /></view>
+      <view class="modal-footer">
+        <view class="btn plain" bindtap="onCloseSub">取消</view>
+        <view class="btn primary" bindtap="onConfirmSub">添加</view>
+      </view>
+    </view>
+  </view>
+</view>

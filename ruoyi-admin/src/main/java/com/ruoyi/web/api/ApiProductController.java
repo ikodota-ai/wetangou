@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -171,6 +172,62 @@ public class ApiProductController
         r.put("storeId", body.getStoreId());
         return r;
     }
+
+    /**
+     * 商家端：编辑商品（小程序端搭配保存后回填 totalValue / subitemPickRuleJson 等）
+     */
+    @LoginRequired
+    @PutMapping
+    public AjaxResult edit(@RequestBody Product body)
+    {
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        if (me == null) {
+            throw new ServiceException("未登录");
+        }
+        if (body == null || body.getProductId() == null) {
+            throw new ServiceException("商品ID不能为空");
+        }
+        Product exist = productService.selectProductByProductId(body.getProductId());
+        if (exist == null) {
+            throw new ServiceException("商品不存在");
+        }
+        if (exist.getMerchantId() == null || !exist.getMerchantId().equals(me.getMerchantId())) {
+            throw new ServiceException("无权编辑该商品");
+        }
+        body.setMerchantId(me.getMerchantId());
+        int rows = productService.updateProduct(body);
+        return rows > 0 ? AjaxResult.success() : AjaxResult.error("保存失败");
+    }
+
+    /**
+     * 商家端：商品上下架
+     */
+    @LoginRequired
+    @PutMapping("/status")
+    public AjaxResult toggleStatus(@RequestBody Product body)
+    {
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        if (me == null) {
+            throw new ServiceException("未登录");
+        }
+        if (body == null || body.getProductId() == null) {
+            throw new ServiceException("商品ID不能为空");
+        }
+        if (body.getStatus() == null || (!body.getStatus().equals("0") && !body.getStatus().equals("1"))) {
+            throw new ServiceException("status 必须是 0(上架) 或 1(下架)");
+        }
+        Product exist = productService.selectProductByProductId(body.getProductId());
+        if (exist == null) {
+            throw new ServiceException("商品不存在");
+        }
+        if (exist.getMerchantId() == null || !exist.getMerchantId().equals(me.getMerchantId())) {
+            throw new ServiceException("无权操作该商品");
+        }
+        exist.setStatus(body.getStatus());
+        int rows = productService.updateProduct(exist);
+        return rows > 0 ? AjaxResult.success() : AjaxResult.error("操作失败");
+    }
+
 
     /**
      * 把商品列表的图片字段（cover/images）转成绝对 URL，

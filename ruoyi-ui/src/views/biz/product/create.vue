@@ -1,0 +1,724 @@
+<template>
+  <div class="dyl-create">
+    <!-- 顶部栏（仿抖音来客"商品创建"标题 + 上品教程）-->
+    <div class="dyl-header">
+      <el-button icon="el-icon-back" size="medium" plain @click="goBack">返回</el-button>
+      <div class="dyl-title">商品创建</div>
+      <el-button type="text" size="medium" @click="openTutorial">
+        <i class="el-icon-question"></i> 上品教程
+      </el-button>
+    </div>
+
+    <div class="dyl-body">
+      <!-- 基础信息卡（折叠/展开，第1步是这卡）-->
+      <el-card class="dyl-card" shadow="never">
+        <div slot="header" class="dyl-card-head" @click="basicCollapsed = !basicCollapsed">
+          <span class="dyl-card-title">基础信息</span>
+          <span v-if="form.productId" class="dyl-card-tag">已锁定 · {{ typeName }}</span>
+          <i :class="basicCollapsed ? 'el-icon-arrow-down' : 'el-icon-arrow-up'" class="dyl-card-arrow"></i>
+        </div>
+        <div v-show="!basicCollapsed" class="dyl-card-body">
+          <el-form :model="form" :rules="basicRules" ref="basicForm" label-width="120px" size="small">
+            <el-form-item label="商品品类" prop="categoryId">
+              <el-cascader
+                v-model="form.categoryIdArr"
+                :options="categoryTree"
+                :props="{ value: 'categoryId', label: 'categoryName', children: 'children', checkStrictly: true, emitPath: false }"
+                placeholder="请选择品类（购物·母婴用品·儿童服饰）"
+                style="width: 100%"
+                @change="onCategoryChange"
+              />
+            </el-form-item>
+            <el-form-item label="商品发布细则" prop="industryCode">
+              <el-input v-model="form.industryCode" readonly placeholder="选择品类后自动匹配">
+                <template slot="append"><el-button @click="viewRules">查看详情</el-button></template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="商品类型" prop="typeCode">
+              <el-input :value="typeName" readonly placeholder="点击选择" @focus="typePickerOpen = true">
+                <template slot="append"><i class="el-icon-arrow-right"></i></template>
+              </el-input>
+            </el-form-item>
+            <el-form-item v-if="form.typeCode === 'HUIXIANG_CARD'" label="惠享卡提示">
+              <el-alert type="warning" :closable="false" show-icon>
+                发布此类目商品需要开通【放心付】保障服务
+              </el-alert>
+            </el-form-item>
+            <el-form-item label="商品名称" prop="productName">
+              <el-input v-model="form.productName" maxlength="60" show-word-limit :placeholder="namePlaceholder" />
+            </el-form-item>
+            <el-form-item v-if="form.typeCode === 'VOUCHER'" label="代金券面值" prop="faceValue">
+              <el-input-number v-model="form.faceValue" :min="0.01" :precision="2" :step="1" controls-position="right" style="width: 100%" />
+              <div class="dyl-tip">输入面值后，代金券名称将自动按面值生成</div>
+            </el-form-item>
+          </el-form>
+          <div class="dyl-step1-footer">
+            <el-button v-if="!form.productId" type="primary" size="medium" :loading="savingBasic" @click="goStep2" style="width: 100%">下一步</el-button>
+            <el-button v-else type="primary" size="medium" @click="basicCollapsed = true" style="width: 100%">已保存 · 展开其他信息</el-button>
+          </div>
+        </div>
+      </el-card>
+
+      <!-- 步骤2：商家信息 + 商品信息 + 售卖信息 + 交易规则 + 消费规则（tab 切换，6/6/5）-->
+      <el-card v-if="form.typeCode && form.productId" class="dyl-card dyl-card-step2" shadow="never">
+        <el-tabs v-model="activeTab" class="dyl-tabs" :class="tabCountClass">
+          <!-- Tab: 商家信息（团购+代金）-->
+          <el-tab-pane v-if="isGroupon || isVoucher" label="商家信息" name="merchant">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="所属商家">
+                <el-input :value="merchantName" readonly />
+              </el-form-item>
+              <el-form-item label="收单方式">
+                <el-radio-group v-model="form.collectMethod">
+                  <el-radio label="HEAD">总部统一收款</el-radio>
+                  <el-radio label="STORE">门店独立收款</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="适用门店" prop="storeIdList">
+                <biz-select v-model="form.storeIdList" type="store" multiple />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 商品信息（团购/代金/组合券包都有）-->
+          <el-tab-pane label="商品信息" name="product">
+            <el-form :model="form" label-width="120px" size="small">
+              <!-- 团购：商品搭配入口 + 单品/商品组管理 -->
+              <template v-if="isGroupon">
+                <el-form-item label="商品搭配">
+                  <el-button size="small" type="primary" plain @click="comboDrawer = true">
+                    <i class="el-icon-edit"></i> 管理商品搭配（{{ subitemGroupsCount }}）
+                  </el-button>
+                  <div class="dyl-tip">共 {{ subitemGroupsCount }} 个项目，顾客实际可享 {{ totalPickCount }} 个</div>
+                </el-form-item>
+              </template>
+
+              <!-- 组合券包：组合商品搭配入口 + 4 种子品类型 -->
+              <template v-if="isCombo">
+                <el-form-item label="组合商品搭配">
+                  <el-button size="small" type="primary" plain @click="comboDrawer = true">
+                    <i class="el-icon-edit"></i> 管理组合搭配（{{ comboItemsCount }}）
+                  </el-button>
+                  <div class="dyl-tip">共 {{ comboItemsCount }} 条搭配 · 总价值（用户侧划线价）¥{{ totalComboValue }}</div>
+                </el-form-item>
+              </template>
+
+              <!-- 代金券：代金券面值 + 名称自动生成 -->
+              <template v-if="isVoucher">
+                <el-form-item label="代金券名称">
+                  <el-input v-model="form.productName" :placeholder="autoVoucherName" />
+                  <div class="dyl-tip">系统已按面值 {{ form.faceValue || 0 }} 元自动生成，可手动调整</div>
+                </el-form-item>
+              </template>
+
+              <!-- 公共：售价/市场价/库存 -->
+              <el-form-item label="售价" prop="price">
+                <el-input-number v-model="form.price" :min="0.01" :precision="2" :step="1" controls-position="right" style="width: 100%" :disabled="isCombo" />
+                <div v-if="isCombo" class="dyl-tip">组合券包售价由系统按总价值自动计算，不可编辑</div>
+              </el-form-item>
+              <el-form-item label="市场价">
+                <el-input-number v-model="form.marketPrice" :min="0" :precision="2" :step="1" controls-position="right" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="库存" prop="stock">
+                <el-input-number v-model="form.stock" :min="0" controls-position="right" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="商品头图" prop="cover">
+                <image-upload v-model="form.cover" :limit="isVoucher ? 1 : 5" />
+              </el-form-item>
+              <el-form-item v-if="!isVoucher" label="环境图">
+                <image-upload v-model="form.images" :limit="10" />
+              </el-form-item>
+              <el-form-item label="项目补充说明">
+                <el-input v-model="form.detail" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="选填，对商品的补充说明" />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 售卖信息（团购+代金）-->
+          <el-tab-pane v-if="isGroupon || isVoucher" label="售卖信息" name="sale">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="投放渠道">
+                <el-checkbox-group v-model="form.saleChannels">
+                  <el-checkbox label="DOUPIN">抖音</el-checkbox>
+                  <el-checkbox label="TOUTIAO">今日头条</el-checkbox>
+                  <el-checkbox label="OTHER">其他</el-checkbox>
+                </el-checkbox-group>
+              </el-form-item>
+              <el-form-item label="职人带货">
+                <el-switch v-model="form.staffPromote" :active-value="1" :inactive-value="0" />
+              </el-form-item>
+              <el-form-item label="商品售卖日期">
+                <el-date-picker v-model="form.saleDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="券码类型">
+                <el-radio-group v-model="form.codeType">
+                  <el-radio label="DOUYIN">抖音券</el-radio>
+                  <el-radio label="MERCHANT">商家券</el-radio>
+                </el-radio-group>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 售卖信息（组合券包独有 — 含商家平台子品ID）-->
+          <el-tab-pane v-if="isCombo" label="售卖信息" name="sale">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="售价（系统算）">
+                <el-input :value="autoComboPrice" readonly>
+                  <template slot="append">元</template>
+                </el-input>
+                <div class="dyl-tip">总价值 ¥{{ totalComboValue }} × 折扣 = ¥{{ autoComboPrice }}</div>
+              </el-form-item>
+              <el-form-item label="库存" prop="stock">
+                <el-input-number v-model="form.stock" :min="0" controls-position="right" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="商品售卖日期">
+                <el-date-picker v-model="form.saleDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="券码类型">
+                <el-radio-group v-model="form.codeType">
+                  <el-radio label="DOUYIN">抖音券</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="商家平台子品ID">
+                <el-input v-model="form.outerSubitemId" placeholder="平台子品标识（可选）" />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 商品资质（组合券包独有）-->
+          <el-tab-pane v-if="isCombo" label="商品资质" name="qualify">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="子品类型管理">
+                <el-button size="small" type="primary" plain @click="comboDrawer = true">
+                  <i class="el-icon-edit"></i> 编辑子品代金券
+                </el-button>
+                <div class="dyl-tip">代金券类子品需配置：券类型（通兑/单品类）+ 适用规则 + 头图 + 辅助图</div>
+              </el-form-item>
+              <el-form-item label="券类型">
+                <el-radio-group v-model="form.voucherType">
+                  <el-radio label="GENERAL">通兑券</el-radio>
+                  <el-radio label="CATEGORY">单品类券</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="适用规则">
+                <el-checkbox-group v-model="form.voucherRules">
+                  <el-checkbox label="ALL_CATEGORY">全部品类适用</el-checkbox>
+                  <el-checkbox label="ALL_BRAND">全部品牌适用</el-checkbox>
+                </el-checkbox-group>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 交易规则（团购+代金）-->
+          <el-tab-pane v-if="isGroupon || isVoucher" label="交易规则" name="trade">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="顾客可消费日期">
+                <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="顾客不可消费日期">
+                <el-date-picker v-model="form.excludeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="每日消费时段">
+                <el-time-picker v-model="form.dailyTimeRange" is-range range-separator="至" start-placeholder="开始" end-placeholder="结束" placeholder="选择时段" value-format="HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="限购规则">
+                <el-input-number v-model="form.limitPerUser" :min="0" controls-position="right" />
+                <span class="dyl-tip-inline">每人限购（0=不限）</span>
+              </el-form-item>
+              <el-form-item label="售后政策" prop="refundPolicy">
+                <el-select v-model="form.refundPolicy" style="width: 100%">
+                  <el-option label="支持随时退" value="ANYTIME" />
+                  <el-option label="仅过期前可退" value="BEFORE_EXPIRE" />
+                  <el-option label="不可退" value="NONE" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="预约规则">
+                <el-switch v-model="form.bookingRequired" :active-value="1" :inactive-value="0" active-text="需要预约" />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 交易规则（组合券包 — 不含消费时段/不可消费日期）-->
+          <el-tab-pane v-if="isCombo" label="交易规则" name="trade">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="顾客可消费日期">
+                <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="限购规则">
+                <el-input-number v-model="form.limitPerUser" :min="0" controls-position="right" />
+                <span class="dyl-tip-inline">每人限购（0=不限）</span>
+              </el-form-item>
+              <el-form-item label="售后政策" prop="refundPolicy">
+                <el-select v-model="form.refundPolicy" style="width: 100%">
+                  <el-option label="支持随时退" value="ANYTIME" />
+                  <el-option label="不可退" value="NONE" />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <!-- Tab: 消费规则（团购+代金，组合券包没有）-->
+          <el-tab-pane v-if="isGroupon || isVoucher" label="消费规则" name="consume">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="店内其他优惠">
+                <el-radio-group v-model="form.storeOtherDiscount">
+                  <el-radio label="SHARE">与店内优惠同享</el-radio>
+                  <el-radio label="EXCLUSIVE">不与店内优惠同享</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="额外费用">
+                <el-input v-model="form.extraFee" placeholder="如有额外费用请说明" />
+              </el-form-item>
+              <el-form-item label="使用张数限制">
+                <el-input-number v-model="form.maxPerOrder" :min="1" :max="99" controls-position="right" />
+                <span class="dyl-tip-inline">单次最多使用张数</span>
+              </el-form-item>
+              <el-form-item v-if="isGroupon" label="使用人数限制">
+                <el-input-number v-model="form.maxPersons" :min="1" :max="99" controls-position="right" />
+                <span class="dyl-tip-inline">单次最多使用人数</span>
+              </el-form-item>
+              <el-form-item v-if="isVoucher" label="适用范围">
+                <el-radio-group v-model="form.scopeType">
+                  <el-radio label="ALL">全场通用</el-radio>
+                  <el-radio label="CATEGORY">按品类</el-radio>
+                  <el-radio label="STORE">按门店</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="其他说明信息">
+                <el-input v-model="form.notice" type="textarea" :rows="3" maxlength="300" show-word-limit />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+        </el-tabs>
+
+        <div class="dyl-step2-footer">
+          <el-button type="primary" size="medium" :loading="saving" @click="saveAll">保存全部</el-button>
+          <el-button @click="goBack">取消</el-button>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 类型选择弹窗（240-244 截图复刻）-->
+    <el-dialog title="选择商品类型" :visible.sync="typePickerOpen" width="560px" append-to-body>
+      <div class="dyl-type-picker">
+        <div v-for="t in enabledTypeList" :key="t.typeCode"
+             class="dyl-type-item"
+             :class="{ active: form.typeCode === t.typeCode, disabled: !t.appCanCreate }"
+             @click="pickType(t)">
+          <div class="dyl-type-name">{{ t.typeName }}</div>
+          <div class="dyl-type-desc">{{ t.typeDesc || t.description }}</div>
+          <el-tag v-if="!t.appCanCreate" size="mini" type="info" effect="plain">平台暂未开放</el-tag>
+          <i v-if="form.typeCode === t.typeCode" class="el-icon-check dyl-type-check"></i>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 商品搭配抽屉（团购：单品+商品组）-->
+    <el-drawer :visible.sync="comboDrawer" direction="rtl" size="540px" :with-header="false" append-to-body>
+      <div class="dyl-combo-drawer">
+        <div class="dyl-combo-head">
+          <el-button icon="el-icon-back" @click="comboDrawer = false" plain>返回</el-button>
+          <span class="dyl-combo-title">{{ isCombo ? '组合商品搭配' : '商品搭配' }}</span>
+        </div>
+        <div class="dyl-combo-tip">
+          {{ isCombo ? '每条搭配可选 团购套餐/代金券/满减券/折扣券 4 种类型，混合搭' : '添加单品和商品组（组内子品 N 选 1）' }}
+        </div>
+        <div v-if="isCombo" class="dyl-combo-list">
+          <div v-for="(c, idx) in comboItems" :key="idx" class="dyl-combo-row">
+            <el-input v-model="c.name" placeholder="搭配名称" size="small" style="margin-bottom: 6px" />
+            <div class="dyl-combo-row2">
+              <el-select v-model="c.subitemType" placeholder="类型" size="small" style="width: 130px">
+                <el-option label="团购套餐" value="GROUPON" />
+                <el-option label="代金券" value="VOUCHER" />
+                <el-option label="满减券" value="MANJIAN" />
+                <el-option label="折扣券" value="ZHEKOU" />
+              </el-select>
+              <el-input-number v-model="c.pickQuantity" :min="1" size="small" controls-position="right" style="width: 90px" />
+              <el-select v-model="c.pickRule" size="small" style="width: 110px">
+                <el-option label="全部可享" value="ALL" />
+                <el-option label="1选1" value="PICK_1" />
+                <el-option label="2选2" value="PICK_2" />
+              </el-select>
+              <el-button type="text" icon="el-icon-delete" @click="comboItems.splice(idx, 1)" />
+            </div>
+            <el-input-number v-model="c.price" :min="0" :precision="2" :step="1" size="small" controls-position="right" placeholder="单价" style="width: 100%" />
+          </div>
+          <el-button size="small" type="primary" plain icon="el-icon-plus" @click="comboItems.push(blankCombo())" style="width: 100%">+ 添加搭配</el-button>
+          <div class="dyl-combo-total">总价值（用户侧划线价）<b>¥{{ totalComboValue }}</b></div>
+        </div>
+        <div v-else class="dyl-combo-list">
+          <div v-for="g in subitemGroups" :key="g.groupId" class="dyl-combo-group">
+            <div class="dyl-combo-group-head">
+              <span>{{ g.groupName }}</span>
+              <el-tag size="mini">{{ g.pickRule }}</el-tag>
+              <el-button type="text" icon="el-icon-delete" @click="onDeleteGroup(g)" />
+            </div>
+            <div v-for="s in g.subitems" :key="s.subitemId" class="dyl-combo-subitem">
+              {{ s.subitemName }} × {{ s.quantity }} · ¥{{ s.price }}
+            </div>
+            <el-button size="mini" plain icon="el-icon-plus" @click="openAddSubitem(g)">添加单品</el-button>
+          </div>
+          <el-button size="small" type="primary" plain icon="el-icon-plus" @click="openAddGroup" style="width: 100%; margin-top: 8px">+ 添加商品组</el-button>
+        </div>
+        <div class="dyl-combo-footer">
+          <el-button type="primary" @click="saveCombo" :loading="savingCombo">保存</el-button>
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- 添加商品组/子品的内部弹窗（兼容老 index.vue 的 subitem 接口）-->
+    <el-dialog title="添加商品组" :visible.sync="groupOpen" width="420px" append-to-body>
+      <el-form :model="groupForm" label-width="100px" size="small">
+        <el-form-item label="组名称"><el-input v-model="groupForm.groupName" placeholder="如：主食" /></el-form-item>
+        <el-form-item label="选择规则">
+          <el-select v-model="groupForm.pickRule" style="width: 100%">
+            <el-option label="全部可享" value="ALL" />
+            <el-option label="1选1" value="1选1" />
+            <el-option label="2选2" value="2选2" />
+            <el-option label="3选2" value="3选2" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="排序"><el-input-number v-model="groupForm.sort" :min="0" /></el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="groupOpen = false">取 消</el-button>
+        <el-button type="primary" @click="submitAddGroup">添 加</el-button>
+      </div>
+    </el-dialog>
+    <el-dialog title="添加子品" :visible.sync="subitemOpen" width="420px" append-to-body>
+      <el-form :model="subitemForm" label-width="100px" size="small">
+        <el-form-item label="所属组"><span>{{ subitemForm._groupName }}</span></el-form-item>
+        <el-form-item label="子品名称"><el-input v-model="subitemForm.subitemName" /></el-form-item>
+        <el-form-item label="数量"><el-input-number v-model="subitemForm.quantity" :min="1" /></el-form-item>
+        <el-form-item label="单价"><el-input-number v-model="subitemForm.price" :min="0" :precision="2" :step="1" /></el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="subitemOpen = false">取 消</el-button>
+        <el-button type="primary" @click="submitAddSubitem">添 加</el-button>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+import { listCategory } from '@/api/biz/category'
+import { addProduct, getProduct } from '@/api/biz/product'
+import { selectProductTypeList } from '@/api/biz/productType'
+import { listGroups, addGroup, delGroup, addSubitem, delSubitem } from '@/api/biz/productSubitem'
+
+export default {
+  name: 'ProductCreate',
+  data() {
+    return {
+      // ===== 步骤 1：基础信息 =====
+      basicCollapsed: false,
+      typePickerOpen: false,
+      categoryTree: [],
+      typeList: [],
+      savingBasic: false,
+      basicRules: {
+        categoryId: [{ required: true, message: '请选择商品品类', trigger: 'change' }],
+        typeCode: [{ required: true, message: '请选择商品类型', trigger: 'change' }],
+        productName: [{ required: true, message: '请输入商品名称', trigger: 'blur' }]
+      },
+      // ===== 步骤 2：tab 状态 =====
+      activeTab: 'merchant',
+      saving: false,
+      // ===== 子品/搭配 =====
+      comboDrawer: false,
+      savingCombo: false,
+      subitemGroups: [],
+      comboItems: [],
+      groupOpen: false,
+      groupForm: { productId: null, groupName: '', pickRule: 'ALL', sort: 0 },
+      subitemOpen: false,
+      subitemForm: { productId: null, groupId: null, _groupName: '', subitemName: '', quantity: 1, price: 0 },
+      // ===== 表单 =====
+      merchantName: '',
+      form: {
+        productId: null,
+        categoryId: null,
+        categoryIdArr: null,
+        industryCode: '',
+        typeCode: '',
+        productName: '',
+        subtitle: '',
+        cover: '',
+        images: '',
+        price: null,
+        marketPrice: null,
+        stock: 0,
+        sales: 0,
+        sort: 0,
+        validityDays: 30,
+        productType: '0',
+        status: '0',
+        delFlag: '0',
+        // v2 字段
+        faceValue: null,
+        minConsume: null,
+        totalTimes: null,
+        periodType: null,
+        periodCount: null,
+        totalValue: null,
+        subitemPickRule: 'ALL',
+        requireXiaoxin: 0,
+        // tab 字段
+        storeIdList: [],
+        collectMethod: 'HEAD',
+        saleChannels: ['DOUPIN'],
+        staffPromote: 0,
+        saleDateRange: [],
+        codeType: 'DOUYIN',
+        outerSubitemId: '',
+        consumeDateRange: [],
+        excludeDateRange: [],
+        dailyTimeRange: [],
+        limitPerUser: 0,
+        refundPolicy: 'ANYTIME',
+        bookingRequired: 0,
+        storeOtherDiscount: 'EXCLUSIVE',
+        extraFee: '',
+        maxPerOrder: 1,
+        maxPersons: 1,
+        scopeType: 'ALL',
+        notice: '',
+        detail: '',
+        voucherType: 'GENERAL',
+        voucherRules: ['ALL_CATEGORY', 'ALL_BRAND']
+      }
+    }
+  },
+  computed: {
+    enabledTypeList() { return (this.typeList || []).filter(t => t.status === '0' || t.status === 0) },
+    typeName() {
+      const t = (this.typeList || []).find(x => x.typeCode === this.form.typeCode)
+      return t ? t.typeName : ''
+    },
+    isGroupon() { return this.form.typeCode === 'GROUPON' },
+    isVoucher() { return this.form.typeCode === 'VOUCHER' },
+    isCombo() { return this.form.typeCode === 'COMBO' },
+    isHuixiang() { return this.form.typeCode === 'HUIXIANG_CARD' },
+    tabCountClass() {
+      if (this.isCombo) return 'dyl-tabs-5'
+      return 'dyl-tabs-6'
+    },
+    namePlaceholder() {
+      if (this.isVoucher && this.form.faceValue) return this.autoVoucherName
+      return '请输入商品名称'
+    },
+    autoVoucherName() {
+      const v = this.form.faceValue
+      if (v && Number(v) > 0) return `${Number(v).toFixed(0)}元代金券`
+      return '代金券'
+    },
+    subitemGroupsCount() {
+      return (this.subitemGroups || []).reduce((sum, g) => sum + (g.subitems || []).length, 0)
+    },
+    totalPickCount() {
+      // 团购套餐的"实际可享"：全部可享=全部项；1选1=1
+      let total = 0
+      for (const g of (this.subitemGroups || [])) {
+        if (g.pickRule === 'ALL' || !g.pickRule) total += (g.subitems || []).length
+        else if (g.pickRule === '1选1') total += 1
+        else if (g.pickRule === '2选2') total += 2
+        else if (g.pickRule === '3选2') total += 2
+        else total += (g.subitems || []).length
+      }
+      return total
+    },
+    comboItemsCount() { return (this.comboItems || []).length },
+    totalComboValue() {
+      return (this.comboItems || []).reduce((sum, c) => sum + Number(c.pickQuantity || 0) * Number(c.price || 0), 0)
+    },
+    autoComboPrice() {
+      // 简单：90% 折扣
+      return (Number(this.totalComboValue || 0) * 0.9).toFixed(2)
+    }
+  },
+  watch: {
+    'form.faceValue'(v) {
+      if (this.isVoucher && v && !this.form.productName) {
+        this.form.productName = this.autoVoucherName
+      }
+    }
+  },
+  created() {
+    this.loadCategory()
+    this.loadTypeList()
+    this.merchantName = (this.$store.state.user && (this.$store.state.user.merchantName || this.$store.state.user.name)) || '当前商家'
+    // 编辑模式：?productId=xxx
+    const pid = this.$route.query.productId
+    if (pid) this.loadProduct(pid)
+  },
+  methods: {
+    loadCategory() {
+      listCategory({ pageNum: 1, pageSize: 200 }).then(res => {
+        this.categoryTree = res.rows || []
+      })
+    },
+    loadTypeList() {
+      selectProductTypeList().then(res => {
+        this.typeList = (res.rows || []).filter(t => t.status === '0' || t.status === 0)
+      })
+    },
+    loadProduct(pid) {
+      getProduct(pid).then(p => {
+        this.form = Object.assign({}, this.form, p)
+        this.form.categoryIdArr = p.categoryId
+        this.basicCollapsed = true
+        if (this.isGroupon) this.loadSubitems()
+      })
+    },
+    onCategoryChange(v) {
+      // 找 industryCode
+      const findIndustry = (tree, id) => {
+        for (const n of tree) {
+          if (n.categoryId === id) return n.industryCode || ''
+          if (n.children) { const r = findIndustry(n.children, id); if (r) return r }
+        }
+        return ''
+      }
+      this.form.industryCode = findIndustry(this.categoryTree, v) || ''
+    },
+    pickType(t) {
+      if (!t.appCanCreate) {
+        this.$alert('该类型暂不支持在抖音来客App创建', '提示', { type: 'warning' })
+        return
+      }
+      this.form.typeCode = t.typeCode
+      this.typePickerOpen = false
+    },
+    viewRules() {
+      this.$alert('该品类对应平台的发布细则要求', '商品发布细则', { type: 'info' })
+    },
+    openTutorial() {
+      this.$alert('抖音来客风格商品创建流程：第1步选类型 → 第2步6个tab填写 → 保存', '上品教程', { type: 'info' })
+    },
+    goBack() { this.$router.back() },
+    goStep2() {
+      this.$refs.basicForm.validate(valid => {
+        if (!valid) return
+        // 校验名称
+        if (this.isVoucher && !this.form.faceValue) {
+          this.$modal.msgError('代金券请输入面值')
+          return
+        }
+        this.savingBasic = true
+        addProduct(this.form).then(res => {
+          this.form.productId = res.data && (res.data.productId || res.data)
+          this.basicCollapsed = true
+          this.$modal.msgSuccess('基础信息已保存，请继续填写商品详情')
+          if (this.isGroupon) this.loadSubitems()
+        }).catch(e => {
+          this.$modal.msgError((e && (e.msg || e.message)) || '保存失败')
+        }).finally(() => { this.savingBasic = false })
+      })
+    },
+    saveAll() {
+      if (!this.form.productId) {
+        this.$modal.msgError('请先完成基础信息')
+        return
+      }
+      this.saving = true
+      addProduct(this.form).then(() => {
+        this.$modal.msgSuccess('保存成功')
+        this.goBack()
+      }).catch(e => {
+        this.$modal.msgError((e && (e.msg || e.message)) || '保存失败')
+      }).finally(() => { this.saving = false })
+    },
+    // ===== 商品搭配 =====
+    loadSubitems() {
+      if (!this.form.productId) return
+      listGroups(this.form.productId).then(res => {
+        this.subitemGroups = (res && (res.data || res)) || []
+      }).catch(() => { this.subitemGroups = [] })
+    },
+    openAddGroup() {
+      this.groupForm = { productId: this.form.productId, groupName: '', pickRule: 'ALL', sort: 0 }
+      this.groupOpen = true
+    },
+    submitAddGroup() {
+      if (!this.groupForm.groupName) { this.$modal.msgError('请输入组名称'); return }
+      addGroup(this.groupForm).then(() => {
+        this.$modal.msgSuccess('已添加')
+        this.groupOpen = false
+        this.loadSubitems()
+      })
+    },
+    onDeleteGroup(g) {
+      this.$modal.confirm('确认删除商品组「' + g.groupName + '」？').then(() => delGroup(g.groupId)).then(() => {
+        this.$modal.msgSuccess('已删除'); this.loadSubitems()
+      }).catch(() => {})
+    },
+    openAddSubitem(g) {
+      this.subitemForm = { productId: this.form.productId, groupId: g.groupId, _groupName: g.groupName, subitemName: '', quantity: 1, price: 0 }
+      this.subitemOpen = true
+    },
+    submitAddSubitem() {
+      if (!this.subitemForm.subitemName) { this.$modal.msgError('请输入子品名称'); return }
+      addSubitem(this.subitemForm).then(() => {
+        this.$modal.msgSuccess('已添加'); this.subitemOpen = false; this.loadSubitems()
+      })
+    },
+    onDeleteSubitem(g, s) {
+      this.$modal.confirm('确认删除子品「' + s.subitemName + '」？').then(() => delSubitem(s.subitemId)).then(() => {
+        this.$modal.msgSuccess('已删除'); this.loadSubitems()
+      }).catch(() => {})
+    },
+    blankCombo() { return { name: '', subitemType: 'GROUPON', pickQuantity: 1, pickRule: 'ALL', price: 0 } },
+    saveCombo() {
+      this.savingCombo = true
+      // 简单：把 comboItems 序列化到 form.subitemPickRuleJson 字段
+      this.form.subitemPickRuleJson = JSON.stringify(this.comboItems)
+      addProduct({ productId: this.form.productId, subitemPickRuleJson: this.form.subitemPickRuleJson }).then(() => {
+        this.$modal.msgSuccess('搭配已保存')
+        this.comboDrawer = false
+      }).catch(e => this.$modal.msgError((e && (e.msg || e.message)) || '保存失败'))
+        .finally(() => { this.savingCombo = false })
+    }
+  }
+}
+</script>
+
+<style scoped>
+.dyl-create { max-width: 960px; margin: 0 auto; padding: 12px; background: #f5f5f7; min-height: 100vh; }
+.dyl-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 12px; }
+.dyl-title { font-size: 18px; font-weight: 600; color: #161823; }
+.dyl-card { margin-bottom: 12px; border-radius: 8px; }
+.dyl-card-head { display: flex; align-items: center; cursor: pointer; }
+.dyl-card-title { font-size: 16px; font-weight: 600; color: #161823; }
+.dyl-card-tag { margin-left: 12px; font-size: 12px; color: #fe2c55; background: #ffe7eb; padding: 2px 8px; border-radius: 4px; }
+.dyl-card-arrow { margin-left: auto; color: #999; }
+.dyl-step1-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+.dyl-card-step2 { padding-bottom: 60px; }
+.dyl-tabs ::v-deep .el-tabs__header { margin-bottom: 16px; }
+.dyl-tabs-6 ::v-deep .el-tabs__item { width: 16.66% !important; padding: 0 4px !important; text-align: center; }
+.dyl-tabs-5 ::v-deep .el-tabs__item { width: 20% !important; padding: 0 4px !important; text-align: center; }
+.dyl-tip { color: #999; font-size: 12px; margin-top: 4px; }
+.dyl-tip-inline { color: #999; font-size: 12px; margin-left: 12px; }
+.dyl-step2-footer { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,.04); z-index: 100; text-align: right; }
+.dyl-step2-footer .el-button + .el-button { margin-left: 8px; }
+.dyl-type-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-height: 500px; overflow-y: auto; }
+.dyl-type-item { position: relative; padding: 16px; border: 1px solid #f0f0f0; border-radius: 8px; cursor: pointer; transition: all .2s; }
+.dyl-type-item:hover { border-color: #fe2c55; }
+.dyl-type-item.active { border-color: #fe2c55; background: #fff5f7; }
+.dyl-type-item.disabled { opacity: .45; cursor: not-allowed; }
+.dyl-type-name { font-size: 15px; font-weight: 600; color: #161823; }
+.dyl-type-desc { font-size: 12px; color: #999; margin-top: 4px; line-height: 1.5; }
+.dyl-type-check { position: absolute; right: 12px; top: 12px; color: #fe2c55; font-size: 18px; }
+.dyl-combo-drawer { padding: 16px; }
+.dyl-combo-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.dyl-combo-title { font-size: 16px; font-weight: 600; }
+.dyl-combo-tip { color: #999; font-size: 12px; padding: 8px 12px; background: #f5f5f7; border-radius: 4px; margin-bottom: 12px; }
+.dyl-combo-row { padding: 10px; background: #fafafa; border-radius: 6px; margin-bottom: 8px; }
+.dyl-combo-row2 { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.dyl-combo-total { text-align: right; padding: 12px 0; color: #161823; }
+.dyl-combo-total b { color: #fe2c55; font-size: 18px; margin-left: 8px; }
+.dyl-combo-group { padding: 10px; background: #fafafa; border-radius: 6px; margin-bottom: 8px; }
+.dyl-combo-group-head { display: flex; align-items: center; gap: 8px; font-weight: 500; margin-bottom: 6px; }
+.dyl-combo-group-head .el-button { margin-left: auto; }
+.dyl-combo-subitem { padding: 4px 8px; color: #555; font-size: 13px; }
+.dyl-combo-footer { text-align: center; padding: 16px 0; border-top: 1px solid #f0f0f0; }
+</style>

@@ -1,0 +1,92 @@
+<view class="page">
+  <!-- 顶部导航 -->
+  <view class="nav">
+    <text class="nav-back" bindtap="goBack">‹</text>
+    <text class="nav-title">团购商品</text>
+    <text class="nav-more" bindtap="onMore">更多</text>
+  </view>
+
+  <!-- Tab: 团购/品牌 + 全部门店 -->
+  <view class="tab-bar">
+    <view class="tab {{mainTab === 0 ? 'active' : ''}}" bindtap="onMainTab" data-idx="0">团购</view>
+    <view class="tab {{mainTab === 1 ? 'active' : ''}}" bindtap="onMainTab" data-idx="1">品牌</view>
+    <view class="store-pick" bindtap="onPickStore">
+      <text class="store-icon">🏪</text>
+      <text class="store-name">全部门店</text>
+      <text class="arrow">▼</text>
+    </view>
+  </view>
+
+  <!-- 状态 Tab（横向 scroll） -->
+  <scroll-view class="status-bar" scroll-x="true" enhanced show-scrollbar="{{false}}">
+    <view class="status-tab {{statusTab === 0 ? 'active' : ''}}" bindtap="onStatusTab" data-idx="0">已上架 <text class="cnt">{{counts.onShelf}}</text></view>
+    <view class="status-tab" bindtap="onStatusTab" data-idx="1">审核中 <text class="cnt">0</text></view>
+    <view class="status-tab" bindtap="onStatusTab" data-idx="2">待商家审核 <text class="cnt">0</text></view>
+    <view class="status-tab" bindtap="onStatusTab" data-idx="3">审核驳回 <text class="cnt">0</text></view>
+    <view class="status-tab" bindtap="onStatusTab" data-idx="4">已下架 <text class="cnt">{{counts.offShelf}}</text></view>
+  </scroll-view>
+
+  <!-- 工具栏 -->
+  <view class="toolbar">
+    <view class="sort"><text>最新修改在上</text><text class="arrow">▼</text></view>
+    <view class="spacer"></view>
+    <view class="tool" bindtap="onSearch"><text class="ico">🔍</text><text>搜索</text></view>
+    <view class="tool" bindtap="onFilter"><text class="ico">▽</text><text>筛选</text></view>
+    <view class="tool" bindtap="onBatch"><text class="ico">▦</text><text>批量改品</text></view>
+  </view>
+
+  <!-- 加载中 / 空 / 列表 -->
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+  <view wx:elif="{{!products.length}}" class="empty">
+    <text>还没有商品</text>
+    <view class="empty-btn" bindtap="goCreate">+ 立即创建</view>
+  </view>
+  <view wx:else class="list">
+    <view wx:for="{{products}}" wx:key="productId" class="item card">
+      <!-- 售卖状态 -->
+      <view class="item-top">
+        <view class="dot {{item.status === '0' ? 'on' : 'off'}}"></view>
+        <text class="state">{{item.status === '0' ? '售卖中' : '已下架'}}</text>
+        <text class="sep">|</text>
+        <text class="muted">长期售卖</text>
+      </view>
+
+      <view class="item-body">
+        <image class="cover" src="{{item.cover || '/assets/img/placeholder.png'}}" mode="aspectFill" />
+        <view class="info">
+          <view class="name">{{item.productName}}</view>
+          <view wx:if="{{item.subtitle}}" class="sub">智能名称：{{item.subtitle}}</view>
+          <view class="meta-line">
+            <text class="muted">已售/剩余库存：</text>
+            <text class="val">{{item.sales}}/{{item.stock === -1 ? '不限库存' : item.stock}}</text>
+          </view>
+          <view class="tag {{item.typeCode}}">{{typeNameOf(item.typeCode)}}</view>
+          <view class="price-line">
+            <text class="price">¥{{item.price}}</text>
+            <text wx:if="{{item.marketPrice && item.marketPrice > item.price}}" class="origin">¥{{item.marketPrice}}</text>
+            <text class="promote">商促价 ¥{{item.promotePrice || item.price}}</text>
+            <text class="qmark">?</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="item-bot">
+        <text class="more">更多</text>
+        <view class="ops">
+          <view class="op" bindtap="onEditTime" data-id="{{item.productId}}">改时间</view>
+          <view class="op" bindtap="onEditStock" data-id="{{item.productId}}">改库存</view>
+          <view class="op primary" bindtap="onEdit" data-id="{{item.productId}}">编辑</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部固定栏 -->
+  <view class="footer">
+    <view class="hot-deal">
+      <view class="badge">暑期</view>
+      <text>爆款商机</text>
+    </view>
+    <view class="create-btn" bindtap="goCreate">创建商品</view>
+  </view>
+</view>

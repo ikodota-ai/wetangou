@@ -1341,3 +1341,49 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 - **次卡/储值卡/周期卡/惠享卡/预售券/提货券** 实拍细节页截图（缺即不可实装）
 - **微信扫一扫 Scheme 客人端** 小程序 UI 改造（`pages/order/detail/index.vue` 加「出示给店员」按钮 + `wxacode.getUnlimited` 渲染二维码）
 - **商品创建页** 6/6/5 tab 实装（待截图补齐 + v2 字段对接）
+
+## 续篇 8（2026-08-15 · 4 commit）
+
+> PC 端商品创建抖音来客 UI + 小程序商家端商品列表/搭配子页 + smoke-c41
+
+### 已实装
+- **admin PC 端 `biz/product/create.vue`（724 行）**: 仿抖音来客 6/6/5 tab 商品创建页
+  - 步骤 1：基础信息（品类 + 类型弹窗 + 商品发布细则 + 名称）→ 「下一步」
+  - 步骤 2：商家信息 + 商品信息 + 售卖信息 + 交易规则 + 消费规则（团购/代金 6 tab；组合券包 5 tab 含「商品资质」无「消费规则」）
+  - 组合券包独有：售价不可编辑（系统按总价值自动算）+ 子品类型 4 选（团购套餐/代金券/满减券/折扣券）+ 通兑券/单品类券选择
+  - el-tabs 6/6/5 tab 等宽分配，仿移动端布局
+  - 商品搭配子页：团购（单品+商品组）/ 组合券包（4 类型混合 + 总价值自动算）
+- **小程序商家端商品列表页 `merchant/product/list`（228 行）**: 仿抖音来客「团购商品」列表
+  - 顶部导航：返回 / 团购商品 / 更多
+  - Tab: 团购 / 品牌 + 全部门店下拉
+  - 状态 Tab（横向 scroll）: 已上架/审核中/待商家审核/审核驳回/已下架
+  - 工具栏: 最新修改在上 / 搜索 / 筛选 / 批量改品
+  - 商品卡: 售卖状态圆点+长期售卖+封面+标题+智能名称+已售/剩余库存+类型tag+售价+划线价+商促价+改时间/改库存/编辑
+  - 底部固定: 爆款商机（带"暑期"badge）+ 创建商品（蓝色主按钮）
+- **小程序商家端商品搭配子页 `merchant/product/combo`（292 行）**: 团购/组合券包共用
+  - 团购模式：商品组（带"全部可享/1选1/2选2/3选2"规则）+ 单品（名称/数量/单价）
+  - 组合券包模式：每条搭配可选 团购套餐/代金券/满减券/折扣券 4 种 + 份数 + 全部可享/1选1/2选2/3选2 + 单价 + 底部「总价值（用户侧划线价）」
+  - 弹窗：添加商品组（名称+规则+排序）/ 添加单品（名称+数量+单价）
+- **后端 ApiProductController 新增 2 端点**（+75 行）:
+  - `PUT /api/product` - 商家端编辑商品（搭配保存后回填 totalValue/subitemPickRuleJson）
+  - `PUT /api/product/status` - 商家端商品上下架
+  - 强制 merchantId 覆盖 + 归属校验（防止越权）
+- **后端 ProductSubitem 子品表加 3 列**:
+  - `subitem_type` VARCHAR(20)（组合券包子品类型 4 选）
+  - `pick_quantity` INT（份数）
+  - `total_value` DECIMAL(10,2)（总价值/划线价）
+- **后端 BizProductSubitemController 子品 endpoint 路径** + 小程序 request.js 7 个新 API（productUpdate/productToggle/productSubitemGroups/productSubitemGroupAdd/Del/productSubitemAdd/Del）
+- **smoke-c41 (13/13 🎉)**: 商家端商品创建+列表+搭配+上下架+未登录拒绝
+
+### 4 commit 速查
+```
+5xx C41 smoke + AGENTS 续篇 8
+5xx admin create.vue + 小程序 list/combo
+5xx ApiProductController PUT edit + status
+5xx subitem_type + pick_quantity + total_value 列
+```
+
+### V3 后续升级（标记）
+- **次卡 / 储值卡 / 周期卡 / 惠享卡** 4 种商品类型的细节页：需商家先开通对应平台服务（如惠享卡需"放心付"），UI 占位目录已建 `doc/抖音来客/04_次卡/ 05_储值卡/ 06_周期卡/ 07_惠享卡/`，待业务方补完截图后实装
+- **预售券 / 提货券** 平台 disabled，本项目不支持
+- 商品列表页 `doc/抖音来客/商品列表页/_实装参考/` 2 张原图已归档

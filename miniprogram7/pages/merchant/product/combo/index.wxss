@@ -1,0 +1,43 @@
+.page { padding: 12px; background: #f5f5f7; min-height: 100vh; padding-bottom: 80px; }
+.head { background: #fff; padding: 14px 16px; border-radius: 8px; margin-bottom: 10px; }
+.head-title { font-size: 17px; font-weight: 600; color: #161823; }
+.head-tip { font-size: 12px; color: #999; margin-top: 4px; }
+.card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.group-card .group-head { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed #eee; margin-bottom: 8px; }
+.g-name { font-size: 15px; font-weight: 600; flex: 1; }
+.tag { font-size: 11px; color: #1677FF; background: #e8f4ff; padding: 2px 6px; border-radius: 3px; }
+.del { color: #f5222d; font-size: 12px; padding: 4px 8px; }
+.subitem { display: flex; align-items: center; padding: 6px 0; font-size: 13px; color: #555; gap: 8px; }
+.s-name { flex: 1; }
+.s-qty { color: #999; }
+.s-price { color: #f5222d; min-width: 50px; text-align: right; }
+.s-del { color: #ccc; padding: 0 4px; }
+.add-sub { padding: 10px 0; color: #1677FF; font-size: 13px; text-align: center; }
+.add-card { background: #fff; border-radius: 8px; padding: 14px; text-align: center; color: #1677FF; font-size: 14px; margin-bottom: 10px; }
+.summary { text-align: right; color: #555; font-size: 13px; padding: 8px 4px; }
+.total-val { color: #f5222d; font-size: 18px; font-weight: 600; margin-left: 4px; }
+.combo-row .row-line { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.combo-row .row-line:last-child { margin-bottom: 0; }
+.c-name { flex: 1; padding: 8px 10px; background: #f5f5f7; border-radius: 4px; font-size: 14px; }
+.picker { padding: 8px 10px; background: #f5f5f7; border-radius: 4px; font-size: 13px; min-width: 100px; display: flex; justify-content: space-between; align-items: center; }
+.picker.small { min-width: 0; flex: 1; }
+.arrow { color: #999; margin-left: 4px; }
+.qty, .price-input { display: flex; align-items: center; gap: 4px; background: #f5f5f7; border-radius: 4px; padding: 4px 8px; }
+.qty-lab { color: #999; font-size: 12px; }
+.qty input, .price-input input { width: 60px; font-size: 14px; }
+.bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,.05); }
+.btn { display: inline-block; padding: 10px 20px; border-radius: 22px; font-size: 14px; text-align: center; }
+.btn.primary { background: #1677FF; color: #fff; }
+.btn.plain { background: #f5f5f7; color: #555; }
+.bottom-bar .btn { width: 100%; }
+.modal { position: fixed; inset: 0; z-index: 100; }
+.modal-mask { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+.modal-body { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 12px 12px 0 0; padding: 20px 16px; }
+.modal-title { font-size: 16px; font-weight: 600; text-align: center; margin-bottom: 16px; }
+.form-line { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #f5f5f7; }
+.form-line text { width: 80px; font-size: 14px; color: #555; }
+.form-line input { flex: 1; font-size: 14px; }
+.form-line .picker { flex: 1; }
+.muted { color: #999; }
+.modal-footer { display: flex; gap: 12px; margin-top: 20px; }
+.modal-footer .btn { flex: 1; }

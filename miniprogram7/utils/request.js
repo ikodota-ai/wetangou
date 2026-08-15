@@ -118,6 +118,17 @@ const api = {
   // 商家端-创建商品（P1-2）
   productTypeAppCreatable: () => request('/biz/productType/appCreatable'),
   productAdd: (data) => request('/api/product/add', { method: 'POST', data }),
+  // 商品编辑（小程序建品后回填 totalValue / subitemPickRuleJson）
+  productUpdate: (data) => request('/api/product', { method: 'PUT', data }),
+  // 上下架
+  productToggle: (data) => request('/api/product/status', { method: 'PUT', data }),
+  // 商品搭配-商品组
+  productSubitemGroups: (params) => request('/biz/productSubitem/groups', { data: params }),
+  productSubitemGroupAdd: (data) => request('/biz/productSubitem/group', { method: 'POST', data }),
+  productSubitemGroupDel: (id) => request('/biz/productSubitem/group/' + id, { method: 'DELETE' }),
+  // 商品搭配-单品
+  productSubitemAdd: (data) => request('/biz/productSubitem/subitem', { method: 'POST', data }),
+  productSubitemDel: (id) => request('/biz/productSubitem/subitem/' + id, { method: 'DELETE' }),
   // 订单
   createOrder: (data) => request('/api/order', { method: 'POST', data }),
   prepayOrder: (id) => request(`/api/order/prepay/${id}`, { method: 'POST' }),
