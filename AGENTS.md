@@ -135,6 +135,13 @@ This is a RuoYi-Vue admin platform: a multi-module Maven backend plus a Vue 2 fr
 - **P2 登录分流**: ✅ fade76ff commit 已实装 login.vue resolveEntryPath + userType 路由过滤（不是"未做"，AGENTS.md 上方话术已修正）
 - **P3 待清理**: ApiPingController 仅调试用 / miniprogram7/tests/ 决定去留
 
+### v2 升级续篇 3 (C31~C33 · 2026-08-15)
+- **C31** `BizAgentUpgradeController` admin 端全 10/10 PASS（已修真实业务 bug: controller 漏调 mapper）
+- **C32** `BizStaffInviteController` admin 端 CUD 14/14 PASS（已修真实 bug: add 端点未自动生成 scene 参数）
+- **C33** `SysUserController` admin 端 14 端点 20/20 PASS（0 业务缺陷，RuoYi 内置防御全覆盖）
+- **回归**: 43 smoke / 10 JUnit / 30 vitest = **baseline 83/83 零退化**
+- 关键技术：SysUser DELETE 端点接收 `/{userIds}`（RuoYi 标准批量），单 id 要发 `id,id`；SysUser 删除是逻辑删除（`del_flag=2`）
+
 ### 13 commit 速查
 ```
 3162bb8c refactor(system): 删除已拆分的旧 ApiOrderService（234 行）
