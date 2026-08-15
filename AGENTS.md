@@ -1301,3 +1301,43 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 | **c39** | 微信扫一扫 Scheme | **14/14 🎉** |
 
 **本轮新增 33/33 PASS，零退化。**
+
+## 续篇 7（2026-08-15 · 3 commit）
+
+> 抖音来客截图归类 + 客人端 Scheme 接口 + smoke-c40
+
+### 已实装
+- **抖音来客 38 张截图归类**: 按 7 种商品类型（团购套餐/代金券/组合券包/次卡/储值卡/周期卡/惠享卡）+ _公共/ + INDEX.md（147 行）整理
+  - `01_团购套餐/` 16 张（6 tab + 5 子页：商品搭配/录入单品/快速录入/复用/上传规格参数）
+  - `02_代金券/` 6 张（6 tab）
+  - `03_组合券包/` 10 张（5 tab + 3 子页）
+  - `04-06_次卡/储值卡/周期卡/` 占位待补截图
+  - `07_惠享卡/` 2 张（基础信息 + 不可创建弹窗）
+  - `_公共/品类与类型弹窗/` 5 张
+  - `.gitignore` 调整：根目录原图仍 ignore，子目录 + INDEX.md 入库
+- **客人端 Scheme 接口** `GET /api/order/{orderId}/scheme` (ApiOrderController.java +55 行):
+  - 鉴权: `@LoginRequired` + 订单归属校验（防他人冒用券码）
+  - 状态: 仅 1（已支付）/ 2（已核销）可生成
+  - 优先用订单 verifyCode，无则即时生成 12 位 UUID 大写
+  - 返回: scheme（URL）+ page + verifyCode + 订单/商品/门店/支付金额/状态
+  - query 拼 `code=...&sid=...`，merchantId 透传 WxMaService 多租户
+- **smoke-c40** (.github/scripts/smoke-c40.sh, 127 行, **13/13 🎉**):
+  - A 建品 / B 下单 / C 标已支付 / D 客人拿 Scheme / E 解析 code+sid / F 店员登录 / G 店员 verify / G+ 订单 status=2
+  - H 越权: 别人订单 `无权查看该订单的核销码` / I 未登录 401
+
+### 3 commit 速查
+```
+91c422ec test(smoke): C40 客人端出示核销码 Scheme 端到端 (13/13)
+9008ea19 feat(api): 订单核销Scheme接口 GET /api/order/{orderId}/scheme
+55c56855 docs(dyl): 抖音来客38张截图按商品类型归类 + INDEX索引
+```
+
+### 完整闭环
+- **客人主动出示**（c40）: 客人下单 → 我的订单「出示给店员」→ Scheme URL → 店员微信扫一扫 → 唤起 verify 页 → `/api/order/verify`
+- **店员主动扫**（c39）: 商家收银台生成核销码 Scheme → 客人微信扫 → 唤起 verify 页 → `/api/order/verify`
+- 两条路径落到**同一个核销接口**，前端只需 1 个 verify 页
+
+### 待补
+- **次卡/储值卡/周期卡/惠享卡/预售券/提货券** 实拍细节页截图（缺即不可实装）
+- **微信扫一扫 Scheme 客人端** 小程序 UI 改造（`pages/order/detail/index.vue` 加「出示给店员」按钮 + `wxacode.getUnlimited` 渲染二维码）
+- **商品创建页** 6/6/5 tab 实装（待截图补齐 + v2 字段对接）
