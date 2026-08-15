@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.common.utils.StringUtils;
@@ -178,7 +179,7 @@ public class ApiBookingController
             vo.put("storeId", signup.getStoreId());
             vo.put("storeName", signup.getStoreName());
             vo.put("storeAddress", signup.getStoreAddress());
-            vo.put("storePhone", signup.getStorePhone());
+            vo.put("storePhone", DesensitizedType.PHONE.desensitizer().apply(signup.getStorePhone()));
             vo.put("storeLatitude", signup.getStoreLatitude());
             vo.put("storeLongitude", signup.getStoreLongitude());
             vo.put("serviceName", signup.getServiceName());
@@ -209,7 +210,7 @@ public class ApiBookingController
         vo.put("bookingId", signup.getBookingId());
         vo.put("memberId", signup.getMemberId());
         vo.put("contact", signup.getContact());
-        vo.put("phone", signup.getPhone());   // 明文
+        vo.put("phone", DesensitizedType.PHONE.desensitizer().apply(signup.getPhone()));
         vo.put("people", signup.getPeople());
         vo.put("status", signup.getStatus());
         vo.put("confirmUser", signup.getConfirmUser());
@@ -221,7 +222,7 @@ public class ApiBookingController
         vo.put("storeId", signup.getStoreId());
         vo.put("storeName", signup.getStoreName());
         vo.put("storeAddress", signup.getStoreAddress());
-        vo.put("storePhone", signup.getStorePhone());
+        vo.put("storePhone", DesensitizedType.PHONE.desensitizer().apply(signup.getStorePhone()));
         vo.put("storeLatitude", signup.getStoreLatitude());
         vo.put("storeLongitude", signup.getStoreLongitude());
         vo.put("serviceName", signup.getServiceName());
