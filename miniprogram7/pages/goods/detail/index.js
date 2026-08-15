@@ -95,6 +95,7 @@ Page({
       name: p.productName || p.name,
       price: p.price != null ? String(p.price) : '0.00',
       typeCode: typeCode,
+      typeName: this.typeText(typeCode),
       faceValue: p.faceValue != null ? String(p.faceValue) : '',
       minConsume: p.minConsume != null ? String(p.minConsume) : '',
       totalTimes: p.totalTimes || 0,

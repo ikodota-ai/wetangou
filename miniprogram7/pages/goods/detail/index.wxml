@@ -18,7 +18,7 @@
   <!-- 标题 + 须知 -->
   <view class="info card">
     <text class="info-name">{{product.name}}</text>
-    <view class="info-row"><text class="lab">类型</text><text class="val type-tag">{{typeText(product.typeCode)}}</text></view>
+    <view class="info-row"><text class="lab">类型</text><text class="val type-tag">{{product.typeName}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'VOUCHER' && product.faceValue}}"><text class="lab">面值</text><text class="val">¥{{product.faceValue}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'VOUCHER' && product.minConsume && product.minConsume !== '0.00'}}"><text class="lab">最低消费</text><text class="val">¥{{product.minConsume}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'TIMECARD' && product.totalTimes}}"><text class="lab">总次数</text><text class="val">{{product.totalTimes}} 次</text></view>
