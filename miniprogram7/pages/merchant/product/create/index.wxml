@@ -8,7 +8,7 @@
       <view class="row" bindtap="onTapCategory">
         <view class="row-label"><text class="required">*</text> <text>商品品类</text></view>
         <view class="row-value">
-          <text class="{{pickedCategory ? '' : 'placeholder'}}">{{pickedCategory || '请选择'}}</text>
+          <text class="{{pickedCategory  ? 'value' : 'placeholder'}}">{{pickedCategory || '请选择'}}</text>
           <text class="arrow">›</text>
         </view>
       </view>
@@ -18,14 +18,14 @@
       <view class="row" bindtap="onTapType">
         <view class="row-label"><text class="required">*</text> <text>商品类型</text></view>
         <view class="row-value">
-          <text class="{{pickedTypeName ? '' : 'placeholder'}}">{{pickedTypeName || '请选择'}}</text>
+          <text class="{{pickedTypeName  ? 'value' : 'placeholder'}}">{{pickedTypeName || '请选择'}}</text>
           <text class="arrow">›</text>
         </view>
       </view>
     </view>
 
     <view class="next-bar">
-      <view class="next-btn {{(pickedCategory && pickedType) ? '' : 'disabled'}}" bindtap="onNext">下一步</view>
+      <view class="next-btn {{(pickedCategory && pickedType) ? 'enabled' : 'disabled'}}" bindtap="onNext">下一步</view>
     </view>
   </block>
 
@@ -76,7 +76,7 @@
         <view wx:for="{{sectionMerchant}}" wx:key="key" class="row" bindtap="onPickStoreProxy" data-key="{{item.key}}">
           <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
           <view class="row-value">
-            <text class="{{form[item.key] ? '' : 'placeholder'}}">{{storeOptions[storeIdx].label || '请选择'}}</text>
+            <text class="{{form[item.key]  ? 'value' : 'placeholder'}}">{{storeOptions[storeIdx].label || '请选择'}}</text>
             <text class="arrow">›</text>
           </view>
         </view>

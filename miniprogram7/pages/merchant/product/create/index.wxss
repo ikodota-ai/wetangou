@@ -18,6 +18,7 @@
 .row-tip { font-size: 24rpx; color: #999; line-height: 1.5; margin-top: 4rpx; }
 
 .placeholder { color: #BBB; }
+.value { color: #1F1F1F; }
 .arrow { color: #C8C8C8; font-size: 32rpx; margin-left: 4rpx; }
 .required { color: #FF4D4F; margin-right: 4rpx; }
 .ipt-prefix { color: #999; font-size: 30rpx; margin-right: 8rpx; }
