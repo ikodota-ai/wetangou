@@ -1,6 +1,8 @@
 package com.ruoyi.web.api;
 
 import java.util.Calendar;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -13,8 +15,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Anonymous;
+import com.alibaba.fastjson2.JSONObject;
+import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.DesensitizedType;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.annotation.StoreStaffRequired;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.biz.api.util.MemberContextHolder;
@@ -42,10 +48,13 @@ import com.ruoyi.system.service.ISysUserService;
 @Anonymous
 @RestController
 @RequestMapping("/api/store/staff")
-public class ApiStoreStaffDashboardController
+public class ApiStoreStaffDashboardController extends BaseController
 {
     @Autowired
     private IOrderService orderService;
+
+    @Autowired
+    private com.ruoyi.biz.api.service.WxMaService wxMaService;
 
     @Autowired
     private IPayBillService payBillService;
@@ -366,5 +375,63 @@ public class ApiStoreStaffDashboardController
         b.setTime(d2);
         return a.get(Calendar.YEAR) == b.get(Calendar.YEAR)
             && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR);
+    }
+
+    /**
+     * 生成核销码 Scheme URL（用于「微信扫一扫」直达核销页）
+     *
+     * <p>店员在桌面台卡/小票上印这个 URL → 客人买单时店员手机微信首页「扫一扫」
+     * → 微信自动唤起小程序 → 跳转到 verify 页 → 自动核销。</p>
+     *
+     * <p>请求体：</p>
+     * <pre>{ "storeId": 200, "verifyCode": "138F31FA1271", "shorten": true }</pre>
+     *
+     * <p>响应：</p>
+     * <pre>{ "scheme": "weixin://dl/business/?appid=xxx&path=...&query=...", "shortUrl": "weixin://s/abc" }</pre>
+     */
+    @LoginRequired
+    @StoreStaffRequired
+    @PostMapping("/verify/qrcode-scheme")
+    public AjaxResult qrcodeScheme(@RequestBody JSONObject body)
+    {
+        Long storeId = body.getLong("storeId");
+        String verifyCode = body.getString("verifyCode");
+        Boolean shorten = body.getBoolean("shorten");
+        if (storeId == null) return AjaxResult.error("storeId 不能为空");
+        if (StringUtils.isEmpty(verifyCode)) return AjaxResult.error("verifyCode 不能为空");
+
+        // 防越权：token 里的 storeId 必须等于 body.storeId
+        LoginMember login = MemberContextHolder.get();
+        if (login != null && "store".equals(login.getUserType()) && !storeId.equals(login.getStoreId())) {
+            return AjaxResult.error("无权操作其他门店");
+        }
+
+        // 取订单的 merchantId（用于多租户路由到正确 appId）
+        com.ruoyi.biz.domain.Order q = new com.ruoyi.biz.domain.Order();
+        q.setVerifyCode(verifyCode);
+        java.util.List<com.ruoyi.biz.domain.Order> orders = orderService.selectOrderList(q);
+        com.ruoyi.biz.domain.Order order = orders.isEmpty() ? null : orders.get(0);
+        Long merchantId = order == null ? null : order.getMerchantId();
+
+        // 拼 query：code + sid（verify 页 onLoad 直接用）
+        String query = "code=" + java.net.URLEncoder.encode(verifyCode, java.nio.charset.StandardCharsets.UTF_8)
+                     + "&sid=" + storeId;
+        String scheme = wxMaService.generateScheme("pages/merchant/verify/index", query, true, merchantId);
+
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("scheme", scheme);
+        vo.put("page", "pages/merchant/verify/index");
+        vo.put("query", query);
+        vo.put("verifyCode", verifyCode);
+        vo.put("storeId", storeId);
+        if (Boolean.TRUE.equals(shorten)) {
+            try {
+                vo.put("shortUrl", wxMaService.shortenUrl(scheme, merchantId));
+            } catch (Exception e) {
+                logger.warn("[qrcodeScheme] 短链生成失败，不影响主流程: {}", e.getMessage());
+                vo.put("shortUrl", scheme);
+            }
+        }
+        return AjaxResult.success(vo);
     }
 }

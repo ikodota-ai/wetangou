@@ -38,6 +38,12 @@ public class WxMaService
     /** 小程序码（无限制）接口 */
     private static final String WXACODE_URL = "https://api.weixin.qq.com/wxa/getwxacodeunlimited";
 
+    /** 小程序 URL Scheme 生成接口（用于「微信扫一扫」直达） */
+    private static final String WXA_SCHEME_URL = "https://api.weixin.qq.com/wxa/generatescheme";
+
+    /** 小程序短链生成接口（压短 Scheme 到 32 字符内） */
+    private static final String WXA_SHORT_URL = "https://api.weixin.qq.com/cgi-bin/shorturl";
+
     @Autowired
     private WxMaConfig wxMaConfig;
 
@@ -97,6 +103,40 @@ public class WxMaService
      * @param phoneCode 前端 bindgetphonenumber 回调返回的 code
      * @return 纯手机号（不含区号）
      */
+/**
+     * 发送订阅消息（核销成功通知 / 退款通知等）
+     *
+     * @param openid 接收者 openid
+     * @param templateId 微信公众平台模板 ID
+     * @param merchantId 商户 ID（用于多租户路由到正确 appId）
+     * @param data 模板字段 { key1: { value: "..." }, ... }
+     * @return 微信返回的 msgid；失败抛 ServiceException
+     */
+    public String sendSubscribeMessage(String openid, String templateId, Long merchantId, java.util.Map<String, java.util.Map<String, String>> data)
+    {
+        if (StringUtils.isEmpty(openid)) throw new ServiceException("openid 不能为空");
+        if (StringUtils.isEmpty(templateId)) throw new ServiceException("templateId 不能为空");
+        if (data == null || data.isEmpty()) throw new ServiceException("模板数据不能为空");
+        // mock 模式：直接 log 后返回 fake msgid
+        if (wxMaConfig.isMockEnabled(merchantId)) {
+            log.info("[WxMaService] mock sendSubscribeMessage to={} tpl={} data={}", openid, templateId, data);
+            return "mock_msg_" + System.currentTimeMillis();
+        }
+        // 真实模式：POST https://api.weixin.qq.com/cgi-bin/message/subscribe/send
+        String accessToken = getAccessToken(merchantId);
+        String url = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=" + accessToken;
+        com.alibaba.fastjson2.JSONObject body = new com.alibaba.fastjson2.JSONObject();
+        body.put("touser", openid);
+        body.put("template_id", templateId);
+        body.put("data", data);
+        String resp = com.ruoyi.common.utils.http.HttpUtils.sendPost(url, body.toJSONString());
+        com.alibaba.fastjson2.JSONObject json = com.alibaba.fastjson2.JSONObject.parseObject(resp);
+        if (json == null || json.getInteger("errcode") == null || json.getInteger("errcode") != 0) {
+            throw new ServiceException("订阅消息发送失败：" + resp);
+        }
+        return json.getString("msgid");
+    }
+
     public String getPhoneNumberByCode(String phoneCode)
     {
         if (StringUtils.isEmpty(phoneCode))
@@ -221,5 +261,87 @@ public class WxMaService
         int ttl = Math.max(expiresIn - 300, 60);
         redisCache.setCacheObject(key, accessToken, ttl, TimeUnit.SECONDS);
         return accessToken;
+    }
+
+    /**
+     * 生成小程序 URL Scheme（用于「微信扫一扫」直达核销页）
+     *
+     * <p>店员扫桌上的核销二维码（内容是 Scheme URL）→ 微信自动唤起小程序
+     * → 跳到 pages/merchant/verify/index?code=xxx&sid=xxx → 自动核销。</p>
+     *
+     * <p>真上线调用 https://api.weixin.qq.com/wxa/generatescheme；mock 模式直接拼
+     * weixin://dl/business/?appid=xxx&path=xxx&query=xxx 字符串返回（微信识别 OK）。</p>
+     *
+     * @param page    小程序页面路径（如 pages/merchant/verify/index）
+     * @param query   query 串（如 code=138F31FA1271&sid=200）
+     * @param permanent true=永久有效（每天 50w 配额），false=最长 30 天
+     * @param merchantId 商户 ID（路由到正确 appId）
+     * @return Scheme URL
+     */
+    public String generateScheme(String page, String query, boolean permanent, Long merchantId)
+    {
+        if (StringUtils.isEmpty(page)) throw new ServiceException("page 不能为空");
+        String appid = wxMaConfig.getAppId(merchantId);
+
+        // mock 模式：直接拼 weixin:// URL，便于本地调试 + smoke 端到端
+        if (wxMaConfig.isMockEnabled(merchantId)) {
+            String url = "weixin://dl/business/?appid=" + appid
+                + "&path=" + java.net.URLEncoder.encode(page, java.nio.charset.StandardCharsets.UTF_8);
+            if (StringUtils.isNotEmpty(query)) {
+                url += "&query=" + java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
+            }
+            log.info("[WxMaService] mock generateScheme appid={} page={} query={} -> {}", appid, page, query, url);
+            return url;
+        }
+
+        // 真实模式：POST https://api.weixin.qq.com/wxa/generatescheme
+        String accessToken = getAccessToken(merchantId);
+        String url = WXA_SCHEME_URL + "?access_token=" + accessToken;
+        com.alibaba.fastjson2.JSONObject body = new com.alibaba.fastjson2.JSONObject();
+        body.put("jump_wxa", true);
+        body.put("expire_type", permanent ? 0 : 1);
+        if (!permanent) {
+            body.put("expire_interval", 30); // 30 天
+        }
+        body.put("path", page);
+        if (StringUtils.isNotEmpty(query)) {
+            body.put("query", query);
+        }
+        String resp = com.ruoyi.common.utils.http.HttpUtils.sendPost(url, body.toJSONString());
+        com.alibaba.fastjson2.JSONObject json = com.alibaba.fastjson2.JSONObject.parseObject(resp);
+        if (json == null || json.getInteger("errcode") == null || json.getInteger("errcode") != 0) {
+            throw new ServiceException("生成 Scheme 失败：" + resp);
+        }
+        String openlink = json.getString("openlink");
+        if (StringUtils.isEmpty(openlink)) {
+            throw new ServiceException("生成 Scheme 失败：openlink 为空");
+        }
+        log.info("[WxMaService] generateScheme appid={} page={} -> {}", appid, page, openlink);
+        return openlink;
+    }
+
+    /**
+     * 把 Scheme URL 压成短链（cgi-bin/shorturl 限制 32 字符内）
+     */
+    public String shortenUrl(String longUrl, Long merchantId)
+    {
+        if (StringUtils.isEmpty(longUrl)) throw new ServiceException("url 不能为空");
+        if (wxMaConfig.isMockEnabled(merchantId)) {
+            // mock：直接 base62 短串 + .link 后缀，模拟微信短链
+            String fake = "weixin://s/" + Long.toString(Math.abs((long) longUrl.hashCode()), 36);
+            log.info("[WxMaService] mock shortenUrl {} -> {}", longUrl, fake);
+            return fake;
+        }
+        String accessToken = getAccessToken(merchantId);
+        String url = WXA_SHORT_URL + "?access_token=" + accessToken;
+        com.alibaba.fastjson2.JSONObject body = new com.alibaba.fastjson2.JSONObject();
+        body.put("action", "long2short");
+        body.put("long_url", longUrl);
+        String resp = com.ruoyi.common.utils.http.HttpUtils.sendPost(url, body.toJSONString());
+        com.alibaba.fastjson2.JSONObject json = com.alibaba.fastjson2.JSONObject.parseObject(resp);
+        if (json == null || json.getInteger("errcode") == null || json.getInteger("errcode") != 0) {
+            throw new ServiceException("短链生成失败：" + resp);
+        }
+        return json.getString("short_url");
     }
 }
