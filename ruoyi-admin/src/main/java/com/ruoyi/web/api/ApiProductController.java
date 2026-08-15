@@ -125,6 +125,33 @@ public class ApiProductController
         if (body.getStoreIds() == null || body.getStoreIds().trim().isEmpty()) {
             throw new ServiceException("请至少选择一个适用门店");
         }
+        // typeCode 必填且必须在 11 种字典内（拒绝前端乱传）
+        if (body.getTypeCode() == null || body.getTypeCode().trim().isEmpty()) {
+            throw new ServiceException("请选择商品类型");
+        }
+        // 业务字段必填校验（按 typeCode 分组）
+        String tc = body.getTypeCode().trim();
+        if (body.getProductName() == null || body.getProductName().trim().isEmpty()) {
+            throw new ServiceException("商品名称不能为空");
+        }
+        if (body.getPrice() == null) {
+            throw new ServiceException("售价不能为空");
+        }
+        if (body.getValidityDays() == null || body.getValidityDays() <= 0) {
+            throw new ServiceException("有效天数必须 > 0");
+        }
+        // 类型特定必填
+        if (("TIMECARD".equals(tc) || "HUIXIANG_CARD".equals(tc)) && (body.getTotalTimes() == null || body.getTotalTimes() <= 0)) {
+            throw new ServiceException(tc + " 必须填写总次数");
+        }
+        if ("PERIOD_CARD".equals(tc)) {
+            if (body.getPeriodType() == null || body.getPeriodType().trim().isEmpty()) {
+                throw new ServiceException("周期卡必须选择周期类型");
+            }
+            if (body.getPeriodCount() == null || body.getPeriodCount() <= 0) {
+                throw new ServiceException("周期卡必须填写周期数");
+            }
+        }
         // 默认值兜底
         if (body.getProductType() == null) body.setProductType("0");
         if (body.getStatus() == null) body.setStatus("0");

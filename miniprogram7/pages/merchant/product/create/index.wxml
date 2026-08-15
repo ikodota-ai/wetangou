@@ -1,109 +1,279 @@
 <view class="page">
-  <view class="card">
-    <view class="head">
-      <view class="identity-badge">商家端</view>
-      <text class="tip">{{storeName || '尚未登录'}}</text>
-    </view>
-  </view>
 
-  <view class="card">
-    <view class="section-title">选择商品类型</view>
-    <view class="type-grid">
-      <view wx:for="{{typeList}}" wx:key="typeCode"
-            class="type-cell {{form.typeCode === item.typeCode ? 'active' : ''}}"
-            data-code="{{item.typeCode}}"
-            bindtap="onPickType">
-        <view>{{item.typeName}}</view>
-        <view class="type-desc">{{item.shortDesc}}</view>
+  <!-- ============ 第 1 页: 选类型 ============ -->
+  <block wx:if="{{step === 1}}">
+    <view class="card">
+      <view class="card-title">基础信息</view>
+
+      <view class="row" bindtap="onTapCategory">
+        <text class="row-label"><text class="required">*</text> 商品品类</text>
+        <view class="row-value">
+          <text class="{{pickedCategory ? '' : 'placeholder'}}">{{pickedCategory || '请选择'}}</text>
+          <text class="arrow">›</text>
+        </view>
       </view>
     </view>
-    <view class="tip" wx:if="{{pickedType}}">已选：{{pickedTypeDesc}}</view>
+
+    <view class="card">
+      <view class="row" bindtap="onTapType">
+        <text class="row-label"><text class="required">*</text> 商品类型</text>
+        <view class="row-value">
+          <text class="{{pickedTypeName ? '' : 'placeholder'}}">{{pickedTypeName || '请选择'}}</text>
+          <text class="arrow">›</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="next-bar">
+      <view class="next-btn {{(pickedCategory && pickedType) ? '' : 'disabled'}}" bindtap="onNext">下一步</view>
+    </view>
+  </block>
+
+  <!-- ============ 第 2 页: 5 tab 表单 ============ -->
+  <block wx:if="{{step === 2}}">
+    <!-- 顶部 tab 栏 -->
+    <view class="tab-bar">
+      <view wx:for="{{tabLabels}}" wx:key="*this"
+            class="tab-item {{activeTab === index ? 'active' : ''}}"
+            data-idx="{{index}}"
+            bindtap="onTabChange">
+        <text>{{item}}</text>
+        <view wx:if="{{activeTab === index}}" class="tab-line"></view>
+      </view>
+    </view>
+
+    <!-- ===== Tab 0: 基础信息（只读） ===== -->
+    <block wx:if="{{activeTab === 0}}">
+      <view class="card">
+        <view class="card-title">基础信息</view>
+        <view class="readonly-row">
+          <text class="row-label">商品品类 <text class="readonly-tag">不可编辑</text></text>
+          <text class="readonly-value">{{pickedCategory}}</text>
+        </view>
+        <view class="readonly-row">
+          <text class="row-label">商品类型 <text class="readonly-tag">不可编辑</text></text>
+          <text class="readonly-value">{{pickedTypeName}}</text>
+        </view>
+        <view class="rule-row" bindtap="onBack">
+          <text>商品发布细则</text>
+          <text class="link">查看详情 ›</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- ===== Tab 1: 商家信息 ===== -->
+    <block wx:if="{{activeTab === 1}}">
+      <view class="card">
+        <view class="card-title">商家信息</view>
+        <view class="readonly-row">
+          <text class="row-label">商家名称 <text class="readonly-tag">不可编辑</text></text>
+          <text class="readonly-value">{{storeName}}</text>
+        </view>
+        <view class="readonly-row">
+          <text class="row-label">收款方式 <text class="readonly-tag">不可编辑</text></text>
+          <text class="readonly-value">总部统一收款</text>
+        </view>
+        <view wx:for="{{sectionMerchant}}" wx:key="key" class="row" bindtap="onPickStoreProxy" data-key="{{item.key}}">
+          <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+          <view class="row-value">
+            <text class="{{form[item.key] ? '' : 'placeholder'}}">{{storeOptions[storeIdx].label || '请选择'}}</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- ===== Tab 2: 商品信息 ===== -->
+    <block wx:if="{{activeTab === 2}}">
+      <view class="card">
+        <view class="card-title">商品信息</view>
+        <view wx:for="{{sectionProduct}}" wx:key="key">
+          <!-- text input -->
+          <view wx:if="{{item.type === 'text'}}" class="row column">
+            <view class="row-head">
+              <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+              <text class="row-counter">{{(form[item.key] || '').length}}/{{item.max || 40}}</text>
+            </view>
+            <textarea wx:if="{{item.label.indexOf('说明') >= 0}}"
+                      class="row-textarea"
+                      maxlength="{{item.max || 500}}"
+                      placeholder="{{item.placeholder || '请输入'}}"
+                      value="{{form[item.key]}}"
+                      data-key="{{item.key}}"
+                      bindinput="onField" />
+            <input wx:else
+                   class="row-input"
+                   maxlength="{{item.max || 40}}"
+                   placeholder="{{item.placeholder || '请输入'}}"
+                   value="{{form[item.key]}}"
+                   data-key="{{item.key}}"
+                   bindinput="onField" />
+            <text wx:if="{{item.placeholder && item.label === '商品名称'}}" class="row-tip">{{item.placeholder}}</text>
+          </view>
+
+          <!-- digit/number input -->
+          <view wx:elif="{{item.type === 'digit' || item.type === 'number'}}" class="row" bindtap="onTapNumberField" data-key="{{item.key}}">
+            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-value with-input">
+              <text wx:if="{{item.prefix}}" class="ipt-prefix">{{item.prefix}}</text>
+              <input class="ipt-inline"
+                     type="digit"
+                     placeholder="{{item.placeholder || '请输入'}}"
+                     value="{{form[item.key]}}"
+                     data-key="{{item.key}}"
+                     bindinput="onField" />
+              <text wx:if="{{item.suffix}}" class="ipt-suffix">{{item.suffix}}</text>
+            </view>
+          </view>
+
+          <!-- period picker -->
+          <view wx:elif="{{item.type === 'period-picker'}}" class="row" bindtap="onTapPeriodField" data-key="{{item.key}}">
+            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-value">
+              <text class="placeholder">请选择</text>
+              <text class="arrow">›</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- ===== Tab 3: 售卖信息 ===== -->
+    <block wx:if="{{activeTab === 3}}">
+      <view class="card">
+        <view class="card-title">售卖信息</view>
+        <view wx:for="{{sectionSale}}" wx:key="key">
+          <view wx:if="{{item.type === 'number'}}" class="row" bindtap="onTapNumberField" data-key="{{item.key}}">
+            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-value with-input">
+              <input class="ipt-inline"
+                     type="digit"
+                     placeholder="{{item.placeholder || '请输入'}}"
+                     value="{{form[item.key]}}"
+                     data-key="{{item.key}}"
+                     bindinput="onField" />
+              <text wx:if="{{item.suffix}}" class="ipt-suffix">{{item.suffix}}</text>
+            </view>
+          </view>
+        </view>
+        <view class="rule-row" bindtap="onTapDateField" data-key="saleDate">
+          <text class="row-label"><text class="required">*</text> 商品售卖日期</text>
+          <view class="row-value">
+            <text class="placeholder">不限时间</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
+        <view class="rule-row" bindtap="onTapRuleField" data-key="refundPolicy">
+          <text class="row-label">售后政策</text>
+          <view class="row-value">
+            <text class="placeholder">请输入</text>
+            <text class="arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- ===== Tab 4: 交易规则 ===== -->
+    <block wx:if="{{activeTab === 4}}">
+      <view class="card">
+        <view class="card-title">交易规则</view>
+        <view class="rule-row">
+          <text class="row-label"><text class="required">*</text> 顾客可消费日期</text>
+          <view class="row-value">
+            <text>自购买次日起 {{form.validityDays || 360}} 天，购买当天默认可用</text>
+            <text class="link">编辑 ›</text>
+          </view>
+        </view>
+        <view wx:for="{{sectionTrade}}" wx:key="key">
+          <view wx:if="{{item.type === 'number'}}" class="row">
+            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-value with-input">
+              <input class="ipt-inline"
+                     type="digit"
+                     placeholder="{{item.placeholder || '请输入'}}"
+                     value="{{form[item.key]}}"
+                     data-key="{{item.key}}"
+                     bindinput="onField" />
+              <text wx:if="{{item.suffix}}" class="ipt-suffix">{{item.suffix}}</text>
+            </view>
+          </view>
+          <view wx:elif="{{item.type === 'switch'}}" class="row">
+            <text class="row-label">{{item.label}}</text>
+            <switch checked="{{form[item.key] === 1}}"
+                    disabled="{{item.disabled}}"
+                    data-key="{{item.key}}"
+                    data-disabled="{{item.disabled ? 'true' : 'false'}}"
+                    bindchange="onSwitch"
+                    color="#1677FF" />
+          </view>
+          <view wx:elif="{{item.type === 'textarea'}}" class="row column">
+            <view class="row-head">
+              <text class="row-label">{{item.label}}</text>
+              <text class="row-counter">{{(form[item.key] || '').length}}/{{item.max || 500}}</text>
+            </view>
+            <textarea class="row-textarea"
+                      maxlength="{{item.max || 500}}"
+                      placeholder="{{item.placeholder || '请输入'}}"
+                      value="{{form[item.key]}}"
+                      data-key="{{item.key}}"
+                      bindinput="onField" />
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 底部固定双按钮 -->
+    <view class="footer">
+      <view class="btn-preview" bindtap="onPreview">预览</view>
+      <view class="btn-submit {{!canSubmit || submitting ? 'disabled' : ''}}"
+            bindtap="onSubmit">
+        {{submitting ? '保存中…' : '提交审核'}}
+      </view>
+    </view>
+  </block>
+
+  <!-- ============ 弹窗: 商品品类 ============ -->
+  <view wx:if="{{categorySheet}}" class="sheet-mask" bindtap="onCloseCategorySheet">
+    <view class="sheet" catchtap="">
+      <view class="sheet-head">
+        <text class="sheet-title">商品品类</text>
+        <text class="sheet-close" bindtap="onCloseCategorySheet">×</text>
+      </view>
+      <view class="sheet-body">
+        <view class="sheet-tip">智能推荐以下品类</view>
+        <view wx:for="{{categoryList}}" wx:key="*this"
+              class="sheet-item"
+              data-name="{{item}}"
+              bindtap="onPickCategoryItem">
+          <text>{{item}}</text>
+        </view>
+        <view class="sheet-tip">以上没有合适的品类，查看<text class="link"> 全部分类</text></view>
+      </view>
+      <view class="sheet-foot">
+        <view class="sheet-btn" bindtap="onCloseCategorySheet">确认</view>
+      </view>
+    </view>
   </view>
 
-  <view class="card" wx:if="{{form.typeCode}}">
-    <view class="section-title">基础信息</view>
-    <view class="ipt-row">
-      <text class="ipt-label">商品名称</text>
-      <input class="ipt" placeholder="如：川西坝子 4 人套餐" value="{{form.productName}}" maxlength="60" bindinput="onField" data-key="productName" />
-    </view>
-    <view class="ipt-row">
-      <text class="ipt-label">副标题</text>
-      <input class="ipt" placeholder="一句话卖点（选填）" value="{{form.subtitle}}" maxlength="80" bindinput="onField" data-key="subtitle" />
-    </view>
-    <view class="ipt-row">
-      <text class="ipt-label">所属门店</text>
-      <picker mode="selector" range="{{storeOptions}}" range-key="label" value="{{storeIdx}}" bindchange="onPickStore">
-        <view class="ipt" style="min-width:380rpx">{{storeOptions[storeIdx].label || '请选择门店'}}</view>
-      </picker>
-    </view>
-    <view class="ipt-row">
-      <text class="ipt-label">分类</text>
-      <picker mode="selector" range="{{categoryOptions}}" range-key="label" value="{{categoryIdx}}" bindchange="onPickCategory">
-        <view class="ipt" style="min-width:380rpx">{{categoryOptions[categoryIdx].label || '不选'}}</view>
-      </picker>
+  <!-- ============ 弹窗: 商品类型 ============ -->
+  <view wx:if="{{typeSheet}}" class="sheet-mask" bindtap="onCloseTypeSheet">
+    <view class="sheet" catchtap="">
+      <view class="sheet-head">
+        <text class="sheet-title">商品类型</text>
+        <text class="sheet-close" bindtap="onCloseTypeSheet">×</text>
+      </view>
+      <view class="sheet-body">
+        <view wx:for="{{typeList}}" wx:key="typeCode" class="type-card {{item.disabled ? 'disabled' : ''}}"
+              data-code="{{item.typeCode}}"
+              bindtap="onPickTypeItem">
+          <view class="type-card-name">{{item.typeName}}</view>
+          <view class="type-card-desc">{{pickedType === item.typeCode ? '已选' : '请选择'}}</view>
+          <view wx:if="{{item.disabled}}" class="type-card-tip">{{item.disabledTip}}</view>
+        </view>
+      </view>
+      <view class="sheet-foot">
+        <view class="sheet-btn" bindtap="onCloseTypeSheet">确认</view>
+      </view>
     </view>
   </view>
-
-  <view class="card" wx:if="{{form.typeCode === 'GROUPON' || form.typeCode === 'VOUCHER'}}">
-    <view class="section-title">{{form.typeCode === 'GROUPON' ? '团购' : '代金券'}}设置</view>
-
-    <view class="ipt-row" wx:if="{{form.typeCode === 'GROUPON'}}">
-      <text class="ipt-label">市场价</text>
-      <input class="ipt" type="digit" placeholder="划线价" value="{{form.marketPrice}}" bindinput="onField" data-key="marketPrice" />
-    </view>
-
-    <view class="ipt-row">
-      <text class="ipt-label">售价 ¥</text>
-      <input class="ipt" type="digit" placeholder="用户实付" value="{{form.price}}" bindinput="onField" data-key="price" />
-    </view>
-
-    <view class="ipt-row" wx:if="{{form.typeCode === 'GROUPON'}}">
-      <text class="ipt-label">商品面值 ¥</text>
-      <input class="ipt" type="digit" placeholder="套餐价值（选填）" value="{{form.faceValue}}" bindinput="onField" data-key="faceValue" />
-    </view>
-
-    <view class="ipt-row" wx:if="{{form.typeCode === 'VOUCHER'}}">
-      <text class="ipt-label">起用金额 ¥</text>
-      <input class="ipt" type="digit" placeholder="满 X 元可用" value="{{form.minConsume}}" bindinput="onField" data-key="minConsume" />
-    </view>
-
-    <view class="ipt-row" wx:if="{{form.typeCode === 'GROUPON'}}">
-      <text class="ipt-label">有效期</text>
-      <input class="ipt" type="number" placeholder="售出后 N 天内有效，默认 30" value="{{form.validityDays}}" bindinput="onField" data-key="validityDays" />
-    </view>
-
-    <view class="toggle-row" wx:if="{{form.typeCode === 'GROUPON'}}">
-      <text class="toggle-label">需预约</text>
-      <switch checked="{{form.bookingRequired === 1}}" bindchange="onSwitch" data-key="bookingRequired" color="#3A6B35" />
-    </view>
-  </view>
-
-  <view class="card" wx:if="{{form.typeCode && form.typeCode !== 'GROUPON' && form.typeCode !== 'VOUCHER'}}">
-    <view class="section-title">提示</view>
-    <view class="tip">该商品类型（MVP 阶段）暂未开放小程序端自助创建，请联系平台在 admin 后台创建。</view>
-  </view>
-
-  <view class="card" wx:if="{{form.typeCode}}">
-    <view class="section-title">库存与说明</view>
-    <view class="ipt-row">
-      <text class="ipt-label">库存</text>
-      <input class="ipt" type="number" placeholder="0 = 不限" value="{{form.stock}}" bindinput="onField" data-key="stock" />
-    </view>
-    <view class="ipt-row">
-      <text class="ipt-label">每人限购</text>
-      <input class="ipt" type="number" placeholder="0 = 不限" value="{{form.limitPerUser}}" bindinput="onField" data-key="limitPerUser" />
-    </view>
-    <view class="ipt-row">
-      <text class="ipt-label">单次最多</text>
-      <input class="ipt" type="number" placeholder="默认 1" value="{{form.maxPerOrder}}" bindinput="onField" data-key="maxPerOrder" />
-    </view>
-    <view class="ipt-row" style="align-items:flex-start">
-      <text class="ipt-label">使用说明</text>
-      <textarea class="ipt-area" placeholder="使用规则 / 退改政策" value="{{form.notice}}" maxlength="500" bindinput="onField" data-key="notice" />
-    </view>
-  </view>
-
-  <button class="btn-primary" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting || !canSubmit}}">
-    {{submitting ? '保存中…' : '保存商品'}}
-  </button>
 </view>
