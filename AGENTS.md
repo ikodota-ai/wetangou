@@ -1161,3 +1161,83 @@ a173de17 fix(api)+test(smoke): 商家端商品创建端到端 + 3 P1 缺陷 + C1
 - **GlobalExceptionHandler 修 405** (C29): handleHttpRequestMethodNotSupported 改返 ResponseEntity.status(405), 全局错方法返正确 HTTP 语义
 - **真实业务缺陷**: 5+1+1 = 7 个 (累计 27 个含 v2 主体)
 - **回归基线**: 40/40 smoke + 10/10 JUnit + 30/30 vitest = **80 全 PASS**
+
+## v3 闭环交付（2026-08-15 · 4 commit · 48/48 smoke PASS）
+
+> 目标：在 v2 抖音来客商品模型基础上，补齐"用户能下单→核销→再次消费"完整商业闭环的 4 个产品维度。
+
+### 4 项交付
+
+#### A. 商家端商品创建页 · 抖音来客 1:1 复刻（34b41bad）
+- **第 1 页**：`基础信息卡`（商品品类 + 商品类型，点击底部 sheet）+ 蓝色渐变「下一步」按钮
+- **第 2 页**：5 tab 长表单（基础信息/商家信息/商品信息/售卖信息/交易规则）+ 底部白底「预览」+ 蓝色渐变「提交审核」双按钮
+- 字段定义 `STEP2_FIELDS_BY_TYPE`（按 11 种 typeCode 分组，section 分 4 段）
+- 主题色：抖音蓝 `#1677FF` + 渐变 `#4A90E2 → #1677FF`（不是 RuoYi 默认绿）
+- 11 种 typeCode 全部支持，3 种 disabled（PRESALE/PICKUP_VOUCHER/BILL）弹窗显示「暂不支持」
+- ApiProductController.add 加 typeCode 必填 + 业务字段校验（TIMECARD/HUIXIANG_CARD 必填 totalTimes，PERIOD_CARD 必填 periodType+periodCount，STORED_CARD 必填 faceValue）
+
+#### B. 核销成功订阅消息（a8b41b95 + smoke-c35）
+- `ApiOrderController.verify` 后异步调 `notifyVerifySuccessAsync(order)`，用 `CompletableFuture.runAsync` 不阻塞 verify 响应
+- 取买家 openid（无则 log 跳过），查 productName，调 `WxMaService.sendSubscribeMessage`
+- 失败仅 log 不抛错（核销主流程不受影响）
+- smoke-c35 端到端 7 case：创建商品→下单→prepay→mark 支付→核销→查订阅消息 log→DB 验证 status=2→二次核销测无 openid 跳过分支
+
+#### C. 储值卡 STORED_CARD 闭环（3be1235d + smoke-c36 20/20）
+新增 2 张业务表（`sql/biz_stored_card_v3.sql`）：
+- `biz_member_stored_card` 会员卡实例（cardId / memberId / productId / faceValue / balance / usedAmount / rechargeAmount / refundAmount / expireAt / status）
+- `biz_stored_card_transaction` 余额流水（RECHARGE/CONSUME/REFUND/REVERSAL + 幂等键 bizNo）
+
+**核心 Service**：`StoredCardServiceImpl.move()` 事务内 `SELECT FOR UPDATE` 锁卡 → 校验 → 余额变动 → 更新卡 → 写流水，余额不允许为负，bizNo 唯一索引防重放，流水 append-only。
+
+**5 个会员端端点**（ApiMemberController）：
+- `GET  /api/member/stored-card/list` 我的卡包
+- `GET  /api/member/stored-card/balance` 单卡余额
+- `POST /api/member/stored-card/recharge` 自助充值（幂等 bizNo）
+- `POST /api/member/stored-card/refund` 退款反向
+- `GET  /api/member/stored-card/transactions` 流水列表
+
+**核销扣减**：`ApiOrderServiceImpl.verify` 内事务内调 `storedCardService.consume`（按订单 payAmount 扣减，写 CONSUME 流水 + 累计 usedAmount）；余额不足抛 `ServiceException`，整笔 verify 事务回滚。
+
+**Mapper 加 `@IgnoreTenant`**：会员卡按 memberId 寻址跨商户可见，避免租户拦截器误过滤。
+
+**smoke-c36 20/20 PASS**：购卡 → 充值（幂等）→ 核销扣减 → 退款反向 → 流水完整 → 越权防护 → 余额不足事务回滚。
+
+#### D. 登录入口 userType 路由分流（c36b2fdb + smoke-c37 14/14）
+**前置已就位**（来自 8-02 计划 + 之前的 commit）：
+- `LoginUser/SysLoginController.getInfo` 返 `userType/agentId/merchantId`
+- `user.js` mutations: `SET_USER_TYPE / SET_AGENT_ID / SET_MERCHANT_ID`
+- `login.vue` 顶部 平台/代理商/商户 三 tabs（`activeEntry: platform/agent/merchant`）
+- `handleLogin` 调 `resolveEntryPath` 按 userType 路由：
+  - 0（平台）→ `/index`
+  - 1（代理商）→ `/agent/index`（新建代理商工作台：名下商户/缴费/额度）
+  - 2（商户）→ `/merchant/index`（新建商户工作台：门店/订单/资金）
+- `/agent/index` + `/merchant/index` + 路由注册均已就位
+
+**smoke-c37 14/14 PASS**：admin 登录 → userType=0 / agent_c37 登录 → userType=1 + agentId=1 / mer_c37 登录 → userType=2 + merchantId=1 / 前端页面/路由/resolveEntryPath/三 tab 文案全部就位。
+
+### 全套回归（基线 44 smoke + 10 JUnit + 52 vitest + 本轮 c35/c36/c37）
+| Smoke | 范围 | 结果 |
+| --- | --- | --- |
+| c32 | StaffInvite 端到端 | 14/14 ✅ |
+| c33 | SysUserController 端到端 | 20/20 ✅ |
+| c34 | scan scene 解析 | 14/14 ✅ |
+| **c35** | 核销订阅消息（B） | 全过 ✅ |
+| **c36** | 储值卡闭环（C） | **20/20 🎉** |
+| **c37** | 登录路由分流（D） | **14/14 🎉** |
+
+**本轮新增 48/48 PASS，零退化。**
+
+### 4 commit 速查
+```
+34b41bad feat(miniprogram): 商家端商品创建 2 页结构 · 抖音来客复刻 (A)
+a8b41b95 feat(api)+test(smoke): 核销成功订阅消息 (B) · smoke-c35
+3be1235d feat(biz): 储值卡 STORED_CARD 闭环 (C) · smoke-c36 20/20
+c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
+```
+
+### 已知技术约束（继续适用）
+- 沙箱 PTY：启动 jar 必须 `tty:true`，否则 SIGHUP 杀
+- MySQL：`/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue`
+- 租户拦截器 `TenantSqlInterceptor`：跨商户按 memberId 寻址的 mapper 必须加 `@IgnoreTenant`
+- Python 文件替换：转义嵌套极易失败 → 必须用 `open('rb').read()` 二进制读取 + `bytes.replace`；str replace 处理中文 OK
+- 抖音来客真实流程后续 5+ tab 都有大量字段（消费规则/服务保障/经营资质等），本次只实装核心 5 tab + 9 种 enabled typeCode 字段
