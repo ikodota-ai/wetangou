@@ -114,6 +114,8 @@ Page({
       saleStartDate: p.saleStartDate || '',
       saleEndDate: p.saleEndDate || '',
       extraFeeDesc: p.extraFeeDesc || '',
+      saleStartText: p.saleStartDate ? this._fmtDate(p.saleStartDate) : '',
+      saleEndText: p.saleEndDate ? this._fmtDate(p.saleEndDate) : '',
       subitemGroups: subitemGroups,
       sold: p.sales || p.sold || 0,
       cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',

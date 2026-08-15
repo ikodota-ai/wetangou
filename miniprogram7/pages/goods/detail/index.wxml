@@ -83,52 +83,86 @@
   </view>
 
 
-  <!-- 购买须知：按 typeCode 动态展示 -->
-  <view class="card">
-    <text class="block-title">购买须知</text>
+    <!-- 购买须知（V2.6 P2：按商品创建字段结构化渲染，不再依赖 notice 富文本） -->
+    <view class="card notice-card">
+      <text class="block-title">购买须知</text>
 
-    <!-- 有效期（V2.6 P1：改用真实字段 validityDays） -->
-    <view class="nl-line"><text class="dot">·</text>有效期</view>
-    <view class="nl-sub">购买后 {{product.validityDays || 30}} 天内有效</view>
+      <!-- 有效期 -->
+      <view class="nl-line" wx:if="{{product.validityDays}}">
+        <text class="dot">·</text>有效期
+      </view>
+      <view class="nl-sub" wx:if="{{product.validityDays}}">
+        购买后 {{product.validityDays}} 天内有效
+      </view>
 
-    <!-- 售卖期 -->
-    <view class="nl-line" wx:if="{{product.saleStartDate || product.saleEndDate}}"><text class="dot">·</text>售卖期</view>
-    <view class="nl-sub" wx:if="{{product.saleStartDate}}">起：{{product.saleStartDate}}</view>
-    <view class="nl-sub" wx:if="{{product.saleEndDate}}">止：{{product.saleEndDate}}</view>
+      <!-- 售卖期 -->
+      <view class="nl-line" wx:if="{{product.saleStartDate || product.saleEndDate}}">
+        <text class="dot">·</text>售卖期
+      </view>
+      <view class="nl-sub" wx:if="{{product.saleStartDate || product.saleEndDate}}">
+        <text wx:if="{{product.saleStartDate}}">{{saleStartText}}</text>
+        <text wx:if="{{product.saleStartDate && product.saleEndDate}}"> 至 </text>
+        <text wx:if="{{product.saleEndDate}}">{{saleEndText}}</text>
+      </view>
 
-    <!-- 单次限购（V2.6 P1：maxPerOrder） -->
-    <view class="nl-line" wx:if="{{product.maxPerOrder}}"><text class="dot">·</text>单次限购</view>
-    <view class="nl-sub" wx:if="{{product.maxPerOrder}}">单笔订单最多 {{product.maxPerOrder}} 件</view>
+      <!-- 限购 -->
+      <view class="nl-line" wx:if="{{product.limitPerUser || product.maxPerOrder}}">
+        <text class="dot">·</text>限购
+      </view>
+      <view class="nl-sub" wx:if="{{product.limitPerUser || product.maxPerOrder}}">
+        <text wx:if="{{product.limitPerUser}}">每人限购 {{product.limitPerUser}} 张</text>
+        <text wx:if="{{product.limitPerUser && product.maxPerOrder}}">；</text>
+        <text wx:if="{{product.maxPerOrder}}">每单最多 {{product.maxPerOrder}} 张</text>
+      </view>
 
-    <!-- 每人限购（V2.6 P1：limitPerUser） -->
-    <view class="nl-line" wx:if="{{product.limitPerUser}}"><text class="dot">·</text>每人限购</view>
-    <view class="nl-sub" wx:if="{{product.limitPerUser}}">同一会员最多购买 {{product.limitPerUser}} 件</view>
+      <!-- 适用人数（GROUPON / BOOKING） -->
+      <view class="nl-line" wx:if="{{product.maxPersons && product.maxPersons > 0}}">
+        <text class="dot">·</text>适用人数
+      </view>
+      <view class="nl-sub" wx:if="{{product.maxPersons && product.maxPersons > 0}}">
+        {{product.maxPersons}} 人使用
+      </view>
 
-    <!-- 库存 -->
-    <view class="nl-line" wx:if="{{product.stock !== null && product.stock !== undefined}}"><text class="dot">·</text>库存</view>
-    <view class="nl-sub" wx:if="{{product.stock === 0}}">已售罄</view>
-    <view class="nl-sub" wx:elif="{{product.stock !== null && product.stock !== undefined}}">剩余 {{product.stock}} 件</view>
+      <!-- 库存（明确告诉用户剩余多少） -->
+      <view class="nl-line" wx:if="{{product.stock !== null && product.stock !== undefined && product.stock > 0}}">
+        <text class="dot">·</text>库存
+      </view>
+      <view class="nl-sub" wx:if="{{product.stock !== null && product.stock !== undefined && product.stock > 0}}">
+        剩余 {{product.stock}} 份
+      </view>
 
-    <!-- 使用须知（V2.6 P1：notice 字段） -->
-    <view class="nl-line" wx:if="{{product.notice}}"><text class="dot">·</text>使用须知</view>
-    <view class="nl-sub" wx:if="{{product.notice}}">{{product.notice}}</view>
+      <!-- 退改政策 -->
+      <view class="nl-line" wx:if="{{product.refundPolicy}}">
+        <text class="dot">·</text>退改政策
+      </view>
+      <view class="nl-sub" wx:if="{{product.refundPolicy}}">
+        {{product.refundPolicy}}
+      </view>
 
-    <!-- 退改政策（refundPolicy） -->
-    <view class="nl-line" wx:if="{{product.refundPolicy}}"><text class="dot">·</text>退改政策</view>
-    <view class="nl-sub" wx:if="{{product.refundPolicy}}">{{product.refundPolicy}}</view>
+      <!-- 附加费 -->
+      <view class="nl-line" wx:if="{{product.extraFeeDesc}}">
+        <text class="dot">·</text>附加费
+      </view>
+      <view class="nl-sub" wx:if="{{product.extraFeeDesc}}">
+        {{product.extraFeeDesc}}
+      </view>
 
-    <!-- 预约必填（BOOKING 才有） -->
-    <view class="nl-line" wx:if="{{product.bookingRequired == 1}}"><text class="dot">·</text>预约规则</view>
-    <view class="nl-sub" wx:if="{{product.bookingRequired == 1}}">需提前预约，到店出示预约凭证</view>
+      <!-- 预约规则（仅 BOOKING 才有） -->
+      <view class="nl-line" wx:if="{{product.bookingRequired == 1}}">
+        <text class="dot">·</text>预约规则
+      </view>
+      <view class="nl-sub" wx:if="{{product.bookingRequired == 1}}">
+        需提前预约，到店出示预约凭证
+      </view>
 
-    <!-- 附加费说明 -->
-    <view class="nl-line" wx:if="{{product.extraFeeDesc}}"><text class="dot">·</text>附加费</view>
-    <view class="nl-sub" wx:if="{{product.extraFeeDesc}}">{{product.extraFeeDesc}}</view>
-
-    <!-- 其他说明 -->
-    <view class="nl-line" wx:if="{{product.otherNotice}}"><text class="dot">·</text>其他说明</view>
-    <view class="nl-sub" wx:if="{{product.otherNotice}}">{{product.otherNotice}}</view>
-  </view>
+      <!-- 其他说明 -->
+      <view class="nl-line" wx:if="{{product.otherNotice}}">
+        <text class="dot">·</text>其他说明
+      </view>
+      <view class="nl-sub" wx:if="{{product.otherNotice}}">
+        {{product.otherNotice}}
+      </view>
+    </view>
 
   <!-- 适用门店 -->
   <view class="card">
