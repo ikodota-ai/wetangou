@@ -52,7 +52,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                     <otherwise> and merchant_id = #{params.merchantIdsIn}</otherwise>
                 </choose>
             </if>
- and merchant_id = #{merchantId}</if>  
+ and merchant_id = #{merchantId}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <if test="delFlag != null  and delFlag != ''"> and del_flag = #{delFlag}</if>
             <if test="storeName != null  and storeName != ''"> and store_name like concat('%', #{storeName}, '%')</if>
             <if test="logo != null  and logo != ''"> and logo = #{logo}</if>
             <if test="province != null  and province != ''"> and province = #{province}</if>
