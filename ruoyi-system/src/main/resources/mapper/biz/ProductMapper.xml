@@ -234,6 +234,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="faceValue != null">face_value = #{faceValue},</if>
             <if test="minConsume != null">min_consume = #{minConsume},</if>
             <if test="totalTimes != null">total_times = #{totalTimes},</if>
+            <if test="voucherAutoName != null">voucher_auto_name = #{voucherAutoName},</if>
+            <if test="voucherMinConsume != null">voucher_min_consume = #{voucherMinConsume},</if>
+            <if test="comboTotalValue != null">combo_total_value = #{comboTotalValue},</if>
+            <if test="comboSaleType != null">combo_sale_type = #{comboSaleType},</if>
+            <if test="comboAutoExtendDays != null">combo_auto_extend_days = #{comboAutoExtendDays},</if>
+            <if test="outerSubitemId != null">outer_subitem_id = #{outerSubitemId},</if>
+            <if test="comboItemsJson != null">combo_items_json = #{comboItemsJson},</if>
+            <if test="voucherScopeType != null">voucher_scope_type = #{voucherScopeType},</if>
+            <if test="voucherScopeIds != null">voucher_scope_ids = #{voucherScopeIds},</if>
+            <if test="grouponPickRule != null">groupon_pick_rule = #{grouponPickRule},</if>
+            <if test="grouponActualCount != null">groupon_actual_count = #{grouponActualCount},</if>
+            <if test="dailyUseLimit != null">daily_use_limit = #{dailyUseLimit},</if>
+            <if test="refundRuleType != null">refund_rule_type = #{refundRuleType},</if>
             <if test="periodType != null">period_type = #{periodType},</if>
             <if test="periodCount != null">period_count = #{periodCount},</if>
             <if test="saleStartDate != null">sale_start_date = #{saleStartDate},</if>

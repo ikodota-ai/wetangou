@@ -1398,3 +1398,51 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 - 消费规则 tab 字段（137/138）：顾客可消费日期/不可消费日期/消费时段/使用张数限制/使用人数限制/每天使用限制/预约规则/店内其他优惠/额外费用/其他说明信息/退款规则
 - admin `create.vue` 修正：tab 数量统一 5；商家信息 tab label 改为动态（团购/代金=商家信息，组合券包=信息）；组合券包去掉了"商品信息"独立 tab（因为组合搭配在商品资质 tab 里）
 - doc/抖音来客/INDEX.md 同步更新
+
+## 续篇 9（2026-08-15 16:55）
+
+> 主表加列覆盖 3 类型差异 + 6 tab 详细字段
+
+### 设计决策
+- **放弃方案 B**（3 张 _ext 子表 join）：类型扩展会让 join 越来越复杂（团购+代金+组合券包 3 张，未来次卡/储值卡/周期卡/惠享卡再加 4 张 → 7 张表 join）
+- **采用方案 A**（主表加列）：13 列扩展字段全部加到 `biz_product`，按 typeCode 切换前端显示
+- 命名规则：`<typeCode 缩写>_<字段名>` 避免冲突
+  - 代金券：voucher_*
+  - 组合券包：combo_* + outer_subitem_id
+  - 团购：groupon_*
+  - 通用：daily_use_limit / refund_rule_type
+
+### 13 列扩展
+| 列名 | 类型 | 用途 | 适用类型 |
+|---|---|---|---|
+| voucher_auto_name | TINYINT(1) | 自动按面值生成名称 | VOUCHER |
+| voucher_min_consume | DECIMAL(10,2) | 满 X 减 Y 的 X | VOUCHER |
+| voucher_scope_type | VARCHAR(20) | 适用范围(ALL/CATEGORY/STORE) | VOUCHER |
+| voucher_scope_ids | VARCHAR(500) | 范围 ID 列表 | VOUCHER |
+| combo_total_value | DECIMAL(10,2) | 总价值(划线价) | COMBO |
+| combo_sale_type | VARCHAR(20) | 售卖类型(LIMIT/LONG) | COMBO |
+| combo_auto_extend_days | INT | 到期自动延期天数 | COMBO |
+| outer_subitem_id | VARCHAR(100) | 商家平台子品ID | COMBO |
+| combo_items_json | TEXT | 搭配明细 JSON | COMBO |
+| groupon_pick_rule | VARCHAR(50) | 搭配规则(ALL/PICK_1/...) | GROUPON |
+| groupon_actual_count | INT | 实际可享数缓存 | GROUPON |
+| daily_use_limit | INT | 每天使用限制 | COMBO (独有) |
+| refund_rule_type | VARCHAR(50) | 退款规则 | COMBO (独有) |
+
+### 售前/交易/消费 字段差异（你已明确）
+- **团购套餐售卖信息** vs **代金券** vs **组合券包** 字段确实不同：
+  - 组合券包独有：售价只读 + 限时售卖 + 商家平台子品ID
+  - 团购+代金 没券码类型（实际在交易规则里）
+- admin create.vue 改造：3 类型 tab 内容独立 v-if 分支，**不共享 tab name**
+
+### SQL
+- `sql/biz_product_columns_v3.sql` (13 列 ADD + 兜底 UPDATE)
+
+### Java/Mapper
+- `Product.java` +13 字段 + getter/setter + toString
+- `ProductMapper.xml` +resultMap +selectVo +insert +update (全 13 列贯通)
+
+### 待办
+- smoke-c42 验证 3 类型各自独立 + 跑通新字段
+- admin create.vue 改造：tab name 独立（不共享）、3 类型 tab 内容差异完全分离
+- INDEX.md 同步 13 列说明

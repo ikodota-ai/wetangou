@@ -59,11 +59,46 @@
         </div>
       </el-card>
 
-      <!-- 步骤2：商家信息 + 商品信息 + 售卖信息 + 交易规则 + 消费规则（tab 切换，6/6/5）-->
+      <!-- 步骤2：3 类型各自独立设计 tab 结构（不强制统一）
+       团购 6 tab = 基础/商家/商品/售卖/交易/消费
+       代金券 6 tab = 商品类型/商家/商品/售卖/交易/消费
+       组合券包 6 tab = 基础/商品/商品资质/售卖/交易/消费 -->
       <el-card v-if="form.typeCode && form.productId" class="dyl-card dyl-card-step2" shadow="never">
         <el-tabs v-model="activeTab" class="dyl-tabs" :class="tabCountClass">
           <!-- Tab: 商家信息（团购/代金）/ 信息（组合券包，基础+商家合并）-->
-          <el-tab-pane :label="merchantTabLabel" name="merchant">
+                              <!-- Tab: 基础信息（团购/代金，含已锁的品类+类型+名称）-->
+          <el-tab-pane v-if="isGroupon || isVoucher" label="基础信息" name="basicG">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="商品品类">
+                <el-input :value="categoryNameOf(form.categoryId)" readonly />
+              </el-form-item>
+              <el-form-item label="商品类型">
+                <el-input :value="typeName" readonly />
+              </el-form-item>
+              <el-form-item label="商品名称" prop="productName">
+                <el-input v-model="form.productName" maxlength="60" show-word-limit placeholder="请输入商品名称" />
+              </el-form-item>
+              <el-form-item v-if="isVoucher" label="代金券面值" prop="faceValue">
+                <el-input-number v-model="form.faceValue" :min="0.01" :precision="2" :step="1" controls-position="right" style="width: 100%" />
+                <div class="dyl-tip">输入面值后，代金券名称将自动按面值生成</div>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+<!-- Tab: 基础信息（组合券包无商家 tab，基础信息独立）-->
+          <el-tab-pane v-if="isCombo" label="基础信息" name="basic">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="商品类型"><el-input :value="typeName" readonly /></el-form-item>
+              <el-form-item label="商品名称" prop="productName">
+                <el-input v-model="form.productName" maxlength="60" show-word-limit placeholder="请输入商品名称" />
+              </el-form-item>
+              <el-form-item label="副标题">
+                <el-input v-model="form.subtitle" maxlength="100" show-word-limit placeholder="副标题" />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+
+          <el-tab-pane v-if="isGroupon || isVoucher" :label="merchantTabLabel" name="merchant">
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="所属商家">
                 <el-input :value="merchantName" readonly />
@@ -103,8 +138,8 @@
             </el-form>
           </el-tab-pane>
 
-          <!-- Tab: 商品信息（团购/代金/组合券包，组合券包的内容在商品资质 tab 里）-->
-          <el-tab-pane v-if="isGroupon || isVoucher" label="商品信息" name="product">
+          <!-- Tab: 商品信息（团购/代金/组合券包，组合券包显示组合搭配入口+头图）-->
+          <el-tab-pane label="商品信息" name="product">
             <el-form :model="form" label-width="120px" size="small">
               <!-- 团购：商品搭配入口 + 单品/商品组管理 -->
               <template v-if="isGroupon">
@@ -423,7 +458,7 @@ export default {
         productName: [{ required: true, message: '请输入商品名称', trigger: 'blur' }]
       },
       // ===== 步骤 2：tab 状态 =====
-      activeTab: 'merchant',
+      activeTab: 'basicG',
       saving: false,
       // ===== 子品/搭配 =====
       comboDrawer: false,
@@ -501,11 +536,24 @@ export default {
     isCombo() { return this.form.typeCode === 'COMBO' },
     isHuixiang() { return this.form.typeCode === 'HUIXIANG_CARD' },
     tabCountClass() {
-      if (this.isCombo) return 'dyl-tabs-5'
-      return 'dyl-tabs-5'  // 团购/代金也是 5 tab (基础信息独立卡片 + 5 tab)
+      return 'dyl-tabs-6'  // 3 类型都 6 tab,水平滚动
     },
+    // 代金券首 tab 特殊命名
     merchantTabLabel() {
-      return this.isCombo ? '信息' : '商家信息'
+      if (this.isGroupon) return '商家信息'
+      if (this.isVoucher) return '商品类型'
+      return '商家信息'
+    },
+    categoryNameOf(id) {
+      if (!id) return ''
+      const find = (tree) => {
+        for (const n of tree) {
+          if (n.categoryId === id) return n.categoryName
+          if (n.children) { const r = find(n.children); if (r) return r }
+        }
+        return ''
+      }
+      return find(this.categoryTree || [])
     },
     namePlaceholder() {
       if (this.isVoucher && this.form.faceValue) return this.autoVoucherName
@@ -571,6 +619,7 @@ export default {
         this.form = Object.assign({}, this.form, p)
         this.form.categoryIdArr = p.categoryId
         this.basicCollapsed = true
+        this.activeTab = this.isCombo ? 'basic' : 'basicG'
         if (this.isGroupon) this.loadSubitems()
       })
     },
@@ -698,8 +747,10 @@ export default {
 .dyl-step1-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
 .dyl-card-step2 { padding-bottom: 60px; }
 .dyl-tabs ::v-deep .el-tabs__header { margin-bottom: 16px; }
-.dyl-tabs-6 ::v-deep .el-tabs__item { width: 16.66% !important; padding: 0 4px !important; text-align: center; }
-.dyl-tabs-5 ::v-deep .el-tabs__item { width: 20% !important; padding: 0 4px !important; text-align: center; }
+.dyl-tabs-6 ::v-deep .el-tabs__nav-scroll { overflow-x: auto !important; }
+.dyl-tabs-6 ::v-deep .el-tabs__nav { white-space: nowrap !important; }
+.dyl-tabs-6 ::v-deep .el-tabs__item { padding: 0 14px !important; font-size: 13px; flex-shrink: 0; }
+
 .dyl-tip { color: #999; font-size: 12px; margin-top: 4px; }
 .dyl-tip-inline { color: #999; font-size: 12px; margin-left: 12px; }
 .dyl-step2-footer { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,.04); z-index: 100; text-align: right; }
