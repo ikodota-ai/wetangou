@@ -232,6 +232,7 @@ public class ApiMerchantStaffController
 
     /** 绑定当前登录员工的微信（首次登录后必做） */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/bindWx")
     public AjaxResult bindWx(@RequestBody JSONObject body)
     {
@@ -264,6 +265,7 @@ public class ApiMerchantStaffController
 
     /** 当前商家员工信息 */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/me")
     public AjaxResult me()
     {
@@ -329,6 +331,7 @@ public class ApiMerchantStaffController
 
     /** 补录员工姓名/手机号（用户后续自助补全） */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/profile")
     public AjaxResult updateProfile(@RequestBody JSONObject body)
     {
@@ -414,6 +417,7 @@ public class ApiMerchantStaffController
 
 /** 退出登录 */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/logout")
     public AjaxResult logout()
     {
@@ -573,12 +577,14 @@ public class ApiMerchantStaffController
     {
         LoginMember m = MemberContextHolder.get();
         if (m == null) throw new ServiceException("未登录");
-        if (!"merchant".equals(m.getUserType())) throw new ServiceException("非商家员工身份");
+        String ut = m.getUserType();
+        if (!("merchant".equals(ut) || "owner".equals(ut) || "manager".equals(ut) || "staff".equals(ut))) throw new ServiceException("非商家员工身份");
         if (m.getStoreId() == null) throw new ServiceException("未绑定门店");
         return m;
     }
 
     @LoginRequired
+    @RequireRole(value = BizRole.STAFF, includeHigher = false)
     @GetMapping("/home")
     public AjaxResult dashboardHome()
     {
@@ -637,6 +643,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
+    @RequireRole(value = BizRole.STAFF, includeHigher = false)
     @GetMapping("/today/orders")
     public AjaxResult todayOrders()
     {
@@ -660,6 +667,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
+    @RequireRole(value = BizRole.STAFF, includeHigher = false)
     @GetMapping("/today/bills")
     public AjaxResult todayBills()
     {
@@ -678,6 +686,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
+    @RequireRole(value = BizRole.STAFF, includeHigher = false)
     @GetMapping("/today/bookings")
     public AjaxResult todayBookings()
     {

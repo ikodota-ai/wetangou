@@ -17,6 +17,8 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.biz.api.annotation.StoreStaffRequired;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.biz.api.annotation.LoginRequired;
+import com.ruoyi.biz.api.annotation.RequireRole;
+import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.service.WxPayService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Member;
@@ -52,6 +54,7 @@ public class ApiBillController
      * 会员发起买单：填写消费金额，可选代金券
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping
     @Transactional
     public AjaxResult create(@RequestBody JSONObject body)
@@ -108,6 +111,7 @@ public class ApiBillController
      * 查询买单状态（会员轮询店员是否已确认）
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/{billId}")
     public AjaxResult detail(@PathVariable Long billId)
     {
@@ -158,6 +162,7 @@ public class ApiBillController
      * mock模式直接置为已支付并返回 mock=true。
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/prepay/{billId}")
     @Transactional
     public AjaxResult prepay(@PathVariable Long billId)
@@ -198,6 +203,7 @@ public class ApiBillController
      * 会员支付（仅mock模式；真实环境由微信支付回调触发），使用代金券
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/pay/{billId}")
     @Transactional
     public AjaxResult pay(@PathVariable Long billId)

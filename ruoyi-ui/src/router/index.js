@@ -89,6 +89,19 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/product/create',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/biz/product/create'),
+        name: 'ProductCreate',
+        meta: { title: '商品高级编辑', activeMenu: '/product' }
+      }
+    ]
+  },
+  {
     path: '/merchant',
     component: Layout,
     hidden: true,

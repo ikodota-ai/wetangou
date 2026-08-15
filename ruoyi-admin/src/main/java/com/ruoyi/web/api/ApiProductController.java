@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.biz.api.annotation.LoginRequired;
+import com.ruoyi.biz.api.annotation.RequireRole;
+import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.ProductExt;
 import com.ruoyi.biz.service.IProductExtService;
@@ -110,6 +112,7 @@ public class ApiProductController
      * merchantId/storeId 由后端强制覆盖防越权
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
     @PostMapping("/add")
     public AjaxResult add(@RequestBody Product body)
     {
@@ -183,6 +186,7 @@ public class ApiProductController
      * 商家端：编辑商品（小程序端搭配保存后回填 totalValue / subitemPickRuleJson 等）
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
     @PutMapping
     public AjaxResult edit(@RequestBody Product body)
     {
@@ -235,6 +239,7 @@ public class ApiProductController
      * 商家端：商品上下架
      */
     @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
     @PutMapping("/status")
     public AjaxResult toggleStatus(@RequestBody Product body)
     {

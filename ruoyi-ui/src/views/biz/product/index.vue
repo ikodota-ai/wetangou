@@ -123,6 +123,13 @@
           <el-button
             size="mini"
             type="text"
+            icon="el-icon-document"
+            @click="handleAdvancedEdit(scope.row)"
+            v-hasPermi="['biz:product:edit']"
+          >高级编辑</el-button>
+          <el-button
+            size="mini"
+            type="text"
             icon="el-icon-delete"
             @click="handleDelete(scope.row)"
             v-hasPermi="['biz:product:remove']"
@@ -613,6 +620,11 @@ export default {
     /** E9: 子品管理入口（打开修改详情，复用底部子品搭配 section）*/
     handleSubitem(row) {
       this.handleUpdate(row);
+    },
+    /** 高级编辑：跳到抖音来客 6 步编辑页（产品类型/售卖/交易/消费/扩展属性） */
+    handleAdvancedEdit(row) {
+      const productId = row.productId
+      this.$router.push({ path: '/product/create', query: { productId } }).catch(() => {})
     },
     handleUpdate(row) {
       this.reset();
