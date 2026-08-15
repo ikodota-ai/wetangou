@@ -1782,3 +1782,100 @@ c43 25/25 + c45 12/12 + c46 11/11 + c47 13/13 + c48 14/14 + c49 8/8
 ### V6-6 权限矩阵 smoke（c44）
 - V6-5 不实装，c44 改为「3 角色 × 5 端点 RBAC 矩阵」覆盖：login → 调端点 → 期望 200/403
 - 已实装
+
+## v2.6 收口后的真机测试 checklist (2026-08-15)
+
+### 准备
+
+#### A. 工具
+- 微信开发者工具（PC 端，已装 miniprogram7 项目）
+- 装好微信的手机（推荐**和电脑同一 WiFi**，否则走"手机开热点给电脑"方案）
+- `ifconfig | grep "inet "` 查电脑 IP（同一 WiFi 下通常是 `192.168.x.x`）
+
+#### B. 后端连通（必须）
+1. 确认 jar 在跑：`curl http://127.0.0.1:8080/` 应返 200
+2. **关键**：手机/真机调试要访问电脑后端，必须改 `BASE_URL`：
+   - 编辑 `miniprogram7/utils/request.js` 顶部
+   - `BASE_URL` 从 `http://127.0.0.1:8080` 改成 `http://<电脑IP>:8080`（如 `http://192.168.1.5:8080`）
+   - 改完**重启**微信开发者工具（编译缓存）
+3. 微信开发者工具 → 详情 → 「不校验合法域名」**打勾**
+
+#### C. 太阳码 mock 开关
+- 太阳码实际不可用（小程序未发布 errcode=40066），但业务接口要能跑通
+- 测试时：`/usr/local/mysql/bin/mysql -uroot -p133301 ry-vue -e "UPDATE sys_config SET config_value='true' WHERE config_key='wx.miniapp.mockEnabled'"`
+- 测完恢复：`UPDATE sys_config SET config_value='false' WHERE config_key='wx.miniapp.mockEnabled'`
+- `redis-cli FLUSHDB` 清缓存 + 重启 jar
+
+### 测试场景（按优先级）
+
+#### 1. 核心闭环：Scheme URL 核销（**必测 · 30min**）
+> 这条**只测微信协议唤起**，不需要后端连通，单独可以先做
+
+- [ ] PC 端微信开发者工具跑顾客端 → 登录 → 选商品下单（mock 模式）
+- [ ] 顾客端：「我的订单」→ 选未核销订单 → 「出示给店员」
+- [ ] 看到 Scheme URL 二维码
+- [ ] 用在线工具（`https://cli.im/`）把 URL 转二维码
+- [ ] **手机微信扫这个二维码** → 唤起小程序 → 进 verify 页
+- [ ] verify 页自动跳登录页（员工未登录）→ 员工用 wxLogin 登录
+- [ ] 回到 verify 页 → 自动核销成功
+- **预期**：顾客的订单 status 变 2（已核销）
+
+#### 2. 员工邀请海报（**必测 · 15min**）
+- [ ] OWNER 登录小程序 → 「员工管理」→ 「邀请员工」→ 生成邀请码
+- [ ] 点「生成分享海报」→ 海报页加载
+- [ ] 看到绿色渐变海报 + 邀请码大字 + 太阳码
+- [ ] 点「保存到相册」→ 弹权限 → 允许
+- [ ] 相册里能看到海报
+- [ ] **手机微信扫海报里的太阳码** → 应该唤起小程序 scan/index
+- **预期**：因为小程序未发布，太阳码扫了会进不去，这是正常的；海报本身要生成好看
+
+#### 3. 推客海报（**必测 · 15min**）
+- [ ] 推客登录小程序 → 「推客中心」→ 「推广海报」
+- [ ] 海报生成 + 保存相册
+- [ ] **手机微信扫海报太阳码** → 唤起 → 进 `pages/index/index`
+- **预期**：进 `pages/index/index` 是因为 scene=distributor:...，app.js 解析后会写 `globalData.inviteBy`
+- 在 PC 端开发者工具 vConsole 里能看到 `globalData.inviteBy` 已被设置
+
+#### 4. 微信扫一扫直达（V6-1 · 10min）
+- [ ] PC 端 OWNER 登录 → 员工管理 → 生成邀请码
+- [ ] 把邀请码的 `invite:1:1:ABC123` 字符串填到测试工具生成二维码
+- [ ] **手机微信扫** → 唤起小程序 → 进 scan/index
+- **预期**：onLoad 直接弹窗「加入该商家？」，不需手动点扫码
+- V6-1 已实装自动走 `_handleScanResult`
+
+#### 5. 员工待审核（V6-3 · 10min）
+- [ ] 关闭 mock，PC 后台 admin 登录 → 员工管理 → 生成邀请码
+- [ ] 手机用**未审核过**的微信号接受邀请
+- [ ] 看新员工 status=3
+- [ ] PC 后台 → 员工审核 → 看到待审核员工
+- [ ] 点「通过」→ status 变 0
+- [ ] 该员工登录小程序 → **可以登录**（不再是"待审核"提示）
+
+#### 6. 手机号补全（V6-2 · 可选）
+- [ ] 员工接受邀请时传 `phoneCode`（需 button open-type=getPhoneNumber）
+- [ ] **预期**：sys_user.phonenumber 被填充
+- 注：当前未在 V6-1 的 scan 页加 getPhoneNumber 按钮，需要手动触发接口
+
+### 已知限制（**不要当成 bug**）
+
+| 现象 | 原因 | 解决方案 |
+|------|------|----------|
+| 太阳码扫了进不去小程序 | 小程序未发布（errcode=40066） | 测试号限制，发版后解决 |
+| 推客海报太阳码扫了只进首页 | scene=distributor:...，不是商品详情 | 已实装：app.js 解析 → 写 inviteBy |
+| 顾客 Scheme URL 扫了只能唤起 verify 页 | 微信协议限制，**不能再加业务参数** | 现状：顾客扫前要在我的订单点"出示" |
+| 真机调接口 404/网络失败 | BASE_URL 没改成电脑 IP | 见准备 B |
+
+### 测试完成后
+
+- 恢复 mock 开关：`UPDATE sys_config SET config_value='false' WHERE config_key='wx.miniapp.mockEnabled'`
+- `redis-cli FLUSHDB`
+- 改回 `BASE_URL` 为 `http://127.0.0.1:8080`（如要 commit 改动就保留，不要混在功能 commit 里）
+- 把测试结果写到 commit message 或独立 `doc/v2.6-真机测试报告.md`
+
+### 下一步
+
+真机测试通过后：
+1. v2.6 正式收口
+2. 进入 v2.5 续篇里的 P1（PC 角色-菜单映射 V5-7）—— 之前说"不做"，待你重新确认
+3. 或者直接开始 v2.7（V3 不急的话）
+

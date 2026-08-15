@@ -6,7 +6,7 @@
       <view class="card-title">基础信息</view>
 
       <view class="row" bindtap="onTapCategory">
-        <text class="row-label"><text class="required">*</text> 商品品类</text>
+        <view class="row-label"><text class="required">*</text> <text>商品品类</text></view>
         <view class="row-value">
           <text class="{{pickedCategory ? '' : 'placeholder'}}">{{pickedCategory || '请选择'}}</text>
           <text class="arrow">›</text>
@@ -16,7 +16,7 @@
 
     <view class="card">
       <view class="row" bindtap="onTapType">
-        <text class="row-label"><text class="required">*</text> 商品类型</text>
+        <view class="row-label"><text class="required">*</text> <text>商品类型</text></view>
         <view class="row-value">
           <text class="{{pickedTypeName ? '' : 'placeholder'}}">{{pickedTypeName || '请选择'}}</text>
           <text class="arrow">›</text>
@@ -74,7 +74,7 @@
           <text class="readonly-value">总部统一收款</text>
         </view>
         <view wx:for="{{sectionMerchant}}" wx:key="key" class="row" bindtap="onPickStoreProxy" data-key="{{item.key}}">
-          <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+          <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
           <view class="row-value">
             <text class="{{form[item.key] ? '' : 'placeholder'}}">{{storeOptions[storeIdx].label || '请选择'}}</text>
             <text class="arrow">›</text>
@@ -91,7 +91,7 @@
           <!-- text input -->
           <view wx:if="{{item.type === 'text'}}" class="row column">
             <view class="row-head">
-              <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+              <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
               <text class="row-counter">{{(form[item.key] || '').length}}/{{item.max || 40}}</text>
             </view>
             <textarea wx:if="{{item.label.indexOf('说明') >= 0}}"
@@ -113,7 +113,7 @@
 
           <!-- digit/number input -->
           <view wx:elif="{{item.type === 'digit' || item.type === 'number'}}" class="row" bindtap="onTapNumberField" data-key="{{item.key}}">
-            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value with-input">
               <text wx:if="{{item.prefix}}" class="ipt-prefix">{{item.prefix}}</text>
               <input class="ipt-inline"
@@ -128,7 +128,7 @@
 
           <!-- period picker -->
           <view wx:elif="{{item.type === 'period-picker'}}" class="row" bindtap="onTapPeriodField" data-key="{{item.key}}">
-            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value">
               <text class="placeholder">请选择</text>
               <text class="arrow">›</text>
@@ -144,7 +144,7 @@
         <view class="card-title">售卖信息</view>
         <view wx:for="{{sectionSale}}" wx:key="key">
           <view wx:if="{{item.type === 'number'}}" class="row" bindtap="onTapNumberField" data-key="{{item.key}}">
-            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value with-input">
               <input class="ipt-inline"
                      type="digit"
@@ -157,7 +157,7 @@
           </view>
         </view>
         <view class="rule-row" bindtap="onTapDateField" data-key="saleDate">
-          <text class="row-label"><text class="required">*</text> 商品售卖日期</text>
+          <view class="row-label"><text class="required">*</text> <text>商品售卖日期</text></view>
           <view class="row-value">
             <text class="placeholder">不限时间</text>
             <text class="arrow">›</text>
@@ -178,7 +178,7 @@
       <view class="card">
         <view class="card-title">交易规则</view>
         <view class="rule-row">
-          <text class="row-label"><text class="required">*</text> 顾客可消费日期</text>
+          <view class="row-label"><text class="required">*</text> <text>顾客可消费日期</text></view>
           <view class="row-value">
             <text>自购买次日起 {{form.validityDays || 360}} 天，购买当天默认可用</text>
             <text class="link">编辑 ›</text>
@@ -186,7 +186,7 @@
         </view>
         <view wx:for="{{sectionTrade}}" wx:key="key">
           <view wx:if="{{item.type === 'number'}}" class="row">
-            <text class="row-label"><text wx:if="{{item.required}}" class="required">*</text> {{item.label}}</text>
+            <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value with-input">
               <input class="ipt-inline"
                      type="digit"
