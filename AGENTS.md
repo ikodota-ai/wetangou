@@ -1241,3 +1241,63 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 - 租户拦截器 `TenantSqlInterceptor`：跨商户按 memberId 寻址的 mapper 必须加 `@IgnoreTenant`
 - Python 文件替换：转义嵌套极易失败 → 必须用 `open('rb').read()` 二进制读取 + `bytes.replace`；str replace 处理中文 OK
 - 抖音来客真实流程后续 5+ tab 都有大量字段（消费规则/服务保障/经营资质等），本次只实装核心 5 tab + 9 种 enabled typeCode 字段
+
+## P2 收口 + 微信扫一扫直达核销（2026-08-15 · 2 commit · 33/33 smoke PASS）
+
+### 交付清单
+
+#### P2-3 菜单 NPE 修复（201c5acf + smoke-c38）
+- **根因**：`sys_menu.menu_id=2265` 员工管理 `parent_id=NULL`，导致 `getRouters` 整条菜单树 NPE，前端侧栏全部空白
+- **修复**：2265 parent_id 设为 2215（tenant 目录），admin 角色补 16 个新菜单权限（INSERT IGNORE 幂等）
+- **副作用**：`getRouters` 返 11 个 TOP 菜单，子菜单含 productType / productSubitem / staffInvite 3 个新目录
+- smoke-c38 19/19：getRouters / 字典 API 11 条 / 9 种 type / 前端 typeText 字典化
+
+#### P2-2 字典化（实装早已完成，本轮验证）
+- `views/biz/product/index.vue` 的 `loadTypeList()` 已调 `selectProductTypeList()`，`typeCode` 下拉 v-for 渲染
+- `typeText(code)` 从 `typeList` 查 typeName（非 hardcode）
+- 仅 `typeTag()` 颜色映射保留 hardcode（UI 决策，非字典数据）
+
+#### 微信扫一扫直达核销（8773f8cf + smoke-c39 14/14）
+**完整链路**：商家印台卡二维码（内容是 Scheme URL）→ 店员手机微信首页「扫一扫」→ 微信自动唤起小程序 → 跳到 `verify` 页 → 自动核销成功
+
+**后端**：
+- `WxMaService.generateScheme(page, query, permanent, merchantId)`
+  - mock 模式：直接拼 `weixin://dl/business/?appid=xxx&path=...&query=...`（微信可识别）
+  - 真实模式：`POST https://api.weixin.qq.com/wxa/generatescheme`
+- `WxMaService.shortenUrl(longUrl, merchantId)` 短链压到 32 字符内
+- `ApiStoreStaffDashboardController` 新增 `POST /api/store/staff/verify/qrcode-scheme {storeId, verifyCode, shorten?}`
+  - 防越权：token.storeId == body.storeId
+  - 多租户路由：自动按 order.merchantId 选 appId
+  - 返 `{scheme, shortUrl, page, query, verifyCode, storeId}`
+
+**前端** `miniprogram7/pages/merchant/verify/index.js`：
+- `onLoad(options)`：监听 `?code=&sid=` query
+- `onShow`：未登录则跳登录页带 `redirect=verify&code=xxx&sid=xxx`（登录后回到 verify 页继续核销）
+- 智能切店：当前 staff.storeId 与 scheme.sid 不一致 → 调 `/api/store/staff/switch-store` 切到目标店再核销
+- 自动核销：已经在对门店 → setData verifyCode → onSubmit → 弹「核销成功」动效
+- 全程 `wx.showLoading` 视觉反馈
+
+**smoke-c39 14/14 PASS**：创建商品→下单→预支付→店员登录→生成 Scheme URL→解码校验 page/query→模拟微信解析→用解出的 code/sid 调 verify→核销成功→越权 storeId=999 被拒→日志断言 generateScheme 调用
+
+### 真实落地（生产改造 0.5 天）
+- 把 `mock_enabled=false` 切到真实微信（每商户配 appid/secret）
+- `WxMaService.generateScheme` 走真实 `POST /wxa/generatescheme` 拿 `openlink`
+- 短链调 `cgi-bin/shorturl` 压短
+- 商家后台「商品-桌卡批量生成」选门店+桌号范围→批量生成台卡 PDF（含 Scheme URL 二维码）
+
+### 2 commit 速查
+```
+201c5acf fix(menu)+test(smoke): P2-3 菜单 NPE 修复 + P2-2 字典化验证 (smoke-c38 19/19)
+8773f8cf feat(api)+feat(miniprogram): 微信扫一扫直达核销 (Scheme 端到端) · smoke-c39 14/14
+```
+
+### 全套回归（基线 44 smoke + 10 JUnit + 52 vitest + 本轮 c33/c36/c37/c38/c39）
+| Smoke | 范围 | 结果 |
+| --- | --- | --- |
+| c33 | SysUserController 端到端 | 20/20 ✅ |
+| c36 | 储值卡闭环 | 20/20 ✅ |
+| c37 | 登录路由分流 | 14/14 ✅ |
+| **c38** | P2 菜单/字典 | **19/19 🎉** |
+| **c39** | 微信扫一扫 Scheme | **14/14 🎉** |
+
+**本轮新增 33/33 PASS，零退化。**
