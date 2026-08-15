@@ -245,6 +245,61 @@ public class ApiOrderController
     }
 
     /**
+     * 客人端：取订单的核销 Scheme URL
+     *
+     * <p>用于「出示给店员」场景：客人在小程序下单团购/优惠券/组合券后
+     * → 我的订单页点「出示给店员」→ 展示一个二维码
+     * → 店员手机微信首页「扫一扫」扫这个码
+     * → 微信自动唤起小程序 verify 页 → 自动核销。</p>
+     *
+     * <p>仅订单归属人可调（防他人冒用券码）。</p>
+     */
+    @LoginRequired
+    @GetMapping("/{orderId}/scheme")
+    public AjaxResult orderScheme(@org.springframework.web.bind.annotation.PathVariable("orderId") Long orderId)
+    {
+        if (orderId == null) return AjaxResult.error("orderId 不能为空");
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null) return AjaxResult.error("订单不存在");
+        // 防冒用：只允许订单本人调
+        Long loginMemberId = com.ruoyi.biz.api.util.MemberContextHolder.getMemberId();
+        if (loginMemberId == null || !loginMemberId.equals(order.getMemberId())) {
+            return AjaxResult.error("无权查看该订单的核销码");
+        }
+        // 仅已支付订单可生成 Scheme
+        if (!"1".equals(order.getStatus()) && !"2".equals(order.getStatus())) {
+            return AjaxResult.error("订单状态不可核销（仅已支付/已核销可出示）");
+        }
+        // 取商品信息
+        Product product = order.getProductId() != null
+            ? productService.selectProductByProductId(order.getProductId()) : null;
+
+        // 核销码：优先用订单上的 verifyCode，没有则即时生成
+        String verifyCode = order.getVerifyCode();
+        if (verifyCode == null || verifyCode.isEmpty()) {
+            verifyCode = com.ruoyi.common.utils.uuid.IdUtils.fastSimpleUUID().substring(0, 12).toUpperCase();
+        }
+
+        // 拼 query：code + sid
+        String query = "code=" + java.net.URLEncoder.encode(verifyCode, java.nio.charset.StandardCharsets.UTF_8)
+                     + "&sid=" + (order.getStoreId() == null ? 0 : order.getStoreId());
+        String scheme = wxMaService.generateScheme("pages/merchant/verify/index", query, true, order.getMerchantId());
+
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("scheme", scheme);
+        vo.put("page", "pages/merchant/verify/index");
+        vo.put("verifyCode", verifyCode);
+        vo.put("orderId", order.getOrderId());
+        vo.put("orderNo", order.getOrderNo());
+        vo.put("storeId", order.getStoreId());
+        vo.put("productName", product == null ? order.getProductName() : product.getProductName());
+        vo.put("payAmount", order.getPayAmount());
+        vo.put("status", order.getStatus());
+        vo.put("statusName", "1".equals(order.getStatus()) ? "待使用" : "2".equals(order.getStatus()) ? "已核销" : "未知");
+        return AjaxResult.success(vo);
+    }
+
+    /**
      * 核销成功订阅消息（异步）
      *
      * <p>取买家 openid（可能查不到，比如临时下单未绑微信 → 静默跳过），
