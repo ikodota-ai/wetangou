@@ -96,6 +96,8 @@ App({
         const d = (res && (res.data || res)) || {}
         if (d && d.merchantId) {
           this.globalData.merchant = Object.assign({}, this.globalData.merchant || {}, d)
+          // 拿到 merchantId 后立即预拉跨店自取商品
+          this.loadAllPickupGoods()
         }
       }).catch((e) => console.warn('[app] bootMerchant FAIL', e))
     } catch (e) {

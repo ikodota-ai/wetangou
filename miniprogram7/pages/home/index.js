@@ -103,21 +103,19 @@ Page({
       const sh = _storeSvcHours || m.serviceHours || m.businessHours || ''
       this.setData({
         store: viewStore,
-        goods: app.globalData.goods,
+        goods: app.globalData.goods || [],
         phone: sp,
         qrcode: sq ? toFullUrl(sq) : '',
         serviceHours: sh,
         isStoreService: !!_storePhone || !!_storeSvcHours || !!_storeQr
       })
       // 「到店自取」tab 用的是跨店商品，globalData.goods 是按 storeId 拉的，可能为空
-      // 这里主动按 merchantId 再拉一次补齐
-      if (!app.globalData.goods || !app.globalData.goods.length) {
-        app.loadAllPickupGoods().then((list) => {
-          if (Array.isArray(list) && list.length && this.data.tab === 'pickup') {
-            this.setData({ goods: list })
-          }
-        })
-      }
+      // 这里主动按 merchantId 再拉一次补齐（不论 pickNearestStore 有没有先填过）
+      app.loadAllPickupGoods().then((list) => {
+        if (Array.isArray(list) && list.length && this.data.tab === 'pickup') {
+          this.setData({ goods: list })
+        }
+      })
       // 只在 storeId 变化时重拉 banners / facilities（占位 → 真实最近切换时才刷）
       if (store.storeId !== lastStoreId) {
         lastStoreId = store.storeId
