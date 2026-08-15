@@ -1522,3 +1522,20 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 
 ### commit
 - 待 commit（feat(auth)+feat(api): 5 角色权限模型 + @RequireRole 拦截器 + smoke-c43 25/25）
+
+## V2.5 迭代清单（2026-08-15）
+
+> 5 角色权限模型（PLATFORM/AGENT/OWNER/MANAGER/STAFF）落地后，待实装项见 `doc/下一轮迭代清单-v2.5-2026-08-15.md`
+>
+> 11 项 / 约 7.0 天工作量 / 4 项 P1 安全 / 4 项 P2 功能
+>
+> 关键 P1：
+> - V5-1 给所有商家端 ApiController 加 `@RequireRole`（防 STAFF 越权，1.0d）
+> - V5-2 平台 dashboard 完整化（商家列表/跨店订单/跨店员工，1.5d）
+> - V5-3 代理商 dashboard 完整化（名下商家/缴费/额度，1.0d）
+> - V5-9/V5-10/V5-11 商品创建/员工管理/提现佣金按 role 限制（0.8d）
+>
+> 关键 P2：
+> - V5-4/V5-5/V5-6 UI 角色化（按 staffUser.roles 显隐 tab/卡片，1.5d）
+> - V5-7 角色-菜单映射（0.5d）
+> - V5-8 smoke-c44 权限矩阵验证（0.5d）
