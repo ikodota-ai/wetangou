@@ -14,6 +14,7 @@ import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.utils.file.FileUploadUtils;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.service.WxMaService;
@@ -62,7 +63,7 @@ public class ApiMemberController
         vo.put("nickName", m.getNickname());
         vo.put("avatar", m.getAvatar());
         vo.put("avatarUrl", m.getAvatar());
-        vo.put("phone", m.getPhone());        // 明文
+        vo.put("phone", DesensitizedType.PHONE.desensitizer().apply(m.getPhone()));
         vo.put("gender", m.getGender());
         vo.put("birthday", m.getBirthday());
         vo.put("status", m.getStatus());

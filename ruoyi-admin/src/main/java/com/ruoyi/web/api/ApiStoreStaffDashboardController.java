@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.biz.api.annotation.StoreStaffRequired;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.biz.api.util.MemberContextHolder;
@@ -322,7 +323,7 @@ public class ApiStoreStaffDashboardController
                 row.put("serviceName", b.getServiceName());
                 row.put("timeSlot", b.getTimeSlot());
                 row.put("contact", s.getContact());
-                row.put("phone", s.getPhone());
+                row.put("phone", DesensitizedType.PHONE.desensitizer().apply(s.getPhone()));
                 row.put("people", s.getPeople());
                 row.put("status", s.getStatus());
                 row.put("remark", s.getRemark());

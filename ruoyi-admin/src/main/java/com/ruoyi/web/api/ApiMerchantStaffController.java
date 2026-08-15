@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -249,7 +250,7 @@ public class ApiMerchantStaffController
         if (ms != null) {
             r.put("role", ms.getRole());
             r.put("realName", ms.getRealName());
-            r.put("phone", ms.getPhone());
+            r.put("phone", DesensitizedType.PHONE.desensitizer().apply(ms.getPhone()));
             r.put("staffNo", ms.getStaffNo());
         }
         return AjaxResult.success(r);
@@ -560,7 +561,7 @@ public class ApiMerchantStaffController
                 o.put("storeName", b.getStoreName());
                 o.put("memberId", bm.getMemberId());
                 o.put("memberName", bm.getMemberName());
-                o.put("memberPhone", bm.getPhone());
+                o.put("memberPhone", DesensitizedType.PHONE.desensitizer().apply(bm.getPhone()));
                 o.put("status", bm.getStatus());
                 o.put("confirmUser", bm.getConfirmUser());
                 o.put("confirmTime", bm.getConfirmTime());
