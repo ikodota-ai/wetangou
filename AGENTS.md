@@ -1112,3 +1112,23 @@ a173de17 fix(api)+test(smoke): 商家端商品创建端到端 + 3 P1 缺陷 + C1
 2df2c6a4 test(smoke): C9 commission 冷静期真实 Quartz 链路 8/8 PASS
 12780380 fix(api)+test(smoke): memberId0 真实现新会员自邀防御 + G6 5/5 PASS
 ```
+
+## v2 升级续篇（2026-08-15 续篇 · C13~C16 · 4 commit）
+
+> 详见 `doc/2026-08-15续篇-c13至c16总览.md`。摸底式 smoke 暴露 2 个 P0 + 1 个隐藏风险 + 验证 3 个安全防御。
+
+### 本轮交付
+- **smoke 4 个**：C13 banner / C14 协议 / C15 门店 / C16 会员资料
+- **2 个真实 P0 缺陷修复**：
+  1. C13 `biz_banner` 被 E18 误归类为强隔离表（移到共享表）
+  2. C15 `StoreMapper.selectStoreList` 缺 status/del_flag 过滤（mapper 加 2 行 if）
+- **3 个安全防御端到端验证**（C16）：
+  1. PUT 敏感字段防篡改（openid/status 被服务端清空）
+  2. 跨会员 memberId 防越权（强制覆盖自己）
+  3. 未登录拦截（@LoginRequired 401）
+- **1 个隐藏风险摸底**（C14）：AgreementMapper.xml if 嵌套结构错乱（controller setStatus 兜住，留 doc 跟踪）
+
+### 累计 8-15 全 16 轮
+- 20 commit / 12 doc / 10 smoke / 2 lint
+- 11 个真实缺陷 + 1 个隐藏风险
+- 29/29 smoke + 10/10 JUnit + 30/30 vitest + 91 静默 lint = **160 全 PASS**
