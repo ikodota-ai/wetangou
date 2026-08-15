@@ -22,7 +22,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * <ol>
  *   <li>判 @Anonymous：放行（如 /join 申请加入）</li>
  *   <li>判是否登录（必须有 LoginMember）</li>
- *   <li>判是不是"会员"：必须有 openid（员工占位 openid "staff:{userId}" 视为非会员）</li>
+ *   <li>判是不是"会员"：必须有真实的 wx openid（"staff:{userId}" 是未绑微信时的占位字符串，不算真实 openid）</li>
  *   <li>判是不是"推客"：biz_distributor 有该 memberId 记录（C 端）或按 openid 反查命中</li>
  * </ol>
  *
@@ -62,7 +62,9 @@ public class DistributorAuthInterceptor implements HandlerInterceptor
             return false;
         }
 
-        // 4) 是不是"会员"（按 openid 判定，员工占位 "staff:" 不算会员）
+        // 4) 是不是"会员"：必须绑了微信（openid 是 "oXXX..." 真实 openid）
+        //    "staff:{userId}" 占位字符串是 buildLoginMember 给未绑微信的 sys_user 填的占位，不是真实 openid
+        //    员工绑了微信后 sys_user.openid 就是真实 wx openid（"oXXX..."），照样能进推客端点
         String openid = lm.getOpenid();
         boolean isMember = openid != null && !openid.isEmpty() && !openid.startsWith("staff:");
         if (!isMember)
@@ -94,6 +96,7 @@ public class DistributorAuthInterceptor implements HandlerInterceptor
         // 策略 2：按 openid 反查 biz_member（员工 / 跨端登录场景）
         //   - 员工（OWNER/MANAGER/STAFF）：lm.merchantId 是当前所属商家，限定 merchantId
         //   - 代理商/平台：lm.merchantId 为 null，跨商户查（一个 openid 只会绑一个会员）
+        //   - 员工绑微信后 sys_user.openid 与 biz_member.openid 一致，自动识别为推客
         Long merchantId = lm.getMerchantId();
         try
         {

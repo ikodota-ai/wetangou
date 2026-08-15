@@ -1672,3 +1672,61 @@ c43 25/25 + c45 12/12 + c46 11/11 + c47 13/13 + c48 14/14 + c49 8/8
 
 ### commit
 - 待 commit（feat(v2.5): V5-11 推客身份 3 层身份模型 · 3 层身份识别)
+
+## v2.5 续篇 13（2026-08-15 21:50 · 方案 C 回滚 + 真实微信 API 验证 · 1 commit）
+
+> 详见本段。基于"我后悔了，不想要方案C了"的决定，把 AuthzRule 框架整个回滚，3 个旧拦截器恢复；同时把 DistributorAuthInterceptor 注释里"员工占位视为非会员"改为"占位 openid 不是真实 openid"（员工是真实的人，绑微信就是会员）。
+
+### 已回滚（authz 框架删除）
+- 删除 `ruoyi-framework/.../authz/` 9 个文件：
+  - `AuthInterceptor.java`
+  - `AuthzEngine.java`
+  - `AuthzResult.java`
+  - `AuthzRule.java`
+  - `rule/AnonymousRule.java`
+  - `rule/LoginRule.java`
+  - `rule/MemberRule.java`
+  - `rule/DistributorRule.java`
+  - `rule/RoleRule.java`
+- 删除 `ruoyi-system/.../annotation/MemberRequired.java`（无引用）
+- `git checkout HEAD --` 4 个文件回滚到 V5-11 状态：
+  - `ApiWebConfig.java` (3 个旧拦截器)
+  - `DistributorRequired.java` (无 meta 注解)
+  - `RequireRole.java` (无 meta 注解)
+  - `LoginMember.java` (无 attributes 字段)
+
+### 仍保留
+- `DistributorAuthInterceptor.java` 注释更新（不是回滚，是优化）：
+  - 原："员工占位 'staff:' 视为非会员"（错：把员工不当人）
+  - 新："`staff:{userId}` 占位字符串是 buildLoginMember 给未绑微信的 sys_user 填的占位，不是真实 openid；员工绑了微信后 sys_user.openid 就是真实 wx openid（oXXX...），照样能进推客端点"
+  - 代码逻辑不变：`staff:` 前缀排除是必要的，因为占位字符串虽然非空但不是真实 openid
+
+### 拦截器恢复后设计（3 拦截器版）
+- [1] MemberAuthInterceptor — 解析 token + @LoginRequired 校验
+- [2] RoleAuthInterceptor — @RequireRole 5 角色校验
+- [3] DistributorAuthInterceptor — @DistributorRequired 推客身份校验
+  - 判别顺序：@Anonymous → 已登录 → 是不是会员（openid 非空非 staff:）→ 是不是推客
+  - 双策略查推客：C 端会员按 memberId 直接查；员工/代理商/平台按 openid 反查 biz_member
+
+### 真实微信 API 验证（关 mock 后）
+- `biz_merchant.mock_enabled` 1 = 关 mock
+- `sys_config.wx.miniapp.mockEnabled` = false (需要清 Redis 缓存)
+- `redis-cli FLUSHDB` → 重启 jar → mock 真正关闭
+- 验证 `/api/auth/login` 用 `code=real_invalid_001`：
+  - 返 `{"errcode":40029,"errmsg":"invalid code"}`（**真实微信 API 调用**）
+  - 证明 appid/secret 有效 + 网络能访问 api.weixin.qq.com
+- 验证 `/biz/staffInvite/qrcode/{id}`：
+  - 返 `{"errcode":40066,"errmsg":"invalid url"}`（**真实 wxacode API 调用**）
+  - 微信侧需要小程序**发布**才能 wxacode 生效（不在本任务范围）
+
+### 累计 smoke
+- 82/82 全 PASS：c43 25 + c45 12 + c46 11 + c47 13 + c48 14 + c49 7
+
+### 员工邀请 vs 核销 — 二维码路径确认
+- **员工邀请**（店长发码，员工扫）：wxacode — 微信原生识别，无需公众号/开放平台
+- **顾客核销**（顾客出示码，店员扫）：Scheme URL（`weixin://dl/business/?appid=xxx&path=xxx&query=...`）— 需要小程序已发布
+- 两种都是"通过微信扫一扫直达小程序"，**用户感知一致**
+- 实现均已在代码里（`BizStaffInviteController.add` + `ApiOrderController.orderScheme`）
+
+### commit
+- 待 commit
