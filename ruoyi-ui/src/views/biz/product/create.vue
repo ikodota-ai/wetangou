@@ -62,8 +62,8 @@
       <!-- 步骤2：商家信息 + 商品信息 + 售卖信息 + 交易规则 + 消费规则（tab 切换，6/6/5）-->
       <el-card v-if="form.typeCode && form.productId" class="dyl-card dyl-card-step2" shadow="never">
         <el-tabs v-model="activeTab" class="dyl-tabs" :class="tabCountClass">
-          <!-- Tab: 商家信息（团购+代金）-->
-          <el-tab-pane v-if="isGroupon || isVoucher" label="商家信息" name="merchant">
+          <!-- Tab: 商家信息（团购/代金）/ 信息（组合券包，基础+商家合并）-->
+          <el-tab-pane :label="merchantTabLabel" name="merchant">
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="所属商家">
                 <el-input :value="merchantName" readonly />
@@ -79,9 +79,32 @@
               </el-form-item>
             </el-form>
           </el-tab-pane>
+          <!-- Tab: 商品资质（组合券包独有）-->
+          <el-tab-pane v-if="isCombo" label="商品资质" name="qualify">
+            <el-form :model="form" label-width="120px" size="small">
+              <el-form-item label="子品类型管理">
+                <el-button size="small" type="primary" plain @click="comboDrawer = true">
+                  <i class="el-icon-edit"></i> 编辑子品代金券
+                </el-button>
+                <div class="dyl-tip">代金券类子品需配置：券类型（通兑/单品类）+ 适用规则 + 头图 + 辅助图</div>
+              </el-form-item>
+              <el-form-item label="券类型">
+                <el-radio-group v-model="form.voucherType">
+                  <el-radio label="GENERAL">通兑券</el-radio>
+                  <el-radio label="CATEGORY">单品类券</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="适用规则">
+                <el-checkbox-group v-model="form.voucherRules">
+                  <el-checkbox label="ALL_CATEGORY">全部品类适用</el-checkbox>
+                  <el-checkbox label="ALL_BRAND">全部品牌适用</el-checkbox>
+                </el-checkbox-group>
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
 
-          <!-- Tab: 商品信息（团购/代金/组合券包都有）-->
-          <el-tab-pane label="商品信息" name="product">
+          <!-- Tab: 商品信息（团购/代金/组合券包，组合券包的内容在商品资质 tab 里）-->
+          <el-tab-pane v-if="isGroupon || isVoucher" label="商品信息" name="product">
             <el-form :model="form" label-width="120px" size="small">
               <!-- 团购：商品搭配入口 + 单品/商品组管理 -->
               <template v-if="isGroupon">
@@ -185,29 +208,7 @@
             </el-form>
           </el-tab-pane>
 
-          <!-- Tab: 商品资质（组合券包独有）-->
-          <el-tab-pane v-if="isCombo" label="商品资质" name="qualify">
-            <el-form :model="form" label-width="120px" size="small">
-              <el-form-item label="子品类型管理">
-                <el-button size="small" type="primary" plain @click="comboDrawer = true">
-                  <i class="el-icon-edit"></i> 编辑子品代金券
-                </el-button>
-                <div class="dyl-tip">代金券类子品需配置：券类型（通兑/单品类）+ 适用规则 + 头图 + 辅助图</div>
-              </el-form-item>
-              <el-form-item label="券类型">
-                <el-radio-group v-model="form.voucherType">
-                  <el-radio label="GENERAL">通兑券</el-radio>
-                  <el-radio label="CATEGORY">单品类券</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item label="适用规则">
-                <el-checkbox-group v-model="form.voucherRules">
-                  <el-checkbox label="ALL_CATEGORY">全部品类适用</el-checkbox>
-                  <el-checkbox label="ALL_BRAND">全部品牌适用</el-checkbox>
-                </el-checkbox-group>
-              </el-form-item>
-            </el-form>
-          </el-tab-pane>
+          
 
           <!-- Tab: 交易规则（团购+代金）-->
           <el-tab-pane v-if="isGroupon || isVoucher" label="交易规则" name="trade">
@@ -257,8 +258,8 @@
             </el-form>
           </el-tab-pane>
 
-          <!-- Tab: 消费规则（团购+代金，组合券包没有）-->
-          <el-tab-pane v-if="isGroupon || isVoucher" label="消费规则" name="consume">
+          <!-- Tab: 消费规则（团购+代金+组合券包都有）-->
+          <el-tab-pane v-if="isGroupon || isVoucher || isCombo" label="消费规则" name="consume">
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="店内其他优惠">
                 <el-radio-group v-model="form.storeOtherDiscount">
@@ -501,7 +502,10 @@ export default {
     isHuixiang() { return this.form.typeCode === 'HUIXIANG_CARD' },
     tabCountClass() {
       if (this.isCombo) return 'dyl-tabs-5'
-      return 'dyl-tabs-6'
+      return 'dyl-tabs-5'  // 团购/代金也是 5 tab (基础信息独立卡片 + 5 tab)
+    },
+    merchantTabLabel() {
+      return this.isCombo ? '信息' : '商家信息'
     },
     namePlaceholder() {
       if (this.isVoucher && this.form.faceValue) return this.autoVoucherName
