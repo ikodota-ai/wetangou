@@ -303,12 +303,14 @@ Page({
         this.setData({ ['form.' + f.key]: f.default })
       }
     })
+    // 给每个 field 补 isTextarea（基于 type 字段），避免 WXML 调 .indexOf
+    const mark = (arr) => arr.map(f => Object.assign({}, f, { isTextarea: f.type === 'textarea' }))
     this.setData({
       fields: all,
-      sectionMerchant: merchant,
-      sectionProduct: [...all.base, ...all.price],
-      sectionSale: all.sale.filter(f => f.section === 'sale'),
-      sectionTrade: [...all.detail, ...all.sale.filter(f => f.section === 'trade')]
+      sectionMerchant: mark(merchant),
+      sectionProduct: mark([...all.base, ...all.price]),
+      sectionSale: mark(all.sale.filter(f => f.section === 'sale')),
+      sectionTrade: mark([...all.detail, ...all.sale.filter(f => f.section === 'trade')])
     })
     this._recomputeSubmit()
   },
@@ -360,7 +362,9 @@ Page({
   onField(e) {
     const key = e.currentTarget.dataset.key
     const val = e.detail.value
-    this.setData({ ['form.' + key]: val })
+    // 同步写入 __len 字段，避免 WXML 用 (form[key] || '').length 这种不支持的语法
+    const len = (val == null) ? 0 : String(val).length
+    this.setData({ ['form.' + key]: val, ['form.' + key + '__len']: len })
     this._recomputeSubmit()
   },
 

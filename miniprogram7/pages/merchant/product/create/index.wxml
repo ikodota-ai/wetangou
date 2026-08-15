@@ -92,9 +92,9 @@
           <view wx:if="{{item.type === 'text'}}" class="row column">
             <view class="row-head">
               <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
-              <text class="row-counter">{{(form[item.key] || '').length}}/{{item.max || 40}}</text>
+              <text class="row-counter">{{form[item.key + '__len'] || 0}}/{{item.max || 40}}</text>
             </view>
-            <textarea wx:if="{{item.label.indexOf('说明') >= 0}}"
+            <textarea wx:if="{{item.isTextarea}}"
                       class="row-textarea"
                       maxlength="{{item.max || 500}}"
                       placeholder="{{item.placeholder || '请输入'}}"
@@ -209,7 +209,7 @@
           <view wx:elif="{{item.type === 'textarea'}}" class="row column">
             <view class="row-head">
               <text class="row-label">{{item.label}}</text>
-              <text class="row-counter">{{(form[item.key] || '').length}}/{{item.max || 500}}</text>
+              <text class="row-counter">{{form[item.key + '__len'] || 0}}/{{item.max || 500}}</text>
             </view>
             <textarea class="row-textarea"
                       maxlength="{{item.max || 500}}"
