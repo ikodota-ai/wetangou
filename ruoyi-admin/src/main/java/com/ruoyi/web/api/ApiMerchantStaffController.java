@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.LoginRequired;
+import com.ruoyi.biz.api.annotation.RequireRole;
+import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.biz.api.service.WxMaService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
@@ -42,6 +44,7 @@ import com.ruoyi.biz.service.IPayBillService;
 import com.ruoyi.biz.service.IBookingService;
 import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.system.service.ISysUserService;
+import com.ruoyi.biz.api.role.BizRole;
 
 /**
  * 小程序商家端（新）/api/merchant/staff/*
@@ -67,6 +70,7 @@ public class ApiMerchantStaffController
     @Autowired private IOrderService orderService;
     @Autowired private IPayBillService payBillService;
     @Autowired private IBookingService bookingService;
+    @Autowired private com.ruoyi.biz.service.IMerchantService merchantService;
 
     /** 账号密码登录（兼容旧 staff 链路） */
     @PostMapping("/login")
@@ -81,11 +85,21 @@ public class ApiMerchantStaffController
         if (!"0".equals(user.getStatus())) throw new ServiceException("账号已被停用");
         if (!SecurityUtils.matchesPassword(password, user.getPassword())) throw new ServiceException("账号或密码错误");
 
-        // 必须有商家员工关联
+        // 必须有商家员工关联（平台/代理商可无关联）
         List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
-        if (links == null || links.isEmpty()) throw new ServiceException("该账号未关联商家");
+        String ut = user.getUserType();
+        boolean isPrivileged = "00".equals(ut) || "01".equals(ut);
+        if ((links == null || links.isEmpty()) && !isPrivileged) {
+            throw new ServiceException("该账号未关联商家");
+        }
 
-        LoginMember lm = buildLoginMember(user, links, "merchant");
+        // 根据 user_type 决定顶层 userType 字符串
+        String topUserType;
+        if ("00".equals(ut)) topUserType = "platform";
+        else if ("01".equals(ut)) topUserType = "agent";
+        else topUserType = "merchant"; // 占位，会被 buildLoginMember 按 role 覆盖
+
+        LoginMember lm = buildLoginMember(user, links == null ? java.util.Collections.emptyList() : links, topUserType);
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
@@ -111,9 +125,18 @@ public class ApiMerchantStaffController
         if (user == null) throw new ServiceException("NOT_BOUND", 600); // 600: 尚未绑定，前端引导走"扫码邀请"流程
 
         List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
-        if (links == null || links.isEmpty()) throw new ServiceException("该微信未关联商家");
+        String ut = user.getUserType();
+        boolean isPrivileged = "00".equals(ut) || "01".equals(ut);
+        if ((links == null || links.isEmpty()) && !isPrivileged) {
+            throw new ServiceException("该微信未关联商家");
+        }
 
-        LoginMember lm = buildLoginMember(user, links, "merchant");
+        String topUserType;
+        if ("00".equals(ut)) topUserType = "platform";
+        else if ("01".equals(ut)) topUserType = "agent";
+        else topUserType = "merchant";
+
+        LoginMember lm = buildLoginMember(user, links == null ? java.util.Collections.emptyList() : links, topUserType);
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
@@ -270,6 +293,40 @@ public class ApiMerchantStaffController
         return AjaxResult.success(r);
     }
 
+    /**
+     * 商家端：营收汇总 demo（仅 OWNER/MANAGER 可访问，STAFF/AGENT/PATFORM 不可）
+     *
+     * <p>平台账号可在小程序端跨店查看，但通过单独的 /api/platform/finance 接口
+     * （不在本 Controller，未来加在 ApiPlatformController）</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @GetMapping("/finance/summary")
+    public AjaxResult financeSummary()
+    {
+        LoginMember m = MemberContextHolder.get();
+        Long merchantId = m.getMerchantId();
+        if (merchantId == null) throw new ServiceException("未关联商家");
+        java.math.BigDecimal totalRevenue = java.math.BigDecimal.ZERO;
+        int totalOrders = 0;
+        // 这里仅 demo：实际从 biz_order / biz_pay_bill 汇总
+        com.ruoyi.biz.domain.Order q = new com.ruoyi.biz.domain.Order();
+        q.setMerchantId(merchantId);
+        java.util.List<com.ruoyi.biz.domain.Order> orders = orderService.selectOrderList(q);
+        for (com.ruoyi.biz.domain.Order o : orders) {
+            totalOrders++;
+            if (o.getPayAmount() != null) totalRevenue = totalRevenue.add(o.getPayAmount());
+        }
+        java.util.HashMap<String, Object> data = new java.util.HashMap<>();
+        data.put("merchantId", merchantId);
+        data.put("totalRevenue", totalRevenue);
+        data.put("totalOrders", totalOrders);
+        data.put("roles", m.getRoles() == null ? java.util.Collections.emptyList() :
+                m.getRoles().stream().map(Enum::name).collect(java.util.stream.Collectors.toList()));
+        return AjaxResult.success(data);
+    }
+
+
     /** 补录员工姓名/手机号（用户后续自助补全） */
     @LoginRequired
     @PostMapping("/profile")
@@ -291,7 +348,71 @@ public class ApiMerchantStaffController
         return AjaxResult.success("已更新");
     }
 
-    /** 退出登录 */
+    
+    /**
+     * 平台端：跨店营收汇总
+     *
+     * <p>参数：</p>
+     * <ul>
+     *   <li>agentId=null 或 0 → 全部商家</li>
+     *   <li>agentId=X → 仅该代理商名下商家</li>
+     *   <li>scope=SELF_MANAGED → 自营商家（agent_id=0 / null）</li>
+     * </ul>
+     */
+    @LoginRequired
+    @RequireRole(BizRole.PLATFORM)
+    @GetMapping("/platform/finance/summary")
+    public AjaxResult platformFinanceSummary(java.lang.Long agentId, String scope)
+    {
+        LoginMember m = MemberContextHolder.get();
+        if (!m.isOwner() && !m.hasAnyRole(BizRole.PLATFORM)) {
+            // 拦截器已挡，这里双保险
+            throw new ServiceException("无权限");
+        }
+        // 汇总维度
+        java.math.BigDecimal totalRevenue = java.math.BigDecimal.ZERO;
+        int totalOrders = 0;
+        int totalMerchants = 0;
+        com.ruoyi.biz.domain.Order q = new com.ruoyi.biz.domain.Order();
+        java.util.List<com.ruoyi.biz.domain.Order> orders = orderService.selectOrderList(q);
+        for (com.ruoyi.biz.domain.Order o : orders) {
+            // 过滤：agentId 匹配 或 SELF_MANAGED
+            if (agentId != null && agentId > 0) {
+                // 检查 merchant 关联的 agent_id
+                Long mAgentId = resolveMerchantAgentId(o.getMerchantId());
+                if (mAgentId == null || !agentId.equals(mAgentId)) continue;
+            } else if ("SELF_MANAGED".equalsIgnoreCase(scope)) {
+                Long mAgentId = resolveMerchantAgentId(o.getMerchantId());
+                if (mAgentId != null && mAgentId > 0) continue;
+            }
+            totalOrders++;
+            if (o.getPayAmount() != null) totalRevenue = totalRevenue.add(o.getPayAmount());
+        }
+        java.util.HashMap<String, Object> data = new java.util.HashMap<>();
+        data.put("agentId", agentId);
+        data.put("scope", scope == null ? "ALL" : scope);
+        data.put("totalRevenue", totalRevenue);
+        data.put("totalOrders", totalOrders);
+        data.put("roles", m.getRoles() == null ? java.util.Collections.emptyList() :
+                m.getRoles().stream().map(Enum::name).collect(java.util.stream.Collectors.toList()));
+        return AjaxResult.success(data);
+    }
+
+    /**
+     * helper: 查 merchant 关联的 agent_id
+     */
+    private Long resolveMerchantAgentId(Long merchantId)
+    {
+        if (merchantId == null) return null;
+        try {
+            com.ruoyi.biz.domain.Merchant mer = merchantService.selectMerchantByMerchantId(merchantId);
+            return mer == null ? null : mer.getAgentId();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+/** 退出登录 */
     @LoginRequired
     @PostMapping("/logout")
     public AjaxResult logout()
@@ -303,23 +424,74 @@ public class ApiMerchantStaffController
 
     // ===== helpers =====
 
+    /**
+     * 构建登录身份
+     *
+     * <p>角色识别规则：</p>
+     * <ol>
+     *   <li>遍历 biz_merchant_staff 关联，取最高 role（OWNER > MANAGER > STAFF）写入 roles 集合</li>
+     *   <li>根据最高 role 决定顶层 userType（owner/manager/staff）</li>
+     *   <li>若 sys_user.user_type='01'（代理商/城市合伙人），额外加入 AGENT 角色</li>
+     * </ol>
+     */
     private LoginMember buildLoginMember(SysUser user, List<MerchantStaff> links, String userType)
     {
         List<Long> storeIds = new ArrayList<>();
         Long merchantId = null;
+        java.util.Set<BizRole> roles = new java.util.HashSet<>();
+        BizRole maxStaffRole = null;
         for (MerchantStaff l : links) {
             if (l.getStoreId() != null && !storeIds.contains(l.getStoreId())) storeIds.add(l.getStoreId());
             if (merchantId == null && l.getMerchantId() != null) merchantId = l.getMerchantId();
+            BizRole r = BizRole.fromStaffRole(l.getRole());
+            roles.add(r);
+            if (maxStaffRole == null || staffRoleRank(r) > staffRoleRank(maxStaffRole)) {
+                maxStaffRole = r;
+            }
+        }
+        // 兼容 userType 参数（旧 staff 链路），确保非空
+        String resolvedUserType = userType;
+        if (maxStaffRole != null) {
+            switch (maxStaffRole) {
+                case OWNER:   resolvedUserType = "owner";   break;
+                case MANAGER: resolvedUserType = "manager"; break;
+                case STAFF:   resolvedUserType = "staff";   break;
+                default: break;
+            }
+        }
+        // 代理商/城市合伙人 叠加身份（user_type=01）
+        if ("01".equals(user.getUserType())) {
+            roles.add(BizRole.AGENT);
+            resolvedUserType = "agent";
+        }
+        // 平台账号 也能登录小程序（user_type=00，外出查跨店数据）
+        if ("00".equals(user.getUserType())) {
+            roles.add(BizRole.PLATFORM);
+            resolvedUserType = "platform";
         }
         Long currentStoreId = storeIds.isEmpty() ? null : storeIds.get(0);
         LoginMember lm = new LoginMember();
-        lm.setUserType(userType);
+        lm.setUserType(resolvedUserType);
+        lm.setRoles(roles);
+        lm.setStaffRole(maxStaffRole);
         lm.setStoreId(currentStoreId);
         lm.setStoreIds(storeIds);
         lm.setMerchantId(merchantId);
+        // lm.setAgentId() 不从 SysUser 取，需从 biz_merchant_user 反查（小程序端场景下用 TenantIdentityResolver 已注入过）
         lm.setMemberId(user.getUserId());
         lm.setOpenid(user.getOpenid() == null ? "staff:" + user.getUserId() : user.getOpenid());
         return lm;
+    }
+
+    /** OWNER=3, MANAGER=2, STAFF=1, 其他=0 */
+    private static int staffRoleRank(BizRole r) {
+        if (r == null) return 0;
+        switch (r) {
+            case OWNER:   return 3;
+            case MANAGER: return 2;
+            case STAFF:   return 1;
+            default:      return 0;
+        }
     }
 
     private AjaxResult packLoginResult(LoginMember lm, SysUser user, List<MerchantStaff> links)
@@ -334,6 +506,12 @@ public class ApiMerchantStaffController
         AjaxResult ajax = AjaxResult.success();
         ajax.put("token", lm.getToken());
         ajax.put("userType", lm.getUserType());
+        ajax.put("staffRole", lm.getStaffRole() == null ? null : lm.getStaffRole().name());
+        ajax.put("roles", lm.getRoles() == null ? java.util.Collections.emptyList() :
+                lm.getRoles().stream().map(Enum::name).collect(java.util.stream.Collectors.toList()));
+        ajax.put("isOwner", lm.isOwner());
+        ajax.put("isManagerOrAbove", lm.isManagerOrAbove());
+        ajax.put("isAgent", lm.isAgent());
         ajax.put("storeId", lm.getStoreId());
         ajax.put("storeIds", storeIds);
         ajax.put("storeName", storeNameMap.getOrDefault(lm.getStoreId(), ""));

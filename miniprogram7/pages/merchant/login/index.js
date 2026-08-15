@@ -106,8 +106,15 @@ Page({
     const memberToken = wx.getStorageSync('token')
     if (memberToken) wx.setStorageSync('memberTokenBackup', memberToken)
     wx.setStorageSync('token', token)
+    const userType = d.userType || 'staff'
+    const roles = d.roles || []
     wx.setStorageSync('staffUser', {
-      userType: d.userType || 'merchant',
+      userType: userType,
+      staffRole: d.staffRole,
+      roles: roles,
+      isOwner: !!d.isOwner,
+      isManagerOrAbove: !!d.isManagerOrAbove,
+      isAgent: !!d.isAgent,
       merchantId: d.merchantId,
       storeId: d.storeId,
       storeName: d.storeName,
@@ -115,9 +122,18 @@ Page({
       token,
       needBindWx: !!d.needBindWx
     })
+    // 按身份路由分流
+    let homeUrl
+    if (userType === 'platform') {
+      homeUrl = '/pages/platform/home/index'
+    } else if (userType === 'agent') {
+      homeUrl = '/pages/agent/home/index'
+    } else {
+      homeUrl = '/pages/merchant/home/index'
+    }
     wx.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
-      wx.reLaunch({ url: '/pages/merchant/home/index' })
+      wx.reLaunch({ url: homeUrl })
     }, 500)
   }
 })

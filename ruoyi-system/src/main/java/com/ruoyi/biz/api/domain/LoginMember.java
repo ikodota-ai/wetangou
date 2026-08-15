@@ -1,7 +1,11 @@
 package com.ruoyi.biz.api.domain;
 
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.domain.Member;
 
 /**
@@ -41,7 +45,19 @@ public class LoginMember implements Serializable
      */
     private String userType;
 
-    /** 代理商ID (userType=1 时) */
+/**
+     * 业务角色集合（小程序端 4 角色 + PC 端身份可叠加）
+     * 一个账号可以同时是 OWNER + MANAGER（老板兼店长）
+     * 也会包含 AGENT (代理商/城市合伙人)
+     */
+    private Set<BizRole> roles = new HashSet<>();
+
+    /**
+     * 商家员工最高 role（OWNER > MANAGER > STAFF），用于快捷判断
+     */
+    private BizRole staffRole;
+
+        /** 代理商ID (userType=1 时) */
     private Long agentId;
 
     /**
@@ -186,4 +202,31 @@ public class LoginMember implements Serializable
     {
         this.member = member;
     }
+
+    public Set<BizRole> getRoles() { return roles; }
+    public void setRoles(Set<BizRole> roles) { this.roles = roles == null ? new HashSet<>() : roles; }
+
+    public BizRole getStaffRole() { return staffRole; }
+    public void setStaffRole(BizRole staffRole) { this.staffRole = staffRole; }
+
+    /**
+     * 是否拥有任一指定角色（多角色账号：OWNER 自动含 MANAGER 权限）
+     */
+    public boolean hasAnyRole(BizRole... candidates)
+    {
+        if (roles == null || roles.isEmpty() || candidates == null) return false;
+        for (BizRole r : candidates)
+        {
+            if (r == null) continue;
+            if (roles.contains(r)) return true;
+        }
+        return false;
+    }
+
+    /** 是否是老板 */
+    public boolean isOwner() { return hasAnyRole(BizRole.OWNER); }
+    /** 是否是店长及以上（OWNER 包含 MANAGER 权限） */
+    public boolean isManagerOrAbove() { return hasAnyRole(BizRole.OWNER, BizRole.MANAGER); }
+    /** 是否是合伙人/代理商 */
+    public boolean isAgent() { return hasAnyRole(BizRole.AGENT); }
 }

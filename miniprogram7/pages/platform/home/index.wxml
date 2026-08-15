@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="header">
+    <view class="badge">平台</view>
+    <view class="title">{{realName}}</view>
+    <view class="sub">跨店运营工作台</view>
+  </view>
+
+  <view class="scope-card">
+    <view class="scope-title">查看范围</view>
+    <view class="scope-tabs">
+      <view class="scope-tab {{scope==='ALL'?'on':''}}" data-scope="ALL" bindtap="onScopeChange">全部商家</view>
+      <view class="scope-tab {{scope==='SELF_MANAGED'?'on':''}}" data-scope="SELF_MANAGED" bindtap="onScopeChange">自营</view>
+      <view class="scope-tab {{scope==='AGENT'?'on':''}}" data-scope="AGENT" bindtap="onScopeChange">指定代理</view>
+    </view>
+    <view class="scope-input" wx:if="{{scope==='AGENT'}}">
+      <input type="number" placeholder="输入代理 ID" value="{{agentId}}" bindinput="onAgentIdInput" />
+      <button bindtap="onAgentQuery">查询</button>
+    </view>
+  </view>
+
+  <view class="stat-card">
+    <view class="stat-title">总营收 ¥ {{totalRevenue}}</view>
+    <view class="stat-sub">{{totalOrders}} 笔订单</view>
+  </view>
+
+  <view class="tip">本工作台展示「平台账号」可见的跨店数据。普通商家财务数据请切换到「商家工作台」。</view>
+</view>

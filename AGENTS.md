@@ -1462,3 +1462,63 @@ c36b2fdb test(smoke): 登录入口 userType 路由分流 (D) · smoke-c37 14/14
 - admin create.vue 改造：tab name 独立、3 类型 tab 内容差异完全分离
 - INDEX.md 同步 13 列说明
 - 登录路由分流实装（userType 路由 + 菜单过滤 + 3 测试账号）
+
+## 续篇 10（2026-08-15 18:00）
+
+> 5 角色权限模型（PLATFORM / AGENT / OWNER / MANAGER / STAFF）+ @RequireRole 注解拦截
+
+### 角色模型（5 类）
+| 角色 | BizRole | sys_user.user_type | biz_merchant_staff.role | 场景 |
+|---|---|---|---|---|
+| **平台** | `PLATFORM` | `00` | - | admin 外出在小程序查跨店数据 |
+| **代理商** | `AGENT` | `01` | - | 招代理 / 管名下商家 |
+| **老板** | `OWNER` | `02` | `OWNER` | 商家主账号，看全部数据 |
+| **店长** | `MANAGER` | `02` | `MANAGER` | 看本店数据 + 核销 + 订单 |
+| **店员** | `STAFF` | `02` | `STAFF` | 仅核销/扫码 |
+
+- 平台账号也能登录小程序（user_type=00，允许无 staff 关联登录）
+- 代理商 = 城市合伙人（同一身份，不另设）
+- 老板 > 店长 > 店员：includeHigher=true 时 OWNER 包含 MANAGER 权限
+
+### 后端实装
+- `BizRole` 枚举（ruoyi-system/src/main/java/com/ruoyi/biz/api/role/BizRole.java）
+- `LoginMember.roles` Set<BizRole> + `isOwner/isManagerOrAbove/isAgent/hasAnyRole()` helper
+- `buildLoginMember()` 按 staff 关联最高 role + sys_user.user_type 决定顶层 userType
+- `packLoginResult()` 多返 `staffRole/roles/isOwner/isManagerOrAbove/isAgent` 字段
+- `@RequireRole(value={...}, includeHigher=true)` 注解
+- `RoleAuthInterceptor` 在 MemberAuthInterceptor 之后跑：
+  - PLATFORM 永真（强特权）
+  - 商家端 OWNER > MANAGER > STAFF
+  - AGENT 单匹配
+- `ApiWebConfig` 注册到 `/api/**` 拦截链
+
+### SQL
+- `sql/biz_role_extension.sql` 幂等脚本
+  - biz_merchant_staff.role 注释扩展
+  - 5 角色测试账号：platform_c43 / agent_c43 / owner_c43 / manager_c43 / staff_c43（统一密码 admin123）
+  - agent_c43 关联 biz_agent.agent_no='AG_C43'
+
+### 接口示例
+| 端点 | @RequireRole | 备注 |
+|---|---|---|
+| `/api/merchant/staff/finance/summary` | `OWNER,MANAGER` (includeHigher=true) | 商家端营收，店员/代理商/平台（业务错）不可 |
+| `/api/merchant/staff/platform/finance/summary` | `PLATFORM` | 平台跨店营收，3 scope：ALL/SELF_MANAGED/agentId=X |
+| `/api/merchant/staff/me` | (无) | 任何角色都能看自己 |
+| `/api/merchant/staff/verify/*` | (无 / @StoreStaffRequired) | 核销，店员核心功能 |
+
+### 小程序端
+- `staffUser` 存 userType/staffRole/roles/isOwner/isManagerOrAbove/isAgent
+- 登录成功后按 userType 路由：
+  - `platform` → `/pages/platform/home/index`（新建）
+  - `agent` → `/pages/agent/home/index`（新建占位）
+  - `owner/manager/staff` → `/pages/merchant/home/index`
+- `platformFinanceSummary` API 加到 utils/request.js
+
+### smoke-c43 ✅ 25/25 PASS
+- 5 角色登录 + userType/roles 正确
+- 商家端 /finance/summary：platform 业务错、agent 403、owner 200、manager 200、staff 403
+- 平台端 /platform/finance/summary：platform 200、其他全 403
+- 平台 scope=ALL/SELF_MANAGED/agentId=X 三种过滤数据正确
+
+### commit
+- 待 commit（feat(auth)+feat(api): 5 角色权限模型 + @RequireRole 拦截器 + smoke-c43 25/25）

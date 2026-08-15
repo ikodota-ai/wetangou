@@ -16,10 +16,13 @@ public class ApiWebConfig implements WebMvcConfigurer
 {
     @Autowired
     private MemberAuthInterceptor memberAuthInterceptor;
+    @Autowired
+    private RoleAuthInterceptor roleAuthInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry)
     {
         registry.addInterceptor(memberAuthInterceptor).addPathPatterns("/api/**");
+        registry.addInterceptor(roleAuthInterceptor).addPathPatterns("/api/**");
     }
 }

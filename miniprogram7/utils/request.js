@@ -156,6 +156,13 @@ const api = {
   merchantStaffLogout: () => request('/api/merchant/staff/logout', { method: 'POST' }),
   // 商家工作台（对标旧 /api/store/staff/{home,today/*,booking/*}）
   merchantStaffHome: () => request('/api/merchant/staff/home'),
+  platformFinanceSummary: (params) => {
+    const qs = Object.keys(params || {})
+      .filter(k => params[k] !== '' && params[k] !== null && params[k] !== undefined)
+      .map(k => k + '=' + encodeURIComponent(params[k]))
+      .join('&');
+    return request('/api/merchant/staff/platform/finance/summary' + (qs ? '?' + qs : ''));
+  },
   merchantStaffTodayOrders: () => request('/api/merchant/staff/today/orders'),
   merchantStaffTodayBills: () => request('/api/merchant/staff/today/bills'),
   merchantStaffTodayBookings: () => request('/api/merchant/staff/today/bookings'),

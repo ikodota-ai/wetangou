@@ -35,6 +35,8 @@
     "pages/staff/history/index",
     "pages/merchant/login/index",
     "pages/merchant/home/index",
+    "pages/platform/home/index",
+    "pages/agent/home/index",
     "pages/merchant/scan/index",
     "pages/merchant/verify/index",
     "pages/merchant/bill/index",
