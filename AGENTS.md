@@ -1879,3 +1879,114 @@ c43 25/25 + c45 12/12 + c46 11/11 + c47 13/13 + c48 14/14 + c49 8/8
 2. 进入 v2.5 续篇里的 P1（PC 角色-菜单映射 V5-7）—— 之前说"不做"，待你重新确认
 3. 或者直接开始 v2.7（V3 不急的话）
 
+
+## v2.6 商品类型化改造 (2026-08-16)
+
+按用户要求「商品信息按类型对应显示 + 限制条件生效」实施完成。
+
+### P0 后端下单校验 (ApiOrderServiceImpl.placeOrder)
+
+新增 4 类限制条件校验（在原有「库存」基础上）：
+
+| 条件 | 字段 | 校验逻辑 |
+|------|------|----------|
+| 售卖开始 | `saleStartDate` | 当前时间 < 售卖开始 → 拒绝 |
+| 售卖结束 | `saleEndDate` | 当前时间 > 售卖结束 → 拒绝 |
+| 单次限购 | `maxPerOrder` | 购买数量 > 单次上限 → 拒绝 |
+| 每人限购 | `limitPerUser` | 累计已下（含待付款/待使用/已核销） + 本次 > 上限 → 拒绝 |
+| 预约必填 | `bookingRequired` | BOOKING 类型自动强制设 1 |
+
+新方法 `countMemberProductBought(memberId, productId)` 查 `biz_order` 累计。
+
+smoke-c51 (8/8 PASS)：
+- 库存=0 拒绝
+- maxPerOrder=2 数量 3 拒绝
+- limitPerUser=1 首次 OK / 二次拒绝
+- 未开售 / 已过售卖期 拒绝
+- 正常商品 / 另一账号 都能下
+
+### P1 后端类型必填校验 (ProductValidator 新增)
+
+7 种 typeCode 各自必填字段：
+
+| typeCode | 必填 | 备注 |
+|----------|------|------|
+| GROUPON | stock / validityDays / maxPerOrder | |
+| VOUCHER | faceValue / minConsume / maxPerOrder | 额外校验 faceValue >= price |
+| COMBO | totalValue / validityDays / subitemPickRule | |
+| BOOKING | bookingRequired=1 / maxPerOrder / validityDays | |
+| STORED_CARD | faceValue / minConsume / validityDays | |
+| TIMECARD | totalTimes / validityDays | |
+| PERIOD_CARD | periodType / periodCount / validityDays | |
+
+接入端点：
+- `ProductController.add / edit` (PC 后台)
+- `ApiProductController.add` (小程序创建)
+
+未启用类型（HUIXIANG_CARD / PRESALE / PICKUP_VOUCHER / BILL）走 default 分支，仅校验 price/productName/typeCode。
+
+### P1 前端详情页改造 (pages/goods/detail)
+
+字段映射（解决原 WXML 大量 mock 文本）：
+
+| 旧（mock 文本） | 新（实际字段） |
+|----------------|----------------|
+| `product.validDays` | `product.validityDays` |
+| `product.purchaseLimit` | `product.limitPerUser` |
+| `product.usageRule` | `product.notice` |
+| `product.voucherLimit` | `product.maxPerOrder` |
+| `product.peopleLimit` | `product.maxPersons` |
+| `product.availableTime` | 移除（字段不存在） |
+| 硬编码 "指定时间可用" | 移除 |
+
+新增显示块：
+- 售卖期（起止日期）
+- 单次限购（maxPerOrder）
+- 每人限购（limitPerUser）
+- 库存（已售罄 / 剩余 N 件）
+- 退改政策（refundPolicy）
+- 附加费说明（extraFeeDesc）
+- 其他说明（otherNotice）
+- 预约规则（仅 BOOKING 显示）
+
+4 种类型专属介绍卡（type-intro）：
+- GROUPON「团购套餐说明」
+- VOUCHER「代金券说明」+ 使用示例
+- COMBO「组合券包说明」
+- BOOKING「预约服务说明」
+
+购买按钮逻辑：
+- 新增 `canBuy()` / `buyBtnDisabledText()`
+- 库存 = 0 / 未到售卖期 / 已过售卖期 → 按钮禁用 + 提示
+- `onBuy()` 入口先校验，不合法弹 toast
+
+### P2 PC 后台创建商品 (ruoyi-ui/.../create.vue)
+
+无需改造 — 已实装完整表单：
+- 基础信息 / 商品信息 / 商品资质 / 售卖信息 / 交易规则 / 消费规则
+- 按 typeCode 动态显隐字段（v-if="form.typeCode === 'VOUCHER'" 等）
+- GROUPON 套餐搭配抽屉（subitemGroups + subitems 增删改）
+- COMBO 组合搭配抽屉（comboItems 4 种类型）
+- VOUCHER 面值 / PERIOD_CARD 周期 / TIMECARD 次数 等已分类型渲染
+
+后端 `ProductValidator` 会自动拦截不合法提交（弹错而非保存）。
+
+### 累计 smoke 状态
+
+| smoke | PASS/FAIL | 覆盖 |
+|-------|-----------|------|
+| c44 | 17/17 | PC RBAC 矩阵 |
+| c45 | 12/12 | 平台 dashboard |
+| c46 | 11/11 | @RequireRole 拦截 |
+| c47 | 13/13 | 平台订单员工 |
+| c48 | 14/14 | 代理商 dashboard |
+| c49 | 7/7 | 3 层身份模型 |
+| c50 | 7/7 | 员工待审核 |
+| c51 | 8/8 | 商品下单校验 (新) |
+
+合计 89/89 PASS + vitest 66/66 PASS
+
+### commit
+
+- `9a7b1c22` feat(v2.6): 商品类型必填校验 + 下单限制条件 + 详情页字段映射
+  - 7 files / +427 / -22
