@@ -105,6 +105,11 @@ public class BizStaffInviteController extends BaseController
             // 默认 7 天后过期
             invite.setExpireAt(new Date(System.currentTimeMillis() + 7L * 24 * 3600 * 1000));
         }
+        // scene 是 NOT NULL 必填; 客户端不传时自动生成 (C32 摸出 P1 缺陷, 修复)
+        if (invite.getScene() == null || invite.getScene().isEmpty())
+        {
+            invite.setScene("invite:" + invite.getMerchantId() + ":" + invite.getStoreId() + ":AUTO");
+        }
         invite.setStatus("0");
         invite.setCreateBy(getUsername());
         int rows = inviteService.insert(invite);
