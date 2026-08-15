@@ -116,6 +116,17 @@ Page({
       extraFeeDesc: p.extraFeeDesc || '',
       saleStartText: p.saleStartDate ? this._fmtDate(p.saleStartDate) : '',
       saleEndText: p.saleEndDate ? this._fmtDate(p.saleEndDate) : '',
+      // 折扣文案（X.X 折）
+      discountText: (function(){
+        const now = Number(p.price), old = Number(p.marketPrice);
+        if (!old || old <= now) return '';
+        const d = (now / old * 10).toFixed(1);
+        return d + ' 折热销中';
+      })(),
+      // 适用门店信息
+      storeCount: (p.storeIds ? String(p.storeIds).split(',').filter(x=>x).length : (p.storeId ? 1 : 0)),
+      storeCountText: (p.storeIds ? String(p.storeIds).split(',').filter(x=>x).length : (p.storeId ? 1 : 0)) + '家',
+      storeScopeText: p.storeNames || (p.storeId ? '当前门店适用' : '全部门店适用'),
       subitemGroups: subitemGroups,
       sold: p.sales || p.sold || 0,
       cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',

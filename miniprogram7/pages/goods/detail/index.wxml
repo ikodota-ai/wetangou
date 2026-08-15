@@ -9,9 +9,9 @@
   <view class="price-bar">
     <view class="price-l">
       <text class="now">¥{{product.price}}</text>
-      <text class="old">¥{{product.price}}</text>
+      <text class="old" wx:if="{{product.marketPrice && product.marketPrice > product.price}}">¥{{product.marketPrice}}</text>
     </view>
-    <view class="price-tag">10.0 折热销中</view>
+    <view class="price-tag" wx:if="{{discountText}}">{{discountText}}</view>
     <view class="price-sold">已售 {{product.sold || 0}}</view>
   </view>
 
@@ -25,9 +25,10 @@
     <view class="info-row" wx:if="{{product.typeCode === 'PERIOD_CARD' && product.periodType}}"><text class="lab">周期</text><text class="val">{{product.periodType === 'MONTH' ? '月卡' : product.periodType === 'QUARTER' ? '季卡' : product.periodType === 'YEAR' ? '年卡' : product.periodType}} {{product.periodCount ? '× ' + product.periodCount : ''}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'COMBO' && product.totalValue}}"><text class="lab">总价值</text><text class="val">¥{{product.totalValue}}</text></view>
     <view class="info-row" wx:if="{{product.requireXiaoxin}}"><text class="lab">冷静期</text><text class="val">购买后 {{product.consumeStartDays || 1}} 天起 {{product.consumeValidDays || 360}} 天内有效</text></view>
-    <view class="info-row"><text class="lab">须知</text><text class="val">指定时间可用</text></view>
-    <view class="info-row"><text class="lab">服务</text><text class="val">免预约</text></view>
-    <view class="info-row"><text class="lab">门店</text><text class="val">全部门店适用</text></view>
+    <view class="info-row"><text class="lab">门店</text><text class="val">{{storeScopeText}}</text></view>
+    <view class="info-row" wx:if="{{product.bookingRequired == 1}}"><text class="lab">服务</text><text class="val">需提前预约</text></view>
+    <view class="info-row" wx:elif="{{product.typeCode === 'VOUCHER'}}"><text class="lab">服务</text><text class="val">免预约</text></view>
+    <view class="info-row" wx:elif="{{product.typeCode === 'GROUPON' || product.typeCode === 'COMBO'}}"><text class="lab">服务</text><text class="val">免预约 / 到店核销</text></view>
   </view>
 
   <!-- 类型说明（V2.6 P1：每种 typeCode 一段简短说明） -->
@@ -167,8 +168,8 @@
   <!-- 适用门店 -->
   <view class="card">
     <view class="store-head">
-      <text class="block-title">适用门店（1家）</text>
-      <text class="more">1家店通用 ></text>
+      <text class="block-title">适用门店（{{storeCountText}}）</text>
+      <text class="more" wx:if="{{storeCount > 1}}">{{storeCountText}}店通用 ></text>
     </view>
     <view class="store-row">
       <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>
