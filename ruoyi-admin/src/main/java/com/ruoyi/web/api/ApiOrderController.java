@@ -10,16 +10,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.api.service.WxPayService;
+import com.ruoyi.biz.api.service.WxMaService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Order;
+import com.ruoyi.biz.domain.Product;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IOrderService;
+import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.StoreStaffRequired;
@@ -35,6 +40,7 @@ import com.ruoyi.biz.api.domain.LoginMember;
 @RequestMapping("/api/order")
 public class ApiOrderController
 {
+    private static final Logger log = LoggerFactory.getLogger(ApiOrderController.class);
     @Autowired
     private ApiOrderServiceImpl apiOrderService;
 
@@ -46,6 +52,12 @@ public class ApiOrderController
 
     @Autowired
     private WxPayService wxPayService;
+
+    @Autowired
+    private IProductService productService;
+
+    @Autowired
+    private WxMaService wxMaService;
 
     /**
      * 下单
@@ -227,6 +239,57 @@ public class ApiOrderController
         }
         Order order = apiOrderService.verify(verifyCode, storeId,
                 "store:" + (loginMember == null ? "" : loginMember.getMemberId()));
+        // 核销成功 → 异步发订阅消息给买家（不阻塞主流程，异常仅 log）
+        notifyVerifySuccessAsync(order);
         return AjaxResult.success(order);
+    }
+
+    /**
+     * 核销成功订阅消息（异步）
+     *
+     * <p>取买家 openid（可能查不到，比如临时下单未绑微信 → 静默跳过），
+     * 调微信 subscribe/send，失败仅 log 不抛错（核销主流程不受影响）。</p>
+     */
+    private void notifyVerifySuccessAsync(Order order)
+    {
+        if (order == null || order.getMemberId() == null) return;
+        try
+        {
+            // 异步线程池执行（不阻塞 verify 响应）
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try
+                {
+                    Member buyer = memberService.selectMemberByMemberId(order.getMemberId());
+                    if (buyer == null || buyer.getOpenid() == null || buyer.getOpenid().isEmpty()) {
+                        log.info("[核销通知] 会员 {} 无 openid，跳过", order.getMemberId());
+                        return;
+                    }
+                    String productName = "商品";
+                    if (order.getProductId() != null) {
+                        Product p = productService.selectProductByProductId(order.getProductId());
+                        if (p != null && p.getProductName() != null) productName = p.getProductName();
+                    }
+                    String templateId = "VERIFY_SUCCESS_TEMPLATE_ID"; // 实际从 sys_config / biz_wxconfig 读取
+                    java.util.Map<String, java.util.Map<String, String>> data = new java.util.HashMap<>();
+                    data.put("thing1", java.util.Collections.singletonMap("value", truncate(productName, 20)));
+                    data.put("date2", java.util.Collections.singletonMap("value", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(order.getVerifyTime())));
+                    data.put("thing3", java.util.Collections.singletonMap("value", truncate("核销成功，请到店使用", 20)));
+                    wxMaService.sendSubscribeMessage(buyer.getOpenid(), templateId, order.getMerchantId(), data);
+                }
+                catch (Exception e) {
+                    log.warn("[核销通知] 发送失败 orderId={} err={}", order.getOrderId(), e.getMessage());
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            log.warn("[核销通知] 调度失败 orderId={} err={}", order.getOrderId(), e.getMessage());
+        }
+    }
+
+    private static String truncate(String s, int max)
+    {
+        if (s == null) return "";
+        return s.length() <= max ? s : s.substring(0, max);
     }
 }

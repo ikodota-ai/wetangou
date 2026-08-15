@@ -7,6 +7,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
@@ -19,6 +21,8 @@ import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.IMemberVoucherService;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IDistributorService;
+import com.ruoyi.biz.service.IStoredCardService;
+import com.ruoyi.biz.domain.StoredCard;
 import com.ruoyi.biz.mapper.DistributorMapper;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Distributor;
@@ -31,6 +35,7 @@ import com.ruoyi.biz.domain.Distributor;
 @Service
 public class ApiOrderServiceImpl implements IApiOrderService
 {
+    private static final Logger log = LoggerFactory.getLogger(ApiOrderServiceImpl.class);
     @Autowired
     private IOrderService orderService;
 
@@ -48,6 +53,9 @@ public class ApiOrderServiceImpl implements IApiOrderService
 
     @Autowired
     private IDistributorService distributorService;
+
+    @Autowired
+    private IStoredCardService storedCardService;
 
     @Autowired
     private DistributorMapper distributorMapper;
@@ -224,7 +232,59 @@ public class ApiOrderServiceImpl implements IApiOrderService
         order.setVerifyTime(new Date());
         order.setVerifyUser(operator);
         orderService.updateOrder(order);
+
+        // 储值卡商品：核销后扣减会员卡内余额
+        try {
+            deductStoredCardIfNeeded(order);
+        } catch (Exception e) {
+            // 储值卡扣减失败，回滚整笔核销
+            log.warn("[核销] 储值卡扣减失败 orderId={} err={}", order.getOrderId(), e.getMessage());
+            throw e;
+        }
         return order;
+    }
+
+    /**
+     * 核销后处理：若订单对应商品 type_code=STORED_CARD，
+     * 按订单实付金额（或面额）扣减会员储值卡余额，事务内完成。
+     *
+     * <p>幂等键 bizNo=orderNo:"C"，已扣过直接跳过（防重放）。</p>
+     */
+    private void deductStoredCardIfNeeded(Order order)
+    {
+        if (order.getProductId() == null) return;
+        Product p = productService.selectProductByProductId(order.getProductId());
+        if (p == null) return;
+        if (!"STORED_CARD".equals(p.getTypeCode())) return;
+        if (order.getMemberId() == null) return;
+
+        // 找会员对应此商品的卡（一会员一卡一面）
+        StoredCard card = storedCardService.selectByMemberAndProduct(order.getMemberId(), p.getProductId());
+        if (card == null) {
+            log.warn("[核销] STORED_CARD 订单 {} 找不到会员 {} 的卡 productId={}",
+                order.getOrderId(), order.getMemberId(), p.getProductId());
+            return;
+        }
+
+        // 扣减金额：优先按 payAmount（实付），否则按面额
+        java.math.BigDecimal amount = order.getPayAmount() != null && order.getPayAmount().signum() > 0
+            ? order.getPayAmount()
+            : (p.getFaceValue() != null ? p.getFaceValue() : BigDecimal.ZERO);
+        if (amount == null || amount.signum() <= 0) {
+            log.warn("[核销] STORED_CARD 订单 {} 扣减金额为 0，跳过", order.getOrderId());
+            return;
+        }
+
+        String bizNo = order.getOrderNo() + ":C";
+        try {
+            storedCardService.consume(card.getCardId(), amount, bizNo,
+                order.getOrderId(), "STAFF", order.getVerifyUser());
+            log.info("[核销] STORED_CARD 扣减成功 orderId={} cardId={} amount={} bizNo={}",
+                order.getOrderId(), card.getCardId(), amount, bizNo);
+        } catch (com.ruoyi.common.exception.ServiceException se) {
+            // 余额不足：把核销回滚（事务整体回滚，由 @Transactional 保证）
+            throw se;
+        }
     }
 
     private String genNo(String prefix)
