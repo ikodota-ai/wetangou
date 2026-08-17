@@ -1,0 +1,9 @@
+{
+  "extEnable": true,
+  "extAppid": "wx9e147c4e2151b123",
+  "ext": {
+    "merchantId": 1,
+    "merchantName": "洞天团购",
+    "baseUrl": "http://172.31.26.216:8080"
+  }
+}

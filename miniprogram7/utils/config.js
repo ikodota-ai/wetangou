@@ -11,7 +11,16 @@
 // 用电脑的 LAN IP（en0 上的 172.31.26.216）绕开。当前为 WiFi 局域网。
 // 切换网络/WiFi 后 IP 可能变，重新跑 ifconfig en0 | grep 'inet ' 取新值。
 // 真机调试改成电脑本机 IP；上线改成 HTTPS 域名。
-const BASE_URL = 'http://172.31.26.216:8080';
+// BASE_URL 解析顺序：ext.json 注入的 baseUrl > localStorage 缓存 > 默认值
+// ext 注入是为了支持第三方平台代发布：每个商户的小程序可有自己的 API 域名
+function resolveBaseUrlDefault() {
+  try {
+    var ext = wx.getExtConfigSync && wx.getExtConfigSync();
+    if (ext && ext.baseUrl) return ext.baseUrl;
+  } catch (e) {}
+  return 'http://172.31.26.216:8080';
+}
+const BASE_URL_DEFAULT = resolveBaseUrlDefault();
 
 // 备选 IP 列表（按"手机可能访问到"顺序降序，新环境时把新 IP 加到最前）。
 // 真机扫码后若首个 IP 不可达，自动尝试下一个，避免每次换网络都要改代码。
@@ -69,7 +78,7 @@ function resolveBaseUrl() {
     var cached = wx.getStorageSync && wx.getStorageSync('resolvedBaseUrl');
     if (cached && typeof cached === 'string') return cached;
   } catch (e) {}
-  return BASE_URL;
+  return BASE_URL_DEFAULT;
 }
 const RESOLVED_BASE_URL = resolveBaseUrl();
 
@@ -78,7 +87,7 @@ function probeBaseUrl() {
   if (_probed) return Promise.resolve(RESOLVED_BASE_URL);
   _probed = true;
   return new Promise(function (resolve) {
-    var candidates = [BASE_URL].concat(BASE_URL_FALLBACKS.filter(function (u) { return u !== BASE_URL; }));
+    var candidates = [BASE_URL_DEFAULT].concat(BASE_URL_FALLBACKS.filter(function (u) { return u !== BASE_URL_DEFAULT; }));
     var done = false;
     candidates.forEach(function (url) {
       wx.request({
@@ -104,6 +113,7 @@ function probeBaseUrl() {
 
 module.exports = {
   BASE_URL: RESOLVED_BASE_URL,
+  BASE_URL_DEFAULT,
   BASE_URL_FALLBACKS,
   HEALTH_PATH,
   HEALTH_TIMEOUT_MS,

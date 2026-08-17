@@ -1,10 +1,10 @@
 // utils/request.js 网络请求封装
-const { BASE_URL, MOCK_ENABLED, APPID, BUILD_IN_APPID, probeBaseUrl } = require('./config.js');
+const { BASE_URL: BASE_URL_DEFAULT, MOCK_ENABLED, APPID, BUILD_IN_APPID, probeBaseUrl } = require('./config.js');
 
 // 启动期一次性打印当前生效的 APPID 与构建期 APPID，便于在开发者工具 Console 排查租户解析问题
 
 // === 启动期探测可用的 BASE_URL（异步，结果会更新 _activeBaseUrl） ===
-let _activeBaseUrl = BASE_URL;
+let _activeBaseUrl = BASE_URL_DEFAULT;
 probeBaseUrl().then(function (u) {
   if (u && u !== _activeBaseUrl) {
     _activeBaseUrl = u;
@@ -12,10 +12,10 @@ probeBaseUrl().then(function (u) {
   }
 }).catch(function () {});
 
-function _base() { return _activeBaseUrl || BASE_URL; }
+function _base() { return _activeBaseUrl || BASE_URL_DEFAULT; }
 
 try {
-  console.log('[miniprogram] APPID =>', APPID, '| BUILD_IN_APPID =>', BUILD_IN_APPID, '| BASE_URL =>', BASE_URL);
+  console.log('[miniprogram] APPID =>', APPID, '| BUILD_IN_APPID =>', BUILD_IN_APPID, '| BASE_URL =>', BASE_URL_DEFAULT);
 } catch (e) {}
 
 // 把后端返回的相对地址补全
@@ -65,7 +65,7 @@ function request(url, options = {}) {
         }
       },
       fail: (err) => {
-        console.error('[request] FAIL', BASE_URL + url, 'X-App-Id=', APPID, 'err=', err);
+        console.error('[request] FAIL', BASE_URL_DEFAULT + url, 'X-App-Id=', APPID, 'err=', err);
         reject(err);
       }
     });
@@ -209,7 +209,7 @@ module.exports = {
   request,
   uploadFile,
   api,
-  BASE_URL,
+  BASE_URL: BASE_URL_DEFAULT,
   APPID,
   toFullUrl,
   fixRichText,

@@ -3,6 +3,14 @@ const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 
 App({
   onLaunch() {
+    // 启动期：优先用 ext.json 注入的 baseUrl（多商户代发布场景），否则用默认 IP
+    try {
+      var cfg = require('./utils/config.js')
+      this.globalData.baseUrl = cfg.BASE_URL_DEFAULT || 'http://172.31.26.216:8080'
+      console.log('[app] onLaunch baseUrl =', this.globalData.baseUrl)
+    } catch (e) {
+      this.globalData.baseUrl = 'http://172.31.26.216:8080'
+    }
     // 启动时解析 scene（带参进入：太阳码 scene=distributor:{merchantId}:{memberId}）
     if (this.parseInviteFromScene) this.parseInviteFromScene()
     // 启动时拉一次会员资料（如果本地有 token），让「我的」页能直接显示真实头像/昵称/手机号
@@ -49,7 +57,7 @@ App({
     // 商品
     goods: [],
     currentProduct: null,
-    baseUrl: "http://172.31.26.216:8080",
+    baseUrl: '', // onLaunch 时根据 ext.json / 默认值填充
     // 会员
     user: {
       memberId: null,
