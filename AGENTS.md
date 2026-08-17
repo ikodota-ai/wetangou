@@ -2338,3 +2338,77 @@ curl -X POST 'http://127.0.0.1:8080/common/upload' \
   - [ ] 配 `OSS_ACCESS_KEY` / `OSS_SECRET_KEY` / `OSS_ENDPOINT` 环境变量
   - [ ] 启 jar 加 `-Dspring.profiles.active=aliyun-oss`
   - [ ] `POST /common/upload` 测试返回 `https://cdn.你的域名.com/...` URL
+
+## v2.6.1 续篇（2026-08-17 · 太阳码核销闭环）
+
+> commit `72d2789a` · 21 files / +643 / -65
+
+### 闭环场景
+
+**会员端** → **员工端** 通过微信扫一扫直接核销，无需手动输入：
+
+```
+会员下单（团购/优惠券/组合券）
+  → 会员进入「我的-订单详情」
+  → 页面展示 360rpx 太阳码（dataUrl 渲染）
+  → 会员出示给员工
+  → 员工用微信首页「扫一扫」扫这个码
+  → 微信自动唤起小程序 → app.js 解析 verify:{orderId}:{code} scene
+  → consumeVerifyScene 跳 /pages/merchant/verify/index?code=...&sid=
+  → 员工端 onShow 自动核销 → 完成
+```
+
+### 后端改动
+
+| 端点 | 内容 | 用途 |
+|---|---|---|
+| `GET /api/order/{id}/qrcode` | `image/png` 字节流 | 流式下载（保留） |
+| `GET /api/order/{id}/qrcode-data` | `JSON { dataUrl, verifyCode, scene, orderId, size }` | **新增**：dataUrl 让 `<image src>` 直显，不依赖 token header |
+
+`ApiOrderServiceImpl.placeOrder` 加 `order.setVerifyCode(genVerifyCode())`，12 位核销码绑定订单。
+
+### 前端改动
+
+- `pages/login/login.{js,wxml,wxss}` 重写为 3 tab 入口：
+  - 微信一键（消费者/会员）
+  - 员工/商家（账号密码，hit /api/merchant/staff/login）
+  - 扫码加入（扫员工邀请码）
+- 9 个旧跳转（`pages/{staff,merchant,platform,agent,mine,product/list,...}/home|me|index`）统一跳 `/pages/login/login?tab=account`
+- `pages/order/detail/index.{wxml,js,wxss}` 加 `<image src="{{qrDataUrl}}">` 太阳码区
+- `app.js` 扩展 `_applyInviteScene`：
+  - `distributor:{mid}:{memberId}` → 推客邀请（已有）
+  - `verify:{orderId}:{code}` → 订单核销（**新增**）
+  - `consumeVerifyScene()` 写一次性 token 到 storage，跳 `/pages/merchant/verify`
+- `pages/{staff,merchant}/home/index.js` onShow 调 `getApp().consumeVerifyScene()`（热启动兜底）
+
+### 闭环验证
+
+- ✅ `smoke-c52` 9/9 PASS（太阳码端点 + 业务校验）
+- ✅ `smoke-c47/c51` 回归 PASS
+- ✅ vitest 66/66 PASS
+- ✅ `curl` 端到端：会员 1000197 login → `/api/order/999178/qrcode-data` → `dataUrl 114 字节` 200
+- ✅ 员工 `owner_c43/admin123` login → 200 (PLATFORM role)
+- ✅ 太阳码 `scene=verify:999178:CDF8D17994BA` 正确
+
+### Mock 切换
+
+```bash
+# 开 mock（演示/真机调试用，code 任意派生 openid）
+java -cp "/tmp:/Users/mac/.m2/repository/mysql/mysql-connector-java/5.1.49/mysql-connector-java-5.1.49.jar" -e 2>/dev/null
+cd scripts/e2e && javac EnableMock.java && java -cp ".:/Users/mac/.m2/repository/mysql/mysql-connector-java/5.1.49/mysql-connector-java-5.1.49.jar" EnableMock
+redis-cli -h 127.0.0.1 -p 6379 DEL 'sys_config:wx.miniapp.mockEnabled' 'merchant:id:1' 'merchant:appid:wx9e147c4e2151b123'
+
+# 关 mock（生产/真微信）
+cd scripts/e2e && javac DisableMock.java && java -cp ".:/Users/mac/.m2/repository/mysql/mysql-connector-java/5.1.49/mysql-connector-java-5.1.49.jar" DisableMock
+redis-cli -h 127.0.0.1 -p 6379 DEL 'sys_config:wx.miniapp.mockEnabled' 'merchant:id:1' 'merchant:appid:wx9e147c4e2151b123'
+```
+
+注意：`biz_merchant.mock_enabled='0'` 才是开 mock（字段语义反着的，0=开 1=关），且需清 redis 缓存。
+
+### 真机测试 checklist
+
+- [ ] 微信扫一扫扫太阳码（测试员拿出订单详情二维码给员工手机微信扫）
+- [ ] 唤起小程序后自动跳 verify 页（看 onLoad 拿 code）
+- [ ] 员工未登录时跳 login?tab=account，登录后回 verify 自动核销
+- [ ] 核销成功后页面提示「核销成功」+ 订单状态变 2
+- [ ] 数据库 `biz_order.status='2'` + `verify_code` 一致
