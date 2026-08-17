@@ -2229,3 +2229,112 @@ d44e1c17 fix(v2.6): 详情页「类型」字段改用 data.typeName 渲染
 7fe6e6cc feat(v2.6): 购买须知按商品创建字段结构化渲染（去 notice 富文本依赖）
   2 files / +73 / -37
 ```
+
+---
+
+## 附件 OSS 接入（2026-08-17 补）
+
+### 已实装（100%）
+
+`ruoyi-common/src/main/java/com/ruoyi/common/storage/` 下 5 个文件 + `application-aliyun-oss.yml` 一份配置：
+
+| 组件 | 作用 |
+|---|---|
+| `StorageAdapter` | 接口：upload / delete / getPublicUrl / generatePresignedUrl |
+| `LocalStorageAdapter` | 本地磁盘（默认） |
+| `S3StorageAdapter` | **S3 协议**适配器（MinIO SDK 8KB 实现，**1 份代码适配 5 种云**）|
+| `StorageFactory` | 按 `ruoyi.storage.type` 选实现 |
+| `StorageProperties` | 配置类：local / s3 / fastdfs 三段 |
+
+### 5 种云存储支持
+
+| `storage.type` | 端点 | 云厂商 |
+|---|---|---|
+| `local` | 本地磁盘 | 开发/演示 |
+| `oss` | `https://oss-cn-hangzhou.aliyuncs.com` | 阿里云 OSS |
+| `minio` | `http://127.0.0.1:9000` | 自建 MinIO |
+| `qiniu` | `https://s3-cn-east-1.qiniucs.com` | 七牛云 S3 兼容 |
+| `cos` | 任意 S3 endpoint | 腾讯云 COS |
+| `s3` | 任意 S3 endpoint | AWS S3 |
+
+### 上传链路
+
+```
+[PC 前端 ImageUpload 组件]
+   POST /common/upload (multipart/form-data)
+      ↓
+[CommonController.uploadFile]
+      ↓
+[FileUploadUtils.upload]
+      ↓
+[StorageFactory.get().upload(...)]
+      ↓
+  ┌─ type=local  → LocalStorageAdapter  → /var/dytuangou/uploadPath/
+  ├─ type=oss    → S3StorageAdapter     → 阿里云 OSS bucket
+  └─ type=minio  → S3StorageAdapter     → MinIO
+      ↓
+[返回] {"fileName":"...","url":"https://cdn.你的域名.com/upload/2026/08/xxx.png"}
+```
+
+### 部署时切换到阿里云 OSS
+
+```bash
+# 1) 准备：阿里云控制台开 OSS bucket（建议私有读+CDN）
+#    - bucket 名：wetangou-prod
+#    - 区域：cn-hangzhou
+#    - 拿 accessKey / secretKey
+
+# 2) 启 jar 时加 profile
+java -jar -Dspring.profiles.active=aliyun-oss \
+  -DOSS_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com \
+  -DOSS_REGION=cn-hangzhou \
+  -DOSS_BUCKET=wetangou-prod \
+  -DOSS_ACCESS_KEY=LTAI5t... \
+  -DOSS_SECRET_KEY=xxx \
+  -DOSS_CDN_DOMAIN=https://cdn.wetangou.com \
+  ruoyi-admin.jar
+
+# 3) 验证
+curl -X POST 'http://127.0.0.1:8080/common/upload' \
+  -F "file=@test.png" \
+  -H "Authorization: Bearer $TOKEN"
+# 期望返回：
+# {"code":200,"url":"https://cdn.wetangou.com/upload/2026/08/test_xxx.png"}
+
+# 4) 浏览器访问 URL 看到图 = OSS OK
+```
+
+### FastDFS 状态
+
+`FastDfsStorageAdapter` 是**占位实现**（pom 未引入 `org.csource:fastdfs-client-java` 依赖，方法体 `throw new RuntimeException("FastDFS 未启用")`）。
+
+**结论：FastDFS 不推荐**（非 S3 协议、生态弱、新项目应直接用 S3 协议）。如果客户强要 FastDFS，启用步骤：
+1. pom 引入 `org.csource:fastdfs-client-java:1.29`
+2. 补全 `FastDfsStorageAdapter` 的 upload/delete/getPublicUrl
+3. yml `storage.type: fastdfs`
+
+### 已落地的上传场景
+
+| 场景 | 链路 | 状态 |
+|---|---|---|
+| PC 端商品封面/详情图 | `biz/product/index.vue` + `create.vue` → ImageUpload 组件 | ✅ |
+| PC 端编辑器插图 | `Editor` 组件 | ✅ |
+| PC 端文件上传 | `FileUpload` 组件 | ✅ |
+| PC 端 Excel 导入 | `ExcelImportDialog` 组件 | ✅ |
+| PC 端用户头像 | `SysProfileController` | ✅ |
+| 小程序会员头像 | `api.uploadAvatar` | ✅ |
+| **小程序商品创建页** | 商家端 6 tab 第 1 步未到图片，**第 2 步需要补 uploadFile 接入** | ⚠️ 未实装 |
+
+### 小程序商品创建页图片上传（V2.7 候选）
+
+`miniprogram7/pages/merchant/product/create/index.wxml` 6 个 tab 中的 tab 1（基础信息）需要加 `cover` / `images` 上传控件，调用 `request.uploadFile('/api/.../cover', tempFilePath)`，后端走 `CommonController` → `StorageFactory`。
+
+后端如果给小程序端另开一个 `/api/common/upload` 端点（绕过 PC 端的 `@PreAuthorize`），需要新增 `ApiCommonController`。
+
+### 部署 Checklist D.1 末尾追加
+
+- [ ] **OSS 接入**（生产前必做）
+  - [ ] 阿里云开 bucket `wetangou-prod`（建议私有读+CDN）
+  - [ ] 配 `OSS_ACCESS_KEY` / `OSS_SECRET_KEY` / `OSS_ENDPOINT` 环境变量
+  - [ ] 启 jar 加 `-Dspring.profiles.active=aliyun-oss`
+  - [ ] `POST /common/upload` 测试返回 `https://cdn.你的域名.com/...` URL
