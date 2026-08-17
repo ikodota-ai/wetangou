@@ -1990,3 +1990,242 @@ smoke-c51 (8/8 PASS)：
 
 - `9a7b1c22` feat(v2.6): 商品类型必填校验 + 下单限制条件 + 详情页字段映射
   - 7 files / +427 / -22
+
+---
+
+## v2.6 商品详情页 + 多商户代发布（2026-08-17 续篇 · 4 commit）
+
+> 本段覆盖：`7fe6e6cc` `69c36746` `d44e1c17` `660df2f5` `a1961ec7`
+> 主题：C 端商品详情页字段化重做 + 多商户代发布链路打通
+
+### A. C 端商品详情页重构（去 notice 富文本依赖）
+
+#### 字段化购买须知卡
+
+`miniprogram7/pages/goods/detail/index.wxml` 整块"购买须知"由 6 项扩到 9 项，**完全按 `biz_product` 表结构化字段渲染**：
+
+| WXML 区块 | DB 字段 | 说明 |
+|---|---|---|
+| 有效期 | `validity_days` | "购买后 N 天内有效" |
+| 售卖期 | `sale_start_date` / `sale_end_date` | "YYYY-MM-DD 至 YYYY-MM-DD" |
+| 限购 | `limit_per_user` / `max_per_order` | "每人限购 N 张；每单最多 M 张" |
+| 适用人数 | `max_persons` | "N 人使用"（仅 GROUPON/BOOKING） |
+| 库存 | `stock` | "剩余 N 份"（>0 才显示） |
+| 退改政策 | `refund_policy` | 整段字符串 |
+| 附加费 | `extra_fee_desc` | 整段字符串 |
+| 预约规则 | `booking_required` | "需提前预约..."（仅 BOOKING） |
+| 其他说明 | `other_notice` | 整段字符串 |
+
+**完全移除 `notice` longtext 富文本字段的 C 端渲染**。`notice` 字段保留在 DB 里，将来如需做"富文本图册"再单独加区块。
+
+#### price-bar 划线价 + 折扣文案
+
+之前划线价 `¥{{product.price}}` 写的是同一个字段（bug），修复后：
+
+- 划线价 `¥{{product.marketPrice}}`（仅当 `marketPrice > price` 才显示）
+- 折扣文案 `{{product.discountText}}`（JS 里 `(price/marketPrice*10).toFixed(1)` 计算）
+
+#### 类型 + 门店动态化
+
+| 之前 | 之后 |
+|---|---|
+| `{{typeText(product.typeCode)}}`（WXML 调 Page 方法，不支持）| `{{product.typeName}}`（normalize 算好放 data）|
+| "全部门店适用"（硬编码）| `{{storeScopeText}}`（取 `storeNames`）|
+| 门店卡"1家"/"1家店通用" | `{{storeCountText}}` / `{{storeCountText}}店通用` |
+
+#### 字段对照
+
+```js
+// normalize() 新增字段
+typeName: this.typeText(typeCode),
+discountText: (function(){
+  const now = Number(p.price), old = Number(p.marketPrice);
+  if (!old || old <= now) return '';
+  return (now / old * 10).toFixed(1) + ' 折热销中';
+})(),
+storeCount: (p.storeIds ? String(p.storeIds).split(',').filter(x=>x).length : 1),
+storeCountText: storeCount + '家',
+storeScopeText: p.storeNames || '当前门店适用',
+```
+
+### B. 多商户代发布链路打通
+
+#### 现状盘点（代码层 100% 实装）
+
+| 模块 | 文件 | 状态 |
+|---|---|---|
+| 控制器 | `MpReleaseController`（11 端点） | ✅ |
+| 控制器 | `MpConfigController`（2 端点） | ✅ |
+| Service | `WxOpenService`（14 方法：accessToken / preAuthCode / commit / submitAudit / release / revertRelease / buildExtJson / getAuthorizerInfo / ...） | ✅ |
+| Service | `MpCodePackServiceImpl`（下载代码包 + 改写 appid + baseUrl 后打成 zip） | ✅ |
+| Service | `MpReleaseServiceImpl`（含 `buildExtJson(Merchant merchant)`） | ✅ |
+| 域 | `MpRelease` 实体（release_id / merchant_id / appid / template_id / audit_id / audit_status / release_status / ext_json / qrcode_url） | ✅ |
+| DB | `biz_mp_release`（发布记录） + `biz_mp_auth`（授权 refresh_token 存储） | ✅ |
+| 菜单 | `sql/biz_tenant_menu.sql` 12 个按钮权限（query/auth/upload/audit/release/rollback/...） | ✅ |
+| PC 后台 | `ruoyi-ui/src/views/biz/mprelease/index.vue`（334 行，含 3 步代上传向导） | ✅ |
+| PC 后台 | `ruoyi-ui/src/views/biz/mpconfig/index.vue`（98 行） | ✅ |
+| API 封装 | `ruoyi-ui/src/api/biz/mprelease.js`（13 个接口） | ✅ |
+
+#### ext.json 占位符模板
+
+`miniprogram7/ext.json`（新增文件，dev 工具本地占位用）：
+
+```json
+{
+  "extEnable": true,
+  "extAppid": "wx9e147c4e2151b123",
+  "ext": {
+    "merchantId": 1,
+    "merchantName": "洞天团购",
+    "baseUrl": "http://172.31.26.216:8080"
+  }
+}
+```
+
+**关键**：上传到第三方平台后，`MpReleaseServiceImpl.buildExtJson(Merchant)` 会**动态替换**这个结构里的：
+
+- `extAppid` ← `biz_merchant.appid`（每个商户自己的 appid）
+- `ext.merchantId` ← `biz_merchant.merchant_id`
+- `ext.merchantName` ← `biz_merchant.merchant_name`
+- `ext.baseUrl` ← `sys_config['wx.open.apiBaseUrl']`（平台统一 API 域名）
+
+然后通过 `WxOpenService.commit(..., extJson, ...)` 注入到微信 `/wxa/commit` 接口。
+
+#### 小程序运行时读 ext（**本次补全**）
+
+之前 `app.js:52 baseUrl: "http://172.31.26.216:8080"` 写死，**ext.json 注入的 baseUrl 实际未生效**。本次补全：
+
+| 文件 | 改动 |
+|---|---|
+| `miniprogram7/utils/config.js` | `BASE_URL_DEFAULT = resolveBaseUrlDefault()`，**优先取 `wx.getExtConfigSync().baseUrl`** |
+| `miniprogram7/utils/request.js` | import 解构改名 `BASE_URL → BASE_URL_DEFAULT`，同步使用 |
+| `miniprogram7/app.js` | `onLaunch` 启动时 `require('./utils/config.js').BASE_URL_DEFAULT` 注入 `globalData.baseUrl` |
+
+**运行时 BASE_URL 解析顺序**：
+
+```
+wx.getExtConfigSync().baseUrl  ←  第三方平台代发布注入（多商户场景）
+  ↓ 没取到
+localStorage['resolvedBaseUrl']  ←  探测缓存（自动降级）
+  ↓ 没取到
+http://172.31.26.216:8080  ←  默认值（开发期）
+```
+
+#### 多商户代发布运行时流程
+
+```
+[PC 平台管理员]
+  1. 微信开放平台申请第三方平台账号（人工）
+  2. 上传 miniprogram7 为「代码模板」（人工）→ 获得 templateId
+  3. 填 sys_config 8 项（一次性 SQL，详见 sql/deploy/sys_config_production.sql）
+  4. PC「小程序发布」页 → 选商户 → 代上传向导 3 步
+  5. 后端 buildExtJson(merchant) 动态生成 extJson（含商户 appid / merchantId / baseUrl）
+  6. WxOpenService.commit → /wxa/commit 上传代码
+  7. WxOpenService.submitAudit → /wxa/submit_audit 提审
+  8. 审核通过后点「发布」→ WxOpenService.release → /wxa/release 全网生效
+  9. 商户的小程序扫码时 wx.getAccountInfoSync() 拿到自己的 appid
+ 10. wx.getExtConfigSync() 拿到自己的 merchantId / baseUrl
+ 11. 前端 request.js 用 ext.baseUrl 调用自己商户的后端 API
+```
+
+### C. SQL 部署模板
+
+`sql/deploy/sys_config_production.sql`（**新增 76 行**）：
+
+- 0. 备份原 sys_config 11 项
+- 1. 第三方平台核心 7 项（componentAppId / Secret / Token / AesKey / templateId / redirectDomain / apiBaseUrl）
+- 2. 平台自有 demo 小程序 2 项（miniapp.appId / miniapp.secret）
+- 3. 关所有 mock 2 项（miniapp.mockEnabled / pay.mockEnabled → false）
+- 4. 验证查询 11 项
+
+**使用方式**：
+
+```bash
+# 1) 替换占位符
+sed -i 's/wxXXXXXXXXXXXXXXXX/你的真实componentAppId/' sql/deploy/sys_config_production.sql
+
+# 2) 备份 + 执行
+mysqldump -uroot -p ry-vue sys_config --where="config_id IN (10,11,19,20,21,22,23,24,25,32,34)" > backup.sql
+mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/deploy/sys_config_production.sql
+
+# 3) 验证
+curl http://127.0.0.1:8080/biz/mprelease/platform-status
+```
+
+### D. 部署前 Checklist（生产环境最小可上线版本）
+
+#### D.1 后端 / 数据库（人工 + SQL）
+
+- [ ] 服务器 JDK 17+，MySQL 5.7+，Redis 6+
+- [ ] 拉代码：`git clone / git pull` 到 `/opt/dytuangou`
+- [ ] 跑 SQL 迁移（按文件名前缀顺序）：
+  - `sql/ry-vue.sql`（RuoYi 基础）
+  - `sql/quartz.sql`（定时任务）
+  - `sql/biz_product_model_v2.sql`（v2 商品模型）
+  - `sql/biz_merchant_v2.sql`（v2 商家员工）
+  - `sql/biz_*.sql`（其他业务：banner / booking / agent / mp / ...）
+  - `sql/biz_tenant_menu.sql`（菜单+3 类角色）
+  - **`sql/deploy/sys_config_production.sql`（生产 sys_config）**
+- [ ] 后端 jar 启动：`nohup java -jar -Dspring.profiles.active=prod -Xms512m -Xmx1024m ruoyi-admin.jar > /var/log/ruoyi/app.log 2>&1 &`
+- [ ] `/api/ping` 返回 200
+
+#### D.2 微信第三方平台（人工，不在代码范围）
+
+- [ ] 申请第三方平台账号：https://open.weixin.qq.com/
+- [ ] 填 Token + EncodingAesKey（32 + 43 位字符串）
+- [ ] 「**代码管理**」上传 miniprogram7 zip 为模板 → 记下 `templateId`
+- [ ] 「**授权管理**」配授权回调 URL：`https://platform.你的域名.com/biz/mpauth/callback`
+- [ ] 把 7 项参数填到 sys_config
+
+#### D.3 微信小程序后台（人工）
+
+- [ ] **request 合法域名**：`https://api.你的域名.com`（多商户代发可加平台域名）
+- [ ] **uploadFile 合法域名**：同上
+- [ ] **downloadFile 合法域名**：同上
+- [ ] **业务域名**：H5 嵌入才需要
+- [ ] 备案（必须先备案）
+- [ ] 类目：餐饮 → 餐饮服务场所 / 餐饮服务管理（需要资质）
+
+#### D.4 小程序上传
+
+- [ ] 微信开发者工具 → 顶部「**上传**」
+- [ ] 版本号：`2.6.0`，备注：v2.6 多商户代发布
+- [ ] 微信公众平台 → 版本管理 → 提交审核
+- [ ] 审核通过后点「**发布**」
+
+#### D.5 数据清理
+
+- [ ] 清理测试商品：`DELETE FROM biz_product WHERE product_id IN (999534, 999535, 999536)`
+- [ ] 清理 smoke 数据：`DELETE FROM biz_product WHERE product_id BETWEEN 999300 AND 999600 AND del_flag='2'`
+- [ ] 清理测试用户：`DELETE FROM sys_user WHERE user_id NOT IN (1, 100, 101)`（保留 admin 和 demo）
+- [ ] 接入真实商家：每个商家在 `biz_merchant` 写一行 + 在 `biz_store` 写 N 个门店
+
+#### D.6 演示版（V3 之前）
+
+- [ ] 暂不接微信支付（`wx.pay.mockEnabled=true`，用户在 PC 后台手动核销）
+- [ ] 演示"团购/代金券/组合券包"3 类型商品各 1 个
+- [ ] 演示"商家账号登录 + 店员账号登录"双端
+- [ ] 演示"邀请员工二维码"和"核销扫码"
+
+### E. commit 速查
+
+```
+a1961ec7 feat(v2.6): 多商户代发布链路打通（ext.json 注入 baseUrl/merchantId/appid）
+  4 files / +37 / -10
+  miniprogram7/app.js           | 10 +++++++++-
+  miniprogram7/ext.json         |  9 +++++++++  (新增)
+  miniprogram7/utils/config.js  | 16 +++++++++++++---
+  miniprogram7/utils/request.js | 12 ++++++------
+
+660df2f5 chore(v2.6): WiFi 环境 BASE_URL 切到 172.31.26.216
+  1 file / +5 / -6
+
+d44e1c17 fix(v2.6): 详情页「类型」字段改用 data.typeName 渲染
+  2 files / +2 / -1
+
+69c36746 feat(v2.6): 商品详情页 price-bar 划线价 + 折扣文案 + 门店动态化
+  2 files / +19 / -7
+
+7fe6e6cc feat(v2.6): 购买须知按商品创建字段结构化渲染（去 notice 富文本依赖）
+  2 files / +73 / -37
+```
