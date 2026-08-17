@@ -145,9 +145,10 @@ Page({
       content: '确定要退出登录吗？',
       success: (res) => {
         if (res.confirm) {
-          app.logout()
-          this.setData({ logged: false, user: {}, hasShowTip: false })
+          try { app.logout() } catch (e) { console.warn('[mine] app.logout fail', e) }
+          this.setData({ logged: false, user: {}, hasShowTip: false, staffActive: false })
           wx.showToast({ title: '已退出', icon: 'success' })
+          setTimeout(() => wx.reLaunch({ url: '/pages/login/login' }), 400)
         }
       }
     })

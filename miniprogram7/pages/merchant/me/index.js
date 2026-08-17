@@ -56,9 +56,7 @@ Page({
         api.merchantStaffLogout()
           .catch(() => {})
           .finally(() => {
-            wx.removeStorageSync('staffUser')
-            const backup = wx.getStorageSync('memberTokenBackup')
-            if (backup) wx.setStorageSync('token', backup)
+            try { getApp().logout() } catch (e) { console.warn('[me] logout fail', e) }
             wx.reLaunch({ url: '/pages/login/login?showMore=1' })
           })
       }

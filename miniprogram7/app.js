@@ -82,6 +82,29 @@ App({
       url: '/pages/merchant/verify/index?code=' + encodeURIComponent(code)
     })
   },
+  /**
+   * 退出登录：清掉 token + memberInfo + staffInfo + globalData 缓存
+   *  - 兼容普通会员（仅清 token+user）和员工/商家（再清 staffUser）
+   *  - 不在这里调 reLaunch（让调用方决定跳哪里）
+   */
+  logout() {
+    try { wx.removeStorageSync('token') } catch (e) {}
+    try { wx.removeStorageSync('memberTokenBackup') } catch (e) {}
+    try { wx.removeStorageSync('staffToken') } catch (e) {}
+    try { wx.removeStorageSync('staffUser') } catch (e) {}
+    try { wx.removeStorageSync('staffInfo') } catch (e) {}
+    try { wx.removeStorageSync('inviteBy') } catch (e) {}
+    try { wx.removeStorageSync('_verifySceneToken') } catch (e) {}
+    // globalData 复位
+    this.globalData = this.globalData || {}
+    this.globalData.user = { memberId: null, openid: null, nickName: '', avatarUrl: '', phone: '', token: '', logged: false }
+    this.globalData.staff = null
+    this.globalData.inviteBy = null
+    this.globalData._pendingVerifyScene = ''
+    // 通知页面刷新（如 mine 页 logged 状态）
+    if (this.notifyUserUpdate) this.notifyUserUpdate()
+  },
+
   globalData: {
     // 位置/门店
     location: null,
