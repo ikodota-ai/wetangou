@@ -172,6 +172,8 @@ public class ApiOrderServiceImpl implements IApiOrderService
             }
         }
         order.setStatus("0");
+        // V2.6 P1：下单时生成 12 位核销码（UUID 截取，扫码核销唯一标识）
+        order.setVerifyCode(genVerifyCode());
         order.setCreateTime(new Date());
         orderService.insertOrder(order);
         return order;

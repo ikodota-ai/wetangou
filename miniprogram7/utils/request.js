@@ -135,6 +135,7 @@ const api = {
   payOrder: (id) => request(`/api/order/pay/${id}`, { method: 'POST' }),
   orderList: (params) => request('/api/order/list', { data: params }),
   orderDetail: (id) => request(`/api/order/${id}`),
+  orderQrcodeData: (id) => request(`/api/order/${id}/qrcode-data`),
   verifyOrder: (data) => request('/api/order/verify', { method: 'POST', data }),
   // 员工工作台
   staffMe: () => request('/api/store/staff/me'),

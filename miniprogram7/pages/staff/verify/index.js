@@ -34,7 +34,7 @@ Page({
     const token = wx.getStorageSync('token') || ''
     if (!staff || staff.userType !== 'store' || !token) {
       // 没登录态：跳回登录
-      wx.redirectTo({ url: '/pages/staff/login/index' })
+      wx.redirectTo({ url: '/pages/login/login?tab=account' })
       return
     }
     this.setData({

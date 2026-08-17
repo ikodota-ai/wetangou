@@ -10,7 +10,7 @@ const STATUS_TEXT = {
 };
 
 Page({
-  data: { id: null, order: null, statusText: '', loading: true },
+  data: { id: null, order: null, statusText: '', loading: true, qrDataUrl: '', qrLoading: false },
   onLoad(opts) {
     this.setData({ id: opts.id });
     this.load();
@@ -44,6 +44,9 @@ Page({
         statusText: STATUS_TEXT[o.status] || '',
         loading: false
       });
+      if (o.status === '1' && o.verifyCode) {
+        this.loadQrCode();
+      }
     }).catch((err) => {
       this.setData({ loading: false });
       wx.showToast({ title: (err && err.msg) || '加载失败', icon: 'none' });
@@ -58,5 +61,15 @@ Page({
     const no = this.data.order && this.data.order.orderNo;
     if (!no) return;
     wx.setClipboardData({ data: no, success: () => wx.showToast({ title: '订单号已复制', icon: 'success' }) });
+  },
+  loadQrCode() {
+    this.setData({ qrLoading: true });
+    api.orderQrcodeData(this.data.id).then((res) => {
+      const d = (res && (res.data || res)) || {};
+      this.setData({ qrDataUrl: d.dataUrl || '', qrLoading: false });
+    }).catch((err) => {
+      this.setData({ qrLoading: false });
+      console.warn('[order/detail] qrcode FAIL', err);
+    });
   }
 });

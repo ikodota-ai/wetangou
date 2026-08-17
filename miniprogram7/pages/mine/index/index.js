@@ -60,7 +60,7 @@ Page({
     if (staff && staff.userType === 'store' && wx.getStorageSync('token')) {
       wx.reLaunch({ url: '/pages/staff/home/index' })
     } else {
-      wx.navigateTo({ url: '/pages/staff/login/index' })
+      wx.navigateTo({ url: '/pages/login/login?tab=account' })
     }
   },
   goMerchantLogin() {
@@ -69,7 +69,7 @@ Page({
     if (staff && staff.userType === 'merchant' && wx.getStorageSync('token')) {
       wx.reLaunch({ url: '/pages/merchant/home/index' })
     } else {
-      wx.navigateTo({ url: '/pages/merchant/login/index' })
+      wx.navigateTo({ url: '/pages/login/login?tab=account' })
     }
   },
   goLogin() {

@@ -22,6 +22,10 @@ App({
     //   2) 否则按商户取第一个门店
     //   目的：进入任意页面（不一定是首页）都能直接读到门店，避免空 store 阻塞下单/买单/预约等流程
     this.bootDefaultStore()
+    // 冷启动有 verify scene → 直接跳员工核销页
+    if (this._pendingVerifyScene) {
+      setTimeout(() => this.consumeVerifyScene(), 200)
+    }
   },
   /**
    * 解析太阳码 scene 里的 inviteBy：
@@ -42,6 +46,16 @@ App({
   },
   _applyInviteScene(scene) {
     if (!scene || typeof scene !== 'string') return
+    // 太阳码 scene 格式：
+    //   distributor:{merchantId}:{memberId}  → 推客邀请
+    //   verify:{orderId}:{code}              → 订单核销（员工扫会员太阳码）
+    if (scene.indexOf('verify:') === 0) {
+      // 写一个一次性 token，merchant/verify onLoad 优先读 _verifySceneToken
+      try { wx.setStorageSync('_verifySceneToken', scene) } catch (e) {}
+      // 热启动场景：app onShow 阶段调用方跳页
+      this._pendingVerifyScene = scene
+      return
+    }
     if (this.globalData.inviteBy) return
     const m = scene.match(/^distributor:\d+:(\d+)/)
     if (m && m[1]) {
@@ -49,6 +63,25 @@ App({
       try { wx.setStorageSync('inviteBy', this.globalData.inviteBy) } catch (e) {}
     }
   },
+  /**
+   * 消费一次性 verify scene → 跳员工核销页
+   *  - 在 onShow / 业务页 onShow 调用一次
+   *  - 没有就 return
+   */
+  consumeVerifyScene() {
+    const scene = this._pendingVerifyScene || wx.getStorageSync('_verifySceneToken') || ''
+    if (!scene || scene.indexOf('verify:') !== 0) return
+    // parse: verify:{orderId}:{code}
+    const parts = scene.split(':')
+    if (parts.length < 3) return
+    const orderId = parts[1]
+    const code = parts.slice(2).join(':')
+    this._pendingVerifyScene = ''
+    try { wx.removeStorageSync('_verifySceneToken') } catch (e) {}
+    // 跳员工核销页（code 已包含完整信息，sid 留空由员工端按当前门店核销）
+    wx.redirectTo({
+      url: '/pages/merchant/verify/index?code=' + encodeURIComponent(code) + '&sid='
+    }),
   globalData: {
     // 位置/门店
     location: null,

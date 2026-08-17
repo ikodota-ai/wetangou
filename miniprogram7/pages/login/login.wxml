@@ -2,11 +2,35 @@
   <view class="top"></view>
   <view class="title">登录</view>
 
-  <view class="card">
+  <!-- 顶部品牌卡 -->
+  <view class="card brand-card">
     <text class="brand">{{merchantName}}</text>
     <view class="divider"></view>
     <text class="perm-title">申请获取以下权限</text>
-    <text class="perm-main">获得你的公开信息（昵称、头像、手机号）</text>
+    <text class="perm-main" wx:if="{{activeTab==='wx'}}">获得你的公开信息（昵称、头像、手机号）</text>
+    <text class="perm-main" wx:if="{{activeTab==='account'}}">员工/商家账号密码登录</text>
+    <text class="perm-main" wx:if="{{activeTab==='scan'}}">扫描员工邀请码加入商家</text>
+  </view>
+
+  <!-- Tab 切换：微信一键 / 账号密码 / 扫码加入 -->
+  <view class="tabs">
+    <view class="tab {{activeTab==='wx' ? 'on' : ''}}" bindtap="onSwitchTab" data-tab="wx">
+      <text>微信登录</text>
+      <view class="tab-line" wx:if="{{activeTab==='wx'}}"></view>
+    </view>
+    <view class="tab {{activeTab==='account' ? 'on' : ''}}" bindtap="onSwitchTab" data-tab="account">
+      <text>员工/商家</text>
+      <view class="tab-line" wx:if="{{activeTab==='account'}}"></view>
+    </view>
+    <view class="tab {{activeTab==='scan' ? 'on' : ''}}" bindtap="onSwitchTab" data-tab="scan">
+      <text>扫码加入</text>
+      <view class="tab-line" wx:if="{{activeTab==='scan'}}"></view>
+    </view>
+  </view>
+
+  <!-- Tab 内容：微信一键登录 -->
+  <view class="card form-card" wx:if="{{activeTab==='wx'}}">
+    <view class="form-tip">授权微信一键登录，适用于：消费者购物、领券、核销</view>
     <view class="perm-list">
       <view class="perm-item">
         <view class="perm-dot ok"></view>
@@ -17,17 +41,42 @@
         <text>手机号（用于下单/核销，不用于营销推送）</text>
       </view>
     </view>
-    <view class="perm-tip">登录后会进入首页，昵称/头像/手机号可在「我的」-「会员资料」里分步完善</view>
+    <view class="perm-tip-foot">登录后会进入首页，昵称/头像/手机号可在「我的」-「会员资料」里分步完善</view>
   </view>
 
-  <view class="btns">
-    <button class="btn-primary" bindtap="onLogin" hover-class="none" disabled="{{submitting}}">
-      {{submitting ? '登录中...' : '授权登录'}}
+  <!-- Tab 内容：账号密码登录 -->
+  <view class="card form-card" wx:if="{{activeTab==='account'}}">
+    <view class="form-tip">适用于：商家员工、店长、商家管理员</view>
+    <view class="ipt-row">
+      <text class="lab">账号</text>
+      <input class="ipt" type="text" placeholder="请输入账号" value="{{username}}" bindinput="onUsername" maxlength="32" />
+    </view>
+    <view class="ipt-row">
+      <text class="lab">密码</text>
+      <input class="ipt" password type="text" placeholder="请输入密码" value="{{password}}" bindinput="onPassword" maxlength="64" />
+    </view>
+  </view>
+
+  <!-- Tab 内容：扫码加入 -->
+  <view class="card form-card scan-card" wx:if="{{activeTab==='scan'}}" bindtap="onScan">
+    <view class="scan-ic"></view>
+    <view class="scan-text">
+      <text class="scan-t">扫描员工邀请码</text>
+      <text class="scan-d">扫描店长分享的二维码，自动创建账号并绑定门店</text>
+    </view>
+    <view class="arr"></view>
+  </view>
+
+  <!-- 底部按钮（仅在 wx / account tab 显示） -->
+  <view class="btns" wx:if="{{activeTab==='wx' || activeTab==='account'}}">
+    <button class="btn-primary" bindtap="onSubmit" hover-class="none" disabled="{{submitting}}">
+      {{submitting ? '登录中...' : (activeTab==='wx' ? '授权登录' : '登 录')}}
     </button>
-    <button class="btn-ghost" bindtap="onSkip" hover-class="none">暂不登录</button>
+    <button class="btn-ghost" bindtap="onSkip" hover-class="none" wx:if="{{activeTab==='wx'}}">暂不登录</button>
   </view>
 
-  <view class="agree">
+  <!-- 协议 -->
+  <view class="agree" wx:if="{{activeTab==='wx'}}">
     <view class="checkbox {{agreed ? 'on' : ''}}" bindtap="toggleAgree"></view>
     <text class="agree-text">我已阅读并同意</text>
     <text class="link" bindtap="goAgreement" data-type="user">《用户注册协议》</text>

@@ -21,7 +21,7 @@ Page({
     const staff = wx.getStorageSync('staffUser') || {}
     if (!staff.merchantId) {
       wx.showToast({ title: '请先登录', icon: 'none' })
-      setTimeout(() => wx.redirectTo({ url: '/pages/merchant/login/index' }), 800)
+      setTimeout(() => wx.redirectTo({ url: '/pages/login/login?tab=account' }), 800)
       return Promise.resolve()
     }
     this.setData({ loading: true })

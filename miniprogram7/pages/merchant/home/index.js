@@ -24,6 +24,7 @@ Page({
   onShow() {
     this.syncStaff()
     this.loadHome()
+    if (getApp() && getApp().consumeVerifyScene) getApp().consumeVerifyScene()
   },
 
   onPullDownRefresh() {
@@ -34,7 +35,7 @@ Page({
     const staff = wx.getStorageSync('staffUser') || {}
     const token = wx.getStorageSync('token') || ''
     if (!staff || !token) {
-      wx.redirectTo({ url: '/pages/merchant/login/index' })
+      wx.redirectTo({ url: '/pages/login/login?tab=account' })
       return
     }
     this.setData({

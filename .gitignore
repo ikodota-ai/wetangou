@@ -87,3 +87,5 @@ skills-lock.json
 # 8. 运维脚本（不入仓）
 doc/*.sh
 sql/*.bak
+scripts/e2e/*.class
+miniprogram7/pages/login/.bak/

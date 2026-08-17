@@ -20,7 +20,7 @@ Page({
   syncStaff() {
     const staff = wx.getStorageSync('staffUser') || {}
     if (!staff || staff.userType !== 'agent') {
-      wx.redirectTo({ url: '/pages/merchant/login/index' })
+      wx.redirectTo({ url: '/pages/login/login?tab=account' })
       return
     }
     this.setData({

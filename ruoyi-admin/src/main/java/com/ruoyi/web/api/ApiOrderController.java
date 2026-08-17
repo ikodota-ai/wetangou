@@ -354,4 +354,83 @@ public class ApiOrderController
         if (s == null) return "";
         return s.length() <= max ? s : s.substring(0, max);
     }
+
+    /**
+     * 订单核销二维码（太阳码）
+     *  - 用户出示给员工扫，员工扫到后跳 /pages/merchant/verify/index?code=...&sid=...
+     *  - 必须本人订单
+     *  - 仅已支付/已核销状态可生成
+     *
+     * 返回：image/png（280x280 太阳码）
+     */
+    @GetMapping(value = "/{orderId}/qrcode", produces = "image/png")
+    public byte[] orderQrcode(@PathVariable("orderId") Long orderId) throws Exception
+    {
+        if (orderId == null) throw new ServiceException("orderId 不能为空");
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null) throw new ServiceException("订单不存在");
+        Long loginMemberId = MemberContextHolder.getMemberId();
+        if (loginMemberId == null || !loginMemberId.equals(order.getMemberId()))
+        {
+            throw new ServiceException("无权查看该订单的核销码");
+        }
+        if (!"1".equals(order.getStatus()) && !"2".equals(order.getStatus()))
+        {
+            throw new ServiceException("订单状态不可核销");
+        }
+        String verifyCode = order.getVerifyCode();
+        if (verifyCode == null || verifyCode.isEmpty())
+        {
+            verifyCode = com.ruoyi.common.utils.uuid.IdUtils.fastSimpleUUID().substring(0, 12).toUpperCase();
+        }
+        // scene 格式：verify:orderId:code （长度 <= 32）
+        String scene = "verify:" + order.getOrderId() + ":" + verifyCode;
+        // page 指向会员订单详情页（员工扫到进会员端不可，再让他扫码核销）
+        // 实际员工场景走 Scheme URL（orderScheme 接口），本接口给用户展示
+        return wxMaService.getWxaCodeUnlimited(scene, "pages/order/detail/index", order.getMerchantId());
+    }
+
+    /**
+     * 订单核销二维码（dataUrl 形式，便于小程序 <image> 直显，不依赖 token header）
+     *
+     * <p>和 /qrcode 区别：本端点返 JSON { dataUrl, verifyCode, orderId, scene }，
+     * dataUrl 是 image/png base64，前端可直接 <image src="{{qrDataUrl}}"> 渲染。
+     * <p>真实 wxacode（无 mock）走此端点也安全：图片以 dataUrl 在前端渲染，
+     * 不暴露内部 access_token 链路。
+     */
+    @GetMapping(value = "/{orderId}/qrcode-data", produces = "application/json")
+    public AjaxResult orderQrcodeData(@PathVariable("orderId") Long orderId) throws Exception
+    {
+        if (orderId == null) return AjaxResult.error("orderId 不能为空");
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null) return AjaxResult.error("订单不存在");
+        Long loginMemberId = MemberContextHolder.getMemberId();
+        if (loginMemberId == null || !loginMemberId.equals(order.getMemberId()))
+        {
+            return AjaxResult.error("无权查看该订单的核销码");
+        }
+        if (!"1".equals(order.getStatus()) && !"2".equals(order.getStatus()))
+        {
+            return AjaxResult.error("订单状态不可核销");
+        }
+        String verifyCode = order.getVerifyCode();
+        if (verifyCode == null || verifyCode.isEmpty())
+        {
+            verifyCode = com.ruoyi.common.utils.uuid.IdUtils.fastSimpleUUID().substring(0, 12).toUpperCase();
+        }
+        String scene = "verify:" + order.getOrderId() + ":" + verifyCode;
+        byte[] png = wxMaService.getWxaCodeUnlimited(scene, "pages/order/detail/index", order.getMerchantId());
+        if (png == null || png.length == 0) {
+            return AjaxResult.error("生成核销码失败");
+        }
+        String dataUrl = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png);
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("orderId", order.getOrderId());
+        vo.put("verifyCode", verifyCode);
+        vo.put("scene", scene);
+        vo.put("dataUrl", dataUrl);
+        vo.put("size", png.length);
+        return AjaxResult.success(vo);
+    }
+
 }

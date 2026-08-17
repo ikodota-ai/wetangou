@@ -22,3 +22,7 @@
 .val.pay { color: #E64340; font-weight: 600; }
 .empty { display: flex; align-items: center; justify-content: center; height: 60vh; }
 .empty-text { font-size: 28rpx; color: #909399; }
+.qr-area { display: flex; flex-direction: column; align-items: center; margin-top: 28rpx; padding-top: 28rpx; border-top: 1rpx dashed #E5E5E5; width: 100%; box-sizing: border-box; }
+.qr-img { width: 360rpx; height: 360rpx; background: #fff; }
+.qr-tip { font-size: 22rpx; color: #909399; margin-top: 16rpx; }
+.qr-loading { font-size: 22rpx; color: #909399; margin-top: 16rpx; }

@@ -10,6 +10,13 @@
     <text class="code-val">{{order.verifyCode}}</text>
     <view class="code-btn" bindtap="copyCode">复制</view>
     <text class="code-exp" wx:if="{{order.expireTime}}">有效期至 {{order.expireTime}}</text>
+    <view class="qr-area" wx:if="{{qrDataUrl}}">
+      <image class="qr-img" src="{{qrDataUrl}}" mode="aspectFit"></image>
+      <text class="qr-tip">请到店出示此码，店员用微信「扫一扫」直接核销</text>
+    </view>
+    <view class="qr-loading" wx:elif="{{qrLoading}}">
+      <text>二维码加载中...</text>
+    </view>
   </view>
 
   <view class="goods card">
