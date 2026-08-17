@@ -74,14 +74,14 @@ App({
     // parse: verify:{orderId}:{code}
     const parts = scene.split(':')
     if (parts.length < 3) return
-    const orderId = parts[1]
     const code = parts.slice(2).join(':')
     this._pendingVerifyScene = ''
     try { wx.removeStorageSync('_verifySceneToken') } catch (e) {}
     // 跳员工核销页（code 已包含完整信息，sid 留空由员工端按当前门店核销）
     wx.redirectTo({
-      url: '/pages/merchant/verify/index?code=' + encodeURIComponent(code) + '&sid='
-    }),
+      url: '/pages/merchant/verify/index?code=' + encodeURIComponent(code)
+    })
+  },
   globalData: {
     // 位置/门店
     location: null,
