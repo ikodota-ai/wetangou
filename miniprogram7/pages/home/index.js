@@ -15,7 +15,13 @@ Page({
     phone: '',
     qrcode: '',
     serviceHours: '',
-    isStoreService: false
+    isStoreService: false,
+    hasStaff: false
+  },
+  onShow() {
+    // 检测是否绑了 staff 身份（右上角可切换）
+    const u = wx.getStorageSync('staffUser') || null
+    this.setData({ hasStaff: !!(u && u.logged) })
   },
   _lastBannerStoreId: null,
   _bannerToastShown: false,
@@ -152,7 +158,16 @@ Page({
         wx.showToast({ title: '首页 banner 加载失败：' + ((err && (err.msg || err.message)) || '网络异常'), icon: 'none', duration: 4000 })
       }
       // 保持 banners=[]（空数组），让 swiper 显示空白以便排查
-      this.setData({ banners: [] })
+      this.setData({ banners: [] ,
+  onSwitchToStaff() {
+    const u = wx.getStorageSync('staffUser') || null
+    if (!u || !u.logged) {
+      wx.showModal({ title: '提示', content: '当前账号未绑定商家身份，可使用「更多登录方式 → 账号密码登录」', showCancel: false })
+      return
+    }
+    wx.reLaunch({ url: '/pages/merchant/home/index' })
+  }
+})
     });
   },
   // 设施标签由后端翻译字典，前端不再硬编码中文

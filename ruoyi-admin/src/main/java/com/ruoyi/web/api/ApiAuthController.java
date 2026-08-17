@@ -1,6 +1,7 @@
 package com.ruoyi.web.api;
 
 import java.util.Date;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,7 +20,14 @@ import com.ruoyi.biz.api.util.MemberTokenService;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Merchant;
 import com.ruoyi.biz.service.IMemberService;
+import com.ruoyi.biz.service.IMerchantStaffService;
 import com.ruoyi.biz.service.ITenantService;
+import com.ruoyi.biz.domain.MerchantStaff;
+import com.ruoyi.system.service.ISysUserService;
+import com.ruoyi.biz.api.role.BizRole;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.exception.ServiceException;
 
 /**
@@ -46,6 +54,12 @@ public class ApiAuthController
     @Autowired
     private ITenantService tenantService;
 
+    @Autowired
+    private IMerchantStaffService staffService;
+
+    @Autowired
+    private ISysUserService userService;
+
     /**
      * 微信登录：code换openid，注册或更新会员，返回会员token
      */
@@ -66,12 +80,51 @@ public class ApiAuthController
         String unionid = session.getString("unionid");
 
         Long inviteBy = body.getLong("inviteBy");
-        // 防止自邀 / 邀请不存在的会员
         if (inviteBy != null && inviteBy.equals(memberId0(merchantId, openid)))
         {
             inviteBy = null;
         }
 
+        // ===== 设计要点（V2.6.2 合并登录）=====
+        // 1) openid 命中 sys_user + biz_merchant_staff → 直接走员工 token，登录到商家端
+        // 2) openid 命中但员工 status≠0 → 按普通会员处理
+        // 3) openid 未命中员工 → 走普通会员登录
+        // 4) 返 hasStaffAccount + needStaffLogin 让前端按需显示「账号密码登录」入口
+        SysUser linkedStaff = null;
+        try {
+            SysUser u = userService.selectUserByOpenId(openid);
+            if (u != null && "0".equals(u.getStatus())) {
+                List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(u.getUserId()); }});
+                if (links != null && !links.isEmpty()) {
+                    linkedStaff = u;
+                    LoginMember staffLm = buildStaffLoginMember(u, links);
+                    String staffToken = memberTokenService.createToken(staffLm);
+                    staffLm.setToken(staffToken);
+                    AjaxResult ajax = AjaxResult.success("员工登录成功");
+                    ajax.put("token", staffToken);
+                    ajax.put("userType", staffLm.getUserType());
+                    ajax.put("loginType", "staff");
+                    ajax.put("isStaff", true);
+                    ajax.put("isOwner", staffLm.isOwner());
+                    ajax.put("isManagerOrAbove", staffLm.isManagerOrAbove());
+                    ajax.put("isAgent", staffLm.isAgent());
+                    ajax.put("staffRole", staffLm.getStaffRole() == null ? null : staffLm.getStaffRole().name());
+                    ajax.put("roles", staffLm.getRoles() == null ? java.util.Collections.emptyList() :
+                            staffLm.getRoles().stream().map(Enum::name).collect(Collectors.toList()));
+                    ajax.put("storeId", staffLm.getStoreId());
+                    ajax.put("storeIds", staffLm.getStoreIds());
+                    ajax.put("merchantId", staffLm.getMerchantId());
+                    MerchantStaff me = links.get(0);
+                    ajax.put("realName", me.getRealName());
+                    ajax.put("nickName", me.getRealName());
+                    ajax.put("avatarUrl", u.getAvatar());
+                    ajax.put("phone", "");
+                    return ajax;
+                }
+            }
+        } catch (Exception ignore) { }
+
+        // ===== 兜底：普通会员登录 =====
         Member member = memberService.selectMemberByOpenid(merchantId, openid);
         if (member == null)
         {
@@ -84,7 +137,6 @@ public class ApiAuthController
             member.setStatus("0");
             member.setCreateTime(new Date());
             member.setLastLoginTime(new Date());
-            // 一次性写入邀请人：仅在新建时绑定，已存在会员不覆盖，避免「换 openid 登录被重新绑定」
             if (inviteBy != null && isValidInviter(merchantId, inviteBy))
             {
                 member.setInviteBy(inviteBy);
@@ -95,16 +147,8 @@ public class ApiAuthController
         else
         {
             member.setLastLoginTime(new Date());
-            if (StringUtils.isNotEmpty(nickName))
-            {
-                member.setNickname(nickName);
-            }
-            if (StringUtils.isNotEmpty(avatarUrl))
-            {
-                member.setAvatar(avatarUrl);
-            }
-            // 已存在会员且 invite_by 为空时，补一次邀请人（避免冷启动登录没拿到 inviteBy 后续回填）
-            // 同时防御自邀：inviteBy 等于当前会员 id 时拒绝
+            if (StringUtils.isNotEmpty(nickName)) member.setNickname(nickName);
+            if (StringUtils.isNotEmpty(avatarUrl)) member.setAvatar(avatarUrl);
             if (member.getInviteBy() == null && inviteBy != null
                     && !inviteBy.equals(member.getMemberId())
                     && isValidInviter(merchantId, inviteBy))
@@ -121,12 +165,15 @@ public class ApiAuthController
         AjaxResult ajax = AjaxResult.success("登录成功");
         ajax.put("token", token);
         ajax.put("memberId", member.getMemberId());
-        // 顺带返回会员资料，登录后小程序能立刻显示昵称/头像/手机号，
-        // 避免「我的」页一直显示默认「微信用户」和默认头像
+        ajax.put("loginType", "member");
         ajax.put("nickName", member.getNickname());
         ajax.put("avatarUrl", member.getAvatar());
         ajax.put("phone", member.getPhone());
+        ajax.put("isStaff", false);
+        // 该 openid 是否绑定了商家账号（不论是否启用）→ 决定是否显示「账号密码登录」入口
+        ajax.put("hasStaffAccount", linkedStaff != null || hasStaffAccountForOpenid(openid));
         return ajax;
+
     }
 
     /**
@@ -244,5 +291,69 @@ public class ApiAuthController
         update.setInviteTime(new Date());
         memberService.updateMember(update);
         return AjaxResult.success("绑定成功");
+    }
+
+    /**
+     * 复制自 ApiMerchantStaffController.buildLoginMember 的核心逻辑
+     * 构造 staff 身份的 LoginMember（带 roles/userType/staffRole/storeId 等）
+     */
+    private LoginMember buildStaffLoginMember(SysUser user, List<MerchantStaff> links)
+    {
+        java.util.List<Long> storeIds = new ArrayList<>();
+        Long merchantId2 = null;
+        java.util.Set<BizRole> roles = new java.util.HashSet<>();
+        BizRole maxStaffRole = null;
+        for (MerchantStaff l : links) {
+            if (l.getStoreId() != null && !storeIds.contains(l.getStoreId())) storeIds.add(l.getStoreId());
+            if (merchantId2 == null && l.getMerchantId() != null) merchantId2 = l.getMerchantId();
+            BizRole r = BizRole.fromStaffRole(l.getRole());
+            roles.add(r);
+            if (maxStaffRole == null || (r != null && r.ordinal() > (maxStaffRole == null ? -1 : maxStaffRole.ordinal()))) {
+                maxStaffRole = r;
+            }
+        }
+        String resolvedUserType = "merchant";
+        if (maxStaffRole != null) {
+            switch (maxStaffRole) {
+                case OWNER:   resolvedUserType = "owner";   break;
+                case MANAGER: resolvedUserType = "manager"; break;
+                case STAFF:   resolvedUserType = "staff";   break;
+                default: break;
+            }
+        }
+        if ("01".equals(user.getUserType())) {
+            roles.add(BizRole.AGENT);
+            resolvedUserType = "agent";
+        }
+        if ("00".equals(user.getUserType())) {
+            roles.add(BizRole.PLATFORM);
+            resolvedUserType = "platform";
+        }
+        Long currentStoreId = storeIds.isEmpty() ? null : storeIds.get(0);
+        LoginMember lm = new LoginMember();
+        lm.setUserType(resolvedUserType);
+        lm.setRoles(roles);
+        lm.setStaffRole(maxStaffRole);
+        lm.setStoreId(currentStoreId);
+        lm.setStoreIds(storeIds);
+        lm.setMerchantId(merchantId2);
+        lm.setMemberId(user.getUserId());
+        lm.setOpenid(user.getOpenid() == null ? "staff:" + user.getUserId() : user.getOpenid());
+        return lm;
+    }
+
+    /**
+     * 检测该 openid 是否绑定了任何商家账号（含 status=1 停用）
+     *  - 用于前端决定是否展示「账号密码登录」入口
+     */
+    private boolean hasStaffAccountForOpenid(String openid)
+    {
+        if (StringUtils.isEmpty(openid)) return false;
+        try {
+            SysUser u = userService.selectUserByOpenId(openid);
+            return u != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

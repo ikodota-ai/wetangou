@@ -32,9 +32,9 @@ Page({
     if (!staff || !token) {
       // staff 还没登录，但有外部 scheme code → 跳到登录页带 redirect
       if (this._schemeCode) {
-        wx.redirectTo({ url: '/pages/login/login?tab=account&redirect=verify&code=' + encodeURIComponent(this._schemeCode) + '&sid=' + (this._schemeSid || '') })
+        wx.redirectTo({ url: '/pages/login/login?showMore=1&redirect=verify&code=' + encodeURIComponent(this._schemeCode) })
       } else {
-        wx.redirectTo({ url: '/pages/login/login?tab=account' })
+        wx.redirectTo({ url: '/pages/login/login?showMore=1' })
       }
       return
     }

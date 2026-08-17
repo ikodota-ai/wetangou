@@ -29,7 +29,7 @@ Page({
     const staff = wx.getStorageSync('staffUser') || {}
     const token = wx.getStorageSync('token') || ''
     if (!staff || staff.userType !== 'store' || !token) {
-      wx.redirectTo({ url: '/pages/login/login?tab=account' })
+      wx.redirectTo({ url: '/pages/login/login?showMore=1' })
       return
     }
     this.setData({

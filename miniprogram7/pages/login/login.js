@@ -1,38 +1,53 @@
 const app = getApp()
 const { api, APPID } = require('../../utils/request.js')
 
+/**
+ * 合并登录页（V2.6.2 设计）
+ *  - 主页：一键微信登录（基于 openid 身份识别）
+ *      - 普通会员 → 用户端首页
+ *      - 已绑 openid 的员工/店长/商家 → 直接进商家端
+ *  - 「更多登录方式」折叠区（仅当 hasStaffAccount=true 时显示）：
+ *      - 账号密码登录：用于没绑 openid 的商家账号
+ *      - 扫码加入：扫员工邀请码
+ *  - 用户端右上角有「切换到商家端」入口（仅当该 openid 命中 staff 时显示）
+ */
 Page({
   data: {
-    activeTab: 'wx',      // wx | account | scan
-    agreed: false,
     submitting: false,
+    agreed: false,
+    showMore: false,           // 折叠区是否展开
+    showAccountLogin: false,  // 账号密码登录（折叠区中切换）
     merchantName: '',
     username: '',
-    password: ''
+    password: '',
+    hasStaffAccount: false    // 后端识别：当前 openid 是否绑了商家账号
   },
 
   onLoad(query) {
     const appInst = getApp() || {}
     const m = (appInst.globalData && appInst.globalData.merchant) || {}
-    // 支持 ?tab=account|scan|wx 直接打开对应 tab
-    const t = query && query.tab
-    const activeTab = (t === 'account' || t === 'scan' || t === 'wx') ? t : 'wx'
-    this.setData({ merchantName: m.merchantName || '当前商家', activeTab: activeTab })
+    // 支持 ?showMore=1 直接展开折叠区（用于商家未绑 openid 场景）
+    const showMore = query && (query.showMore === '1' || query.showMore === 1)
+    this.setData({ merchantName: m.merchantName || '当前商家', showMore: !!showMore })
   },
 
   onShow() {
     // 处理从扫码加入回来后可能需要的提示
   },
 
-  onSwitchTab(e) {
-    const tab = e.currentTarget.dataset.tab
-    this.setData({ activeTab: tab, submitting: false })
+  toggleAgree() { this.setData({ agreed: !this.data.agreed }) },
+
+  toggleMore() { this.setData({ showMore: !this.data.showMore }) },
+
+  toggleAccountLogin() {
+    this.setData({
+      showAccountLogin: !this.data.showAccountLogin,
+      showMore: !this.data.showMore
+    })
   },
 
   onUsername(e) { this.setData({ username: e.detail.value }) },
   onPassword(e) { this.setData({ password: e.detail.value }) },
-
-  toggleAgree() { this.setData({ agreed: !this.data.agreed }) },
 
   goAgreement(e) {
     const type = e.currentTarget.dataset.type
@@ -42,24 +57,11 @@ Page({
   onSkip() { wx.switchTab({ url: '/pages/home/index' }) },
 
   /**
-   * 提交登录：按 activeTab 分发
-   *  - wx     → 微信一键登录（消费者）
-   *  - account → 账号密码登录（员工/商家）
-   *  - scan   → 扫一扫（员工邀请码），onScan 自处理
+   * 一键微信登录：openid 优先身份识别
+   *  - 普通会员 → 用户端首页 /pages/home/index
+   *  - 员工/店长/商家（openid 已绑）→ 商家端首页 /pages/merchant/home/index
    */
-  onSubmit() {
-    if (this.data.activeTab === 'wx') {
-      return this._doWxLogin()
-    }
-    if (this.data.activeTab === 'account') {
-      return this._doAccountLogin()
-    }
-  },
-
-  /**
-   * 微信一键登录：原会员登录流程
-   */
-  _doWxLogin() {
+  onWxLogin() {
     if (!this.data.agreed) {
       wx.showToast({ title: '请先阅读并勾选协议', icon: 'none' })
       return
@@ -85,26 +87,7 @@ Page({
         }).then((data) => {
           wx.hideLoading()
           this.setData({ submitting: false })
-          const token = data && (data.token || (data.data && data.data.token))
-          const memberId = data && (data.memberId || (data.data && data.data.memberId))
-          if (!token) {
-            wx.showModal({ title: '登录失败', content: '后端未返回 token', showCancel: false })
-            return
-          }
-          wx.setStorageSync('token', token)
-          const appInst = getApp() || {}
-          appInst.globalData = appInst.globalData || {}
-          appInst.globalData.user = Object.assign(appInst.globalData.user || {}, {
-            memberId: memberId,
-            token: token,
-            nickName: (data.nickName) || (data.data && data.data.nickName) || '',
-            avatarUrl: (data.avatarUrl) || (data.data && data.data.avatarUrl) || '',
-            phone: '',
-            logged: true
-          })
-          appInst.notifyUserUpdate && appInst.notifyUserUpdate()
-          wx.showToast({ title: '登录成功', icon: 'success' })
-          setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 600)
+          this._handleLoginResult(data)
         }).catch((err) => {
           wx.hideLoading()
           this.setData({ submitting: false })
@@ -121,10 +104,82 @@ Page({
   },
 
   /**
-   * 账号密码登录：员工/商家
+   * 处理登录结果：按 loginType 分发
+   */
+  _handleLoginResult(data) {
+    if (!data) {
+      wx.showModal({ title: '登录失败', content: '后端无响应', showCancel: false })
+      return
+    }
+    const token = data.token || (data.data && data.data.token)
+    if (!token) {
+      wx.showModal({ title: '登录失败', content: '后端未返回 token', showCancel: false })
+      return
+    }
+    const loginType = data.loginType || (data.data && data.data.loginType) || 'member'
+    const isStaff = data.isStaff === true || (data.data && data.data.isStaff === true)
+    const hasStaffAccount = data.hasStaffAccount === true || (data.data && data.data.hasStaffAccount === true)
+    const appInst = getApp() || {}
+    appInst.globalData = appInst.globalData || {}
+    // 写 token 到 storage
+    wx.setStorageSync('token', token)
+    if (loginType === 'staff') {
+      // 员工身份：写 staffUser
+      const staffInfo = {
+        token: token,
+        staffId: data.staffUserId || data.memberId,
+        userId: data.staffUserId || data.memberId,
+        realName: data.realName || data.nickName,
+        nickName: data.nickName,
+        avatarUrl: data.avatarUrl,
+        phone: data.phone,
+        merchantId: data.merchantId,
+        storeId: data.storeId,
+        storeIds: data.storeIds || [],
+        roles: data.roles || [],
+        userType: data.userType,
+        isOwner: data.isOwner,
+        isManagerOrAbove: data.isManagerOrAbove,
+        isAgent: data.isAgent,
+        staffRole: data.staffRole,
+        logged: true
+      }
+      wx.setStorageSync('staffUser', staffInfo)
+      appInst.globalData.staff = staffInfo
+      appInst.globalData.user = Object.assign(appInst.globalData.user || {}, {
+        memberId: staffInfo.userId,
+        token: token,
+        nickName: staffInfo.realName,
+        avatarUrl: staffInfo.avatarUrl,
+        phone: staffInfo.phone,
+        logged: true
+      })
+      wx.showToast({ title: '商家端登录成功', icon: 'success' })
+      setTimeout(() => wx.reLaunch({ url: '/pages/merchant/home/index' }), 600)
+    } else {
+      // 会员身份
+      const memberId = data.memberId || (data.data && data.data.memberId)
+      appInst.globalData.user = Object.assign(appInst.globalData.user || {}, {
+        memberId: memberId,
+        token: token,
+        nickName: data.nickName || '',
+        avatarUrl: data.avatarUrl || '',
+        phone: data.phone || '',
+        logged: true
+      })
+      // 副身份提醒：hasStaffAccount → 提示可账号密码登录
+      this.setData({ hasStaffAccount: hasStaffAccount })
+      wx.showToast({ title: '登录成功', icon: 'success' })
+      setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 600)
+    }
+    appInst.notifyUserUpdate && appInst.notifyUserUpdate()
+  },
+
+  /**
+   * 账号密码登录：员工/商家（用于没绑 openid 的账号）
    * 成功后路由到 /pages/merchant/home/index
    */
-  _doAccountLogin() {
+  onAccountLogin() {
     const { username, password, submitting } = this.data
     if (submitting) return
     if (!username || !password) {
@@ -138,30 +193,36 @@ Page({
         wx.hideLoading()
         this.setData({ submitting: false })
         const token = data && (data.token || (data.data && data.data.token))
-        const staff = data && (data.staff || (data.data && data.data.staff)) || (data && data.data)
         if (!token) {
           wx.showModal({ title: '登录失败', content: '后端未返回 token', showCancel: false })
           return
         }
-        // 写 token 到 storage（与会员 token 共享 storage key，靠 userType 区分）
-        wx.setStorageSync('staffToken', token)
-        wx.setStorageSync('staffInfo', staff)
+        // 写 staffUser
+        const staffInfo = {
+          token: token,
+          userId: data.userId,
+          realName: data.realName,
+          nickName: data.nickName,
+          avatarUrl: data.avatarUrl,
+          phone: data.phone,
+          merchantId: data.merchantId,
+          storeId: data.storeId,
+          storeIds: data.storeIds || [],
+          roles: data.roles || [],
+          userType: data.userType,
+          isOwner: data.isOwner,
+          isManagerOrAbove: data.isManagerOrAbove,
+          isAgent: data.isAgent,
+          staffRole: data.staffRole,
+          logged: true
+        }
+        wx.setStorageSync('token', token)
+        wx.setStorageSync('staffUser', staffInfo)
         const appInst = getApp() || {}
         appInst.globalData = appInst.globalData || {}
-        appInst.globalData.staff = Object.assign(appInst.globalData.staff || {}, {
-          token: token,
-          staffId: staff && (staff.staffId || staff.userId),
-          realName: staff && (staff.realName || staff.nickName || staff.username),
-          merchantId: staff && staff.merchantId,
-          storeId: staff && staff.storeId,
-          storeName: staff && staff.storeName,
-          roles: staff && staff.roles,
-          logged: true
-        })
-        wx.showToast({ title: '登录成功', icon: 'success' })
-        setTimeout(() => {
-          wx.reLaunch({ url: '/pages/merchant/home/index' })
-        }, 600)
+        appInst.globalData.staff = staffInfo
+        wx.showToast({ title: '商家端登录成功', icon: 'success' })
+        setTimeout(() => wx.reLaunch({ url: '/pages/merchant/home/index' }), 600)
       })
       .catch((err) => {
         wx.hideLoading()
@@ -173,65 +234,35 @@ Page({
 
   /**
    * 扫码加入：扫员工邀请码
-   * 兼容两种格式：
-   *  1) scene 字符串：invite:MID:SID:CODE
-   *  2) 小程序码 path：pages/merchant/scan/index?scene=invite%3A...
    */
   onScan() {
     wx.scanCode({
-      onlyFromCamera: false,
       scanType: ['qrCode'],
-      success: (res) => {
-        const raw = (res && (res.result || res.path)) || ''
-        if (!raw) {
-          wx.showToast({ title: '未识别到内容', icon: 'none' })
-          return
-        }
-        let scene = raw
-        const queryIdx = raw.indexOf('scene=')
-        if (raw.indexOf('pages/') === 0 && queryIdx > -1) {
-          scene = decodeURIComponent(raw.substring(queryIdx + 6))
-        }
-        if (scene.indexOf('invite:') !== 0) {
-          wx.showToast({ title: '非商家邀请码', icon: 'none' })
-          return
-        }
-        this._acceptInvite(scene)
-      },
-      fail: (err) => {
-        console.warn('[login] scan cancel/fail', err)
-      }
+      success: (res) => this._handleScanResult((res && (res.result || res.path)) || ''),
+      fail: () => { wx.showToast({ title: '扫码已取消', icon: 'none' }) }
     })
   },
 
-  _acceptInvite(scene) {
-    wx.login({
-      success: (lr) => {
-        if (!lr || !lr.code) {
-          wx.showToast({ title: '微信登录失败', icon: 'none' })
-          return
-        }
-        wx.showLoading({ title: '加入中...', mask: true })
-        api.merchantStaffAcceptInvite({ code: lr.code, appid: APPID, scene: scene })
-          .then((data) => {
-            wx.hideLoading()
-            const token = data && (data.token || (data.data && data.data.token))
-            if (!token) {
-              wx.showModal({ title: '加入失败', content: '未返回 token', showCancel: false })
-              return
-            }
-            wx.setStorageSync('staffToken', token)
-            wx.showToast({ title: '已加入商家', icon: 'success' })
-            setTimeout(() => {
-              wx.reLaunch({ url: '/pages/merchant/home/index' })
-            }, 600)
-          })
-          .catch((err) => {
-            wx.hideLoading()
-            const msg = (err && (err.msg || err.errMsg || err.message)) || '加入失败'
-            wx.showModal({ title: '加入失败', content: msg, showCancel: false })
-          })
+  _handleScanResult(text) {
+    if (!text) return
+    let scene = text
+    if (text.indexOf('scene=') >= 0) {
+      try {
+        const u = new URL(text)
+        scene = u.searchParams.get('scene') || text
+      } catch (e) {
+        const m = text.match(/scene=([^&]+)/)
+        scene = m ? decodeURIComponent(m[1]) : text
       }
-    })
+    }
+    if (scene.indexOf('invite:') === 0) {
+      wx.navigateTo({ url: '/pages/merchant/scan/index?scene=' + encodeURIComponent(scene) })
+      return
+    }
+    if (scene.indexOf('distributor:') === 0 || scene.indexOf('verify:') === 0) {
+      wx.showToast({ title: '请用「扫一扫」扫描邀请码', icon: 'none' })
+      return
+    }
+    wx.showToast({ title: '无法识别的二维码', icon: 'none' })
   }
 })

@@ -29,7 +29,7 @@ Page({
       })
       .catch((err) => {
         if (err && err.code === 401) {
-          wx.redirectTo({ url: '/pages/login/login?tab=account' })
+          wx.redirectTo({ url: '/pages/login/login?showMore=1' })
         } else {
           console.warn('[merchant me] err', err)
         }
@@ -59,7 +59,7 @@ Page({
             wx.removeStorageSync('staffUser')
             const backup = wx.getStorageSync('memberTokenBackup')
             if (backup) wx.setStorageSync('token', backup)
-            wx.reLaunch({ url: '/pages/login/login?tab=account' })
+            wx.reLaunch({ url: '/pages/login/login?showMore=1' })
           })
       }
     })
