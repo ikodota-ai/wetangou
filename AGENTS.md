@@ -2412,3 +2412,69 @@ redis-cli -h 127.0.0.1 -p 6379 DEL 'sys_config:wx.miniapp.mockEnabled' 'merchant
 - [ ] 员工未登录时跳 login?tab=account，登录后回 verify 自动核销
 - [ ] 核销成功后页面提示「核销成功」+ 订单状态变 2
 - [ ] 数据库 `biz_order.status='2'` + `verify_code` 一致
+
+## v2.6.2 续篇（2026-08-17 · openid 优先身份识别）
+
+> commit `d5956bdf` · 17 files / +506 / -202
+
+### 设计变更（用户反馈后调整）
+
+V2.6.1 的「3 tab 选身份」方案不直观。V2.6.2 改为 **「openid 优先 + 折叠其他方式」**：
+
+```
+用户进入登录页
+  ↓
+【主路径】一键微信登录
+  ↓
+后端按 openid 查身份：
+  - 命中 sys_user + biz_merchant_staff 且 status=0 → 直接返 staff token，进商家端
+  - 命中但 status=1（停用）→ 兜底走会员登录，前端 hasStaffAccount=true 提示
+  - 未命中 → 走普通会员登录，进用户端
+  ↓
+【折叠区】更多登录方式（hasStaffAccount=true 时默认展开）
+  - 账号密码登录：商家未绑 openid 兜底
+  - 扫码加入：扫员工邀请码
+  ↓
+【用户端右上角】staff 切换浮层（仅 hasStaff 时显示）
+  → 一键 reLaunch 到 /pages/merchant/home/index
+```
+
+### 后端改动
+
+`ApiAuthController.login`：
+- openid 优先：先 `userService.selectUserByOpenId(openid)` 查 staff
+- 命中 + status=0 + 有 biz_merchant_staff 关联 → 走 staff token 路径
+  - 复用 `buildLoginMember` 核心逻辑（建在同 controller 里避免跨 controller 引用）
+  - 返 `loginType:staff` + `isStaff:true` + `isOwner/isManagerOrAbove/isAgent` + `roles` + `staffRole` + `storeId/storeIds` + `merchantId` + `realName` + `staffUserId`
+- 兜底：普通会员登录
+- 新增字段 `hasStaffAccount`（即使 staff status=1，前端也提示「可账号密码登录」）
+
+### 前端改动
+
+- `pages/login/login.{js,wxml,wxss}` 重写：
+  - 主页：单一「微信一键登录」按钮 + 协议
+  - 底部折叠区：「更多登录方式」（账号密码 / 扫码加入）
+  - `?showMore=1` URL 参数直接展开折叠区
+  - 9 个旧跳转（staff/merchant/platform/agent/mine）从 `?tab=account` 改为 `?showMore=1`
+- `pages/home/index.{js,wxml,wxss}` 加右上角「切到商家端」浮层
+  - 仅 `hasStaff=true`（即 storage.staffUser 存在）时显示
+  - 点击 `wx.reLaunch({ url: '/pages/merchant/home/index' })`
+
+### 验证
+
+- ✅ `smoke-c53` 11/11 PASS：openid 优先身份识别三场景
+- ✅ `smoke-c52` 9/9 PASS：太阳码回归
+- ✅ `smoke-c47/c51` 回归 PASS
+- ✅ vitest 66/66 PASS
+- ✅ `mvn compile` BUILD SUCCESS
+- ✅ curl 端到端：
+  - 纯会员 → `loginType:member, isStaff:false`
+  - openid 绑 owner_c43 → `loginType:staff, isStaff:true, isOwner:true, staffRole:OWNER, roles:[OWNER]`
+  - staff token 调 `/api/merchant/staff/me` → `userId:59`
+  - status=1 停用 → 兜底 member + `hasStaffAccount:true`
+
+### 关键设计点
+
+- **token 共享 storage key**：`wx.setStorageSync('token', token)`，会员和员工都用同一个 key，前端通过 storage.staffUser 是否存在区分身份
+- **userType 字段**：`/api/auth/login` 返 `userType=owner/manager/staff/agent/platform/member`，拦截器据此鉴权
+- **statusBar 高度兼容**：浮层用 `position:absolute; top:24rpx; right:24rpx; z-index:10`，不依赖 statusBar
