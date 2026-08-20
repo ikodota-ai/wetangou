@@ -19,8 +19,6 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.LoginRequired;
-import com.ruoyi.biz.api.annotation.RequireRole;
-import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Booking;
 import com.ruoyi.biz.domain.BookingMember;
@@ -62,7 +60,6 @@ public class ApiBookingController
      * 会员报名预约
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping
     public AjaxResult create(@RequestBody JSONObject body)
     {
@@ -151,7 +148,6 @@ public class ApiBookingController
      * <p>自己看自己 → phone 明文；过滤 status=2（已取消）默认排除，避免列表噪音。</p>
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/list")
     public AjaxResult list(@RequestParam(required = false) String status)
     {
@@ -201,7 +197,6 @@ public class ApiBookingController
      * <p>自己看自己 → phone 明文；不返回实体，避免 @Sensitive 把它变 138****0000。</p>
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/signup/{signupId}")
     public AjaxResult signupDetail(@PathVariable Long signupId)
     {
@@ -243,7 +238,6 @@ public class ApiBookingController
      * 其他会员的联系人与手机号不对外暴露。</p>
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/{bookingId}")
     public AjaxResult detail(@PathVariable Long bookingId)
     {
@@ -278,7 +272,6 @@ public class ApiBookingController
      * 取消动作由请求头 userType 决定：member 走本人校验，store 走门店归属校验。</p>
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/cancel/{signupId}")
     public AjaxResult cancel(@PathVariable Long signupId)
     {

@@ -86,6 +86,11 @@ public class ApiDistributorController
      * 入参：无（从 token 拿 agentId，再查名下 merchantIds）
      * 返回：{ totalAmount, settledAmount, pendingAmount, commissionCount, merchants: [...] }
      */
+    // 类上有 @DistributorRequired（推客才能访问），但本端点是**代理商**视角：
+    // 代理商账号通常不是推客，会被拦截器 403「您还不是推客，请先申请加入」，
+    // C1/C26 的代理商佣金概览就变成永远打不开的 dead-end。
+    // 用 @Anonymous 跳过推客校验，方法体内已用 userType=1 + agentId 做鉴权。
+    @Anonymous
     @GetMapping("/agent/summary")
     public AjaxResult agentSummary()
     {

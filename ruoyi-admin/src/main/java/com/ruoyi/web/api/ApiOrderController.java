@@ -15,8 +15,6 @@ import org.slf4j.LoggerFactory;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.biz.api.annotation.LoginRequired;
-import com.ruoyi.biz.api.annotation.RequireRole;
-import com.ruoyi.biz.api.role.BizRole;
 import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.api.service.WxPayService;
 import com.ruoyi.biz.api.service.WxMaService;
@@ -82,7 +80,6 @@ public class ApiOrderController
      * mock模式（未配齐微信支付凭证）直接置为支付成功并返回 mock=true。
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/prepay/{orderId}")
     public AjaxResult prepay(@PathVariable Long orderId)
     {
@@ -131,7 +128,6 @@ public class ApiOrderController
      * 模拟支付成功（仅mock模式下由前端触发；真实环境由微信支付回调触发）
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/pay/{orderId}")
     public AjaxResult pay(@PathVariable Long orderId)
     {
@@ -153,7 +149,6 @@ public class ApiOrderController
      * 不走 wxPayService.createOrder，直接落 paySuccess，验证佣金真实入账链路
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/_e2e_paySuccess/{orderId}")
     public AjaxResult e2ePaySuccess(@PathVariable Long orderId)
     {
@@ -177,7 +172,6 @@ public class ApiOrderController
      * 我的订单列表（按状态筛选）
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/list")
     public AjaxResult list(@RequestParam(required = false) String status)
     {
@@ -192,7 +186,6 @@ public class ApiOrderController
      * 订单详情
      */
     @LoginRequired
-    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @GetMapping("/{orderId}")
     public AjaxResult detail(@PathVariable Long orderId)
     {
