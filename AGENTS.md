@@ -2478,3 +2478,172 @@ V2.6.1 的「3 tab 选身份」方案不直观。V2.6.2 改为 **「openid 优�
 - **token 共享 storage key**：`wx.setStorageSync('token', token)`，会员和员工都用同一个 key，前端通过 storage.staffUser 是否存在区分身份
 - **userType 字段**：`/api/auth/login` 返 `userType=owner/manager/staff/agent/platform/member`，拦截器据此鉴权
 - **statusBar 高度兼容**：浮层用 `position:absolute; top:24rpx; right:24rpx; z-index:10`，不依赖 statusBar
+
+## 项目摸底 + 实测基线（2026-08-20 · 无代码改动的全量审计）
+
+> 背景：火山引擎 coding plan → agent plan 切换后 `/resume` 丢失上下文，本次重新完整摸清项目并**实测**（非文档转述）。
+
+### 项目全景速查
+
+| 维度 | 事实 |
+|---|---|
+| 基座 | RuoYi-Vue 3.9.2，7 Maven 模块 + Vue2 admin + 微信小程序 |
+| 代码量 | 514 个 `.java` / 104 个 MyBatis XML / 76 个 Controller |
+| PC 三端身份 | 平台 `userType=0` / 代理商 `1` / 商户 `2`，`login.vue resolveEntryPath()` 分流 |
+| 小程序 5 角色 | PLATFORM / AGENT / OWNER / MANAGER / STAFF，走 `@RequireRole` + `RoleAuthInterceptor` |
+| 小程序页面 | `miniprogram7/app.json` **48 页**（顾客端 + 员工端 + 商家端 + 平台/代理商工作台） |
+| admin 业务模块 | `ruoyi-ui/src/views/biz/` **29 个** + `src/api/biz/` 29 个 API |
+| 业务表 | **37 张 `biz_*`** 全部已建（商品 184 / 订单 152 / 会员 655 / 商家员工 24） |
+| 多商户代发布 | `MpReleaseController` 11 端点 + `WxOpenService` 14 方法 + ext.json 注入 appid/merchantId/baseUrl（代码 100%） |
+| 存储 | `StorageFactory` 1 套 S3 适配 5 云（local/oss/minio/qiniu/cos），`aliyun-oss` profile 就绪 |
+| smoke 脚本 | `.github/scripts/` **62 个** smoke + 3 个 lint |
+
+### 实测基线（2026-08-20 20:35~20:50 实跑）
+
+| 项目 | 结果 |
+|---|---|
+| 后端进程 | PID 11093（screen `ry-mock3`，profile=druid），`/api/ping` 200 |
+| `mvn test -pl ruoyi-system` | **10/10 PASS**（CommissionMapperTest 3 + AgentServiceImplTest 7） |
+| vitest（miniprogram7） | **66/66 PASS**（5 文件） |
+| lint-mybatis | 52 xml / **0 errors** |
+| lint-sql-seed | 21/21 PASS |
+| lint-smoke | 62 个脚本，1 fail（`smoke-c46.sh` 缺 shebang → 本轮已修） |
+| 全量 smoke | **40 PASS / 22 FAIL** |
+
+### 22 个 smoke FAIL 根因定位（**全部是 fixture 漂移，0 个产品缺陷**）
+
+这是本次摸底最重要的结论，避免后续 session 误判为「产品有 22 个 bug」。
+
+| 类别 | 脚本 | 根因 | 证据 |
+|---|---|---|---|
+| **fixture 数据缺失** | e16 | `biz_banner` 999301 记录不存在，`getInfo` 拿到 null 直接 `success()` 跳过 `assertDataScope` 断言 | 重新导入 `sql/smoke-e13-e17-fixture.sql` → **立刻 18/18 PASS** |
+| **脚本早于 RBAC 加固** | c35 c36 c39 c40 c41 | 脚本写于 `6524f6d3`（V5-1 `@RequireRole`）**之前**，用普通会员 token 调 `@RequireRole({OWNER,MANAGER})` 端点 → 403 | `owner_c43` 实测 `POST /api/product/add` → **200 productId=999609** |
+| 同上 | c5 c17 c18 c22 | 同因，403「需要 OWNER/MANAGER/STAFF」 | — |
+| **fixture 账号密码漂移** | c11 c20 | `staff001` 密码被历史 smoke 改过 → 「账号或密码错误」 | `owner_c43`/`manager_c43` + `admin123` 登录 **200 带 staffRole/roles/storeIds** |
+| **库存耗尽 + set -e 静默中断** | c2 c3 c4 | 商品 1000 库存 0 → `{"msg":"商品库存不足"}` → `ORDER_ID` 空 → `set -e` 中断，日志无 ❌ 只是提前结束 | `bash -x` 复现断点 |
+| **串行互相污染** | c52 | `c53` 把 `biz_member 1000197` 的 openid 改成 `mock_c53_plain`，c52 用 `code=c52_1000197` 派生 `mock_c52_1000197` → 落到新 member → 订单 999178 归属人不匹配 → 「无权查看该订单的核销码」 | mock openid 规则：`WxMaService:84` `openid = "mock_" + jsCode` |
+| **推客/代理商身份漂移** | c23 c26 | fixture member 已不是推客 → 403「您还不是推客」 | — |
+| **真实微信凭证缺失** | c16 | `wx.miniapp` 走 mock 但某端点需真 access_token → 「获取access_token失败」 | 14/15 PASS，仅 1 case |
+| **其他 fixture** | c6 c8 c25 | `set -e` 提前结束，已通过的断言全 ✅ | — |
+
+### 关键安全防线（已实装，实测确认）
+
+- `WxMaConfig.isMockEnabled()` / `WxPayConfig.isMockEnabled()` 在 active profile 含 **`prod`** 时**强制返回 false**，即便 `sys_config` 被误改为 true 也无效。
+- `TenantFilterHelper.assertDataScope(merchantId)` 已在 6 个 controller 的 `getInfo` 落地（Product/Category/Store/StoreAlbum/Booking/Banner），e16 18/18 验证。
+- admin 端 biz controller 全部有 `@PreAuthorize`。
+
+### ⚠️ 上线阻塞项（部署前必须处理，已参数化到 `sql/deploy/` + `doc/上线配置清单-2026-08-20.md`）
+
+1. **`aliyun-oss` profile 单独激活不会强制关 mock**（最高危）
+   - `application-aliyun-oss.yml` 不含 `prod` 标记，此时 mock 由 `sys_config` 决定
+   - 当前库里 `wx.miniapp.mockEnabled=true` / `wx.pay.mockEnabled=true`
+   - **必须用 `-Dspring.profiles.active=prod,aliyun-oss`**，否则生产可能走 mock 支付（钱收不到）
+2. **微信/支付凭证全空**：`wx.open.*` 7 项 + `wx.pay.*` 6 项都是空串，`wx.pay.notifyUrl` 还是 `https://your-domain.com/api/pay/notify`
+3. **JWT secret 是默认值**：`application.yml` `token.secret: abcdefghijklmnopqrstuvwxyz`
+4. **prod profile 硬编码本地库**：`application-prod.yml` `url: jdbc:mysql://localhost:3306/ry-vue` + `password: 133301`；Druid 控制台默认口令 `ruoyi/123456` 且 `statViewServlet.enabled=true`
+5. **小程序 BASE_URL 是局域网 IP**：`miniprogram7/utils/config.js` 默认 `http://172.31.26.216:8080`，`BASE_URL_FALLBACKS` 全内网
+
+### 环境备忘（本机）
+
+- mysql 客户端**不在 PATH**，用绝对路径：`/usr/local/mysql/bin/mysql -uroot -p133301 ry-vue`
+- macOS **没有 `timeout` 命令**（跑 smoke 别包 timeout，会全部假 FAIL）
+- 后端启动：screen 会话 `ry-mock3`，`-Dspring.profiles.active=druid`
+
+## 上线前收口（2026-08-20 · smoke 40→62/62 + 3 个真实上线阻断缺陷）
+
+> 承接上一节「项目摸底 + 实测基线」。上一节结论是「22 个 FAIL 全是 fixture 漂移」，
+> 本轮按 fixture 自备去修时，**又挖出 3 个真实产品缺陷**（fixture 修好后才暴露出来）。
+
+### ⚠️ 3 个真实缺陷（全部会阻断生产，已修）
+
+#### 1. 顾客端 9 个核心端点被误加员工角色门禁（最严重）
+
+`6524f6d3`（V5-1 批量加 `@RequireRole`）误伤了**会员自助端点**，普通会员调用一律 403：
+
+| Controller | 端点 | 影响 |
+|---|---|---|
+| ApiOrderController | `POST /api/order/prepay/{id}` | **会员无法支付**（下单能成功，付款 403）|
+| ApiOrderController | `POST /api/order/pay/{id}` | 同上 |
+| ApiOrderController | `POST /api/order/_e2e_paySuccess/{id}` | e2e 调试端点 |
+| ApiOrderController | `GET /api/order/list` | 「我的订单」打不开 |
+| ApiOrderController | `GET /api/order/{id}` | 订单详情打不开 |
+| ApiBillController | `POST /api/bill` + `/{billId}` + `/prepay` + `/pay` | 买单全链路不可用 |
+| ApiBookingController | `POST /api/booking` + `/list` + `/signup/{id}` + `/{id}` + `/cancel/{id}` | 预约全链路不可用 |
+
+- **判定依据**：这些方法注释都写着「会员发起买单」「我的订单列表」「会员支付」，
+  且方法体内**已有** `MemberContextHolder.getMemberId()` 归属校验（不存在越权风险）。
+  角色门禁纯属批量加注解时误伤。
+- **修法**：移除这 14 处 `@RequireRole`（3 个 controller 的 `@RequireRole` 归零 + 清理 import）。
+- **保留**：`ApiProductController.add/edit/status` 的 `@RequireRole({OWNER,MANAGER})` 是**正确**的
+  （商家建商品），会员建商品本就该 403。
+- **验证**：会员 token 实测 下单 200 → prepay 200(mock) → list 200 → detail 200 → bill 200 → booking 200。
+
+#### 2. `ProductMapper.updateProduct` 引用了不存在的列 → 支付扣库存必崩
+
+- 症状：`prepay` 报 `ReflectionException: There is no getter for property named 'voucherAutoName' in 'class Product'`。
+- 根因：`f99942c0`「主表瘦身 + biz_product_ext 1:1 扩展表」把 13 个字段迁到 ext 表，
+  但 `updateProduct` 的 `<if>` 分支没删干净。这 13 个字段 `biz_product` 表已无对应列、
+  `Product` 实体也没 getter → 任何走 `updateProduct` 的操作（含**支付成功后扣库存**）直接 500。
+- 涉及字段：`voucherAutoName / voucherMinConsume / voucherScopeType / voucherScopeIds /
+  comboTotalValue / comboSaleType / comboAutoExtendDays / outerSubitemId / comboItemsJson /
+  grouponPickRule / grouponActualCount / dailyUseLimit / refundRuleType`
+- 顺带修第二层 bug：`where p.product_id = #{productId}` —— UPDATE 语句没有表别名，
+  `p.` 前缀导致 `SQLSyntaxErrorException: Unknown column 'p.product_id' in 'where clause'`。
+- **注意**：`resultMap` 里的 `voucherAutoName` 映射要保留（那是 ext join 的映射，合法）。
+
+#### 3. 代理商佣金概览是 dead-end（C1/C26 没真正解锁）
+
+- `ApiDistributorController` **类级**有 `@DistributorRequired`（必须是推客），
+  但 `/api/distributor/agent/summary` 是**代理商**视角的端点。
+  代理商账号通常不是推客 → 拦截器 403「您还不是推客，请先申请加入」→ 永远打不开。
+- 类级注解无法为单个方法豁免，`/join` 早先就是用 `@Anonymous` 绕的（同一套模式）。
+- 修法：`agentSummary()` 加 `@Anonymous`（方法体内已自校验 `未登录` + `userType=1` + `agentId`）。
+- 验证：smoke-c23 / c26 从 FAIL 转 PASS。
+
+### smoke 基线 40 → 62/62
+
+新增 `.github/scripts/lib/smoke-fixture.sh`（共享 fixture 库，7 个 helper）：
+
+| helper | 解决的污染 |
+|---|---|
+| `fx_reset_staff_pwd` | 历史 smoke 改过 `staff001` 密码 → 后续脚本登录 500 |
+| `fx_fix_staff_user_type` | `staff001.user_type` 曾是 `'00'`（平台），商家端点抛「非商家员工身份」；商户员工必须 `'02'` |
+| `fx_ensure_product_stock` | 商品 1000 被历史下单耗成 stock=0 / del_flag=2 |
+| `fx_pin_member_openid` | c53 覆盖 member 1000197 的 openid → c52 认不出订单归属人 |
+| `fx_clear_member_openid` | 「无 openid 分支」用例：openid 是 NOT NULL 且有唯一键，置 NULL/空串都会报错 |
+| `fx_load_e13_e17_fixture` | e13~e17 跨租户 fixture 缺失 → `getInfo` 返 null 直接 success，越权断言根本没跑 |
+| `fx_login_owner` / `fx_login_admin` / `fx_login_member` | 统一取正确身份的 token |
+
+踩到的 4 个 bash/MySQL 坑（写脚本时注意）：
+
+1. macOS **没有 `timeout`** 命令 —— 包一层会让全部 smoke 假 FAIL。
+2. `biz_member.openid` 是 **NOT NULL** + 唯一键 `uk_merchant_openid(merchant_id, openid)`：
+   置 NULL → ERROR 1048；统一置 `''` → 第二个 ERROR 1062。要先腾空占用者。
+3. `LOG_BEFORE=$(grep -c ... || echo 0)`：`grep -c` 无匹配时 rc=1，
+   命令替换的退出码会传给赋值语句，**`set -e` 直接中断脚本**（且日志里看不到 ❌，只是提前结束）。
+   正确写法：`X=$(grep -c ... ) || X=0`。
+4. 用会员 token 冒充商家建商品：V5-1 之后 `/api/product/add` 要 OWNER/MANAGER，得用 `fx_login_owner`。
+
+### 上线配置参数化（5 个阻塞项）
+
+- `application.yml`：`token.secret` → `${JWT_SECRET:...}`（原默认值 `abcdefghijklmnopqrstuvwxyz` 等于公开密钥）
+- `application-prod.yml`：数据源 → `${DB_HOST}/${DB_PORT}/${DB_NAME}/${DB_USER}/${DB_PASSWORD}`；
+  Druid 监控页 `enabled: ${DRUID_STAT_ENABLED:false}`（**默认关**）+ 口令走环境变量
+- **`WxPayConfig` / `WxMaConfig` 的 `isProductionProfile()` 扩展**（最高危项的代码层兜底）：
+  原来只认 `prod`，但部署文档教的是 `-Dspring.profiles.active=aliyun-oss` ——
+  那种启法下 mock 开关会退回读 `sys_config`（库里存量是 `true`）→ **生产走 mock 支付**。
+  现在 `prod / production / aliyun-oss / oss / minio / cos / qiniu` 都算生产，一律强制关 mock。
+  实测：`-Dspring.profiles.active=aliyun-oss,druid` 启动 + `sys_config` mock=true，
+  调 `/api/auth/login` 返回 `errcode 40029 invalid code`（真的走了微信 API，mock 已被强制关）✅
+- 新增 `doc/上线配置清单-2026-08-20.md`（170 行）+ `.github/scripts/preflight-prod.sh`（8 项自检）
+- **仍必须显式写 `-Dspring.profiles.active=prod,aliyun-oss`**，兜底只是防漏
+
+### 本轮最终基线
+
+| 项 | 结果 |
+|---|---|
+| smoke | **62/62 PASS**（从 40/62） |
+| JUnit（ruoyi-system） | 10/10 PASS |
+| vitest（miniprogram7） | 66/66 PASS |
+| lint-mybatis / lint-smoke / lint-sql-seed | 52 xml 0 err / 62 脚本 0 fail / 21 seed 0 fail |
+| `mvn package` | BUILD SUCCESS |
