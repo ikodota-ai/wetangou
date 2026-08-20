@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # C41 「商家端商品创建+列表+搭配+上下架」端到端 smoke
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_reset_staff_pwd staff001
+
 set -e
 H=http://127.0.0.1:8080
 LOG=/tmp/jrun-c41.log
@@ -15,7 +22,9 @@ echo "C41 「商家端商品创建+列表+搭配+上下架」 smoke:"
 # A) 商家登录拿 token
 LOGIN=$(curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"code\":\"smoke_c41_mer_${TS}\",\"appid\":\"wx9e147c4e2151b123\",\"nickName\":\"c41_mer\"}" $H/api/auth/login)
-MTOK=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
+# MTOK 原先用「会员 token」冒充商家建商品；V5-1 给 /api/product/add 加了
+# @RequireRole({OWNER,MANAGER}) 后必须用真实 OWNER token（会员建商品本就该 403）。
+MTOK=$(fx_login_owner)
 [ -n "$MTOK" ] && echo "  ✅ A) 商家登录" && PASS=$((PASS+1)) || { echo "  ❌ A) login"; FAIL=$((FAIL+1)); exit 1; }
 
 # B) 创建团购商品

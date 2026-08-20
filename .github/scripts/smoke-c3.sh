@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # C3 commission 链路 smoke: member→distributor→order(distributorId)→paySuccess→commission
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_ensure_product_stock 1000
+
 set -e
 H=http://127.0.0.1:8080
 APPID="${APPID:-wx9e147c4e2151b123}"

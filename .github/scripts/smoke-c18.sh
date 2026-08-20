@@ -10,6 +10,13 @@
 #   G) POST /api/order/pay/{id} 跨会员越权
 #   H) POST /api/order/_e2e_paySuccess/{id} 内部端点 (mock 支付成功)
 #   I) POST /api/order/prepay/{id} (已有, 业务核心)
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_reset_staff_pwd staff001
+
 set -e
 H=http://127.0.0.1:8080
 DB_CMD="/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 --default-character-set=utf8mb4 ry-vue"

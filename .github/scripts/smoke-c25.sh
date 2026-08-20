@@ -6,6 +6,15 @@
 #   C) /api/merchant/staff/booking/signup/list memberPhone 脱敏
 #   D) /api/store/staff/me realName/phone 脱敏 (员工查自己)
 # 前置: 后端 8080 在跑; mock appid; staff001 可登录
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_ensure_product_stock 1000
+fx_reset_staff_pwd staff001
+fx_fix_staff_user_type staff001
+
 set -e
 H=http://127.0.0.1:8080
 DB="/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue"

@@ -7,6 +7,12 @@
 #   D) /api/auth/info 返 userType/agentId 字段 (新写入)
 #   E) DB 还原 user_type=0, agent_id=NULL (cleanup)
 # 前置: 后端 8080 在跑; mock appid
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+
 set -e
 H=http://127.0.0.1:8080
 DB="/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue"

@@ -3,6 +3,13 @@
 # 验证: bill 状态机 0→1(create mock 自动)→2(prepay mock 触发 markPaid)
 #       payAmount 写入 + memberVoucher 不在时不写
 # 注意: biz_settle_record 不在 bill 链路里 (bill 走 commission 路径, commission 走 settle_days 冷静期)
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_ensure_product_stock 1000
+
 set -e
 H=http://127.0.0.1:8080
 APPID="${APPID:-wx9e147c4e2151b123}"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 H=http://127.0.0.1:8080
 PASS=0; FAIL=0

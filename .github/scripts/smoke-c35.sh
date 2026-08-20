@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 # C35 核销成功订阅消息端到端
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_reset_staff_pwd staff001
+
 set -e
 H=http://127.0.0.1:8080
 DB="/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue"
-LOG=/tmp/jrun-c35.log
+# 后端日志路径（D 步骤要 grep「核销通知/订阅消息」断言）。
+# 可显式传 LOG=...；未传时自动挑「最近被写过的」候选日志，避免串行跑时
+# 因为写死路径不存在而拿不到日志 → 假 FAIL。
+if [ -z "${LOG:-}" ]; then
+  LOG=$(ls -t /tmp/ry-*.log /tmp/jrun*.log 2>/dev/null | head -1)
+  LOG="${LOG:-/tmp/jrun-c35.log}"
+fi
 TS=$(date +%s | tail -c 7)
 PASS=0; FAIL=0
 chk() { local n="$1" e="$2" g="$3"
@@ -16,7 +29,9 @@ echo "C35 核销成功订阅消息 smoke:"
 # A) 商家端 add product
 LOGIN=$(curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"code\":\"smoke_c35_${TS}\",\"appid\":\"wx9e147c4e2151b123\",\"nickName\":\"smoke_c35_mer\"}" $H/api/auth/login)
-MTOK=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
+# MTOK 原先用「会员 token」冒充商家建商品；V5-1 给 /api/product/add 加了
+# @RequireRole({OWNER,MANAGER}) 后必须用真实 OWNER token（会员建商品本就该 403）。
+MTOK=$(fx_login_owner)
 ADD=$(curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $MTOK" \
   -d "{\"storeIds\":\"200\",\"typeCode\":\"GROUPON\",\"productName\":\"C35_$TS\",\"price\":1,\"validityDays\":30,\"maxPerOrder\":1,\"stock\":10,\"productType\":\"0\",\"status\":\"0\",\"delFlag\":\"0\",\"sales\":0,\"sort\":0,\"bookingRequired\":0}" $H/api/product/add)
 PID=$(echo "$ADD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('productId',0))")
@@ -87,14 +102,17 @@ ORD2=$(curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Be
   -d "{\"productId\":$PID,\"num\":1}" $H/api/order)
 OID2=$(echo "$ORD2" | python3 -c "import sys,json; d=json.load(sys.stdin).get('data'); print(d.get('orderId',0) if isinstance(d, dict) else 0)" 2>/dev/null)
 curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $MTOK_MEM" $H/api/order/prepay/$OID2 > /dev/null
-$DB -e "UPDATE biz_member SET openid=NULL WHERE member_id=$MEM_ID;" 2>/dev/null
+# biz_member.openid 是 NOT NULL 列，置 NULL 会 ERROR 1048 并被 set -e 中断。
+# 后端判定用 openid == null || openid.isEmpty()（ApiOrderController:318），空串同样命中
+# 「无 openid 跳过」分支，所以这里用空串表达「无 openid」。
+fx_clear_member_openid "$MEM_ID"
 $DB -e "UPDATE biz_order SET status='1', pay_time=now(), expire_time=DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE order_id=$OID2;" 2>/dev/null
 VC2=$($DB -N -e "SELECT verify_code FROM biz_order WHERE order_id=$OID2;" 2>/dev/null | head -1)
-LOG_BEFORE=$(grep -c "无 openid" $LOG 2>/dev/null || echo 0)
+LOG_BEFORE=$(grep -c "无 openid" "$LOG" 2>/dev/null) || LOG_BEFORE=0
 curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $STOK" \
   -d "{\"storeId\":$STAFF_SID,\"verifyCode\":\"$VC2\"}" $H/api/order/verify > /dev/null
 sleep 1
-LOG_AFTER=$(grep -c "无 openid" $LOG 2>/dev/null || echo 0)
+LOG_AFTER=$(grep -c "无 openid" "$LOG" 2>/dev/null) || LOG_AFTER=0
 if [ "$LOG_AFTER" -gt "$LOG_BEFORE" ]; then
   echo "  ✅ F) 无 openid 静默跳过"
   PASS=$((PASS+1))

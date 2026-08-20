@@ -6,6 +6,15 @@
 #   - dataUrl 是 data:image/png;base64, 开头
 #   - 仅本人订单可访问（他人 → 错误）
 #   - 原始 /qrcode 端点返 image/png 字节
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 关键：本脚本用 code=c52_1000197 登录，依赖 member 1000197 的 openid == mock_c52_1000197。
+# 而 smoke-c53 会把该 member 的 openid 改成 mock_c53_plain，串行跑时本脚本会认不出订单归属人
+# → "无权查看该订单的核销码"。这里把 openid 钉回来。
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_pin_member_openid 1000197 c52_1000197
+
 set -u
 H=http://127.0.0.1:8080
 PASS=0; FAIL=0

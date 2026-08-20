@@ -8,6 +8,13 @@
 #   E) no auth → 401
 #
 # 前置: 后端 8080 在跑; productId=1000 mid=1 storeId=200; staff001 已关联 store 200
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_ensure_product_stock 1000
+
 set -e
 H=http://127.0.0.1:8080
 APPID="${APPID:-wx9e147c4e2151b123}"

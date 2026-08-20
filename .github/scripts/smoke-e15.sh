@@ -2,6 +2,12 @@
 # E15 P1 smoke: 6 controller 越权 guard
 #   - Member / Distributor / MerchantFee / Commission / CommissionRule → assertDataScope (merchantId)
 #   - AgentFee → assertAgentDataScope (agentId)
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_load_e13_e17_fixture
+
 set -e
 H=http://127.0.0.1:8080
 J() { python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))"; }

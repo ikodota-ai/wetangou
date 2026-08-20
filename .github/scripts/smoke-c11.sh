@@ -10,6 +10,14 @@
 #   G) 缺 storeIds 应被拒
 #   H) 防越权：员工不能给非自己 merchantId 的门店建（merchantId 强制覆盖）
 #   I) 创建后 productId 真实落库 + biz_product.typeCode 与请求一致
+
+# fixture 自备（见 .github/scripts/lib/smoke-fixture.sh）
+# 背景：62 smoke 串行跑会互相污染（改密码/耗库存/覆盖 openid），造成假 FAIL
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+fx_ensure_mock_on
+fx_reset_staff_pwd owner_c43
+fx_fix_staff_user_type owner_c43
+
 set -e
 H=http://127.0.0.1:8080
 DB_CMD="/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 --default-character-set=utf8mb4 ry-vue"
@@ -20,8 +28,10 @@ chk() { local n="$1" e="$2" g="$3"
 }
 
 # A) 员工登录
+# 用 owner_c43（OWNER）而不是 staff001（STAFF）：本脚本 E/F/G/H 用例要调
+# /api/product/add，而它是 @RequireRole({OWNER,MANAGER})。STAFF 建商品本就该 403。
 LOGIN=$(curl -s -X POST -H "Content-Type: application/json" \
-  -d '{"username":"staff001","password":"admin123"}' \
+  -d '{"username":"owner_c43","password":"admin123"}' \
   $H/api/merchant/staff/login)
 STAFF_TOK=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
 STAFF_MID=$(echo "$LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('merchantId',0))")
@@ -93,7 +103,10 @@ echo "$BAD1" | grep -q "适用门店" && echo "  ✅ G 缺 storeIds 被拒" && P
 P3_PAYLOAD=$(python3 -c "import json; print(json.dumps({
   'typeCode':'GROUPON','productName':'C11_越权烟测',
   'merchantId':9999,'storeId':999,'storeIds':'999',
-  'price':50,'validityDays':30
+  'price':50,'validityDays':30,
+  # ProductValidator 要求 GROUPON 必填 stock/maxPerOrder（v2.6 P1 类型必填校验）。
+  # 本用例要验的是「merchantId/storeId 越权被强制覆盖」，必填字段得给全，否则 500 在校验就返回了。
+  'stock':10,'maxPerOrder':1
 }))")
 P3=$(curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $STAFF_TOK" \
   -d "$P3_PAYLOAD" $H/api/product/add)
