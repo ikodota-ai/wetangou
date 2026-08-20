@@ -92,13 +92,26 @@ public class WxPayConfig
         return "true".equalsIgnoreCase(StringUtils.trimToEmpty(value));
     }
 
+    /** 视为生产环境的 profile 名（一律强制关闭 mock） */
+    private static final java.util.Set<String> PRODUCTION_PROFILES =
+            new java.util.HashSet<>(java.util.Arrays.asList("prod", "production", "aliyun-oss", "oss", "minio", "cos", "qiniu"));
+
+    /**
+     * 是否处于「生产语义」的 profile。
+     *
+     * <p>除了 {@code prod}，还认 {@code aliyun-oss}（以及其他真实云存储 profile）：
+     * 部署文档教的是 {@code -Dspring.profiles.active=aliyun-oss}，如果只认 prod，
+     * 这种启法下 mock 开关会退回读 sys_config —— 而库里存量值可能是 true，
+     * 生产就会走 mock 支付/mock 登录（钱收不到、任何 code 都能登录）。</p>
+     */
     private boolean isProductionProfile()
     {
         String[] profiles = environment.getActiveProfiles();
         if (profiles == null) return false;
         for (String p : profiles)
         {
-            if ("prod".equalsIgnoreCase(p)) return true;
+            if (p == null) continue;
+            if (PRODUCTION_PROFILES.contains(p.trim().toLowerCase())) return true;
         }
         return false;
     }

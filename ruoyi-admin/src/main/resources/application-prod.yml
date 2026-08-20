@@ -20,9 +20,10 @@ spring:
         druid:
             # 主库数据源
             master:
-                url: jdbc:mysql://localhost:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
-                username: root
-                password: 133301
+                # 生产用环境变量注入（见 doc/上线配置清单-2026-08-20.md）
+                url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ry-vue}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=${DB_USE_SSL:true}&serverTimezone=GMT%2B8
+                username: ${DB_USER:root}
+                password: ${DB_PASSWORD:133301}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
@@ -56,13 +57,14 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                enabled: true
+                # 生产默认关闭监控页（暴露 SQL/URL/会话信息）；确需开启用 DRUID_STAT_ENABLED=true
+                enabled: ${DRUID_STAT_ENABLED:false}
                 # 设置白名单，不填则允许所有访问
                 allow:
                 url-pattern: /druid/*
                 # 控制台管理用户名和密码
-                login-username: ruoyi
-                login-password: 123456
+                login-username: ${DRUID_STAT_USER:ruoyi}
+                login-password: ${DRUID_STAT_PASSWORD:123456}
             filter:
                 stat:
                     enabled: true
