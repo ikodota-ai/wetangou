@@ -628,6 +628,7 @@ unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiAppl
 
 - `AGENTS.md` —— 仓库开发规约 + 逐 session 交付记录（**最权威的实现细节来源**）
 - `doc/上线配置清单-2026-08-20.md` —— 上线前必改项清单（配合 `preflight-prod.sh`）
+- `doc/上线数据迁移方案-2026-08-22.md` —— 本地库 → 服务器的两种迁移方案 + 清洗 SQL
 - `doc/部署上线指南.md` —— 服务器部署步骤
 - `doc/多商户与代理商改造方案.md` —— 架构 + 改造细节 + 验证记录
 
@@ -772,6 +773,16 @@ bash .github/scripts/preflight-prod.sh
 8. OSS bucket / accessKey 是否配置
 
 **目标是 FAIL=0 再发布。** 检查 5/6 需要 mysql 客户端与 `DB_NAME`，否则该项跳过并给 WARN。
+
+### 4. 数据迁移（本地库 → 服务器）
+
+**不要**整库 `mysqldump` 直导：本地库有 21 个默认密码账号、878 个 mock 会员、232 笔假订单、
+42168 行 job 日志和 2 处字符集损坏。推荐「结构走脚本 + 手工录真实商户/商品」，
+详细两种方案与清洗 SQL 见 `doc/上线数据迁移方案-2026-08-22.md`。
+
+> 上线后请登录后台确认侧边栏「团购运营」下有 6 个分组共 25 个页面。
+> 这 19 个业务菜单最初是代码生成器直接写进开发库的，SQL 一直没入仓，
+> 现已补为 `sql/biz_menu_business_pages.sql` 并接入 `init-all.sh`。
 
 ### 小程序侧
 

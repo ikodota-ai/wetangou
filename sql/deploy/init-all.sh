@@ -84,7 +84,8 @@ run biz_store_service
 run migration-2026-08-14-f1-category-store-id
 
 echo "--- 5/6 菜单 / 权限 / 配置 ---"
-run biz_menu_reorganization
+run biz_menu_reorganization      # 先建 5 个分组目录（门店商品/交易订单/...）
+run biz_menu_business_pages     # 再挂 19 个业务菜单页 + 按钮权限（代码生成器产物，从无 SQL）
 run biz_menu_flatten
 run biz_tenant_menu
 run biz_mpconfig_menu
@@ -101,6 +102,10 @@ run biz_booking_member_menu
 run v2_admin_menus
 run v3_p2_menus_routes
 run migration-2026-08-14-f2-mpauth-menu
+
+# 再跑一遍菜单补齐：部分按钮的父菜单（预约明细 / 提现申请）由上面的脚本创建，
+# 第一遍时 @pid 为空挂不上，这里补挂。脚本幂等，重复执行安全。
+run biz_menu_business_pages
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

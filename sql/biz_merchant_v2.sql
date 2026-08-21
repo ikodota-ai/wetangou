@@ -124,7 +124,10 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- 1) 员工管理菜单（若已存在则忽略）
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '员工管理',
-       (SELECT menu_id FROM sys_menu WHERE menu_name = '门店商品' AND parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '团购运营' AND parent_id = 0) LIMIT 1),
+       -- 注（2026-08-22）：原来要求「门店商品」必须挂在「团购运营」下，但 biz_menu_flatten.sql
+       -- 会把分组平铺成顶级 → 子查询取不到 → parent_id 落 NULL → getRouters 500。
+       -- 改为按名字直接找，取不到落 0（顶级）。
+       IFNULL((SELECT menu_id FROM (SELECT menu_id FROM sys_menu WHERE menu_name = '门店商品' AND menu_type='M' ORDER BY menu_id LIMIT 1) x), 0),
        6, 'staffInvite', 'biz/staffInvite/index', 1, 0, 'C', '0', '0', 'biz:staffInvite:list', 'peoples', 'admin', SYSDATE(), '商家员工邀请码 + 员工名单管理'
 FROM (SELECT 1) t
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE component = 'biz/staffInvite/index' LIMIT 1);

@@ -24,7 +24,10 @@ CREATE TABLE biz_banner (
 
 -- 菜单 + 权限
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-VALUES ('首页轮播图', (SELECT menu_id FROM (SELECT menu_id FROM sys_menu WHERE menu_name='商城管理' LIMIT 1) t), 6, 'banner', 'biz/banner/index', 1, 0, 'C', '0', '0', 'biz:banner:list', 'picture', 'admin', NOW(), '首页轮播图管理')
+-- 注（2026-08-22）：原来父菜单写死找 '商城管理'，该菜单在本项目并不存在 → parent_id 落 NULL，
+-- 而 SysMenu.getParentId() 被 getRouters 直接 longValue() → 整个后台侧边栏 500。
+-- 改为优先挂「门店商品」，取不到则落 0（顶级），用 IFNULL 兜死，绝不写 NULL。
+VALUES ('首页轮播图', IFNULL((SELECT menu_id FROM (SELECT menu_id FROM sys_menu WHERE menu_name IN ('门店商品','商城管理') AND menu_type='M' ORDER BY FIELD(menu_name,'门店商品','商城管理') LIMIT 1) t), 0), 6, 'banner', 'biz/banner/index', 1, 0, 'C', '0', '0', 'biz:banner:list', 'picture', 'admin', NOW(), '首页轮播图管理')
 ON DUPLICATE KEY UPDATE perms = VALUES(perms);
 
 SET @pid = LAST_INSERT_ID();

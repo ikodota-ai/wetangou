@@ -2732,3 +2732,67 @@ screen -dmS ry-newdb bash -c 'java ... -Dserver.port=8081 \
 ### 顺手参数化（`application.yml`）
 - `ruoyi.profile` → `${RUOYI_PROFILE_PATH:...}`（原来是硬编码 Mac 路径 `/Users/mac/ruoyi/uploadPath`）
 - Redis `host/port/database/password` → `${REDIS_HOST:...}` 等（原来全硬编码 localhost）
+
+## 「能不能直接把本地库导到服务器」调研 + 菜单缺失修复（2026-08-22）
+
+> 用户问：直接把本地 `ry-vue` 导入服务器行不行？
+
+### 本地库体检结果（不建议整库直导）
+| 项 | 实测 | 风险 |
+|---|---|---|
+| `sys_user` | 41 行，其中 **21 个账号密码是默认 `admin123` 哈希** | 含 `staff_*`/`c44_*`/`*_c43` 等 30+ 测试账号，生产是入口级风险 |
+| `biz_member` | 888 行，**878 个是 mock openid**（`mock_*` / `freed_*` / `smoke_open_*`） | 真实微信用户只有 1 个（`oNsDb4oo...`，手机号 17311262511 是真号） |
+| `biz_order` | 232 笔全是 smoke 造的假单 | 会污染生产报表、佣金结算 |
+| `biz_product` | 266 个，绝大多数 `SMOKE_*` | — |
+| `sys_job_log` | **42168 行** / `sys_logininfor` 2272 / `sys_oper_log` 1502 | 纯垃圾，占了 12.5MB 库的大头 |
+| `mock` 开关 | `wx.pay.mockEnabled=true`、`wx.miniapp.mockEnabled=true` | 导过去后靠 prod profile 代码层兜住，但数据层仍建议改 false |
+| `wx.pay.notifyUrl` | `https://your-domain.com/api/pay/notify` | 占位值，未配 |
+| 备份表 | `sys_menu_bak_20260805_022842`、`sys_role_menu_bak_*` | 冗余 |
+| 字符集损坏 | `biz_product_category` 有 1 行双重编码（`ç¾Žé£Ÿ` = 美食）；`sys_menu` 有 1 行 `biz:staffInvite:query` 菜单名乱码 | 导过去就是永久脏数据 |
+
+**结论**：建议「结构走脚本 + 只搬配置类数据」，不要整库 dump。
+
+### 关键发现：init-all.sh 建出来的库，后台侧边栏是空的
+昨天（8-21）验证「全新库能装起来」只测了 API，**没测 `/getRouters`**，漏掉两个致命问题：
+
+#### 1. 19 个业务菜单从来没有 SQL（缺 18 页 + 88 按钮）
+- 本地库业务菜单（`menu_type='C'` 且 `perms like 'biz:%'`）**32 个**，init-all.sh 建出来只有 **14 个**
+- 缺的是：门店管理 / 商品分类 / 商品管理 / 相册管理 / 协议管理 / 团购订单 / 买单记录 /
+  会员管理 / 会员用户 / 代金券管理 / 会员账户 / 推客管理 / 佣金规则 / 佣金记录 /
+  提现申请 / 提现记录 / 商品创建 / 商品详情 —— 加上 88 个按钮权限
+- **根因**：这 19 个菜单最初由 RuoYi 代码生成器直接写进开发库，SQL 从没入仓。
+  `sql/biz_menu_reorganization.sql` 名字看着像建菜单，实际只做**重新分组**
+  （把已存在的菜单 UPDATE 到 5 个分组下），从不 INSERT 它们。
+- **修**：新建 `sql/biz_menu_business_pages.sql`（从本地库自动导出，按 perms 判存在性，幂等）
+
+#### 2. `sys_menu.parent_id` 有 NULL → `/getRouters` 直接 500
+- 现象：登录成功、`/getInfo` 正常，但 `GET /getRouters` 返
+  `Cannot invoke "java.lang.Long.longValue()" because ... SysMenu.getParentId() is null`
+  → **后台侧边栏完全空白**，什么都点不开
+- 两个来源（都是父菜单子查询取不到就写 NULL）：
+  - `sql/biz_banner.sql`：父菜单写死找 `'商城管理'` —— 这个菜单在本项目**根本不存在**
+  - `sql/biz_merchant_v2.sql`：要求「门店商品」必须挂在「团购运营」下，但 `biz_menu_flatten.sql`
+    会把分组平铺成顶级 → 子查询失配
+- **修**：两处都改 `IFNULL(..., 0)`；并在 `biz_menu_business_pages.sql` 末尾加全局兜底
+  `UPDATE sys_menu SET parent_id=0 WHERE parent_id IS NULL;`
+
+#### 3. 顺带修的两个副作用
+- 我第一版 `biz_menu_business_pages.sql` 自建 5 个分组目录 → 与 `biz_menu_reorganization.sql`
+  建的撞成**两套同名分组**（侧边栏出现两个「门店商品」）。改为只按名字查找、绝不自建，
+  并在 init-all.sh 里排到 `biz_menu_reorganization` **之后**
+- NULL 兜底会把「员工管理」「小程序授权」变成顶级无名分组（侧边栏出现 2 个 `None` 标题）
+  → 加 6.1 段归位到「门店商品」/「平台配置」（用变量取 pid，避开 MySQL ERROR 1093）
+- `biz:booking:*` / `biz:withdraw:*` 共 9 个按钮的父菜单由 init-all.sh 后续脚本创建，
+  第一遍 `@pid` 为空挂不上 → init-all.sh 里让 `biz_menu_business_pages` **跑两遍**（幂等）
+
+### 最终验收（真后端指向新库，8085 端口）
+```
+GET /getRouters → code 200，顶级路由 5 个（系统管理/系统监控/系统工具/若依官网/团购运营）
+团购运营 → 6 个分组 / 25 个业务页：
+  租户管理(5) 门店商品(7) 交易订单(2) 会员体系(4) 推客分销(5) 平台配置(2)
+parent_id IS NULL = 0 行；业务 C 菜单 30 个；与本地库仅差 1 条（那条乱码，故意不带）
+init-all.sh 连跑两遍都 FAILED=0（幂等）
+```
+
+### 回归
+smoke 62/62 / lint-mybatis 0 err / lint-sql-seed 22 脚本 0 fail
