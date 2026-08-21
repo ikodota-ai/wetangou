@@ -78,9 +78,12 @@ INSERT IGNORE INTO sys_role_menu(role_id, menu_id)
   SELECT 3, menu_id FROM sys_menu WHERE parent_id=@banner_id;
 
 -- 轮播图管理（商户自管）— 移到 门店商品 顶级下
-DELETE FROM sys_role_menu WHERE menu_id IN (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list');
-DELETE FROM sys_role_menu WHERE menu_id IN (SELECT menu_id FROM sys_menu WHERE parent_id IN (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list'));
-DELETE FROM sys_menu WHERE parent_id IN (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list');
+-- 注：MySQL 5.7 的 DELETE 不允许子查询引用目标表（ERROR 1093），
+--     即使包一层派生表也会被合并优化掉，所以先用变量取出 menu_id 再删。
+SET @old_banner_id = (SELECT menu_id FROM sys_menu WHERE perms='biz:banner:list' LIMIT 1);
+DELETE FROM sys_role_menu WHERE menu_id = @old_banner_id;
+DELETE FROM sys_role_menu WHERE menu_id IN (SELECT menu_id FROM sys_menu WHERE parent_id = @old_banner_id);
+DELETE FROM sys_menu WHERE parent_id = @old_banner_id AND @old_banner_id IS NOT NULL;
 DELETE FROM sys_menu WHERE perms='biz:banner:list';
 INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '轮播图管理', 2108, 6, 'banner', 'biz/banner/index', NULL, '', 1, 0, 'C', '0', '0', 'biz:banner:list', 'picture', 'admin', NOW(), '商户首页轮播图'

@@ -2647,3 +2647,88 @@ V2.6.1 的「3 tab 选身份」方案不直观。V2.6.2 改为 **「openid 优�
 | vitest（miniprogram7） | 66/66 PASS |
 | lint-mybatis / lint-smoke / lint-sql-seed | 52 xml 0 err / 62 脚本 0 fail / 21 seed 0 fail |
 | `mvn package` | BUILD SUCCESS |
+
+## 全新库初始化实测 + README 现代化（2026-08-21）
+
+> 起因：用户「即将部署上线」。README 最后更新是 8-14（`c2ff6dbc`），之后累积 114 commit。
+> 顺手用**一个空库**把 `sql/` 全部脚本重跑一遍，验证「新服务器能不能从零装起来」。
+
+### 结论：原本装不起来。修掉 11 个部署期缺陷。
+
+#### 2 个上线阻断（新库必崩，开发库因历史遗留手工改过所以看不出来）
+1. **`biz_product_ext` 表没有任何建表脚本** —— commit `f99942c0`「主表瘦身 + `biz_product_ext` 1:1 扩展表」
+   把 13 个类型差异字段挪进新表，`ProductMapper.xml` 的 `selectProductList` 会 `left join` 它，
+   但**建表 SQL 从没进仓库**（开发库里的表是当时手工建的，注释还是 `?????` 乱码，说明用错字符集）。
+   → 新库跑完全部脚本后打开「商品管理」直接 500 `Table 'xxx.biz_product_ext' doesn't exist`。
+   → 修：新建 `sql/biz_product_ext.sql`，字段与 `com.ruoyi.biz.domain.ProductExt` 一一对应，中文注释重写。
+2. **`biz_merchant` 建表缺 5 列** —— `sql/biz_tenant_tables.sql` 建表没有
+   `service_phone / service_qrcode / business_hours / service_hours / intro`，
+   但 `MerchantMapper.xml` 的 `selectMerchantVo` 明确查这 5 列（resultMap 也映射了）。
+   `biz_merchant_service_hours_upgrade.sql` 只补 `service_hours`，且它是裸 `ALTER ... AFTER business_hours`，
+   锚点列本身都不存在 → 新库报 `1054 Unknown column 'business_hours'`。
+   → 修：5 列补进 `biz_tenant_tables.sql` 建表语句；升级脚本改成 information_schema 判断的幂等版。
+
+#### 3 个 `USE ry-vue;` 硬编码（数据安全隐患）
+`migration-2026-08-14-f1` / `-f2` / `smoke-e13-e17-fixture` 三个文件里写着 `USE ry-vue;`。
+`use` 是 mysql 客户端指令，**会无视命令行上给的库名直接切库** —— 意味着「对着测试库执行、
+结果写进了生产库」。全部注释掉并写明库名要从命令行传。
+
+#### 6 个非幂等 / 语法缺陷
+| 文件 | 问题 | 修法 |
+|---|---|---|
+| `biz_menu_flatten.sql:83` | MySQL 5.7 `ERROR 1093`：`DELETE FROM sys_menu WHERE parent_id IN (SELECT ... FROM sys_menu ...)`。包一层派生表也不行（会被优化器合并） | 先 `SET @old_banner_id := (SELECT ...)` 再按变量删 |
+| `biz_merchant_v2.sql` | 2 处 `LIMIT 1 LIMIT 1` 语法错；`INSERT` 6 列 vs `SELECT` 5 值（漏 status，而 `biz_store_user` 根本没有 status 列） | 去重 LIMIT；status 补常量 `'0'` |
+| `biz_product_seed.sql:44` | `from biz_category -- 注释` **漏分号**，行尾注释把下一条 `update` 吞进同一语句 → 1064 | 补 `;` |
+| `biz_product_model_v2.sql` | `where del_flag = '0'`，但 `biz_category` 无 `del_flag` 列 | 去掉该 where |
+| `biz_product_stores.sql` / `biz_store_service.sql` / `migration-f1` | 裸 `ALTER TABLE ADD COLUMN`，新版建表已含该列 → `1060 Duplicate column` | 改 information_schema 判断的幂等版 |
+| `biz_booking_upgrade.sql` | `drop table if exists biz_booking_member` + 无条件迁移/`drop column`。新库 `biz_tables.sql` 已是场次结构 → 1054；**存量库重跑会 drop 掉真实报名数据** | 改 `create table if not exists` + 用 `@has_old` 判断是否旧结构，新库 no-op |
+
+### 产出：`sql/deploy/init-all.sh`
+- 固化实测通过的**顺序**（顺序敏感，三处依赖必须遵守）：
+  `biz_product_model_v2`（建 `biz_product_type/_category/_subitem`）
+  → `biz_product_model_v2_safe`（加 `sys_user.user_type/merchant_id` + `biz_product` v2 列）
+  → `biz_merchant_v2`（`sys_user.openid` + `biz_merchant_staff(_invite)`）
+  → `biz_role_extension`（同时依赖上面两者）
+- 6 段分组：RuoYi 基础 → 业务建表 → v2 扩展列 → 代理商/会员/预约/门店 → 菜单权限 → 字典种子
+- `WITH_DEMO=1` 才导演示/测试数据（生产默认不导）
+- 逐文件 `OK/FAIL` + 末尾汇总 + `exit $FAILED`（可进 CI）
+- **实测**：空库 → 47 个脚本全 OK（`FAILED=0`）；第二遍重跑仍全 OK（幂等）；`WITH_DEMO=1` 也全 OK
+
+### 同库端到端复验（后端真启动，指向新库）
+```
+screen -dmS ry-newdb bash -c 'java ... -Dserver.port=8081 \
+  -Dspring.datasource.druid.master.url="jdbc:mysql://127.0.0.1:3306/ry_init_test?..." \
+  -jar ruoyi-admin/target/ruoyi-admin.jar'
+```
+- 启动成功（~75s），`/api/ping` 200
+- 后台 20 个列表接口 + `/getInfo` 全 200（merchant/store/product/order/member/agent/productType/
+  category/banner/commission/distributor/booking/voucher/staffInvite/bill/withdraw/mpauth/
+  agentfee/merchantfee/system 各页）
+- 小程序端：mock 登录 200 → merchant/info、banner、product list/detail、store、member/profile、
+  order/list、voucher 全 200
+- **下单链路跑通**：`POST /api/order {productId:1000, num:1}` → 999003 →
+  `POST /api/order/prepay/999003` 返 mock payNo 且订单转 status=1 → `verify_code` 已生成
+- 新库表数 68 / sys_menu 157 / product_type 11 / product_category 96
+
+### 环境坑（新增）
+- 新库 `sys.account.captchaEnabled` 默认 `true`（`ry_20260417.sql` 原值），smoke 脚本不带验证码会 500
+  「验证码已失效」。开发库是 `false` 所以一直没暴露。改库值后**必须删 Redis 缓存**：
+  `redis-cli del sys_config:sys.account.captchaEnabled`（`redis-cli` 在 `/opt/local/bin/`）
+- `/api/order` 下单参数是 **`num`** 不是 `quantity`；prepay/pay 是**路径参数** `/api/order/prepay/{orderId}`
+- `PayBillController` 的 `@RequestMapping` 是 **`/biz/bill`**（不是 `/biz/paybill`）
+
+### README 现代化（同 commit）
+- 第七章「初始化数据库」12 条手敲 mysql 命令 → 换成 `sql/deploy/init-all.sh` 一键 + 顺序依赖警告
+- 第八章「已交付」15 行旧表格 → 按版本里程碑重组（v2.0~2.4 基础 / v2.5 角色权限 / v2.6 商品类型化 /
+  v2.6.1-2 登录核销 / 上线收口 / 全新库初始化收口）。**刻意不逐条列 114 个 commit**，
+  改为指向 AGENTS.md 对应章节，避免两份文档重复维护
+- 第九章「已知边界」：删掉已实装的误判项，重组为「功能未做 / 依赖外部条件 / 测试与工程」
+- 「Smoke Test」段：从「本地手跑 C1 3/3」→ 完整测试基线表（62 smoke / 10 JUnit / 66 vitest / 3 lint）
+  + `lib/smoke-fixture.sh` 7 个 helper 用法 + 3 个写脚本踩过的坑
+- 新增「部署上线」章节：profile 必须含 `prod`（最高危，否则走 mock 支付）+ 环境变量对照表
+  （变量名与 `application*.yml` 实际占位符逐一核对过）+ preflight 8 项 + 小程序侧 3 件事
+- 第十章「文档索引」：5 条 → 分「必读 / 产品与接口 / 运维与专题」三组
+
+### 顺手参数化（`application.yml`）
+- `ruoyi.profile` → `${RUOYI_PROFILE_PATH:...}`（原来是硬编码 Mac 路径 `/Users/mac/ruoyi/uploadPath`）
+- Redis `host/port/database/password` → `${REDIS_HOST:...}` 等（原来全硬编码 localhost）

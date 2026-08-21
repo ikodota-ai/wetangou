@@ -81,7 +81,7 @@ CREATE VIEW biz_store_user_v AS
 
 -- 4) 数据迁移：把现有 biz_store_user 数据同步到 biz_merchant_staff
 INSERT INTO biz_merchant_staff (merchant_id, store_id, user_id, role, status, create_time)
-SELECT IFNULL(merchant_id, 0), store_id, user_id, 'STAFF', create_time
+SELECT IFNULL(merchant_id, 0), store_id, user_id, 'STAFF', '0', create_time
 FROM biz_store_user
 ON DUPLICATE KEY UPDATE update_time = NOW();
 
@@ -124,14 +124,14 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 -- 1) 员工管理菜单（若已存在则忽略）
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '员工管理',
-       (SELECT menu_id FROM sys_menu WHERE menu_name = '门店商品' AND parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '团购运营' AND parent_id = 0) LIMIT 1 LIMIT 1),
+       (SELECT menu_id FROM sys_menu WHERE menu_name = '门店商品' AND parent_id = (SELECT menu_id FROM sys_menu WHERE menu_name = '团购运营' AND parent_id = 0) LIMIT 1),
        6, 'staffInvite', 'biz/staffInvite/index', 1, 0, 'C', '0', '0', 'biz:staffInvite:list', 'peoples', 'admin', SYSDATE(), '商家员工邀请码 + 员工名单管理'
 FROM (SELECT 1) t
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE component = 'biz/staffInvite/index' LIMIT 1);
 
 -- 2) 按钮权限（list / add / edit / remove / query / export）
 --    按 ruoyi 习惯直接用 menu_id 拼 perms，这里用存储过程式逐行插入
-SET @m_staff = (SELECT menu_id FROM sys_menu WHERE component = 'biz/staffInvite/index' LIMIT 1 LIMIT 1);
+SET @m_staff = (SELECT menu_id FROM sys_menu WHERE component = 'biz/staffInvite/index' LIMIT 1);
 
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
 SELECT '员工查询', @m_staff, 1, '', '', 1, 0, 'F', '0', '0', 'biz:staffInvite:query', '#', 'admin', SYSDATE(), ''

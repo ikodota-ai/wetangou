@@ -1,7 +1,11 @@
 -- Smoke E13/E14/E16 测试数据 fixture (跨 merchantId 测试)
 -- 警告：c1 smoke 假设 agent001 (mid=1) 总额 = 62.8；本 fixture 含 E15 commission 数据
 -- 跑顺序：E13/E14/E16 -> C1 -> E15（避免 E15 commission 999202 污染 C1 断言）
-USE ry-vue;
+-- 注（2026-08-21）：原本这里是 `USE ry-vue;`。
+-- `use` 是 mysql 客户端指令，会无视命令行上指定的库直接切到 ry-vue，
+-- 导致「对着测试库执行、却写进生产库」。库名请在命令行给：
+--   mysql --default-character-set=utf8mb4 -uroot -p <目标库> < 本文件
+-- USE ry-vue;
 
 -- E13: OrderController
 INSERT INTO biz_order (order_id, order_no, merchant_id, store_id, product_id, member_id, num, total_amount, discount_amount, pay_amount, status, create_time) VALUES

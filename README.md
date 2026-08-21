@@ -403,21 +403,32 @@ dytuangou/
 
 ## 七、快速开始
 
-### 1. 初始化数据库（按顺序执行，全部幂等）
+### 1. 初始化数据库（一键，2026-08-21 全新库实测通过）
 
 ```bash
-mysql -uroot -p ry-vue < sql/ry_20260417.sql          # RuoYi 基础
-mysql -uroot -p ry-vue < sql/biz_tables.sql           # 业务表
-mysql -uroot -p ry-vue < sql/biz_menu_reorganization.sql  # 菜单重组
-mysql -uroot -p ry-vue < sql/biz_tenant_tables.sql    # 租户表
-mysql -uroot -p ry-vue < sql/biz_tenant_upgrade.sql   # 存量表加 merchant_id
-mysql -uroot -p ry-vue < sql/biz_tenant_menu.sql      # 租户管理菜单
-mysql -uroot -p ry-vue < sql/biz_mpconfig_menu.sql    # 小程序平台配置菜单
-mysql -uroot -p ry-vue < sql/biz_distributor_invite.sql    # 推客邀请
-mysql -uroot -p ry-vue < sql/biz_booking_upgrade.sql  # 预约升级
-mysql -uroot -p ry-vue < sql/quartz.sql               # 定时任务
-mysql -uroot -p ry-vue < sql/biz_banner.sql           # 首页 banner
-mysql -uroot -p ry-vue < sql/biz_commission_settle_job.sql  # 佣金冷静期 Job
+# 建库
+mysql -uroot -p -e "CREATE DATABASE \`ry-vue\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
+
+# 按验证过的顺序导入全部脚本（幂等，可重复跑）
+DB_PASSWORD=你的密码 bash sql/deploy/init-all.sh ry-vue
+
+# 需要演示/测试数据时（生产不要开）
+DB_PASSWORD=你的密码 WITH_DEMO=1 bash sql/deploy/init-all.sh ry-vue
+```
+
+脚本会打印每个文件的 `OK / FAIL`，末尾汇总；全绿即 `FAILED=0`。默认管理员 `admin / admin123`。
+
+> ⚠️ 顺序敏感，不要自行重排。三处依赖关系是踩过坑的：
+> `biz_product_model_v2`（建 `biz_product_type` 等表）→ `biz_product_model_v2_safe`（加
+> `sys_user.user_type/merchant_id`）→ `biz_merchant_v2`（建 `biz_merchant_staff`）→
+> `biz_role_extension`（同时依赖前两者）。
+>
+> ⚠️ 脚本内含 `drop table`，**只能对空库/新库执行**。存量库升级请按需单跑对应脚本。
+
+生产环境还要额外导入一次配置模板：
+
+```bash
+mysql -uroot -p ry-vue < sql/deploy/sys_config_production.sql
 ```
 
 ### 2. 启动后端
@@ -500,86 +511,274 @@ unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiAppl
 
 ---
 
-## 八、已交付（plan 11/11 ✅ + 增量 5 项）
+## 八、已交付
 
-| # | 模块 | 状态 | 关键 commit |
-|---|---|---|---|
-| 1 | 门店端操作鉴权（order/verify、bill/confirm、booking/cancel） | ✅ | — |
-| 2 | 关闭 mock 兜底（生产环境） | ✅ | — |
-| 3 | datetime 字段序列化精度修复（后端 Jackson + 前端展示） | ✅ | — |
-| 4 | 推客粉丝邀请机制（invite_by + scene 解析 + 海报页） | ✅ | `8639bb2d` |
-| 5 | 19 个业务页加「商户」筛选列（BizSelect 公共组件） | ✅ | — |
-| 6 | 手机号解密（`/biz/phone/decrypt` + 会员页「查看完整」+ 审计） | ✅ | `f0e55e76` |
-| 7 | WxPayService 按商户取支付凭证（`createJsapiOrderByMerchant` + 双入口回调路由） | ✅ | `c9e515f5` |
-| 8 | 微信第三方平台真实接入（ticket 回调 + preauthcode + ext_json + commit + token 轮换） | ✅ | `2226ab92` |
-| 9 | sys_user ↔ 业务用户表身份回填（`biz_merchant_user` 路由 + `TenantIdentityResolver` + `getInfo` 回传） | ✅ | — |
-| 10 | 佣金冷静期 Quartz（`SettleCommissionTask` + 推客 frozenAmount/availableAmount 联动 + `settled_to_distributor` 防重） | ✅ | `80674a87` |
-| 11 | 首页 banner 后端化（CRUD UI + `/api/banner/list` + 小程序首页接入） | ✅ | — |
-| 12 | pom 改用 `--release 17`（产物字节码 100% Java 17 兼容，JDK 17/21/25 都能跑） | ✅ | `0416420f` |
-| 13 | `/api/merchant/info` 强制 X-App-Id（缺 header 400，移除静默兜底） | ✅ | `c1f33805` |
-| 14 | Spring Boot 3.4 + Tomcat 11 nested fat-jar ClassNotFound 修复（EntryPoint 改字节流） | ✅ | `49805ff5` |
-| 15 | 小程序「我的」登录态从真实会员资料回填 + 推客海报页 + 商家客服兜底 | ✅ | `4209e256` |
+> 完整逐条记录在 `AGENTS.md`（按 session 归档）与 `git log --oneline`；本章按**版本里程碑**归纳，
+> 每行末尾标注可在 AGENTS.md / `doc/` 中检索的关键词。
 
-详见 `doc/多商户与代理商改造方案.md` 与 `git log --oneline`。
+### v2.0 ~ v2.4 基础平台（多租户 + 微信 + 分销）
+
+| # | 模块 | 关键 commit |
+|---|---|---|
+| 1 | 多租户隔离：MyBatis 拦截器自动注入 `merchant_id` + `TenantFilterHelper` 12 个 Service 切片 | `5f17bd5a` 起 |
+| 2 | sys_user ↔ 业务用户表身份回填（`biz_merchant_user` + `TenantIdentityResolver` + `getInfo` 回传） | `530c5a3b` |
+| 3 | 登录入口按 userType 分流（平台 / 代理商 / 商户三 tab + 路由与菜单过滤） | `fade76ff` |
+| 4 | 微信支付 V3 按商户路由（`createJsapiOrderByMerchant` + 双入口回调路由） | `c9e515f5` |
+| 5 | 微信第三方平台接入（ticket 回调 + preauthcode + ext_json + commit + token 轮换） | `2226ab92` |
+| 6 | 推客分销：邀请（`invite_by` + scene 解析）+ 海报页 + 太阳码文件缓存 | `8639bb2d` `27e4a0b5` |
+| 7 | 佣金冷静期 Quartz（`SettleCommissionTask` + frozen/available 联动 + 防重结算） | `80674a87` `2701f1e7` |
+| 8 | 代理商佣金概览（C1，含跨租户空集 guard `and 1=0`） | `7a0299d4` |
+| 9 | 首页 banner 后端化（CRUD + `/api/banner/list` + 小程序接入） | — |
+| 10 | 全链路手机号脱敏 + `/biz/phone/decrypt` 审计解密 | `f0e55e76` |
+| 11 | 19 个业务页统一「商户」筛选（`BizSelect` 公共组件 + require.context 自动注册） | `11cca693` |
+| 12 | pom 改 `--release 17`（产物字节码 100% Java 17，JDK 17/21/25 均可运行） | `0416420f` |
+| 13 | Spring Boot 3.4 + Tomcat 11 nested fat-jar ClassNotFound 修复 | `49805ff5` |
+| 14 | `/api/merchant/info` 强制 `X-App-Id`（缺 header 400，移除静默兜底） | `c1f33805` |
+| 15 | v2 抖音来客商品模型：`biz_product_type` 11 种字典 + 子品 / 子品组 + 商户员工邀请 | `4e071924` 起 13 commit |
+
+### v2.5 角色权限模型（2026-08-15）
+
+- **5 角色**：`PLATFORM / AGENT / OWNER / MANAGER / STAFF`，`@RequireRole(includeHigher=true)` + `RoleAuthInterceptor`（`cb7b1a8c`）
+- **三层身份叠加**：同一 openid 可同时是会员 / 推客 / 员工，`@MemberRequired` `@DistributorRequired` 分别拦截（`243a8c1c` `e172ef7c`）
+- **平台 dashboard**：`ApiPlatformController` 跨店订单流水 + 员工总览（`6524f6d3` `73eb1a4c`）
+- **代理商 dashboard**：`ApiAgentController` 4 端点 + `biz_agent.user_id` 绑定（`928f3123`）
+- **小程序 UI 角色化**：`utils/role.js` + 商家端首页卡片/入口按角色显隐（`410cd9a4`）
+- 决策记录：**不实装** `sys_biz_role_menu`——5 角色只管小程序 API 鉴权，PC 后台继续用 RuoYi 原生 `sys_role_menu`（V6-5）
+
+### v2.6 商品类型化 + 代发布 + 存储（2026-08-16 ~ 08-17）
+
+- **商品表瘦身**：主表 + `biz_product_ext` 1:1 扩展表（13 列类型差异 + 公共 2 列）（`f99942c0`）
+- **类型必填校验**：`ProductValidator` 按 `typeCode` 校验必填字段；`ApiOrderServiceImpl.placeOrder` 按类型限制下单（`9a7b1c22`）
+- **C 端详情页重构**：去 notice 富文本依赖，购买须知按创建字段结构化渲染 + 划线价/折扣/门店动态化（`7fe6e6cc` `69c36746`）
+- **PC 抖音来客风格创建页** + 小程序商家端商品列表 / 搭配子页（`83bf4493` `34b41bad`）
+- **核销直达**：`GET /api/order/{orderId}/scheme` 微信扫一扫直达核销（`8773f8cf` `9008ea19`）
+- **储值卡 STORED_CARD 闭环**：表 + service + 核销扣减（`3be1235d`）；核销成功订阅消息（`a8b41b95`）
+- **员工工作流（V6）**：邀请 scene 免扫直达 + `getPhoneNumberByCode` 回填手机号 + 待审核 `status=3` + PC 审核端点（`848cb6a4`）
+- **多商户代发布**：`ext.json` 注入 `baseUrl / merchantId / appid`（`a1961ec7`）
+- **附件存储 5 云适配**：`StorageFactory` → local / oss / minio / qiniu / cos / s3（`2bee05a6`）
+
+### v2.6.1 / v2.6.2 登录与核销闭环（2026-08-17）
+
+- **v2.6.1**：合并登录入口 + 订单太阳码 + 员工扫码核销端到端闭环（`72d2789a`）
+- **v2.6.2**：登录改 **openid 优先身份识别**（一次授权自动判定会员/推客/员工），其他方式折叠（`d5956bdf`）
+
+### 上线收口（2026-08-20）
+
+- **3 个真实上线阻断缺陷**（`3b8cc0ca`）：顾客端 14 处 `@RequireRole` 误伤 / `ProductMapper.updateProduct` 引用已迁出字段导致支付扣库存必崩 / `/api/distributor/agent/summary` 恒 403 dead-end
+- **配置参数化**（`6f087df8`）：`aliyun-oss` 等 profile 也强制关 mock 支付、JWT/数据源/Druid 口令走环境变量
+- **smoke 基线 40/62 → 62/62**（`a4245638`）：新增 `.github/scripts/lib/smoke-fixture.sh` 共享 fixture 库，27 个脚本接入前置
+- **部署自检**（`42747abe`）：`doc/上线配置清单-2026-08-20.md` + `.github/scripts/preflight-prod.sh` 8 项只读检查
+
+### 全新库初始化收口（2026-08-21）
+
+用一个空库把 `sql/` 全部脚本重跑一遍，暴露并修掉 **11 个部署期缺陷**（详见 `AGENTS.md` 同名章节）：
+
+- **2 个上线阻断**：`biz_product_ext` 表**从来没有建表脚本**（`f99942c0` 漏交），商品列表页必 500；
+  `biz_merchant` 建表缺 `business_hours / service_hours / service_phone / service_qrcode / intro` 5 列，
+  但 `MerchantMapper` 在查它们 → 商户管理页必 500
+- **3 个 `USE ry-vue;` 硬编码**：`use` 是客户端指令，会无视命令行指定的库直接切到 `ry-vue`
+  —— 对着测试库执行却写进生产库
+- **6 个非幂等 / 语法问题**：MySQL 5.7 的 `ERROR 1093`（DELETE 子查询引用目标表）、
+  `LIMIT 1 LIMIT 1`、`INSERT` 列数与 `SELECT` 值数不符、漏分号被行尾注释吞掉、
+  裸 `ALTER ADD COLUMN` 重复跑报 1060、`biz_booking_upgrade` 会 `drop` 掉真实报名数据表
+- **产出** `sql/deploy/init-all.sh`：固化实测顺序，全新库 → 全绿 `FAILED=0`，第二遍重跑仍全绿
+
+同库端到端复验（后端指向新库，8081 端口）：后台 20 个列表接口 + `/getInfo` 全 200，
+小程序端登录 / 商品 / 门店 / 订单 / 会员全 200，**下单 → prepay → 生成核销码链路跑通**。
 
 ---
 
 ## 九、已知边界（下一轮迭代）
 
+> 登录分流、员工多门店、mp release UI 等曾列在本章的项目**均已实装**（见第八章）。
+> 本章只保留**当前真实未做**的部分。
+
+**功能未做**
+
 - Quartz 任务失败未配置告警（仅写 `sys_job_log`，未接邮件/钉钉）
 - Banner 未做 VIP 等级加权排序缓存（当前按 `sort, create_time` 排序）
-- 登录入口按 `userType` 路由分流（代理商/商户/平台三入口） — 后端 `LoginUser.userType` 字段已加，前端 store + router 分流待下一轮完成（见 AGENTS.md Pending 1）
 - 微信支付模式 1（平台统收分账）待资质评估后接入
 - 商品配送（delivery tab）参数已预留，运力/范围规则待补
-- mp release 流程 UI 已就绪（`biz/mprelease`），但真实 release 调用 `wxa/release` 依赖第三方平台授权（`biz_mp_auth.refresh_token` 落库轮换已实现）
-- 小程序「员工登录」入口 + **多门店权限** 已实现：
-  - 员工可关联多个门店（`biz_store_user` 多对多），登录时全部写入 token `storeIds` 集合
-  - 当前激活门店写入 `LoginMember.storeId`，员工可在「我的」页一键切换
-  - `MemberAuthInterceptor` 拦截所有 `@StoreStaffRequired` 端点，校验请求 storeId **属于** token storeIds 集合，否则 403
-  - 切换端点 `POST /api/store/staff/switch-store` 后端 `refreshToken` 写 redis 缓存；前端调 `me` 拿到新 storeName
-  - 已端到端实测：staff001 绑 100/101/200 三门店，切换 200→100 成功，跨店访问 999 拒绝
+- **订单退款**：`biz_order` status 0~4 无 refund 端点，佣金退款联动（`commission.status=2` +
+  已结算则 `available -= amount`）随之未实装
+- 小程序商家端「创建商品」页缺图片上传控件（需新增 `ApiCommonController` 绕过 PC 端 `@PreAuthorize`）
+- `FastDfsStorageAdapter` 是占位实现（pom 未引依赖，方法体直接抛异常）；用 OSS/S3 即可，不影响
+
+**依赖外部条件**
+
+- mp release 流程 UI + 后端 11 端点已就绪，但真实 `wxa/release` 调用依赖微信第三方平台授权
+  （`biz_mp_auth.refresh_token` 落库轮换已实现，缺的是平台资质与 7 项 `wx.open.*` 配置）
+- 太阳码（`getWxaCodeUnlimited`）需小程序**已发布**，未发布时返回 `errcode 40066`；
+  本地联调走 `wx.miniapp.mockEnabled=true`
+
+**测试与工程**
+
+- CI 用 `runs-on: macos-14`，端到端 smoke 只做 `bash -n` 静态校验（runner 缺 docker/mysql-client）；
+  真实 62 个 smoke 需本地手跑，建议后续迁到 `ubuntu-latest` + service container
+- `sql/` 下有 60+ 脚本，其中 `biz_merchant_v2` / `biz_merchant_v2_simple` / `biz_merchant_v2_step1`、
+  `biz_product_model_v2` / `_safe` / `_step2a`、`biz_agent_store_quota` / `_hotfix` 属于同一改造的多个变体
+  （当时为绕开 Navicat 不支持 `DELIMITER` 等问题拆出来的）。`sql/deploy/init-all.sh` 已固化实测可用的那一组，
+  其余变体保留备查，但**不要**混着跑
 
 ---
 
 ## 十、文档索引
 
+**必读**
+
+- `AGENTS.md` —— 仓库开发规约 + 逐 session 交付记录（**最权威的实现细节来源**）
+- `doc/上线配置清单-2026-08-20.md` —— 上线前必改项清单（配合 `preflight-prod.sh`）
+- `doc/部署上线指南.md` —— 服务器部署步骤
 - `doc/多商户与代理商改造方案.md` —— 架构 + 改造细节 + 验证记录
+
+**产品与接口**
+
 - `doc/PRD.md` —— 产品需求
+- `doc/PRD-抖音来客商品模型.md` —— 11 种商品类型模型（v2 商品改造依据）
 - `doc/小程序API文档.md` —— 小程序 `/api/**` 接口契约
 - `doc/页面-文件-路由映射.md` —— 后台菜单 ↔ 视图 ↔ 接口 三方映射
-- `AGENTS.md` —— 仓库开发规约 + 上下文交接
+- `doc/不同身份权限与菜单评估.md` —— 5 角色 / 3 角色权限边界
+
+**运维与专题**
+
+- `doc/存储适配指南.md` —— local / oss / minio / qiniu / cos / s3 切换
+- `doc/小程序发布-商家自助操作手册.md` —— 第三方平台代发布流程
+- `doc/操作手册.md` / `doc/操作手册-提现审核.md` —— 运营侧操作说明
+- `doc/手机热点调试指南.md` / `doc/真机验证-2026-08-14.md` —— 真机联调
+- `doc/` 下另有 40+ 份 `C*/E*/V*` smoke 与审计记录，按编号对应 `.github/scripts/smoke-*.sh`
 
 ---
 
-## Smoke Test
+## 测试与回归基线
 
-本地手跑 C1 端点跨租户回归测试：
+当前基线（2026-08-20 实跑，全绿）：
+
+| 层次 | 数量 | 命令 |
+|---|---|---|
+| 端到端 smoke（bash + curl + MySQL 断言） | **62 / 62** | `for f in .github/scripts/smoke-*.sh; do bash "$f"; done` |
+| 后端 JUnit（真 MyBatis + 真 MySQL，0 mock） | **10 / 10** | `mvn test -pl ruoyi-system` |
+| 小程序 vitest（纯函数单测） | **66 / 66** | `cd miniprogram7 && npx vitest run` |
+| MyBatis XML 静态检查（52 个 xml） | 0 err | `bash .github/scripts/lint-mybatis.sh` |
+| smoke 脚本静态检查（62 个脚本） | 0 fail | `bash .github/scripts/lint-smoke.sh` |
+| SQL 种子幂等检查（21 个脚本） | 0 fail | `bash .github/scripts/lint-sql-seed.sh` |
+
+### 跑 smoke 的前置条件
+
+1. 后端 jar 在 `127.0.0.1:8080` 运行（profile 建议 `druid`，mock 支付开着更好联调）
+2. MySQL 可连：脚本默认用 `/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 ry-vue`，
+   可用环境变量覆盖：`FX_MYSQL` / `FX_DB` / `FX_H` / `FX_APPID`
+3. 已执行 `sql/` 下种子脚本（全部幂等，可重复跑）
 
 ```bash
-# 前置：后端 jar 已 build 且在 8080 跑，MySQL 有 biz_agent / biz_merchant / biz_commission 真实数据
+# 单个
 bash .github/scripts/smoke-c1.sh
+
+# 全量串行（约 2~4 分钟）
+: > /tmp/smoke-all.txt
+for f in .github/scripts/smoke-*.sh; do
+  k=$(basename "$f" .sh)
+  if bash "$f" > "/tmp/sm-$k.log" 2>&1; then echo "$k PASS"; else echo "$k FAIL"; fi
+done | tee /tmp/smoke-all.txt
+grep -c PASS /tmp/smoke-all.txt
 ```
 
-期望输出（3/3 通过）：
+> macOS 上**没有 `timeout` 命令**，不要给 smoke 外面套 `timeout`，否则全部假 FAIL。
 
+### 共享 fixture 库（`.github/scripts/lib/smoke-fixture.sh`）
+
+62 个 smoke 串行跑时曾有 22 个 FAIL，逐个定位后**全部是 fixture 漂移**（前序脚本改了共享数据），
+0 个产品缺陷。因此抽出共享前置库，写新 smoke 时优先 `source` 复用：
+
+```bash
+source "$(dirname "$0")/lib/smoke-fixture.sh"
+
+fx_reset_staff_pwd            # 把 staff001 密码重置回 admin123（历史脚本会改密码）
+fx_fix_staff_user_type        # staff001 的 user_type 修回 '02'（商户员工）
+fx_ensure_product_stock 1000  # 商品库存兜底补足（历史下单会耗尽）
+fx_pin_member_openid          # 固定测试会员 openid（c53 会改它）
+fx_clear_member_openid        # 腾空 openid 占用者（uk_merchant_openid 唯一键）
+fx_ensure_mock_on             # 确保 mock 支付/微信开关为 true
+
+TOK=$(fx_login_owner)         # OWNER 角色 token（owner_c43）
+TOK=$(fx_login_admin)         # 平台 admin token
+TOK=$(fx_login_member)        # C 端会员 token
 ```
-[A] OK: total=62.8, byMerchant=1 row
-[B] OK: total=0.0, byMerchant=0 row (no cross-tenant leak)
-[C] OK: no auth -> 401
-C1 smoke test PASSED
+
+写 smoke 时踩过的坑（避免重复）：
+
+- `biz_member.openid` 是 **NOT NULL + 唯一键** `uk_merchant_openid(merchant_id, openid)`：
+  置 NULL 报 1048，统一置 `''` 报 1062，必须先腾空占用者（用 `fx_clear_member_openid`）
+- `set -e` 下 `X=$(grep -c ... || echo 0)` 会**直接中断脚本**（grep 无匹配 rc=1 传给赋值），
+  正确写法是 `X=$(grep -c ...) || X=0`
+- RuoYi 的 DELETE 端点接收 `/{ids}` 批量路径，单个 id 也建议传 `id,id`；`sys_user` 删除是**逻辑删除**（`del_flag=2`）
+
+### CI（`.github/workflows/build.yml`）
+
+CI 只做**静态校验 + 构建**：`lint-mybatis` → `mvn clean package` → `npm run build:prod`。
+端到端 smoke 需要真 MySQL 与真数据，留给开发者本地手跑。
+
+> 待办：runner 目前是 `macos-14`（计费 10x、与生产不一致），建议迁到 `ubuntu-latest` + MySQL service container，
+> 那时可把 62 个 smoke 接进 CI。
+
+---
+
+## 部署上线
+
+完整清单见 **`doc/上线配置清单-2026-08-20.md`**，部署步骤见 **`doc/部署上线指南.md`**。以下是最容易踩的三件事。
+
+### 1. profile 必须包含 `prod`（最高危）
+
+`WxPayConfig` / `WxMaConfig` 只在「生产 profile」下**强制关闭 mock 支付与 mock 微信登录**；
+非生产 profile 会退回读 `sys_config`，而库里的 mock 开关默认是 `true` —— 一旦漏配，**线上会走假支付**。
+
+当前被识别为生产的 profile：`prod` / `production` / `aliyun-oss` / `oss` / `minio` / `cos` / `qiniu`。
+
+```bash
+# 推荐写法：显式带 prod，再叠加存储 profile
+java -jar ruoyi-admin.jar --spring.profiles.active=prod,druid,aliyun-oss
 ```
 
-**测试覆盖**：
-- A: agentId=1（有 1 个下属商户）→ total=62.80, byMerchant 1 行
-- B: agentId=999（无下属商户）→ total=0, byMerchant 0 行（**防跨租户泄漏**，对应 commit `7a0299d4`）
-- C: 无 token → 401（鉴权必须）
+### 2. 必需环境变量（不要写进 yml 提交）
 
-**回归触发场景**：
-- 改了 `CommissionMapper.xml` 漏掉 `merchantIdsEmpty` guard
-- 改了 `BizAgentCommissionController` 漏掉 `.get('total_amount')` 驼峰对齐
-- 改了 `CommissionServiceImpl` 漏 IFNULL 兜底
+| 变量 | 默认值（仓库内） | 用途 |
+|---|---|---|
+| `JWT_SECRET` | `abcdefghijklmnopqrstuvwxyz` | `token.secret`，**必须换**：`openssl rand -base64 48` |
+| `DB_HOST` / `DB_PORT` / `DB_NAME` | `localhost` / `3306` / `ry-vue` | 主数据源地址 |
+| `DB_USER` / `DB_PASSWORD` | `root` / `133301` | **必须换**成最小权限账号 |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | `localhost` / `6379` / 空 | 会话与缓存 |
+| `DRUID_STAT_ENABLED` | `false` | Druid 监控页开关，排查完务必关回 |
+| `DRUID_STAT_USER` / `DRUID_STAT_PASSWORD` | `ruoyi` / `123456` | 开启监控页时必须换 |
+| `RUOYI_PROFILE_PATH` | 开发机 Mac 路径 | 本地附件目录（`storage.type=oss` 时基本用不到） |
+| `OSS_BUCKET` / `OSS_ACCESS_KEY` / `OSS_SECRET_KEY` / `OSS_ENDPOINT` | — | 见 `doc/存储适配指南.md` |
 
-CI 流水线只做 `bash -n` 静态语法校验（避免 macos-14 runner 缺 docker/mysql-client 的环境问题）；**端到端 smoke 留给开发者本地手跑**。
+`sys_config` 侧还需在后台改：`wx.miniapp.mockEnabled` / `wx.pay.mockEnabled` 改 `false`（prod profile 会代码层强制关，
+但仍建议数据层一并改），以及 `wx.pay.appId / mchId / apiV3Key / certSerialNo / privateKeyPath / notifyUrl`（notifyUrl 必须 HTTPS）。
+
+### 3. 上线前自检
+
+```bash
+bash .github/scripts/preflight-prod.sh
+```
+
+8 项只读检查（不写库、不改文件）：
+
+1. `SPRING_PROFILES_ACTIVE` 是否含 `prod`
+2. `JWT_SECRET` 是否仍是仓库默认值 / 是否够长
+3. `DB_HOST` 是否还指向本机、`DB_USER` 是否 root、`DB_PASSWORD` 是否开发密码
+4. Druid 监控页是否被打开、口令是否默认
+5. `sys_config` 里两个 mock 开关的实际取值
+6. 微信支付 5 项凭证是否非空 + `notifyUrl` 是否 HTTPS 且非占位
+7. 小程序 `config.js` 默认 `BASE_URL` 是否还是内网地址
+8. OSS bucket / accessKey 是否配置
+
+**目标是 FAIL=0 再发布。** 检查 5/6 需要 mysql 客户端与 `DB_NAME`，否则该项跳过并给 WARN。
+
+### 小程序侧
+
+- `miniprogram7/utils/config.js` 的默认 `BASE_URL` 目前是内网地址，上线必须改成 **HTTPS 域名**
+  （或由第三方平台代发布时通过 `ext.json` 注入 `apiBaseUrl`）
+- 微信后台「开发设置 → 服务器域名」需把该 HTTPS 域名加入 `request` 白名单
+- 太阳码 `getWxaCodeUnlimited` 要求小程序**已发布**，未发布返回 `errcode 40066`
 
 ---
 

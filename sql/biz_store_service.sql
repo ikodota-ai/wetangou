@@ -6,7 +6,16 @@
 -- ----------------------------
 
 -- 1) 门店新增服务设置字段（存在则忽略，可手动执行一次）
-alter table biz_store add column services varchar(255) default '' comment '服务设置（字典biz_store_service，多选逗号分隔）' after intro;
+-- 幂等加列：新版 sql/biz_tables.sql 建表已含 services，存量库才需要 ALTER
+set @sql := (
+  select if(
+    exists(select 1 from information_schema.columns
+           where table_schema = database() and table_name = 'biz_store' and column_name = 'services'),
+    'select ''biz_store.services already exists'' as msg',
+    'alter table biz_store add column services varchar(255) default '''' comment ''服务设置（字典biz_store_service，多选逗号分隔）'' after intro'
+  )
+);
+prepare stmt from @sql; execute stmt; deallocate prepare stmt;
 
 -- 2) 字典类型
 delete from sys_dict_type where dict_type = 'biz_store_service';

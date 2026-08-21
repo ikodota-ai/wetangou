@@ -6,7 +6,11 @@
 --   2. sys_menu: 新增 2290 (mpauth 菜单) + 2291 (mpauth:query 按钮)
 --   3. sys_role_menu: role_id=4 加 mpauth (2290/2291)
 -- 验证: E16 Banner 3/3 PASS + E17 MpAuth 3/3 PASS (agent 别人 500 / 自己 200 / admin 200)
-USE ry-vue;
+-- 注（2026-08-21）：原本这里是 `USE ry-vue;`。
+-- `use` 是 mysql 客户端指令，会无视命令行上指定的库直接切到 ry-vue，
+-- 导致「对着测试库执行、却写进生产库」。库名请在命令行给：
+--   mysql --default-character-set=utf8mb4 -uroot -p <目标库> < 本文件
+-- USE ry-vue;
 -- 1. agent 角色加 banner
 INSERT IGNORE INTO sys_role_menu (role_id, menu_id) VALUES (4, 2259), (4, 2260);
 -- 2. sys_menu 新增 mpauth (parent_id=0 顶级)
