@@ -4,11 +4,16 @@ name: Test & Lint
 # 触发：master 分支 push / pull_request
 # 步骤（macos-14 runner 缺 docker/mysql-client，仅做静态/单元/前端 vitest）：
 #   1) MyBatis mapper XML lint
-#   2) smoke 脚本 lint（bash -n 全部 25 个）
-#   3) 后端 JUnit（mvn test -pl ruoyi-system）
-#   4) miniprogram7 vitest
-# 5) ruoyi-ui ESLint + 关键页面 import 路径校验
-# 6) Python fixture 脚本 lint（sql/*.sql 通过 sqlfluff 不强求，只做 grep 完整性）
+#   2) smoke 脚本 lint（bash -n 全部脚本，数量随 .github/scripts/ 增长）
+#   3) SQL 种子脚本幂等性 lint
+#   4) 后端 JUnit（mvn test -pl ruoyi-system）
+#   5) miniprogram7 vitest
+#
+# 关于后端 JUnit：CommissionMapperTest / AgentServiceImplTest 刻意跑真 MySQL
+# （要验证 MyBatis 动态 SQL 在真库上的行为，换 H2/mock 就失去意义）。
+# CI 无 MySQL 时它们通过 @EnabledIf(TestDb#available) 标记为 skipped 而非 failed。
+# 若将来换到 ubuntu runner 并挂 service container，设 TEST_DB_URL /
+# TEST_DB_USERNAME / TEST_DB_PASSWORD 环境变量即可让它们真跑。
 
 on:
   push:
@@ -28,7 +33,7 @@ jobs:
       - name: MyBatis mapper XML lint
         run: bash .github/scripts/lint-mybatis.sh
 
-      - name: Smoke script lint (25 scripts)
+      - name: Smoke script lint
         run: bash .github/scripts/lint-smoke.sh
 
       - name: SQL seed coverage

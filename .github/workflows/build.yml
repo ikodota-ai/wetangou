@@ -9,6 +9,13 @@ name: Build & Verify
 # 4) mvn -B clean package（后端 7 模块编译 + 单元测试）
 # 5) ruoyi-ui npm ci + npm run build:prod（前端产物到 dist/）
 # 6) 上传 ruoyi-admin/target/*.jar + ruoyi-ui/dist 作为 artifact
+#
+# 能力边界（重要，别被绿勾误导）：
+# 本流水线只保证「干净环境能编译打包 + 前端能 build + 没有漏提交文件」。
+# 依赖真实 MySQL 的端到端 smoke（.github/scripts/smoke-*.sh，62 个脚本 700+ 断言）
+# CI 一律不跑，只做 bash -n 语法校验 —— macos-14 runner 没 docker、缺 mysql-client，
+# 且 GitHub Actions 的 service container 是 Linux-only，在 macOS runner 上无效。
+# 业务正确性（跨租户隔离、越权、核销链路）必须由开发者本地跑 smoke 验证。
 
 on:
   push:
@@ -80,31 +87,20 @@ jobs:
           if-no-files-found: warn
 
   smoke:
-    name: C1 Smoke Test
+    name: Smoke Script Lint (syntax only)
     runs-on: macos-14
     timeout-minutes: 10
     needs: build
     if: github.event_name == 'push'  # PR 不跑（避免 PR 触发改 DB）
 
-    services:
-      mysql:
-        image: mysql:5.7
-        env:
-          MYSQL_ROOT_PASSWORD: 133301
-          MYSQL_DATABASE: ry-vue
-        ports:
-          - 3306:3306
-        options: >-
-          --character-set-server=utf8mb4
-          --collation-server=utf8mb4_unicode_ci
-
-    # smoke 脚本做语法静态检查（不真起服务/DB）
-    # 实际端到端 smoke 由开发者本地手跑（见 doc/下一轮迭代清单-2026-08-05.md）
-    # macos-14 runner 没 docker、缺 mysql-client、brew install 太慢，所以这里只 bash -n 校验
+    # 注意：这里刻意不声明 services.mysql —— service container 是 Linux-only 特性，
+    # 在 macos runner 上会被静默忽略（原来声明了 mysql:5.7 但从未生效，属于误导性死配置，已删）。
+    # 因此本 job 只做 smoke 脚本的语法静态检查，不起服务、不连 DB。
+    # 真正的端到端 smoke 由开发者本地跑：bash .github/scripts/smoke-<id>.sh
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate smoke-c1.sh syntax
-        run: bash -n .github/scripts/smoke-c1.sh && echo "smoke script syntax OK"
+      - name: Validate all smoke scripts syntax
+        run: bash .github/scripts/lint-smoke.sh
 

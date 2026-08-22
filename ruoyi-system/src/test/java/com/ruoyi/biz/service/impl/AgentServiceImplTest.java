@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.test.context.TestPropertySource;
 import com.ruoyi.common.core.domain.model.TenantContext;
 import com.ruoyi.common.exception.ServiceException;
@@ -21,13 +22,15 @@ import com.ruoyi.common.utils.TenantContextHolder;
  */
 @SpringBootTest(classes = com.ruoyi.biz.mapper.MinimalTestApp.class)
 @TestPropertySource(properties = {
-    "spring.datasource.url=jdbc:mysql://127.0.0.1:3306/ry-vue?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true",
-    "spring.datasource.username=root",
-    "spring.datasource.password=133301",
+    "spring.datasource.url=${TEST_DB_URL:jdbc:mysql://127.0.0.1:3306/ry-vue?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}",
+    "spring.datasource.username=${TEST_DB_USERNAME:root}",
+    "spring.datasource.password=${TEST_DB_PASSWORD:133301}",
     "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
     "mybatis.type-aliases-package=com.ruoyi.**.domain",
     "mybatis.mapper-locations=classpath*:mapper/**/*Mapper.xml"
 })
+@EnabledIf(value = "com.ruoyi.testsupport.TestDb#available",
+           disabledReason = "需要真实 MySQL；无库时跳过（CI runner 无 MySQL，且 service container 是 Linux-only）")
 @DisplayName("E11: AgentServiceImpl 数据权限 guard")
 class AgentServiceImplTest
 {
