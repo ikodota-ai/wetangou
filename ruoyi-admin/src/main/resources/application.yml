@@ -127,7 +127,7 @@ token:
   # 令牌有效期（默认30分钟）
   expireTime: 30
   # 会员令牌有效期（分钟，默认7天）
-  memberExpireTime: 10080
+  memberExpireTime: 43200
 
 # MyBatis配置
 mybatis:

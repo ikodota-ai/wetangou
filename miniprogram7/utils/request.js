@@ -34,8 +34,75 @@ function fixRichText(html) {
   return String(html).replace(/(<img[^>]+src=["'])([^"']+)(["'])/gi, (m, p1, src, p3) => p1 + toFullUrl(src) + p3);
 }
 
+// === 401 双 token 精准清理 ===
+// 后端 MemberAuthInterceptor 返 401 时带 authScope 字段：
+//   member → 会员 token 过期，清 memberToken + token，保留 staffToken
+//   staff  → 员工登录态失效（会员 token 访问商家端接口），仅清 staffToken
+// 历史版本无 authScope → 兼容清空全部
+function _clearAuth(authScope) {
+  if (authScope === 'staff') {
+    // 员工态失效：清员工会话，不动会员 token
+    try { wx.removeStorageSync('staffToken') } catch (e) {}
+    try { wx.removeStorageSync('staffUser') } catch (e) {}
+    try { wx.removeStorageSync('currentIdentity') } catch (e) {}
+    // 如果当前 token 是 staff token，则恢复为 memberToken
+    const memberToken = wx.getStorageSync('memberToken')
+    if (memberToken) {
+      try { wx.setStorageSync('token', memberToken) } catch (e) {}
+    }
+  } else if (authScope === 'member') {
+    // 会员态失效：清会员 token，保留员工会话
+    try { wx.removeStorageSync('memberToken') } catch (e) {}
+    try { wx.removeStorageSync('token') } catch (e) {}
+  } else {
+    // 老版本兼容：无 authScope 的 401，全清
+    try { wx.removeStorageSync('token') } catch (e) {}
+    try { wx.removeStorageSync('memberToken') } catch (e) {}
+    try { wx.removeStorageSync('staffToken') } catch (e) {}
+  }
+}
+
+// === 静默重登 + 重试（仅会员态）===
+// 会员 token 真过期时，自动 wx.login() 换 code 重新登录，
+// 成功后用新 token 重试原请求一次。微信授权静默，用户无感。
+// 防重入：同一时刻最多一个重登请求正在进行。
+let _reloginPromise = null
+function _reloginAndRetry(url, options, authScope) {
+  if (_reloginPromise) return _reloginPromise
+  _reloginPromise = (async () => {
+    try {
+      // 仅会员态可静默重登；员工态保持原始 401
+      if (authScope !== 'member') throw new Error('skip')
+      const lr = await new Promise((resolve, reject) => {
+        wx.login({ success: resolve, fail: reject })
+      })
+      if (!lr || !lr.code) throw new Error('wx.login failed')
+      // 直接调 request 而非 api.login，避免循环引用
+      const data = await request('/api/auth/login', { method: 'POST', data: { code: lr.code, appid: APPID, inviteBy: null } })
+      const token = (data && (data.token || data.data && data.data.token)) || ''
+      if (!token) throw new Error('relogin no token')
+      try { wx.setStorageSync('token', token) } catch (e) {}
+      try { wx.setStorageSync('memberToken', token) } catch (e) {}
+      // 用新 token 重试原请求
+      return request(url, options)
+    } catch (e) {
+      throw { code: 401, msg: '登录已过期', _reloginFailed: true }
+    } finally {
+      _reloginPromise = null
+    }
+  })()
+  return _reloginPromise
+}
+
 function request(url, options = {}) {
-  const token = wx.getStorageSync('token');
+  // 当前身份决定用哪个 token：会员用 memberToken/当前 token，员工用 staffToken
+  const currentId = wx.getStorageSync('currentIdentity')
+  const staffToken = wx.getStorageSync('staffToken')
+  const memberToken = wx.getStorageSync('memberToken')
+  const token = currentId === 'staff' && staffToken
+    ? staffToken
+    : (memberToken || wx.getStorageSync('token'))
+
   return new Promise((resolve, reject) => {
     wx.request({
       url: _base() + url,
@@ -52,13 +119,20 @@ function request(url, options = {}) {
           if (d.code === 200 || d.code === 0 || d.success) {
             resolve(d.data || d);
           } else if (d.code === 401) {
-            wx.removeStorageSync('token');
-            reject({ code: 401, msg: '未登录' });
+            const authScope = d.authScope || ''
+            _clearAuth(authScope)
+            // 静默重登：仅会员态 401 自动重试一次
+            if (authScope === 'member' && !options._retry) {
+              _reloginAndRetry(url, { ...options, _retry: true }, authScope)
+                .then(resolve).catch(reject)
+              return
+            }
+            reject({ code: 401, msg: d.msg || '未登录', authScope: authScope });
           } else {
             resolve(d);
           }
         } else if (res.statusCode === 401) {
-          wx.removeStorageSync('token');
+          _clearAuth('')
           reject({ code: 401 });
         } else {
           reject(res);

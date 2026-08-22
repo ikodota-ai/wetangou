@@ -91,6 +91,10 @@ App({
     try { wx.removeStorageSync('token') } catch (e) {}
     try { wx.removeStorageSync('memberTokenBackup') } catch (e) {}
     try { wx.removeStorageSync('staffToken') } catch (e) {}
+    // 双身份（会员/商家）会话一并清，否则退出后仍能免密切回商家版
+    try { wx.removeStorageSync('memberToken') } catch (e) {}
+    try { wx.removeStorageSync('currentIdentity') } catch (e) {}
+    try { wx.removeStorageSync('hasStaffAccount') } catch (e) {}
     try { wx.removeStorageSync('staffUser') } catch (e) {}
     try { wx.removeStorageSync('staffInfo') } catch (e) {}
     try { wx.removeStorageSync('inviteBy') } catch (e) {}

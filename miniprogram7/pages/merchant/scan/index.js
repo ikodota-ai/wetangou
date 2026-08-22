@@ -1,5 +1,6 @@
 const { api } = require('../../../utils/request.js')
 const { parseInviteScene } = require('../../../utils/inviteScene.js')
+const identity = require('../../../utils/identity.js')
 
 const REASON_MSG = {
   empty: '二维码内容为空',
@@ -51,8 +52,8 @@ Page({
     // 确认弹窗：避免误扫
     wx.showModal({
       title: '加入该商家？',
-      content: '扫描成功后将以员工身份登录该门店。',
-      confirmText: '加入',
+      content: '将向该门店提交入职申请，店长审核通过后即可使用商家版。',
+      confirmText: '提交申请',
       cancelText: '取消',
       success: (mr) => {
         if (!mr.confirm) { this.setData({ scanning: false }); return }
@@ -81,18 +82,38 @@ Page({
             wx.hideLoading()
             this.setData({ scanning: false })
             const d = data || {}
-            const token = d.token
-            if (!token) { wx.showToast({ title: '加入失败：无 token', icon: 'none' }); return }
-            // 备份原 C 端 token（员工端覆盖了 C 端 session）
-            const memberToken = wx.getStorageSync('token')
-            if (memberToken) wx.setStorageSync('memberTokenBackup', memberToken)
-            wx.setStorageSync('token', token)
-            wx.setStorageSync('staffUser', {
-              userType: d.userType || 'merchant',
-              merchantId: d.merchantId, storeId: d.storeId,
-              storeName: d.storeName, realName: d.realName, token,
-              needBindWx: !!d.needBindWx
+            // 待审核：账号与微信已绑定，但未获得商家端登录态，需店长在后台通过
+            if (d.pendingAudit || !d.token) {
+              // 标记本人已有员工账号，「我的」页可显示商家版入口（点进去会提示待审核）
+              try { wx.setStorageSync('hasStaffAccount', true) } catch (e) {}
+              wx.showModal({
+                title: '申请已提交',
+                content: '请联系店长在后台审核通过，通过后即可进入商家版。',
+                showCancel: false,
+                confirmText: '我知道了',
+                success: () => wx.navigateBack({ delta: 1 })
+              })
+              return
+            }
+            // 已在职（例如二次扫码/已审核过）→ 直接建立商家端会话
+            identity.saveStaffSession(d.token, {
+              token: d.token,
+              userId: d.userId || d.memberId,
+              userType: d.userType || 'staff',
+              staffRole: d.staffRole,
+              roles: d.roles || [],
+              isOwner: !!d.isOwner,
+              isManagerOrAbove: !!d.isManagerOrAbove,
+              isAgent: !!d.isAgent,
+              merchantId: d.merchantId,
+              storeId: d.storeId,
+              storeIds: d.storeIds || [],
+              storeName: d.storeName,
+              realName: d.realName,
+              needBindWx: !!d.needBindWx,
+              logged: true
             })
+            try { wx.setStorageSync('hasStaffAccount', true) } catch (e) {}
             wx.showToast({ title: '已加入', icon: 'success' })
             setTimeout(() => wx.reLaunch({ url: '/pages/merchant/home/index' }), 500)
           })
@@ -112,6 +133,13 @@ Page({
               wx.showModal({
                 title: '邀请码已使用',
                 content: '该邀请码已被其他员工使用',
+                showCancel: false,
+                confirmText: '我知道了'
+              })
+            } else if (msg.indexOf('待店长审核') > -1) {
+              wx.showModal({
+                title: '等待审核',
+                content: '你的入职申请已提交，请联系店长在后台审核通过。',
                 showCancel: false,
                 confirmText: '我知道了'
               })

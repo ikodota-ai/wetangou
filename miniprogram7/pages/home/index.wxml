@@ -17,11 +17,6 @@
       </swiper-item>
     </swiper>
 
-    <!-- 右上角：切换到商家端（仅 staff 身份时显示） -->
-    <view class="staff-fab" wx:if="{{hasStaff}}" bindtap="onSwitchToStaff">
-      <text class="staff-fab-t">切到商家端</text>
-    </view>
-
     <!-- 门店卡 -->
     <view class="store-card card">
       <view class="sc-head">
@@ -90,7 +85,7 @@
         <view class="tab-bar"></view>
       </view>
     </view>
-
+    
     <view class="goods-list" wx:if="{{tab==='pickup'}}">
       <view class="goods" wx:for="{{goods}}" wx:key="productId" data-id="{{item.productId}}" bindtap="goDetail">
         <image class="g-img" src="{{item.cover}}"></image>

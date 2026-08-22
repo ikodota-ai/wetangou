@@ -1,6 +1,7 @@
 const app = getApp()
 const { api } = require('../../../utils/request.js')
 const role = require('../../../utils/role.js')
+const identity = require('../../../utils/identity.js')
 
 Page({
   data: {
@@ -97,12 +98,39 @@ Page({
   goOrders() { wx.navigateTo({ url: '/pages/merchant/order/index' }) },
   goHistory(){ wx.navigateTo({ url: '/pages/merchant/history/index' }) },
   goMe()     { wx.navigateTo({ url: '/pages/merchant/me/index' }) },
+  /**
+   * 切回会员版。
+   *
+   * 保留商家会话（不删 staffUser / staffToken），这样从「我的」再切回来是零请求。
+   * 只有真正「退出商家账号」时才清 —— 那是另一个动作。
+   */
   goSwitchAccount() {
-    const memberToken = wx.getStorageSync('memberTokenBackup')
-    if (memberToken) {
-      wx.setStorageSync('token', memberToken)
+    const r = identity.switchToMember()
+    if (r.ok) {
+      wx.reLaunch({ url: '/pages/home/index' })
+      return
     }
-    wx.removeStorageSync('staffUser')
-    wx.reLaunch({ url: '/pages/home/index' })
+    // 没有会员登录态（例如直接用账号密码进的商家端）→ 引导去会员登录
+    wx.showModal({
+      title: '尚未登录会员',
+      content: '当前微信还没有会员登录记录，去用微信登录一次即可在两端来回切换。',
+      confirmText: '去登录',
+      success: (m) => {
+        if (m.confirm) wx.reLaunch({ url: '/pages/login/login' })
+      }
+    })
+  },
+
+  /** 退出商家账号：清商家会话，回到会员版（会员登录态保留）*/
+  onLogoutStaff() {
+    wx.showModal({
+      title: '退出商家账号',
+      content: '退出后需重新登录才能进入商家版，会员身份不受影响。',
+      success: (m) => {
+        if (!m.confirm) return
+        identity.clearStaff()
+        wx.reLaunch({ url: '/pages/home/index' })
+      }
+    })
   }
 })

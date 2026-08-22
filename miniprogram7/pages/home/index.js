@@ -19,9 +19,7 @@ Page({
     hasStaff: false
   },
   onShow() {
-    // 检测是否绑了 staff 身份（右上角可切换）
-    const u = wx.getStorageSync('staffUser') || null
-    this.setData({ hasStaff: !!(u && u.logged) })
+    // 身份切换入口统一放在「我的」页，首页不再显示
   },
   _lastBannerStoreId: null,
   _bannerToastShown: false,
@@ -160,12 +158,8 @@ Page({
       // 保持 banners=[]（空数组），让 swiper 显示空白以便排查
       this.setData({ banners: [] ,
   onSwitchToStaff() {
-    const u = wx.getStorageSync('staffUser') || null
-    if (!u || !u.logged) {
-      wx.showModal({ title: '提示', content: '当前账号未绑定商家身份，可使用「更多登录方式 → 账号密码登录」', showCancel: false })
-      return
-    }
-    wx.reLaunch({ url: '/pages/merchant/home/index' })
+    // 已下线：身份切换入口移到「我的」页（pages/mine/index）
+    wx.switchTab({ url: '/pages/mine/index/index' })
   }
 })
     });

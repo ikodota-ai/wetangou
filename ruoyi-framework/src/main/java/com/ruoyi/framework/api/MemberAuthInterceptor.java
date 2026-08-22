@@ -85,14 +85,16 @@ public class MemberAuthInterceptor implements HandlerInterceptor
         {
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType("application/json;charset=UTF-8");
-            writeError(response, 401, "会员未登录或登录已过期");
+            writeError(response, 401, "会员未登录或登录已过期", "member");
             return false;
         }
         if ((staffMethodAnno != null || staffClassAnno != null))
         {
             if (loginMember == null)
             {
-                writeError(response, 401, "员工登录态失效，请重新登录");
+                // authScope=staff：调用方拿的是会员 token（或无 token）访问商家端接口，
+                // 前端只应清员工会话，不能连带清掉仍然有效的会员 token
+                writeError(response, 401, "员工登录态失效，请重新登录", "staff");
                 return false;
             }
             if (!"store".equals(loginMember.getUserType()))
@@ -152,9 +154,31 @@ public class MemberAuthInterceptor implements HandlerInterceptor
 
     private void writeError(HttpServletResponse response, int code, String msg) throws java.io.IOException
     {
+        writeError(response, code, msg, null);
+    }
+
+    /**
+     * 输出错误 JSON。
+     *
+     * @param authScope 认证域标记，供小程序端区分「会员态失效」与「员工态失效」：
+     *                  member = 会员 token 无效，前端可清会员 token 并静默重登；
+     *                  staff  = 员工登录态缺失（常见于会员 token 访问商家端接口），
+     *                           此时**不得**清掉有效的会员 token。
+     *                  注意 code 必须是数字（历史版本写成字符串 "401"，前端 d.code === 401 判不中）。
+     */
+    private void writeError(HttpServletResponse response, int code, String msg, String authScope)
+            throws java.io.IOException
+    {
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":\"" + code + "\",\"msg\":\"" + msg + "\"}");
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"code\":").append(code).append(",\"msg\":\"").append(msg).append("\"");
+        if (authScope != null)
+        {
+            sb.append(",\"authScope\":\"").append(authScope).append("\"");
+        }
+        sb.append("}");
+        response.getWriter().write(sb.toString());
     }
 
     /**

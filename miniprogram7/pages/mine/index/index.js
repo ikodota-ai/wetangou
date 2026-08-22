@@ -1,4 +1,6 @@
 const app = getApp()
+const { api, APPID } = require('../../../utils/request.js')
+const identity = require('../../../utils/identity.js')
 
 Page({
   data: {
@@ -11,7 +13,10 @@ Page({
     serviceQrcode: '',
     businessHours: '',
     // 员工身份标识：true=当前是员工 token
-    staffActive: false
+    staffActive: false,
+    // 是否可一键切到商家版（本地已有商家会话，或该微信绑过员工账号）
+    canSwitchStaff: false,
+    switchHint: ''
   },
 
   onLoad() {
@@ -25,6 +30,7 @@ Page({
     }
     const staff = wx.getStorageSync('staffUser') || {}
     this.setData({ staffActive: !!(staff && staff.userType === 'store') })
+    this.refreshSwitchEntry()
     this.syncUser()
 
     // 已登录 + 资料不完整 + 未弹过提示 → 弹完善资料
@@ -64,13 +70,70 @@ Page({
     }
   },
   goMerchantLogin() {
-    // 商家端 v2：已登录（userType=merchant）进工作台，否则进登录页
+    // 扫码加入新员工（首次入职场景）：走商家登录页的扫码入口
+    wx.navigateTo({ url: '/pages/merchant/login/index' })
+  },
+
+  /**
+   * 刷新「切换到商家版」入口的可见性与提示文案。
+   *
+   * 两种情况都算「可切」：
+   *  a) 本地已有商家 token（切过去零请求，秒进）
+   *  b) 会员登录时后端返 hasStaffAccount=true（该 openid 绑过员工，可静默免密换 token）
+   */
+  refreshSwitchEntry() {
     const staff = wx.getStorageSync('staffUser') || {}
-    if (staff && staff.userType === 'merchant' && wx.getStorageSync('token')) {
-      wx.reLaunch({ url: '/pages/merchant/home/index' })
-    } else {
-      wx.navigateTo({ url: '/pages/login/login?showMore=1' })
+    const hasLocal = identity.hasStaffSession() || !!(staff && staff.logged)
+    const hasStaffAccount = !!wx.getStorageSync('hasStaffAccount')
+    const can = hasLocal || hasStaffAccount
+    let hint = ''
+    if (hasLocal) {
+      hint = staff.realName ? ('当前身份：' + staff.realName) : '已登录商家账号'
+    } else if (hasStaffAccount) {
+      hint = '该微信已关联商家，可免密进入'
     }
+    this.setData({ canSwitchStaff: can, switchHint: hint })
+  },
+
+  /**
+   * 切到商家版：优先复用本地商家会话，否则静默 wx.login 用 openid 免密登录。
+   * wx.login 只换 code，不弹授权框，用户全程无感。
+   */
+  onSwitchToStaff() {
+    if (this._switching) return
+    this._switching = true
+    identity.switchToStaff({ api: api, appid: APPID })
+      .then((r) => {
+        if (r.ok) {
+          const url = r.userType === 'platform' ? '/pages/platform/home/index'
+                    : r.userType === 'agent'    ? '/pages/agent/home/index'
+                    : '/pages/merchant/home/index'
+          wx.reLaunch({ url: url })
+          return
+        }
+        if (r.reason === 'PENDING_AUDIT') {
+          wx.showModal({
+            title: '等待店长审核',
+            content: '你的入职申请已提交，店长在后台审核通过后即可进入商家版。',
+            showCancel: false,
+            confirmText: '我知道了'
+          })
+          return
+        }
+        if (r.reason === 'NOT_BOUND') {
+          wx.showModal({
+            title: '未绑定商家身份',
+            content: '当前微信还没有关联商家员工。用账号密码登录一次后会自动绑定，之后即可免密切换。',
+            confirmText: '去登录',
+            success: (m) => {
+              if (m.confirm) wx.navigateTo({ url: '/pages/login/login?showMore=1' })
+            }
+          })
+          return
+        }
+        wx.showToast({ title: r.reason || '切换失败', icon: 'none' })
+      })
+      .finally(() => { this._switching = false })
   },
   goLogin() {
     wx.navigateTo({ url: '/pages/login/login' })

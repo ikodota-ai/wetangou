@@ -195,3 +195,15 @@
 .staff-entry:active {
   background: rgba(0,0,0,0.02);
 }
+/* 可切换商家版时强调显示（有身份可用 → 不再是弱化入口）*/
+.staff-entry-primary .staff-entry-text {
+  font-size: 28rpx;
+  color: #FE2C55;
+  font-weight: 600;
+}
+.staff-entry-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #BBB;
+}

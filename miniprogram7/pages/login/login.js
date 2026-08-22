@@ -1,5 +1,6 @@
 const app = getApp()
 const { api, APPID } = require('../../utils/request.js')
+const identity = require('../../utils/identity.js')
 
 /**
  * 合并登录页（V2.6.2 设计）
@@ -145,6 +146,7 @@ Page({
         logged: true
       }
       wx.setStorageSync('staffUser', staffInfo)
+      identity.saveStaffSession(token, staffInfo)
       appInst.globalData.staff = staffInfo
       appInst.globalData.user = Object.assign(appInst.globalData.user || {}, {
         memberId: staffInfo.userId,
@@ -167,7 +169,9 @@ Page({
         phone: data.phone || '',
         logged: true
       })
-      // 副身份提醒：hasStaffAccount → 提示可账号密码登录
+      // 副身份提醒：hasStaffAccount → 该 openid 绑过员工，首页可显示「切到商家端」并静默免密
+      identity.saveMemberToken(token)
+      try { wx.setStorageSync('hasStaffAccount', !!hasStaffAccount) } catch (e) {}
       this.setData({ hasStaffAccount: hasStaffAccount })
       wx.showToast({ title: '登录成功', icon: 'success' })
       setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 600)
@@ -188,7 +192,10 @@ Page({
     }
     this.setData({ submitting: true })
     wx.showLoading({ title: '登录中', mask: true })
-    api.merchantStaffLogin({ username, password })
+    // 静默取 wx code 一并提交：后端若发现该账号未绑微信会自动绑定，
+    // 之后这个微信就能免密切换到商家端。拿不到 code 也不阻断登录。
+    this._withWxCode((wxCode) => {
+      api.merchantStaffLogin({ username, password, code: wxCode, appid: APPID })
       .then((data) => {
         wx.hideLoading()
         this.setData({ submitting: false })
@@ -216,12 +223,13 @@ Page({
           staffRole: data.staffRole,
           logged: true
         }
-        wx.setStorageSync('token', token)
         wx.setStorageSync('staffUser', staffInfo)
+        identity.saveStaffSession(token, staffInfo)
         const appInst = getApp() || {}
         appInst.globalData = appInst.globalData || {}
         appInst.globalData.staff = staffInfo
-        wx.showToast({ title: '商家端登录成功', icon: 'success' })
+        const bound = data && data.openidAutoBound
+        wx.showToast({ title: bound ? '已绑定微信，下次可免密' : '商家端登录成功', icon: 'success' })
         setTimeout(() => wx.reLaunch({ url: '/pages/merchant/home/index' }), 600)
       })
       .catch((err) => {
@@ -230,6 +238,19 @@ Page({
         const msg = (err && (err.msg || err.errMsg || err.message)) || '登录失败'
         wx.showModal({ title: '登录失败', content: msg, showCancel: false })
       })
+    })
+  },
+
+  /** 静默取 wx.login code（失败传空，不阻断主流程）*/
+  _withWxCode(next) {
+    try {
+      wx.login({
+        success: (r) => next((r && r.code) || ''),
+        fail: () => next('')
+      })
+    } catch (e) {
+      next('')
+    }
   },
 
   /**

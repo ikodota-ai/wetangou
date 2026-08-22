@@ -91,8 +91,15 @@
       </view>
     </view>
 
-    <!-- 员工 / 商家入口：弱化显示，与 C 端功能分隔开 -->
-    <view class="staff-entry" bindtap="goStaffLogin">
+    <!-- 身份切换 / 商家入口：弱化显示，与 C 端功能分隔开 -->
+    <!-- 已有商家身份（本地会话 or 该微信绑过员工）→ 一键免密切到商家版 -->
+    <view class="staff-entry staff-entry-primary" wx:if="{{canSwitchStaff}}" bindtap="onSwitchToStaff">
+      <text class="staff-entry-text">切换到商家版</text>
+      <text class="staff-entry-sub">{{switchHint}}</text>
+    </view>
+
+    <!-- 没有商家身份 → 账号密码登录 -->
+    <view class="staff-entry" wx:else bindtap="goStaffLogin">
       <text class="staff-entry-text">员工 / 商家登录</text>
     </view>
 
