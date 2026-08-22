@@ -492,6 +492,26 @@ public class SysUserServiceImpl implements ISysUserService
     }
 
     /**
+     * 绑定微信 openid
+     *
+     * <p>注意：不能复用 updateUser —— 它的动态 set 不含 openid 列，传了也不会落库。</p>
+     */
+    @Override
+    public boolean bindOpenid(Long userId, String openid)
+    {
+        return userMapper.bindOpenid(userId, openid) > 0;
+    }
+
+    /**
+     * 解绑微信 openid（置 NULL）
+     */
+    @Override
+    public boolean unbindOpenid(Long userId)
+    {
+        return userMapper.unbindOpenid(userId) > 0;
+    }
+
+    /**
      * 更新用户登录信息（IP和登录时间）
      * 
      * @param userId 用户ID

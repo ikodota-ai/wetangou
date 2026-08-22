@@ -80,6 +80,16 @@ public interface SysUserMapper
      * @param avatar 头像地址
      * @return 结果
      */
+    /**
+     * 绑定微信 openid（updateUser 的动态 set 不含 openid，必须走专用语句）
+     */
+    public int bindOpenid(@Param("userId") Long userId, @Param("openid") String openid);
+
+    /**
+     * 解绑微信 openid（置 NULL + openid_bound=0）
+     */
+    public int unbindOpenid(@Param("userId") Long userId);
+
     public int updateUserAvatar(@Param("userId") Long userId, @Param("avatar") String avatar);
 
     /**

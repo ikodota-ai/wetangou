@@ -167,6 +167,23 @@ public interface ISysUserService
     public boolean updateUserAvatar(Long userId, String avatar);
 
     /**
+     * 绑定微信 openid（小程序免密登录用）
+     *
+     * @param userId 用户ID
+     * @param openid 微信 openid
+     * @return 结果
+     */
+    public boolean bindOpenid(Long userId, String openid);
+
+    /**
+     * 解绑微信 openid（admin 端解绑 / 员工换微信）
+     *
+     * @param userId 用户ID
+     * @return 结果
+     */
+    public boolean unbindOpenid(Long userId);
+
+    /**
      * 更新用户登录信息（IP和登录时间）
      * 
      * @param userId 用户ID

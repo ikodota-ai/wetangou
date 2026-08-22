@@ -167,6 +167,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="pwdUpdateDate != null">pwd_update_date,</if>
  			<if test="createBy != null and createBy != ''">create_by,</if>
  			<if test="remark != null and remark != ''">remark,</if>
+ 			<if test="openid != null and openid != ''">openid,</if>
+ 			<if test="openidBound != null">openid_bound,</if>
+ 			<if test="userType != null and userType != ''">user_type,</if>
+ 			<if test="merchantId != null">merchant_id,</if>
  			create_time
  		)values(
  			<if test="userId != null and userId != ''">#{userId},</if>
@@ -182,6 +186,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="pwdUpdateDate != null">#{pwdUpdateDate},</if>
  			<if test="createBy != null and createBy != ''">#{createBy},</if>
  			<if test="remark != null and remark != ''">#{remark},</if>
+ 			<if test="openid != null and openid != ''">#{openid},</if>
+ 			<if test="openidBound != null">#{openidBound},</if>
+ 			<if test="userType != null and userType != ''">#{userType},</if>
+ 			<if test="merchantId != null">#{merchantId},</if>
  			sysdate()
  		)
 	</insert>
@@ -206,6 +214,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  		where user_id = #{userId}
 	</update>
 	
+	<!-- 绑定微信 openid（updateUser 的动态 set 不含 openid 列，必须走专用语句）-->
+	<update id="bindOpenid">
+ 		update sys_user set openid = #{openid}, openid_bound = 1, update_time = sysdate()
+ 		where user_id = #{userId}
+	</update>
+
+	<!-- 解绑微信 openid（置 NULL；动态 set 会跳过 null，故单独写）-->
+	<update id="unbindOpenid">
+ 		update sys_user set openid = null, openid_bound = 0, update_time = sysdate()
+ 		where user_id = #{userId}
+	</update>
+
 	<update id="updateUserStatus" parameterType="SysUser">
  		update sys_user set status = #{status}, update_time = sysdate() where user_id = #{userId}
 	</update>
