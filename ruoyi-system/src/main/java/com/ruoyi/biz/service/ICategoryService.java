@@ -28,6 +28,15 @@ public interface ICategoryService
     public List<Category> selectCategoryList(Category category);
 
     /**
+     * 查询商品品类树（按 parent_id 组装 children），供前端 el-cascader 级联选择使用。
+     * 只返回启用状态（status=0）的节点。
+     *
+     * @param category 过滤条件（如 industryCode）
+     * @return 顶级节点列表，children 递归嵌套
+     */
+    public List<Category> selectCategoryTree(Category category);
+
+    /**
      * 新增商品分类
      * 
      * @param category 商品分类

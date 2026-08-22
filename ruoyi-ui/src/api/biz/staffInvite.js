@@ -30,6 +30,20 @@ export function updateStaff(data) {
 export function profileStaff(data) {
   return request({ url: '/biz/staffInvite/staff/profile', method: 'post', data })
 }
+// 解绑员工微信（admin 端）：释放 openid，员工需重新账号密码登录
+export function unbindStaffWx(userId) {
+  return request({ url: '/biz/staffInvite/staff/unbindWx/' + userId, method: 'put' })
+}
+
+// 待审核员工清单（扫码入职后 status=3）
+export function listStaffAudit() {
+  return request({ url: '/biz/staffInvite/staff/audit', method: 'get' })
+}
+// 审核入职：approve=true 通过（转在职）/ false 拒绝（删除关联）
+export function auditStaff(data) {
+  return request({ url: '/biz/staffInvite/staff/audit', method: 'post', data })
+}
+
 export function delStaff(id) {
   return request({ url: '/biz/staffInvite/staff/' + id, method: 'delete' })
 }

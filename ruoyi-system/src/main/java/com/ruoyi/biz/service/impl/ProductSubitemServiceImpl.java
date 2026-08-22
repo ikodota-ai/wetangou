@@ -62,4 +62,19 @@ public class ProductSubitemServiceImpl implements IProductSubitemService
     {
         return subitemMapper.deleteByProductId(productId);
     }
+
+    @Override
+    public List<ProductSubitem> selectSubitemList(ProductSubitem query)
+    {
+        return subitemMapper.selectSubitemList(query);
+    }
+
+    @Override
+    public List<String> selectNameCandidates(String keyword)
+    {
+        // 商户账号只看自己的历史子品；平台/代理商不限（候选名称非敏感数据）
+        com.ruoyi.common.core.domain.model.TenantContext ctx = com.ruoyi.common.utils.TenantContextHolder.get();
+        Long merchantId = (ctx != null && ctx.isMerchant()) ? ctx.getMerchantId() : null;
+        return subitemMapper.selectNameCandidates(merchantId, keyword);
+    }
 }

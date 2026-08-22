@@ -424,7 +424,21 @@
     <el-dialog title="添加子品" :visible.sync="subitemOpen" width="420px" append-to-body>
       <el-form :model="subitemForm" label-width="100px" size="small">
         <el-form-item label="所属组"><span>{{ subitemForm._groupName }}</span></el-form-item>
-        <el-form-item label="子品名称"><el-input v-model="subitemForm.subitemName" /></el-form-item>
+        <el-form-item label="子品名称">
+          <el-select
+            v-model="subitemForm.subitemName"
+            filterable
+            allow-create
+            default-first-option
+            remote
+            :remote-method="searchSubitemName"
+            :loading="nameLoading"
+            placeholder="输入可筛选历史子品，也可直接输入新名称"
+            style="width: 100%"
+          >
+            <el-option v-for="n in nameOptions" :key="n" :label="n" :value="n" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="数量"><el-input-number v-model="subitemForm.quantity" :min="1" /></el-form-item>
         <el-form-item label="单价"><el-input-number v-model="subitemForm.price" :min="0" :precision="2" :step="1" /></el-form-item>
       </el-form>
@@ -437,10 +451,10 @@
 </template>
 
 <script>
-import { listCategory } from '@/api/biz/category'
-import { addProduct, getProduct } from '@/api/biz/product'
+import { treeCategory } from '@/api/biz/category'
+import { addProduct, updateProduct, getProduct } from '@/api/biz/product'
 import { selectProductTypeList } from '@/api/biz/productType'
-import { listGroups, addGroup, delGroup, addSubitem, delSubitem } from '@/api/biz/productSubitem'
+import { listGroups, addGroup, delGroup, addSubitem, delSubitem, listSubitemNameCandidates } from '@/api/biz/productSubitem'
 
 export default {
   name: 'ProductCreate',
@@ -468,6 +482,8 @@ export default {
       groupOpen: false,
       groupForm: { productId: null, groupName: '', pickRule: 'ALL', sort: 0 },
       subitemOpen: false,
+      nameOptions: [],
+      nameLoading: false,
       subitemForm: { productId: null, groupId: null, _groupName: '', subitemName: '', quantity: 1, price: 0 },
       // ===== 表单 =====
       merchantName: '',
@@ -544,17 +560,6 @@ export default {
       if (this.isVoucher) return '商品类型'
       return '商家信息'
     },
-    categoryNameOf(id) {
-      if (!id) return ''
-      const find = (tree) => {
-        for (const n of tree) {
-          if (n.categoryId === id) return n.categoryName
-          if (n.children) { const r = find(n.children); if (r) return r }
-        }
-        return ''
-      }
-      return find(this.categoryTree || [])
-    },
     namePlaceholder() {
       if (this.isVoucher && this.form.faceValue) return this.autoVoucherName
       return '请输入商品名称'
@@ -605,9 +610,10 @@ export default {
   },
   methods: {
     loadCategory() {
-      listCategory({ pageNum: 1, pageSize: 200 }).then(res => {
-        this.categoryTree = res.rows || []
-      })
+      // /biz/category/list 返回的是扁平分页数据，el-cascader 需要 children 嵌套树
+      treeCategory().then(res => {
+        this.categoryTree = (res && (res.data || res)) || []
+      }).catch(() => { this.categoryTree = [] })
     },
     loadTypeList() {
       selectProductTypeList().then(res => {
@@ -615,24 +621,56 @@ export default {
       })
     },
     loadProduct(pid) {
-      getProduct(pid).then(p => {
+      getProduct(pid).then(res => {
+        // request 拦截器返回整个 AjaxResult，商品在 res.data
+        const p = (res && (res.data || res)) || {}
         this.form = Object.assign({}, this.form, p)
+        this.form.productId = p.productId || Number(pid)
         this.form.categoryIdArr = p.categoryId
+        // 多门店回填：后端返 storeIds 逗号串，表单用 storeIdList 数组
+        this.form.storeIdList = p.storeIds ? String(p.storeIds).split(',').filter(v => v).map(v => Number(v)) : []
         this.basicCollapsed = true
         this.activeTab = this.isCombo ? 'basic' : 'basicG'
-        if (this.isGroupon) this.loadSubitems()
+        if (this.isGroupon || this.isCombo) this.loadSubitems()
+      }).catch(e => {
+        this.$modal.msgError((e && (e.msg || e.message)) || '商品加载失败')
       })
     },
+
+    /** 提交表单：有 productId 走 PUT 修改，否则 POST 新增 */
+    saveProduct() {
+      const payload = Object.assign({}, this.form)
+      payload.storeIds = (this.form.storeIdList || []).join(',')
+      delete payload.categoryIdArr
+      return payload.productId ? updateProduct(payload) : addProduct(payload)
+    },
     onCategoryChange(v) {
-      // 找 industryCode
-      const findIndustry = (tree, id) => {
-        for (const n of tree) {
-          if (n.categoryId === id) return n.industryCode || ''
-          if (n.children) { const r = findIndustry(n.children, id); if (r) return r }
+      // cascader 绑的是 categoryIdArr，但表单校验和提交用的是 categoryId，必须同步
+      const id = Array.isArray(v) ? v[v.length - 1] : v
+      this.$set(this.form, 'categoryId', id || null)
+      const findIndustry = (tree, target) => {
+        for (const n of (tree || [])) {
+          if (n.categoryId === target) return n.industryCode || ''
+          if (n.children) { const r = findIndustry(n.children, target); if (r) return r }
         }
         return ''
       }
-      this.form.industryCode = findIndustry(this.categoryTree, v) || ''
+      this.form.industryCode = findIndustry(this.categoryTree, id) || ''
+      if (this.$refs.basicForm) {
+        this.$refs.basicForm.validateField('categoryId')
+      }
+    },
+    /** 按 categoryId 找品类名（供只读回显用；带参数不能放 computed）*/
+    categoryNameOf(id) {
+      if (!id) return ''
+      const find = (tree) => {
+        for (const n of (tree || [])) {
+          if (n.categoryId === id) return n.categoryName
+          if (n.children) { const r = find(n.children); if (r) return r }
+        }
+        return ''
+      }
+      return find(this.categoryTree)
     },
     pickType(t) {
       if (!t.appCanCreate) {
@@ -658,11 +696,19 @@ export default {
           return
         }
         this.savingBasic = true
-        addProduct(this.form).then(res => {
-          this.form.productId = res.data && (res.data.productId || res.data)
+        this.saveProduct().then(res => {
+          // 后端 POST /biz/product 回传自增主键（data 即 productId）
+          if (!this.form.productId) {
+            const d = res && res.data
+            this.form.productId = (d && d.productId) || d
+          }
+          if (!this.form.productId) {
+            this.$modal.msgError('保存成功但未取到商品ID，请返回列表用「高级编辑」继续')
+            return
+          }
           this.basicCollapsed = true
           this.$modal.msgSuccess('基础信息已保存，请继续填写商品详情')
-          if (this.isGroupon) this.loadSubitems()
+          if (this.isGroupon || this.isCombo) this.loadSubitems()
         }).catch(e => {
           this.$modal.msgError((e && (e.msg || e.message)) || '保存失败')
         }).finally(() => { this.savingBasic = false })
@@ -674,7 +720,7 @@ export default {
         return
       }
       this.saving = true
-      addProduct(this.form).then(() => {
+      this.saveProduct().then(() => {
         this.$modal.msgSuccess('保存成功')
         this.goBack()
       }).catch(e => {
@@ -708,6 +754,15 @@ export default {
     openAddSubitem(g) {
       this.subitemForm = { productId: this.form.productId, groupId: g.groupId, _groupName: g.groupName, subitemName: '', quantity: 1, price: 0 }
       this.subitemOpen = true
+      this.searchSubitemName('')
+    },
+    /** 拉取历史子品名称候选（el-select remote） */
+    searchSubitemName(keyword) {
+      this.nameLoading = true
+      listSubitemNameCandidates(keyword || '').then(res => {
+        this.nameOptions = (res && (res.data || res)) || []
+      }).catch(() => { this.nameOptions = [] })
+        .finally(() => { this.nameLoading = false })
     },
     submitAddSubitem() {
       if (!this.subitemForm.subitemName) { this.$modal.msgError('请输入子品名称'); return }
@@ -725,7 +780,7 @@ export default {
       this.savingCombo = true
       // 简单：把 comboItems 序列化到 form.subitemPickRuleJson 字段
       this.form.subitemPickRuleJson = JSON.stringify(this.comboItems)
-      addProduct({ productId: this.form.productId, subitemPickRuleJson: this.form.subitemPickRuleJson }).then(() => {
+      updateProduct({ productId: this.form.productId, subitemPickRuleJson: this.form.subitemPickRuleJson }).then(() => {
         this.$modal.msgSuccess('搭配已保存')
         this.comboDrawer = false
       }).catch(e => this.$modal.msgError((e && (e.msg || e.message)) || '保存失败'))

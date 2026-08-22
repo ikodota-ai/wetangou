@@ -28,6 +28,11 @@ public class ProductSubitem extends BaseEntity
     private Integer sort;
     private Date createTime;
 
+    /** 冗余展示字段（列表 join 出来，非本表列） */
+    private String productName;
+    private String groupName;
+    private String pickRule;
+
     public Long getSubitemId() { return subitemId; }
     public void setSubitemId(Long subitemId) { this.subitemId = subitemId; }
     public Long getGroupId() { return groupId; }
@@ -50,6 +55,12 @@ public class ProductSubitem extends BaseEntity
     public void setSort(Integer sort) { this.sort = sort; }
     public Date getCreateTime() { return createTime; }
     public void setCreateTime(Date createTime) { this.createTime = createTime; }
+    public String getProductName() { return productName; }
+    public void setProductName(String productName) { this.productName = productName; }
+    public String getGroupName() { return groupName; }
+    public void setGroupName(String groupName) { this.groupName = groupName; }
+    public String getPickRule() { return pickRule; }
+    public void setPickRule(String pickRule) { this.pickRule = pickRule; }
 
     @Override
     public String toString() {

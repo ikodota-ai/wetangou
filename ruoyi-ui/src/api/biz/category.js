@@ -9,6 +9,15 @@ export function listCategory(query) {
   })
 }
 
+// 查询商品品类树（商品编辑页 el-cascader 级联用）
+export function treeCategory(query) {
+  return request({
+    url: '/biz/category/tree',
+    method: 'get',
+    params: query
+  })
+}
+
 // 查询商品分类详细
 export function getCategory(categoryId) {
   return request({

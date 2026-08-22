@@ -68,6 +68,10 @@ public class Category extends BaseEntity
     @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
     private String status;
 
+    /** 子节点（树形端点组装，非表字段；为空时不序列化，否则 el-cascader 会给叶子挂空展开箭头） */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+    private java.util.List<Category> children;
+
     public void setCategoryId(Long categoryId) 
     {
         this.categoryId = categoryId;
@@ -159,6 +163,8 @@ public class Category extends BaseEntity
     public void setLicenseRequired(String licenseRequired) { this.licenseRequired = licenseRequired; }
     public String getComplianceNotice() { return complianceNotice; }
     public void setComplianceNotice(String complianceNotice) { this.complianceNotice = complianceNotice; }
+    public java.util.List<Category> getChildren() { return children; }
+    public void setChildren(java.util.List<Category> children) { this.children = children; }
 
     @Override
     public String toString() {

@@ -20,6 +20,7 @@ import com.ruoyi.biz.domain.ProductSubitem;
 import com.ruoyi.biz.domain.ProductSubitemGroup;
 import com.ruoyi.biz.service.IProductSubitemGroupService;
 import com.ruoyi.biz.service.IProductSubitemService;
+import com.ruoyi.common.core.page.TableDataInfo;
 
 /**
  * 商品搭配管理（团购套餐 / 组合券包 用）
@@ -37,16 +38,59 @@ public class BizProductSubitemController extends BaseController
     @Autowired
     private IProductSubitemService subitemService;
 
+    /**
+     * 子品分页列表（admin「子商品管理」独立页），带 productName / groupName，
+     * 并按当前登录身份做租户过滤（商户只看自己商品下的子品）。
+     */
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:list,biz:productSubitem:list')")
+    @GetMapping("/list")
+    public TableDataInfo list(ProductSubitem query)
+    {
+        // 子品表本身没有 merchant_id（靠 join biz_product 过滤），
+        // 所以不能走 TenantFilterHelper 的 setMerchantId 分支，这里显式写 params.merchantIdsIn。
+        applyTenantScope(query);
+        startPage();
+        return getDataTable(subitemService.selectSubitemList(query));
+    }
+
+    /**
+     * 把当前登录身份可见的商户范围写入 params.merchantIdsIn（mapper 用它 join biz_product 过滤）。
+     * 平台不限；代理商限名下商户（空集合 → -1 即空结果）；商户限自身。
+     */
+    private void applyTenantScope(ProductSubitem query)
+    {
+        com.ruoyi.common.core.domain.model.TenantContext ctx = com.ruoyi.common.utils.TenantContextHolder.get();
+        if (ctx == null || ctx.isPlatform())
+        {
+            return;
+        }
+        if (query.getParams() == null)
+        {
+            query.setParams(new java.util.HashMap<>());
+        }
+        if (ctx.isAgent())
+        {
+            List<Long> ids = ctx.getMerchantIds();
+            query.getParams().put("merchantIdsIn",
+                                   (ids == null || ids.isEmpty()) ? java.util.Collections.emptyList() : ids);
+            return;
+        }
+        if (ctx.isMerchant())
+        {
+            query.getParams().put("merchantIdsIn", ctx.getMerchantId());
+        }
+    }
+
     // ==================== 商品组 ====================
 
-    @PreAuthorize("@ss.hasPermi('biz:product:list')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:list,biz:productSubitem:list')")
     @GetMapping("/groups")
     public AjaxResult groups(@RequestParam("productId") Long productId)
     {
         return success(groupService.selectByProductId(productId));
     }
 
-    @PreAuthorize("@ss.hasPermi('biz:product:query')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:query,biz:productSubitem:query')")
     @GetMapping("/group/{groupId}")
     public AjaxResult groupInfo(@PathVariable("groupId") Long groupId)
     {
@@ -54,7 +98,7 @@ public class BizProductSubitemController extends BaseController
     }
 
     @Log(title = "商品搭配", businessType = BusinessType.INSERT)
-    @PreAuthorize("@ss.hasPermi('biz:product:add')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:add,biz:productSubitem:add')")
     @PostMapping("/group")
     public AjaxResult addGroup(@RequestBody ProductSubitemGroup group)
     {
@@ -64,7 +108,7 @@ public class BizProductSubitemController extends BaseController
     }
 
     @Log(title = "商品搭配", businessType = BusinessType.UPDATE)
-    @PreAuthorize("@ss.hasPermi('biz:product:edit')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:edit,biz:productSubitem:edit')")
     @PutMapping("/group")
     public AjaxResult editGroup(@RequestBody ProductSubitemGroup group)
     {
@@ -73,7 +117,7 @@ public class BizProductSubitemController extends BaseController
     }
 
     @Log(title = "商品搭配", businessType = BusinessType.DELETE)
-    @PreAuthorize("@ss.hasPermi('biz:product:remove')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:remove,biz:productSubitem:remove')")
     @DeleteMapping("/group/{groupId}")
     public AjaxResult removeGroup(@PathVariable("groupId") Long groupId)
     {
@@ -83,15 +127,25 @@ public class BizProductSubitemController extends BaseController
 
     // ==================== 子品 ====================
 
-    @PreAuthorize("@ss.hasPermi('biz:product:query')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:query,biz:productSubitem:query')")
     @GetMapping("/subitem")
     public AjaxResult subitems(@RequestParam("groupId") Long groupId)
     {
         return success(subitemService.selectByGroupId(groupId));
     }
 
+    /**
+     * 历史子品名称候选（去重），供「添加子品」输入框下拉筛选复用，避免每次纯手输。
+     */
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:query,biz:productSubitem:query')")
+    @GetMapping("/nameCandidates")
+    public AjaxResult nameCandidates(@RequestParam(value = "keyword", required = false) String keyword)
+    {
+        return success(subitemService.selectNameCandidates(keyword));
+    }
+
     @Log(title = "商品搭配", businessType = BusinessType.INSERT)
-    @PreAuthorize("@ss.hasPermi('biz:product:add')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:add,biz:productSubitem:add')")
     @PostMapping("/subitem")
     public AjaxResult addSubitem(@RequestBody ProductSubitem subitem)
     {
@@ -102,7 +156,7 @@ public class BizProductSubitemController extends BaseController
     }
 
     @Log(title = "商品搭配", businessType = BusinessType.UPDATE)
-    @PreAuthorize("@ss.hasPermi('biz:product:edit')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:edit,biz:productSubitem:edit')")
     @PutMapping("/subitem")
     public AjaxResult editSubitem(@RequestBody ProductSubitem subitem)
     {
@@ -111,7 +165,7 @@ public class BizProductSubitemController extends BaseController
     }
 
     @Log(title = "商品搭配", businessType = BusinessType.DELETE)
-    @PreAuthorize("@ss.hasPermi('biz:product:remove')")
+    @PreAuthorize("@ss.hasAnyPermi('biz:product:remove,biz:productSubitem:remove')")
     @DeleteMapping("/subitem/{subitemId}")
     public AjaxResult removeSubitem(@PathVariable("subitemId") Long subitemId)
     {

@@ -95,7 +95,13 @@ public class ProductController extends BaseController
     public AjaxResult add(@RequestBody Product product)
     {
         ProductValidator.validate(product);
-        return toAjax(productService.insertProduct(product));
+        int rows = productService.insertProduct(product);
+        if (rows <= 0)
+        {
+            return error("新增商品失败");
+        }
+        // 回传自增主键：前端「高级编辑」第 1 步保存后需要 productId 才能继续填写后续 tab
+        return success(product.getProductId());
     }
 
     /**

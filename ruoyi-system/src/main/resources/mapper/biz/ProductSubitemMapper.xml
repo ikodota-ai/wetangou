@@ -40,6 +40,61 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by sort asc, subitem_id asc
     </select>
 
+    <!-- 列表专用 resultMap：继承基础映射并补 join 出来的冗余展示列 -->
+    <resultMap type="ProductSubitem" id="SubitemListResult" extends="SubitemResult">
+        <result property="productName" column="product_name" />
+        <result property="groupName"   column="group_name"   />
+        <result property="pickRule"    column="pick_rule"    />
+    </resultMap>
+
+    <!-- 分页列表：join 商品名 / 组名，支持按商品名、子品名、商户过滤 -->
+    <select id="selectSubitemList" parameterType="ProductSubitem" resultMap="SubitemListResult">
+        select s.subitem_id, s.group_id, s.subitem_type, s.product_id, s.subitem_name,
+               s.quantity, s.pick_quantity, s.total_value, s.price, s.sort, s.create_time,
+               p.product_name as product_name, g.group_name as group_name, g.pick_rule as pick_rule
+        from biz_product_subitem s
+        left join biz_product p on p.product_id = s.product_id
+        left join biz_product_subitem_group g on g.group_id = s.group_id
+        <where>
+            <if test="productId != null"> and s.product_id = #{productId}</if>
+            <if test="groupId != null"> and s.group_id = #{groupId}</if>
+            <if test="subitemName != null and subitemName != ''">
+                and s.subitem_name like concat('%', #{subitemName}, '%')
+            </if>
+            <if test="productName != null and productName != ''">
+                and p.product_name like concat('%', #{productName}, '%')
+            </if>
+            <if test="params != null and params.merchantIdsIn != null">
+                <choose>
+                    <when test="params.merchantIdsIn instanceof java.util.List">
+                        <if test="params.merchantIdsIn.size() &gt; 0"> and p.merchant_id in
+                            <foreach collection="params.merchantIdsIn" item="mid" open="(" close=")" separator=",">#{mid}</foreach>
+                        </if>
+                        <if test="params.merchantIdsIn.size() == 0"> and 1=0 </if>
+                    </when>
+                    <otherwise> and p.merchant_id = #{params.merchantIdsIn}</otherwise>
+                </choose>
+            </if>
+        </where>
+        order by s.product_id desc, s.group_id asc, s.sort asc, s.subitem_id asc
+    </select>
+
+    <!-- 历史子品名称候选（去重），join biz_product 以便按商户隔离 -->
+    <select id="selectNameCandidates" resultType="java.lang.String">
+        select distinct s.subitem_name
+        from biz_product_subitem s
+        left join biz_product p on p.product_id = s.product_id
+        <where>
+            s.subitem_name is not null and s.subitem_name != ''
+            <if test="merchantId != null"> and p.merchant_id = #{merchantId}</if>
+            <if test="keyword != null and keyword != ''">
+                and s.subitem_name like concat('%', #{keyword}, '%')
+            </if>
+        </where>
+        order by s.subitem_name asc
+        limit 200
+    </select>
+
     <insert id="insert" parameterType="ProductSubitem" useGeneratedKeys="true" keyProperty="subitemId">
         insert into biz_product_subitem
         <trim prefix="(" suffix=")" suffixOverrides=",">

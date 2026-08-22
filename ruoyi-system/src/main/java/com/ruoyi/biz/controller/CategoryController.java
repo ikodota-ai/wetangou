@@ -48,6 +48,19 @@ public class CategoryController extends BaseController
     }
 
     /**
+     * 商品品类树（供商品编辑页 el-cascader 级联选择）。
+     *
+     * <p>品类是平台级公共字典，商品新增/编辑的人必须能读，
+     * 所以放行 biz:category:list 与 biz:product:* 任一权限。</p>
+     */
+    @PreAuthorize("@ss.hasAnyPermi('biz:category:list,biz:product:list,biz:product:add,biz:product:edit')")
+    @GetMapping("/tree")
+    public AjaxResult tree(Category category)
+    {
+        return success(categoryService.selectCategoryTree(category));
+    }
+
+    /**
      * 导出商品分类列表
      */
     @PreAuthorize("@ss.hasPermi('biz:category:export')")

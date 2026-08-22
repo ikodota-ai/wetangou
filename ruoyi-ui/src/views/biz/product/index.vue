@@ -116,13 +116,6 @@
           <el-button
             size="mini"
             type="text"
-            icon="el-icon-goods"
-            @click="handleSubitem(scope.row)"
-            v-hasPermi="['biz:product:query']"
-          >子品</el-button>
-          <el-button
-            size="mini"
-            type="text"
             icon="el-icon-document"
             @click="handleAdvancedEdit(scope.row)"
             v-hasPermi="['biz:product:edit']"
@@ -356,7 +349,20 @@
           <span>{{ subitemForm._groupName }}</span>
         </el-form-item>
         <el-form-item label="子品名称" prop="subitemName">
-          <el-input v-model="subitemForm.subitemName" placeholder="如：红烧肉" maxlength="100" />
+          <el-select
+            v-model="subitemForm.subitemName"
+            filterable
+            allow-create
+            default-first-option
+            remote
+            :remote-method="searchSubitemName"
+            :loading="nameLoading"
+            placeholder="输入可筛选历史子品，也可直接输入新名称"
+            style="width: 100%"
+          >
+            <el-option v-for="n in nameOptions" :key="n" :label="n" :value="n" />
+          </el-select>
+          <div class="subitem-tip">支持搜索复用历史子品名称；没有匹配项时直接输入即可新建。</div>
         </el-form-item>
         <el-form-item label="数量" prop="quantity">
           <el-input-number v-model="subitemForm.quantity" :min="1" :max="99" />
@@ -376,7 +382,7 @@
 <script>
 import { listProduct, getProduct, delProduct, addProduct, updateProduct } from "@/api/biz/product"
 import { selectProductTypeList } from "@/api/biz/productType"
-import { listGroups, addGroup, delGroup, addSubitem, updateSubitem, delSubitem } from "@/api/biz/productSubitem"
+import { listGroups, addGroup, delGroup, addSubitem, updateSubitem, delSubitem, listSubitemNameCandidates } from "@/api/biz/productSubitem"
 
 export default {
   name: "Product",
@@ -422,6 +428,9 @@ export default {
         groupName: [{ required: true, message: '请输入组名称', trigger: 'blur' }]
       },
       subitemOpen: false,
+      // 子品名称候选（历史去重），支持筛选复用
+      nameOptions: [],
+      nameLoading: false,
       subitemForm: { productId: null, groupId: null, _groupName: '', subitemName: '', quantity: 1, price: 0 },
       subitemRules: {
         subitemName: [{ required: true, message: '请输入子品名称', trigger: 'blur' }]
@@ -509,6 +518,18 @@ export default {
         price: 0
       }
       this.subitemOpen = true
+      this.searchSubitemName('')
+    },
+    /** 拉取历史子品名称候选（el-select remote） */
+    searchSubitemName(keyword) {
+      this.nameLoading = true
+      listSubitemNameCandidates(keyword || '').then(res => {
+        this.nameOptions = (res && (res.data || res)) || []
+      }).catch(() => {
+        this.nameOptions = []
+      }).finally(() => {
+        this.nameLoading = false
+      })
     },
     submitAddSubitem() {
       this.$refs.subitemForm.validate(v => {
@@ -616,10 +637,6 @@ export default {
       this.reset();
       this.title = "添加商品";
       this.open = true;
-    },
-    /** E9: 子品管理入口（打开修改详情，复用底部子品搭配 section）*/
-    handleSubitem(row) {
-      this.handleUpdate(row);
     },
     /** 高级编辑：跳到抖音来客 6 步编辑页（产品类型/售卖/交易/消费/扩展属性） */
     handleAdvancedEdit(row) {

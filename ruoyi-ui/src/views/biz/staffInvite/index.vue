@@ -94,6 +94,13 @@
         <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
           <biz-select v-model="staffQuery.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
         </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select v-model="staffQuery.status" placeholder="全部" clearable style="width:140px" @change="getStaffList">
+            <el-option label="在职" value="0" />
+            <el-option label="待审核" value="3" />
+            <el-option label="离职" value="1" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="el-icon-search" size="mini" @click="getStaffList">搜索</el-button>
           <el-button icon="el-icon-refresh" size="mini" @click="resetStaffQuery">重置</el-button>
@@ -101,6 +108,11 @@
       </el-form>
 
       <el-row :gutter="10" class="mb8">
+        <el-col :span="1.5">
+          <el-button type="warning" plain size="mini" icon="el-icon-s-check" @click="showPendingOnly">
+            待审核{{ pendingCount > 0 ? '（' + pendingCount + '）' : '' }}
+          </el-button>
+        </el-col>
         <right-toolbar :showSearch.sync="showSearch" @queryTable="getStaffList"></right-toolbar>
       </el-row>
 
@@ -110,14 +122,20 @@
         <el-table-column label="昵称" align="center" prop="nickName" />
         <el-table-column label="真实姓名" align="center" prop="realName" />
         <el-table-column label="手机" align="center" prop="phone" />
-        <el-table-column label="openid" align="center" prop="openid" show-overflow-tooltip />
+        <el-table-column label="微信绑定" align="center" prop="wxBound" width="150">
+          <template slot-scope="scope">
+            <el-tag v-if="scope.row.wxBound === 1" type="success" size="mini">已绑（可免密）</el-tag>
+            <el-tag v-else type="info" size="mini">未绑</el-tag>
+            <div v-if="scope.row.openidMasked" class="openid-masked">{{ scope.row.openidMasked }}</div>
+          </template>
+        </el-table-column>
         <el-table-column label="门店" align="center" prop="storeName">
           <template slot-scope="scope">{{ scope.row.storeName || scope.row.storeId }}</template>
         </el-table-column>
         <el-table-column label="角色" align="center" prop="role" />
         <el-table-column label="状态" align="center" prop="status">
           <template slot-scope="scope">
-            <el-tag :type="scope.row.status === '0' ? 'success' : 'info'">{{ scope.row.status === '0' ? '在职' : '离职' }}</el-tag>
+            <el-tag :type="staffStatusTag(scope.row.status)">{{ staffStatusText(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="入职" align="center" prop="hiredAt" width="170">
@@ -125,9 +143,20 @@
             <span>{{ scope.row.hiredAt ? parseTime(scope.row.hiredAt, '{y}-{m}-{d}') : '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
+        <el-table-column label="操作" align="center" width="330" class-name="small-padding fixed-width">
           <template slot-scope="scope">
+            <template v-if="scope.row.status === '3'">
+              <el-button size="mini" type="text" icon="el-icon-check" @click="handleAudit(scope.row, true)" v-hasPermi="['biz:staffInvite:edit']">通过</el-button>
+              <el-button size="mini" type="text" icon="el-icon-close" style="color:#F56C6C" @click="handleAudit(scope.row, false)" v-hasPermi="['biz:staffInvite:edit']">拒绝</el-button>
+            </template>
             <el-button size="mini" type="text" icon="el-icon-edit" @click="handleEditStaff(scope.row)" v-hasPermi="['biz:staffInvite:edit']">补录资料</el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-mobile"
+              :disabled="scope.row.wxBound !== 1"
+              @click="handleUnbindWx(scope.row)"
+              v-hasPermi="['biz:staffInvite:edit']">解绑微信</el-button>
             <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDeleteStaff(scope.row)" v-hasPermi="['biz:staffInvite:remove']">删除</el-button>
           </template>
         </el-table-column>
@@ -199,6 +228,7 @@
         <el-form-item label="状态" prop="status">
           <el-select v-model="staffForm.status" style="width:100%">
             <el-option label="在职" value="0" />
+            <el-option label="待审核" value="3" />
             <el-option label="离职" value="1" />
           </el-select>
         </el-form-item>
@@ -212,7 +242,7 @@
 </template>
 
 <script>
-import { listStaffInvite, addStaffInvite, delStaffInvite, listStaff, updateStaff, profileStaff, delStaff, qrcodeStaffInvite } from '@/api/biz/staffInvite'
+import { listStaffInvite, addStaffInvite, delStaffInvite, listStaff, updateStaff, profileStaff, delStaff, qrcodeStaffInvite, unbindStaffWx, listStaffAudit, auditStaff } from '@/api/biz/staffInvite'
 
 export default {
   name: 'StaffInvite',
@@ -246,7 +276,8 @@ export default {
       staffLoading: true,
       staffList: [],
       staffTotal: 0,
-      staffQuery: { pageNum: 1, pageSize: 10, realName: null, phone: null, merchantId: null },
+      staffQuery: { pageNum: 1, pageSize: 10, realName: null, phone: null, merchantId: null, status: null },
+      pendingCount: 0,
       staffOpen: false,
       staffForm: { id: null, userId: null, userName: '', realName: '', phone: '', staffNo: '', status: '0' },
       staffRules: {
@@ -375,9 +406,37 @@ export default {
         this.staffList = res.rows || []
         this.staffTotal = res.total || 0
       }).finally(() => { this.staffLoading = false })
+      this.loadPendingCount()
+    },
+    loadPendingCount() {
+      listStaffAudit().then(res => {
+        this.pendingCount = (res.data || []).length
+      }).catch(() => { /* 计数失败不影响主列表 */ })
+    },
+    showPendingOnly() {
+      this.staffQuery.status = '3'
+      this.staffQuery.pageNum = 1
+      this.getStaffList()
+    },
+    staffStatusText(s) {
+      return ({ '0': '在职', '1': '离职', '3': '待审核' })[s] || s
+    },
+    staffStatusTag(s) {
+      return ({ '0': 'success', '1': 'info', '3': 'warning' })[s] || ''
+    },
+    handleAudit(row, approve) {
+      const tip = approve
+        ? '确认通过「' + (row.realName || row.nickName || row.userId) + '」的入职申请？通过后即可登录商家端核销。'
+        : '确认拒绝并移除该员工的门店关联？账号会保留，可重新扫码入职。'
+      this.$modal.confirm(tip).then(() => {
+        return auditStaff({ id: row.id, approve: approve })
+      }).then(() => {
+        this.$modal.msgSuccess(approve ? '已通过' : '已拒绝')
+        this.getStaffList()
+      }).catch(() => {})
     },
     resetStaffQuery() {
-      this.staffQuery = { pageNum: 1, pageSize: 10, realName: null, phone: null, merchantId: this.staffQuery.merchantId }
+      this.staffQuery = { pageNum: 1, pageSize: 10, realName: null, phone: null, merchantId: this.staffQuery.merchantId, status: null }
       this.getStaffList()
     },
     handleEditStaff(row) {
@@ -423,12 +482,32 @@ export default {
         this.getStaffList()
         this.$modal.msgSuccess('已删除')
       }).catch(() => {})
+    },
+    /** 解绑微信：员工换手机/换微信/离职时用。只清 openid，不解除雇佣关系 */
+    handleUnbindWx(row) {
+      if (row.wxBound !== 1) {
+        this.$modal.msgWarning('该员工尚未绑定微信')
+        return
+      }
+      const who = row.realName || row.userName || ('用户' + row.userId)
+      this.$modal.confirm('确认解绑「' + who + '」的微信？解绑后该员工需重新用账号密码登录（登录时会自动绑定新微信），员工关系不受影响。').then(() => {
+        return unbindStaffWx(row.userId)
+      }).then(() => {
+        this.getStaffList()
+        this.$modal.msgSuccess('已解绑微信')
+      }).catch(() => {})
     }
   }
 }
 </script>
 
 <style scoped>
+.openid-masked {
+  margin-top: 2px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: #999;
+}
 .code-text {
   font-family: 'SF Mono', Menlo, monospace;
   font-size: 16px;
