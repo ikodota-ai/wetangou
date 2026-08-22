@@ -14,12 +14,25 @@ const REASON_MSG = {
 
 Page({
   data: {
-    scanning: false
+    scanning: false,
+    // true 表示本页由微信「扫一扫」带 scene 直达（主路径），
+    // 此时不渲染「扫码」按钮，避免在自动处理期间闪一下无关入口
+    fromScene: false
   },
 
+  /**
+   * 入职页入口。
+   *
+   * <p>主路径：店长在后台生成 getWxaCodeUnlimited 小程序码
+   * （page=pages/merchant/scan/index, scene=invite:MID:SID:CODE），
+   * 新员工用微信「扫一扫」或相册长按识别 → 微信直接拉起小程序落到本页，
+   * options.scene 即邀请码，无需先登录（此时他还没有账号）。</p>
+   *
+   * <p>注意 scene 在小程序码里是被 URL 编码过的，必须 decodeURIComponent。</p>
+   */
   onLoad(options) {
-    // 微信扫一扫 / 分享入口直达：path?scene=invite:1:100:ABC
     if (options && options.scene) {
+      this.setData({ fromScene: true })
       this._handleScanResult(decodeURIComponent(options.scene))
     }
   },
@@ -43,7 +56,8 @@ Page({
   _handleScanResult(raw) {
     const parsed = parseInviteScene(raw)
     if (!parsed.ok) {
-      this.setData({ scanning: false })
+      // 直达场景失败要退回手动扫码态，否则页面会一直停在「正在识别…」
+      this.setData({ scanning: false, fromScene: false })
       wx.showToast({ title: REASON_MSG[parsed.reason] || '二维码无效', icon: 'none' })
       return
     }
@@ -56,10 +70,10 @@ Page({
       confirmText: '提交申请',
       cancelText: '取消',
       success: (mr) => {
-        if (!mr.confirm) { this.setData({ scanning: false }); return }
+        if (!mr.confirm) { this.setData({ scanning: false, fromScene: false }); return }
         this._doAccept(scene)
       },
-      fail: () => this.setData({ scanning: false })
+      fail: () => this.setData({ scanning: false, fromScene: false })
     })
   },
 
@@ -67,7 +81,7 @@ Page({
     wx.login({
       success: (lr) => {
         if (!lr || !lr.code) {
-          this.setData({ scanning: false })
+          this.setData({ scanning: false, fromScene: false })
           wx.showToast({ title: '微信授权失败', icon: 'none' })
           return
         }
@@ -119,7 +133,7 @@ Page({
           })
           .catch((err) => {
             wx.hideLoading()
-            this.setData({ scanning: false })
+            this.setData({ scanning: false, fromScene: false })
             const msg = (err && (err.msg || err.message)) || '加入失败'
             // 业务错误码细分
             if (msg.indexOf('已过期') > -1) {
@@ -156,7 +170,7 @@ Page({
           })
       },
       fail: () => {
-        this.setData({ scanning: false })
+        this.setData({ scanning: false, fromScene: false })
         wx.showToast({ title: '微信授权失败', icon: 'none' })
       }
     })

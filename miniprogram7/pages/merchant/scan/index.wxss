@@ -15,3 +15,25 @@
 .ic::before { width: 56rpx; height: 10rpx; top: 40rpx; left: 32rpx; box-shadow: 0 -16rpx 0 #3A6B35, 0 16rpx 0 #3A6B35; }
 .ic::after { width: 10rpx; height: 56rpx; top: 32rpx; left: 55rpx; box-shadow: 16rpx 0 0 #3A6B35, -16rpx 0 0 #3A6B35; }
 .hint { margin-top: 40rpx; text-align: center; color: #999; font-size: 24rpx; line-height: 1.6; }
+
+/* 微信「扫一扫」直达时的处理态（主路径，不显示扫码按钮） */
+.processing {
+  padding: 120rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+}
+.spinner {
+  width: 72rpx;
+  height: 72rpx;
+  border: 6rpx solid #E5E5EA;
+  border-top-color: #3A6B35;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.processing-t { font-size: 32rpx; font-weight: 600; color: #1A1A1A; }
+.processing-d { font-size: 24rpx; color: #999; }

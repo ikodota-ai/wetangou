@@ -1,7 +1,23 @@
 <view class="page">
-  <view class="big-btn" bindtap="onScan">
-    <view class="ic"></view>
-    <text>扫描员工邀请码</text>
+  <!--
+    主路径：微信「扫一扫」识别店长分享的小程序码后直达本页，
+    onLoad 拿到 options.scene 自动进入入职流程 —— 此时不该闪现「扫码」按钮。
+  -->
+  <view class="processing" wx:if="{{fromScene}}">
+    <view class="spinner"></view>
+    <text class="processing-t">正在识别邀请码…</text>
+    <text class="processing-d">请稍候，确认后将提交入职申请</text>
   </view>
-  <view class="hint">扫描店长分享的二维码后会自动加入商家并跳转到工作台</view>
+
+  <!-- 兜底路径：已在小程序内，手动进本页扫码（如码在别人手机上） -->
+  <block wx:else>
+    <view class="big-btn" bindtap="onScan">
+      <view class="ic"></view>
+      <text>扫描员工邀请码</text>
+    </view>
+    <view class="hint">
+      推荐直接用微信「扫一扫」扫描店长分享的二维码，可免去这一步。
+      提交后需店长在后台审核通过，方可使用商家版。
+    </view>
+  </block>
 </view>

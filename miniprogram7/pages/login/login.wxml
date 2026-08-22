@@ -65,14 +65,13 @@
         </view>
         <button class="btn-primary sub" bindtap="onAccountLogin" hover-class="none" disabled="{{submitting}}">账号密码登录</button>
       </view>
-      <!-- 扫码加入 -->
-      <view class="card scan-card" bindtap="onScan">
-        <view class="scan-ic"></view>
-        <view class="scan-text">
-          <text class="scan-t">扫描员工邀请码</text>
-          <text class="scan-d">扫描店长分享的二维码，自动创建账号并绑定门店</text>
-        </view>
-        <view class="arr"></view>
+      <!--
+        入职扫码入口已移除：小程序码应由微信「扫一扫」直接拉起
+        pages/merchant/scan/index，不必先进本登录页。
+      -->
+      <view class="card scan-tip">
+        <text class="scan-tip-t">新员工入职</text>
+        <text class="scan-tip-d">用微信「扫一扫」扫描店长分享的「员工邀请码」即可提交入职申请，无需在此登录。</text>
       </view>
     </view>
   </view>

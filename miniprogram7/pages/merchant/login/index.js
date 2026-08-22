@@ -2,6 +2,18 @@ const app = getApp()
 const { request, api, APPID } = require('../../../utils/request.js')
 const identity = require('../../../utils/identity.js')
 
+/**
+ * 商家员工登录页 —— 只负责「已有账号」的账号密码登录。
+ *
+ * 刻意不提供扫码入职入口：店长在后台生成的是小程序码
+ * （page=pages/merchant/scan/index, scene=invite:MID:SID:CODE），
+ * 新员工应用微信「扫一扫」或相册长按识别直接拉起小程序落到入职页 ——
+ * 此时他还没有账号，先让他面对一个登录页是反直觉的。
+ *
+ * 原来这里有一份 onScan + acceptInvite 实现，与 pages/merchant/scan 重复，
+ * 且 scene 校验更弱（只判前缀，不校验段数/数字/短码长度）、无防重、无确认弹窗，
+ * 已删除。入职链路统一走 pages/merchant/scan（复用 utils/inviteScene.js 纯函数）。
+ */
 Page({
   data: {
     username: '',
@@ -18,65 +30,6 @@ Page({
 
   goBackHome() {
     wx.reLaunch({ url: '/pages/home/index' })
-  },
-
-  onScan() {
-    wx.scanCode({
-      onlyFromCamera: false,
-      scanType: ['qrCode'],
-      success: (res) => {
-        const raw = (res && (res.result || res.path)) || ''
-        if (!raw) {
-          wx.showToast({ title: '未识别到内容', icon: 'none' })
-          return
-        }
-        // 兼容两种格式：
-        // 1) scene 字符串：invite:MID:SID:CODE
-        // 2) 小程序码 path：pages/merchant/scan/index?scene=invite%3AMID%3ASID%3ACODE
-        let scene = raw
-        const queryIdx = raw.indexOf('scene=')
-        if (raw.indexOf('pages/') === 0 && queryIdx > -1) {
-          scene = decodeURIComponent(raw.substring(queryIdx + 6))
-        }
-        if (scene.indexOf('invite:') !== 0) {
-          wx.showToast({ title: '非商家邀请码', icon: 'none' })
-          return
-        }
-        // 进入 accept 流程：拉起 wx.login → 拿 code → 调后端 acceptInvite
-        this.acceptInvite(scene)
-      },
-      fail: (err) => {
-        console.warn('[merchant scan] cancel/fail', err)
-      }
-    })
-  },
-
-  acceptInvite(scene) {
-    wx.login({
-      success: (lr) => {
-        if (!lr || !lr.code) {
-          wx.showToast({ title: '微信登录失败', icon: 'none' })
-          return
-        }
-        wx.showLoading({ title: '加入中...', mask: true })
-        // 读取用户资料（头像/昵称）作为新建账号初始信息
-        const profile = wx.getStorageSync('memberProfile') || {}
-        api.merchantStaffAcceptInvite({
-          code: lr.code,
-          scene: scene,
-          nickName: profile.nickName || '',
-          avatarUrl: profile.avatarUrl || ''
-        }).then((data) => {
-          wx.hideLoading()
-          this.handleLoginSuccess(data)
-        }).catch((err) => {
-          wx.hideLoading()
-          console.error('[merchant accept] err', err)
-          wx.showToast({ title: (err && (err.msg || err.message)) || '加入失败', icon: 'none' })
-        })
-      },
-      fail: () => wx.showToast({ title: '微信授权失败', icon: 'none' })
-    })
   },
 
   onLogin() {

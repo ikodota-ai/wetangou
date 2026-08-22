@@ -134,65 +134,24 @@
   height: 48rpx;
 }
 
-/* 扫码加入卡 */
-.scan-card {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  padding: 48rpx 32rpx;
+/* 新员工入职说明（入口已移除，改为微信「扫一扫」直达） */
+.scan-tip {
+  padding: 32rpx;
   border: 2rpx dashed #2BA245;
   background: #F4FAF4;
-}
-.scan-ic {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 16rpx;
-  background: #2BA245;
-  position: relative;
-  flex-shrink: 0;
-}
-.scan-ic::before,
-.scan-ic::after {
-  content: '';
-  position: absolute;
-  background: #FFFFFF;
-}
-.scan-ic::before {
-  width: 32rpx;
-  height: 8rpx;
-  top: 18rpx;
-  left: 24rpx;
-}
-.scan-ic::after {
-  width: 8rpx;
-  height: 32rpx;
-  top: 24rpx;
-  left: 24rpx;
-  box-shadow: 32rpx 0 0 #FFFFFF;
-}
-.scan-text {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
 }
-.scan-t {
-  font-size: 30rpx;
+.scan-tip-t {
+  font-size: 28rpx;
   font-weight: 600;
   color: #1A1A1A;
 }
-.scan-d {
+.scan-tip-d {
   font-size: 24rpx;
   color: #888;
   line-height: 1.5;
-}
-.arr {
-  width: 16rpx;
-  height: 16rpx;
-  border-top: 4rpx solid #888;
-  border-right: 4rpx solid #888;
-  transform: rotate(45deg);
-  flex-shrink: 0;
 }
 
 /* 按钮 */
@@ -275,9 +234,3 @@
 .sub-form { margin-bottom: 24rpx; }
 .sub-tip { font-size: 24rpx; color: #909399; margin-bottom: 16rpx; }
 .btn-primary.sub { margin-top: 16rpx; }
-.scan-card { display: flex; align-items: center; }
-.scan-ic { width: 80rpx; height: 80rpx; background: #3A6B35; border-radius: 16rpx; flex-shrink: 0; }
-.scan-text { flex: 1; display: flex; flex-direction: column; margin-left: 20rpx; }
-.scan-t { font-size: 28rpx; color: #333; }
-.scan-d { font-size: 22rpx; color: #909399; margin-top: 8rpx; }
-.arr { width: 16rpx; height: 16rpx; border-right: 4rpx solid #909399; border-top: 4rpx solid #909399; transform: rotate(45deg); }

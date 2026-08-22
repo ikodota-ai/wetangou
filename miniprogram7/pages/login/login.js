@@ -9,7 +9,6 @@ const identity = require('../../utils/identity.js')
  *      - 已绑 openid 的员工/店长/商家 → 直接进商家端
  *  - 「更多登录方式」折叠区（仅当 hasStaffAccount=true 时显示）：
  *      - 账号密码登录：用于没绑 openid 的商家账号
- *      - 扫码加入：扫员工邀请码
  *  - 用户端右上角有「切换到商家端」入口（仅当该 openid 命中 staff 时显示）
  */
 Page({
@@ -251,39 +250,5 @@ Page({
     } catch (e) {
       next('')
     }
-  },
-
-  /**
-   * 扫码加入：扫员工邀请码
-   */
-  onScan() {
-    wx.scanCode({
-      scanType: ['qrCode'],
-      success: (res) => this._handleScanResult((res && (res.result || res.path)) || ''),
-      fail: () => { wx.showToast({ title: '扫码已取消', icon: 'none' }) }
-    })
-  },
-
-  _handleScanResult(text) {
-    if (!text) return
-    let scene = text
-    if (text.indexOf('scene=') >= 0) {
-      try {
-        const u = new URL(text)
-        scene = u.searchParams.get('scene') || text
-      } catch (e) {
-        const m = text.match(/scene=([^&]+)/)
-        scene = m ? decodeURIComponent(m[1]) : text
-      }
-    }
-    if (scene.indexOf('invite:') === 0) {
-      wx.navigateTo({ url: '/pages/merchant/scan/index?scene=' + encodeURIComponent(scene) })
-      return
-    }
-    if (scene.indexOf('distributor:') === 0 || scene.indexOf('verify:') === 0) {
-      wx.showToast({ title: '请用「扫一扫」扫描邀请码', icon: 'none' })
-      return
-    }
-    wx.showToast({ title: '无法识别的二维码', icon: 'none' })
   }
 })

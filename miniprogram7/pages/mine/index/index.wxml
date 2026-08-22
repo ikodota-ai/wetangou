@@ -103,9 +103,14 @@
       <text class="staff-entry-text">员工 / 商家登录</text>
     </view>
 
-    <!-- 商家端 v2 入口：扫码加入新员工 -->
-    <view class="staff-entry" bindtap="goMerchantLogin">
-      <text class="staff-entry-text">商家员工（扫码加入）</text>
+    <!--
+      商家员工账号登录入口（不是扫码入职）：
+      新员工入职走微信「扫一扫」扫小程序码直达 pages/merchant/scan，
+      这里只给「已有账号但本机未登录」的员工用。
+    -->
+    <view class="staff-entry" wx:if="{{!canSwitchStaff}}" bindtap="goMerchantLogin">
+      <text class="staff-entry-text">商家员工登录</text>
+      <text class="staff-entry-sub">已有店长分配的账号</text>
     </view>
 
     <view class="logout btn-ghost" wx:if="{{logged}}" bindtap="onLogout">退出登录</view>

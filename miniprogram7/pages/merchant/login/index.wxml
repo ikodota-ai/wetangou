@@ -1,19 +1,7 @@
 <view class="page">
   <view class="top"></view>
   <view class="title">商家员工登录</view>
-  <view class="sub">扫码加入商家 / 用账号密码登录，登录后可核销与处理预约</view>
-
-  <!-- 扫码加入 -->
-  <view class="scan-card" bindtap="onScan">
-    <view class="scan-ic"></view>
-    <view class="scan-text">
-      <text class="scan-t">扫码加入商家</text>
-      <text class="scan-d">扫描店长分享的「员工邀请码」自动创建账号并绑定门店</text>
-    </view>
-    <view class="arr"></view>
-  </view>
-
-  <view class="divider"><text>或用账号密码登录</text></view>
+  <view class="sub">用店长分配的账号登录，可核销订单与处理预约</view>
 
   <view class="card">
     <view class="form-item">
@@ -27,11 +15,19 @@
   </view>
 
   <view class="btns">
-    <button class="btn-primary" bindtap="onLogin" loading="{{loading}}" disabled="{{loading}}" hover-class="none">账号密码登录</button>
+    <button class="btn-primary" bindtap="onLogin" loading="{{loading}}" disabled="{{loading}}" hover-class="none">登录</button>
   </view>
 
+  <!--
+    新员工入职不在这里扫码：店长在后台生成的是小程序码，
+    用微信「扫一扫」（或相册长按识别）直接拉起小程序落到入职页，
+    无需先进入本登录页。
+  -->
   <view class="hint">
-    <text>如未绑定微信，登录后会自动引导绑定。账号由店长在后台生成邀请码后扫码分发。</text>
+    <text>还没有账号？用微信「扫一扫」扫描店长分享的「员工邀请码」即可提交入职申请，店长审核通过后用本页账号登录。</text>
+  </view>
+  <view class="hint hint-tip">
+    <text>首次用账号密码登录会自动绑定当前微信，之后可在「我的」页免密切换商家版。</text>
   </view>
   <view class="back-home" bindtap="goBackHome">
     <text>← 返回会员端</text>

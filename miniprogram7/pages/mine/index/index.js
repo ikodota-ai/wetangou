@@ -70,7 +70,9 @@ Page({
     }
   },
   goMerchantLogin() {
-    // 扫码加入新员工（首次入职场景）：走商家登录页的扫码入口
+    // 商家员工账号密码登录（已有账号场景）。
+    // 新员工入职不走这里：店长后台生成的是小程序码，
+    // 用微信「扫一扫」直接拉起 pages/merchant/scan/index 提交入职申请。
     wx.navigateTo({ url: '/pages/merchant/login/index' })
   },
 

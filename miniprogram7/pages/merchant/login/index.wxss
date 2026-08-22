@@ -16,65 +16,6 @@
   color: #888;
   margin-bottom: 36rpx;
 }
-.scan-card {
-  background: linear-gradient(135deg, #3A6B35, #5A8A4A);
-  border-radius: 20rpx;
-  padding: 32rpx;
-  display: flex;
-  align-items: center;
-  color: #fff;
-  box-shadow: 0 6rpx 20rpx rgba(58,107,53,0.25);
-}
-.scan-card:active { opacity: 0.9; }
-.scan-ic {
-  width: 80rpx;
-  height: 80rpx;
-  background: #fff;
-  border-radius: 40rpx;
-  flex-shrink: 0;
-  margin-right: 24rpx;
-  position: relative;
-}
-.scan-ic::before, .scan-ic::after {
-  content: '';
-  position: absolute;
-  background: #3A6B35;
-}
-.scan-ic::before {
-  width: 36rpx; height: 6rpx;
-  top: 28rpx; left: 22rpx;
-  box-shadow: 0 -10rpx 0 #3A6B35, 0 10rpx 0 #3A6B35;
-}
-.scan-ic::after {
-  width: 6rpx; height: 36rpx;
-  top: 22rpx; left: 37rpx;
-  box-shadow: 10rpx 0 0 #3A6B35, -10rpx 0 0 #3A6B35;
-}
-.scan-text { flex: 1; }
-.scan-t { display: block; font-size: 32rpx; font-weight: 700; }
-.scan-d { display: block; font-size: 24rpx; opacity: 0.85; margin-top: 8rpx; }
-.arr {
-  width: 16rpx;
-  height: 16rpx;
-  border-top: 4rpx solid #fff;
-  border-right: 4rpx solid #fff;
-  transform: rotate(45deg);
-  flex-shrink: 0;
-}
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 40rpx 0 24rpx;
-  color: #999;
-  font-size: 24rpx;
-}
-.divider::before, .divider::after {
-  content: '';
-  flex: 1;
-  height: 1rpx;
-  background: #E5E5EA;
-}
-.divider text { padding: 0 20rpx; }
 .card {
   background: #fff;
   border-radius: 16rpx;
@@ -129,3 +70,9 @@
   color: #3A6B35;
 }
 .back-home:active { opacity: 0.5; }
+
+/* 次级说明（首次登录自动绑微信提示），比主 hint 更弱 */
+.hint-tip {
+  margin-top: 12rpx;
+  opacity: 0.75;
+}

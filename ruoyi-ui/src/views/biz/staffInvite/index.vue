@@ -200,8 +200,15 @@
         <img v-else-if="qrcodeUrl" :src="qrcodeUrl" class="qrcode-img" />
         <div v-else class="qrcode-loading">无二维码</div>
         <div class="qrcode-hint">
-          <div>员工用微信扫一扫即可加入商家</div>
+          <div class="qrcode-steps">
+            <div><b>①</b> 把二维码发给新员工（可下载图片转发到微信）</div>
+            <div><b>②</b> 员工用微信「扫一扫」或相册长按识别，无需先注册登录</div>
+            <div><b>③</b> 员工提交入职申请后，在下方「待审核员工」中审核通过</div>
+          </div>
           <div class="qrcode-code">邀请码：<b>{{ qrcodeRow ? qrcodeRow.inviteCode : '' }}</b></div>
+          <el-alert
+            type="warning" :closable="false" show-icon
+            title="微信「扫一扫」仅能识别已发布的正式版小程序码；开发版/体验版请用开发者工具的「通过二维码编译」测试。" />
         </div>
       </div>
       <div slot="footer">
@@ -502,6 +509,8 @@ export default {
 </script>
 
 <style scoped>
+.qrcode-steps { text-align: left; line-height: 1.9; margin-bottom: 8px; }
+.qrcode-steps b { color: #409EFF; margin-right: 4px; }
 .openid-masked {
   margin-top: 2px;
   font-family: 'SF Mono', Menlo, monospace;
