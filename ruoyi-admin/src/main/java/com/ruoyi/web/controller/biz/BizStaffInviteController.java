@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
@@ -49,6 +50,9 @@ public class BizStaffInviteController extends BaseController
 
     @Autowired
     private ServerConfig serverConfig;
+
+    @Autowired
+    private com.ruoyi.system.service.ISysUserService userService;
 
     // ==================== 邀请码 ====================
 
@@ -159,9 +163,58 @@ public class BizStaffInviteController extends BaseController
     @GetMapping("/staff/list")
     public TableDataInfo staffList(MerchantStaff query)
     {
+        // 防跨租户：代理商只见名下商户、商户只见自己
+        com.ruoyi.biz.tenant.TenantFilterHelper.apply(query,
+                (q, mid) -> ((MerchantStaff) q).setMerchantId(mid),
+                q -> ((MerchantStaff) q).getMerchantId());
         startPage();
         List<MerchantStaff> list = staffService.selectList(query);
+        // 补微信绑定状态（必须在 getDataTable 之前，否则改的是已复制走的对象）
+        fillWxBindStatus(list);
         return getDataTable(list);
+    }
+
+    /**
+     * 解绑员工微信（admin 端）。
+     *
+     * <p>场景：员工换手机/换微信、或离职后微信被误留。解绑后该 openid 释放，
+     * 员工需重新用账号密码登录（登录时会自动绑定新微信）。</p>
+     *
+     * <p>只清 sys_user.openid，不动 biz_merchant_staff 关联 —— 解绑 ≠ 解除雇佣关系。</p>
+     */
+    @Log(title = "商家员工", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('biz:staffInvite:edit')")
+    @PutMapping("/staff/unbindWx/{userId}")
+    public AjaxResult unbindWx(@PathVariable("userId") Long userId)
+    {
+        com.ruoyi.common.core.domain.entity.SysUser user = userService.selectUserByUserId(userId);
+        if (user == null) return error("员工账号不存在");
+        if (StringUtils.isEmpty(user.getOpenid())) {
+            return error("该员工尚未绑定微信");
+        }
+        // 必须走专用语句：updateUser 的动态 set 不含 openid 列，置 null 不会落库
+        if (!userService.unbindOpenid(userId)) {
+            return error("解绑失败");
+        }
+        return success("已解绑微信，该员工下次需用账号密码登录");
+    }
+
+    /** 给员工列表补 wxBound / openidMasked 展示字段（非表字段） */
+    private void fillWxBindStatus(List<MerchantStaff> list)
+    {
+        if (list == null || list.isEmpty()) return;
+        for (MerchantStaff ms : list) {
+            if (ms.getUserId() == null) continue;
+            try {
+                com.ruoyi.common.core.domain.entity.SysUser u = userService.selectUserByUserId(ms.getUserId());
+                boolean bound = u != null && u.getOpenid() != null && !u.getOpenid().isEmpty();
+                ms.setWxBound(bound ? 1 : 0);
+                if (bound) {
+                    String oid = u.getOpenid();
+                    ms.setOpenidMasked(oid.length() <= 8 ? oid : oid.substring(0, 4) + "****" + oid.substring(oid.length() - 4));
+                }
+            } catch (Exception ignore) { }
+        }
     }
 
     @Log(title = "商家员工", businessType = BusinessType.UPDATE)
@@ -202,6 +255,9 @@ public class BizStaffInviteController extends BaseController
     {
         MerchantStaff q = new MerchantStaff();
         q.setStatus("3");
+        com.ruoyi.biz.tenant.TenantFilterHelper.apply(q,
+                (x, mid) -> ((MerchantStaff) x).setMerchantId(mid),
+                x -> ((MerchantStaff) x).getMerchantId());
         return success(staffService.selectList(q));
     }
 
@@ -213,6 +269,8 @@ public class BizStaffInviteController extends BaseController
         if (body.getId() == null) return error("缺少 id");
         MerchantStaff db = staffService.selectById(body.getId());
         if (db == null) return error("员工关联不存在");
+        // 防越权审批别家商户的员工
+        com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(db.getMerchantId());
         if (!"3".equals(db.getStatus())) return error("该员工不在待审核状态");
         Boolean approve = body.getApprove();
         if (approve == null) return error("缺少 approve 字段");

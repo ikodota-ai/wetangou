@@ -94,8 +94,16 @@ public class ApiAuthController
         try {
             SysUser u = userService.selectUserByOpenId(openid);
             if (u != null && "0".equals(u.getStatus())) {
-                List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(u.getUserId()); }});
-                if (links != null && !links.isEmpty()) {
+                List<MerchantStaff> allLinks = staffService.selectList(new MerchantStaff() {{ setUserId(u.getUserId()); }});
+                // 只认在职关联（status=0 或历史空值）；待审核(3)/离职(1) 按普通会员处理，
+                // 与上面「2) openid 命中但员工 status≠0 → 按普通会员处理」的设计一致。
+                List<MerchantStaff> links = new java.util.ArrayList<>();
+                if (allLinks != null) {
+                    for (MerchantStaff l : allLinks) {
+                        if (l.getStatus() == null || "0".equals(l.getStatus())) links.add(l);
+                    }
+                }
+                if (!links.isEmpty()) {
                     linkedStaff = u;
                     LoginMember staffLm = buildStaffLoginMember(u, links);
                     String staffToken = memberTokenService.createToken(staffLm);
@@ -325,7 +333,9 @@ public class ApiAuthController
             roles.add(BizRole.AGENT);
             resolvedUserType = "agent";
         }
-        if ("00".equals(user.getUserType())) {
+        // 与 ApiMerchantStaffController.buildLoginMember 保持一致：
+        // 有商家员工关联的账号即便 user_type=00（历史脏数据）也不得升级为平台身份
+        if ("00".equals(user.getUserType()) && (links == null || links.isEmpty())) {
             roles.add(BizRole.PLATFORM);
             resolvedUserType = "platform";
         }

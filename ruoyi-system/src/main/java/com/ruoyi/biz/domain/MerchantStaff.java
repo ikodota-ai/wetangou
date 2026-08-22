@@ -32,6 +32,11 @@ public class MerchantStaff extends BaseEntity
     private String openid;
     private String storeName;
 
+    /** 微信绑定状态（1=已绑，可免密切换商家端；0=未绑，只能账号密码登录）*/
+    private Integer wxBound;
+    /** 脱敏 openid（仅展示用，如 oXYZ****abcd）*/
+    private String openidMasked;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getMerchantId() { return merchantId; }
@@ -44,6 +49,10 @@ public class MerchantStaff extends BaseEntity
     public void setRole(String role) { this.role = role; }
     public String getStaffNo() { return staffNo; }
     public void setStaffNo(String staffNo) { this.staffNo = staffNo; }
+    public Integer getWxBound() { return wxBound; }
+    public void setWxBound(Integer wxBound) { this.wxBound = wxBound; }
+    public String getOpenidMasked() { return openidMasked; }
+    public void setOpenidMasked(String openidMasked) { this.openidMasked = openidMasked; }
     public String getRealName() { return realName; }
     public void setRealName(String realName) { this.realName = realName; }
     public String getPhone() { return phone; }

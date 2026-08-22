@@ -63,6 +63,10 @@ import com.ruoyi.biz.api.role.BizRole;
 @RequestMapping("/api/merchant/staff")
 public class ApiMerchantStaffController
 {
+    /** biz_merchant_staff.status：0=在职 1=离职 3=待审核 */
+    private static final String STAFF_STATUS_ACTIVE = "0";
+    private static final String STAFF_STATUS_PENDING = "3";
+
     @Autowired private ISysUserService userService;
     @Autowired private IMerchantStaffService staffService;
     @Autowired
@@ -75,6 +79,7 @@ public class ApiMerchantStaffController
     @Autowired private IPayBillService payBillService;
     @Autowired private IBookingService bookingService;
     @Autowired private com.ruoyi.biz.service.IMerchantService merchantService;
+    @Autowired private com.ruoyi.biz.service.ITenantService tenantService;
 
     /** 账号密码登录（兼容旧 staff 链路） */
     @PostMapping("/login")
@@ -90,12 +95,22 @@ public class ApiMerchantStaffController
         if (!SecurityUtils.matchesPassword(password, user.getPassword())) throw new ServiceException("账号或密码错误");
 
         // 必须有商家员工关联（平台/代理商可无关联）
-        List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
+        List<MerchantStaff> allLinks = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
         String ut = user.getUserType();
-        boolean isPrivileged = "00".equals(ut) || "01".equals(ut);
-        if ((links == null || links.isEmpty()) && !isPrivileged) {
+        // 平台/代理商可无员工关联；但一旦有关联就说明是商户侧账号，不再当特权处理
+        boolean isPrivileged = ("00".equals(ut) || "01".equals(ut)) && (allLinks == null || allLinks.isEmpty());
+        // 只认在职关联：待审核/离职不得登录商家端
+        List<MerchantStaff> links = filterActiveLinks(allLinks);
+        if (links.isEmpty() && !isPrivileged) {
+            if (hasPendingLink(allLinks)) {
+                throw new ServiceException("入职申请待店长审核通过后才能登录", 601);
+            }
             throw new ServiceException("该账号未关联商家");
         }
+
+        // 密码登录成功后自动绑定当前微信 openid，让该员工下次能免密切换。
+        // 仅在「本账号尚未绑过」且「该 openid 未被别的账号占用」时绑，避免 A 在 B 手机上登录导致绑错人。
+        boolean autoBound = autoBindOpenid(user, body);
 
         // 根据 user_type 决定顶层 userType 字符串
         String topUserType;
@@ -107,7 +122,47 @@ public class ApiMerchantStaffController
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
-        return packLoginResult(lm, user, links);
+        AjaxResult r = packLoginResult(lm, user, links);
+        r.put("openidAutoBound", autoBound);
+        return r;
+    }
+
+    /**
+     * 密码登录时顺带绑定微信 openid（幂等、失败不阻断登录）。
+     *
+     * @return true 表示本次真的写入了绑定关系
+     */
+    private boolean autoBindOpenid(SysUser user, JSONObject body)
+    {
+        String wxCode = body.getString("code");
+        if (StringUtils.isEmpty(wxCode)) {
+            return false;
+        }
+        // 已经绑过就不动（换绑必须由 admin 先解绑，避免把老 openid 悄悄顶掉）
+        if (StringUtils.isNotEmpty(user.getOpenid())) {
+            return false;
+        }
+        try {
+            Long mid = body.getLong("merchantId");
+            if (mid == null) {
+                mid = resolveMerchantIdByAppid(body.getString("appid"));
+            }
+            JSONObject session = wxMaService.code2Session(wxCode, mid);
+            String openid = session.getString("openid");
+            if (StringUtils.isEmpty(openid)) {
+                return false;
+            }
+            SysUser exist = userService.selectUserByOpenId(openid);
+            if (exist != null && !exist.getUserId().equals(user.getUserId())) {
+                // 该微信已归属其他员工账号，不抢绑
+                return false;
+            }
+            userService.bindOpenid(user.getUserId(), openid);
+            return true;
+        } catch (Exception e) {
+            // 自动绑定是增强项，失败不能影响密码登录本身
+            return false;
+        }
     }
 
     /**
@@ -119,7 +174,11 @@ public class ApiMerchantStaffController
     {
         String code = body.getString("code");
         if (StringUtils.isEmpty(code)) throw new ServiceException("缺少 code");
+        // 商户定向优先级：显式 merchantId > 按小程序 appid 解析（多商户下由当前 appid 决定身份归属）
         Long merchantId = body.getLong("merchantId");
+        if (merchantId == null) {
+            merchantId = resolveMerchantIdByAppid(body.getString("appid"));
+        }
 
         JSONObject session = wxMaService.code2Session(code, merchantId);
         String openid = session.getString("openid");
@@ -127,12 +186,20 @@ public class ApiMerchantStaffController
 
         SysUser user = userService.selectUserByOpenId(openid);
         if (user == null) throw new ServiceException("NOT_BOUND", 600); // 600: 尚未绑定，前端引导走"扫码邀请"流程
+        if (!"0".equals(user.getStatus())) throw new ServiceException("账号已被停用");
 
-        List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
+        List<MerchantStaff> allLinks = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
         String ut = user.getUserType();
-        boolean isPrivileged = "00".equals(ut) || "01".equals(ut);
-        if ((links == null || links.isEmpty()) && !isPrivileged) {
-            throw new ServiceException("该微信未关联商家");
+        boolean isPrivileged = ("00".equals(ut) || "01".equals(ut)) && (allLinks == null || allLinks.isEmpty());
+        // 一个 openid 可能在多个商户下都有员工关联；当前小程序 appid 决定用哪一份身份
+        allLinks = filterLinksByMerchant(allLinks, merchantId);
+        // 只认在职关联：待审核/离职不得登录商家端
+        List<MerchantStaff> links = filterActiveLinks(allLinks);
+        if (links.isEmpty() && !isPrivileged) {
+            if (hasPendingLink(allLinks)) {
+                throw new ServiceException("入职申请待店长审核通过后才能登录", 601);
+            }
+            throw new ServiceException("NOT_BOUND", 600);
         }
 
         String topUserType;
@@ -205,15 +272,22 @@ public class ApiMerchantStaffController
         // 5) 校验员工关联（可能已存在 / 可能新绑）
         final SysUser boundUser = user;
         List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(boundUser.getUserId()); }});
-        boolean alreadyBound = links != null && links.stream().anyMatch(l -> sid.equals(l.getStoreId()) && mid.equals(l.getMerchantId()));
-        if (!alreadyBound)
+        MerchantStaff existLink = null;
+        if (links != null) {
+            for (MerchantStaff l : links) {
+                if (sid.equals(l.getStoreId()) && mid.equals(l.getMerchantId())) { existLink = l; break; }
+            }
+        }
+        if (existLink == null)
         {
             MerchantStaff ms = new MerchantStaff();
             ms.setMerchantId(mid);
             ms.setStoreId(sid);
             ms.setUserId(user.getUserId());
             ms.setRole(invite.getRole() == null ? "STAFF" : invite.getRole());
-            ms.setStatus("0");
+            // 扫码入职默认「待审核」，需 OWNER/MANAGER 在后台 /biz/staffInvite/staff/audit 通过后才在职。
+            // 邀请码可能被转发/截图外传，直接给 status=0 等于任何人扫到就能核销。
+            ms.setStatus(STAFF_STATUS_PENDING);
             ms.setCreateTime(new Date());
             staffService.insert(ms);
             // 重新查关联
@@ -226,12 +300,30 @@ public class ApiMerchantStaffController
         invite.setStatus("1");
         inviteService.update(invite);
 
-        // 7) 自动登录
-        LoginMember lm = buildLoginMember(user, links, "merchant");
+        // 7) 只有「已在职」的关联才发 token。
+        //    待审核（status=3）时账号与 openid 已落库，但不给商家端登录态，
+        //    否则审核形同虚设（扫到码即可核销）。
+        List<MerchantStaff> activeLinks = filterActiveLinks(links);
+        if (activeLinks.isEmpty())
+        {
+            AjaxResult pending = AjaxResult.success("已提交入职申请，请等待店长审核");
+            pending.put("pendingAudit", true);
+            pending.put("userId", user.getUserId());
+            pending.put("merchantId", mid);
+            pending.put("storeId", sid);
+            pending.put("openidBound", 1);
+            pending.put("needBindWx", false);
+            pending.put("token", null);
+            return pending;
+        }
+
+        LoginMember lm = buildLoginMember(user, activeLinks, "merchant");
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
-        return packLoginResult(lm, user, links);
+        AjaxResult ok = packLoginResult(lm, user, activeLinks);
+        ok.put("pendingAudit", false);
+        return ok;
     }
 
     /** 绑定当前登录员工的微信（首次登录后必做） */
@@ -258,9 +350,8 @@ public class ApiMerchantStaffController
 
         SysUser user = userService.selectUserByUserId(lm.getMemberId());
         if (user == null) throw new ServiceException("员工账号不存在");
-        user.setOpenid(openid);
-        user.setOpenidBound(1);
-        userService.updateUser(user);
+        // 走专用语句：updateUser 的动态 set 不含 openid 列
+        userService.bindOpenid(user.getUserId(), openid);
 
         AjaxResult r = AjaxResult.success("绑定成功");
         r.put("openid", openid);
@@ -442,6 +533,77 @@ public class ApiMerchantStaffController
      *   <li>若 sys_user.user_type='01'（代理商/城市合伙人），额外加入 AGENT 角色</li>
      * </ol>
      */
+    /**
+     * 按小程序 appid 解析所属商户（多商户身份归属的判定依据）。
+     *
+     * <p>appid 为空时返回 null（表示不限定，沿用旧行为）；
+     * appid 非空但查不到 / 商户停用时抛错，避免把 A 商户的微信登录到 B 商户。</p>
+     */
+    private Long resolveMerchantIdByAppid(String appid)
+    {
+        if (StringUtils.isEmpty(appid)) {
+            return null;
+        }
+        com.ruoyi.biz.domain.Merchant merchant = tenantService.getMerchantByAppid(appid);
+        if (merchant == null) {
+            throw new ServiceException("小程序未接入或已停用：" + appid);
+        }
+        if (!"0".equals(merchant.getStatus())) {
+            throw new ServiceException("商户已停用，请联系服务商");
+        }
+        return merchant.getMerchantId();
+    }
+
+    /**
+     * 把员工关联收敛到指定商户。
+     *
+     * <p>merchantId 为空（未按 appid 定向）时原样返回；
+     * 过滤后为空则也原样返回 —— 让调用方按"未关联商家"处理，
+     * 而不是在这里静默降级到别家商户的身份。</p>
+     */
+    /**
+     * 只保留「在职」员工关联（status=0）。
+     *
+     * <p>待审核（3）/ 离职（1）的关联不得进入登录态，否则：
+     * 待审核 → 审核机制形同虚设；离职 → 前员工仍能核销。</p>
+     */
+    private List<MerchantStaff> filterActiveLinks(List<MerchantStaff> links)
+    {
+        List<MerchantStaff> hit = new ArrayList<>();
+        if (links == null) return hit;
+        for (MerchantStaff l : links) {
+            // status 为空视为在职（兼容历史数据未回填的情况）
+            if (l.getStatus() == null || STAFF_STATUS_ACTIVE.equals(l.getStatus())) {
+                hit.add(l);
+            }
+        }
+        return hit;
+    }
+
+    /** 关联里是否存在待审核记录（用于给前端「等待店长审核」提示） */
+    private boolean hasPendingLink(List<MerchantStaff> links)
+    {
+        if (links == null) return false;
+        for (MerchantStaff l : links) {
+            if (STAFF_STATUS_PENDING.equals(l.getStatus())) return true;
+        }
+        return false;
+    }
+
+    private List<MerchantStaff> filterLinksByMerchant(List<MerchantStaff> links, Long merchantId)
+    {
+        if (merchantId == null || links == null || links.isEmpty()) {
+            return links;
+        }
+        List<MerchantStaff> hit = new ArrayList<>();
+        for (MerchantStaff l : links) {
+            if (merchantId.equals(l.getMerchantId())) {
+                hit.add(l);
+            }
+        }
+        return hit;
+    }
+
     private LoginMember buildLoginMember(SysUser user, List<MerchantStaff> links, String userType)
     {
         List<Long> storeIds = new ArrayList<>();
@@ -477,8 +639,11 @@ public class ApiMerchantStaffController
                 if (agent != null) agentId = agent.getAgentId();
             } catch (Exception ignore) { }
         }
-        // 平台账号 也能登录小程序（user_type=00，外出查跨店数据）
-        if ("00".equals(user.getUserType())) {
+        // 平台账号 也能登录小程序（user_type=00，外出查跨店数据）。
+        // 纵深防御：仅当该账号「没有任何商家员工关联」时才认平台身份。
+        // 历史上 acceptInvite 曾把扫码入职账号误建成 user_type=00，
+        // 若此处不加 links 判空，这些店员登录后会直接拿到 PLATFORM 角色（可读全平台数据）。
+        if ("00".equals(user.getUserType()) && (links == null || links.isEmpty())) {
             roles.add(BizRole.PLATFORM);
             resolvedUserType = "platform";
         }
@@ -569,7 +734,9 @@ public class ApiMerchantStaffController
         u.setDelFlag("0");
         u.setCreateBy("invite:" + invite.getInviteCode());
         u.setCreateTime(new Date());
-        u.setUserType("00"); // RuoYi 默认普通用户
+        // 商户员工身份：必须是 02，绝不能给 00（00 会在 buildLoginMember 里被判为 PLATFORM 角色，
+        // 导致扫码入职的店员直接拿到平台越权：可读全平台商户/订单/员工名单）
+        u.setUserType("02");
         u.setMerchantId(invite.getMerchantId()); // 多商户隔离
         userService.insertUser(u);
         return u;

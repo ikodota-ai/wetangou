@@ -49,8 +49,16 @@ trap '{
 # C) acceptInvite happy path
 C=$(curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"code\":\"mock_${TS}_ok\",\"scene\":\"${SCENE_OK}\",\"nickName\":\"c34_happy\"}" $H/api/merchant/staff/acceptInvite)
-chk "C) happy 200" "操作成功" "$C"
-echo "$C" | grep -q '"token"' && echo "  ✅ C+) token 返回" && PASS=$((PASS+1)) || { echo "  ❌ C+) token: ${C:0:200}"; FAIL=$((FAIL+1)); }
+# 新版行为：扫码入职落「待审核」(biz_merchant_staff.status=3)，不下发商家端 token，
+# 需 OWNER/MANAGER 在 /biz/staffInvite/staff/audit 审核通过后才能登录（防邀请码外传即可核销）
+chk "C) happy 200 待审核" "已提交入职申请" "$C"
+echo "$C" | grep -q '"pendingAudit":true' && echo "  ✅ C+) pendingAudit=true" && PASS=$((PASS+1)) || { echo "  ❌ C+) pendingAudit: ${C:0:200}"; FAIL=$((FAIL+1)); }
+echo "$C" | grep -q '"token":null' && echo "  ✅ C++0) 待审核不发 token" && PASS=$((PASS+1)) || { echo "  ❌ C++0) 待审核仍发 token: ${C:0:200}"; FAIL=$((FAIL+1)); }
+# 新建员工关联应为 status=3 待审核，且账号 user_type=02（不得为 00 平台身份，否则越权）
+C_UID=$(echo "$C" | python3 -c "import sys,json;print(json.load(sys.stdin).get('userId') or 0)")
+LST=$($DB -N -e "SELECT s.status, u.user_type FROM biz_merchant_staff s JOIN sys_user u ON u.user_id=s.user_id WHERE s.user_id=$C_UID LIMIT 1;" 2>/dev/null | head -1)
+[ "$(echo "$LST" | awk '{print $1}')" = "3" ] && echo "  ✅ C++1) 员工 status=3 待审核" && PASS=$((PASS+1)) || { echo "  ❌ C++1) 员工 status=$LST"; FAIL=$((FAIL+1)); }
+[ "$(echo "$LST" | awk '{print $2}')" = "02" ] && echo "  ✅ C++2) user_type=02 无平台越权" && PASS=$((PASS+1)) || { echo "  ❌ C++2) user_type=$LST"; FAIL=$((FAIL+1)); }
 # 状态机断言
 ST=$($DB -N -e "SELECT status FROM biz_merchant_staff_invite WHERE invite_id=$INV_ID;" 2>/dev/null | head -1)
 [ "$ST" = "1" ] && echo "  ✅ C++) status=1 已用" && PASS=$((PASS+1)) || { echo "  ❌ C++) status=$ST"; FAIL=$((FAIL+1)); }
