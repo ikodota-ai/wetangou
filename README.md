@@ -403,33 +403,32 @@ dytuangou/
 
 ## 七、快速开始
 
-### 1. 初始化数据库（一键，2026-08-21 全新库实测通过）
+### 1. 初始化数据库（3 个 SQL 文件，2026-08-22 实测通过）
 
 ```bash
-# 建库
 mysql -uroot -p -e "CREATE DATABASE \`ry-vue\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
 
-# 按验证过的顺序导入全部脚本（幂等，可重复跑）
-DB_PASSWORD=你的密码 bash sql/deploy/init-all.sh ry-vue
-
-# 需要演示/测试数据时（生产不要开）
-DB_PASSWORD=你的密码 WITH_DEMO=1 bash sql/deploy/init-all.sh ry-vue
+mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/ry_20260417.sql        # RuoYi 基础表
+mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/quartz.sql             # 定时任务表
+mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/deploy/wetuangou.sql   # 全部业务内容
 ```
 
-脚本会打印每个文件的 `OK / FAIL`，末尾汇总；全绿即 `FAILED=0`。默认管理员 `admin / admin123`。
+第 3 个文件包含：业务建表 + v2 商品模型 + 代理商/会员/预约/门店 + **260 个菜单** + 字典种子。
+导完最后一句会打印统计，其中 `bad_parent_should_be_0` 必须为 0。默认管理员 `admin / admin123`。
 
-> ⚠️ 顺序敏感，不要自行重排。三处依赖关系是踩过坑的：
-> `biz_product_model_v2`（建 `biz_product_type` 等表）→ `biz_product_model_v2_safe`（加
-> `sys_user.user_type/merchant_id`）→ `biz_merchant_v2`（建 `biz_merchant_staff`）→
-> `biz_role_extension`（同时依赖前两者）。
->
-> ⚠️ 脚本内含 `drop table`，**只能对空库/新库执行**。存量库升级请按需单跑对应脚本。
-
-生产环境还要额外导入一次配置模板：
+生产环境再补配置模板；演示数据仅测试环境用：
 
 ```bash
-mysql -uroot -p ry-vue < sql/deploy/sys_config_production.sql
+mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/deploy/sys_config_production.sql
+mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/deploy/wetuangou-demo.sql   # 生产不要跑
 ```
+
+> 用 Navicat 等 GUI 时：右键库 → 运行 SQL 文件，**编码选 utf-8**（选错中文乱码）。
+> 顺序不能换；3 个文件都幂等（可重复跑）；**只对空库/新库执行**（脚本含 `drop table`）。
+>
+> `wetuangou.sql` 由 `sql/deploy/build-merged.py` 自动合并生成，**不要手改**；
+> 改源脚本后重新跑生成器。等价的 shell 版本 `sql/deploy/init-all.sh` 保留备用
+> （逐文件打印 OK/FAIL，排错更方便）。细节见 `sql/deploy/README.md`。
 
 ### 2. 启动后端
 
@@ -629,6 +628,7 @@ unzip -p ruoyi-admin/target/ruoyi-admin.jar BOOT-INF/classes/com/ruoyi/RuoYiAppl
 - `AGENTS.md` —— 仓库开发规约 + 逐 session 交付记录（**最权威的实现细节来源**）
 - `doc/上线配置清单-2026-08-20.md` —— 上线前必改项清单（配合 `preflight-prod.sh`）
 - `doc/上线数据迁移方案-2026-08-22.md` —— 本地库 → 服务器的两种迁移方案 + 清洗 SQL
+- `sql/deploy/README.md` —— 部署 SQL 导入指南（3 个文件 + Navicat 操作 + 生成方式）
 - `doc/部署上线指南.md` —— 服务器部署步骤
 - `doc/多商户与代理商改造方案.md` —— 架构 + 改造细节 + 验证记录
 
