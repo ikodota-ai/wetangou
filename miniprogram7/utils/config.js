@@ -8,17 +8,29 @@
 // 5) 若后端不可达，前端须显式报错，禁止静默回退 mock。
 
 // 微信开发者工具的 cronet 网络栈 + macOS SOCKS 代理会拦截 127.0.0.1 / localhost，
-// 用电脑的 LAN IP（en0 上的 172.31.26.216）绕开。当前为 WiFi 局域网。
+// 用电脑的 LAN IP（en0 上的 172.20.10.2）绕开。当前为手机热点。
 // 切换网络/WiFi 后 IP 可能变，重新跑 ifconfig en0 | grep 'inet ' 取新值。
 // 真机调试改成电脑本机 IP；上线改成 HTTPS 域名。
-// BASE_URL 解析顺序：ext.json 注入的 baseUrl > localStorage 缓存 > 默认值
-// ext 注入是为了支持第三方平台代发布：每个商户的小程序可有自己的 API 域名
+//
+// BASE_URL 解析顺序：ext.json 注入的 baseUrl > localStorage 缓存 > 下方默认值
+//
+// 关于 ext.json（重要，别误判成 bug）：
+//   wx.getExtConfigSync() 只在「第三方平台代开发」场景返回值，即代码由开放平台
+//   第三方平台代上传到商户自己的 appid 下，且提交时带了 ext.json。
+//   用自有 appid 直接在开发者工具里跑（当前情形）时它恒返空对象 / 抛错，
+//   开发者工具还会提示「xxx 不是 3rdMiniProgramAppid, ext.json 无法生效」——
+//   这是预期行为，不是配置写错了。此时自动 fallback 到下方默认值。
+//   仓库根的 miniprogram7/ext.json 仅作占位与格式参考；真正下发的 ext.json 由
+//   后端 MpReleaseServiceImpl.buildExtJson() 按 biz_merchant.appid +
+//   sys_config['wx.open.apiBaseUrl'] 动态生成，不读这个文件。
+//   接入第三方平台代发布后本函数即生效，届时每个商户可有独立 API 域名，
+//   所以这段读取逻辑必须保留。
 function resolveBaseUrlDefault() {
   try {
     var ext = wx.getExtConfigSync && wx.getExtConfigSync();
     if (ext && ext.baseUrl) return ext.baseUrl;
   } catch (e) {}
-  return 'http://172.31.26.216:8080';
+  return 'http://172.20.10.2:8080';
 }
 const BASE_URL_DEFAULT = resolveBaseUrlDefault();
 
@@ -30,7 +42,8 @@ const BASE_URL_DEFAULT = resolveBaseUrlDefault();
 //   3) 127.0.0.1（仅开发工具模拟器可用）
 // 4) 兜底：模拟器内通常可达
 const BASE_URL_FALLBACKS = [
-  'http://172.31.26.216:8080',// 当前 WiFi 环境（电脑 en0）
+  'http://172.20.10.2:8080',  // 当前手机热点环境（电脑 en0）
+  'http://172.31.26.216:8080',// 历史 WiFi 局域网
   'http://192.168.1.136:8080',// 历史 WiFi 局域网
   'http://127.0.0.1:8080',    // 仅开发工具模拟器
 ];

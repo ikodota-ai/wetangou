@@ -3,13 +3,15 @@ const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 
 App({
   onLaunch() {
-    // 启动期：优先用 ext.json 注入的 baseUrl（多商户代发布场景），否则用默认 IP
+    // 启动期回填 baseUrl，仅用于日志与页面调试展示；真正发请求的地址由
+    // utils/request.js 的 probeBaseUrl() 探测结果决定（换网络时能自愈）。
+    // 这里不再硬编码 IP：唯一事实来源是 utils/config.js，避免两处 IP 漂移。
     try {
       var cfg = require('./utils/config.js')
-      this.globalData.baseUrl = cfg.BASE_URL_DEFAULT || 'http://172.31.26.216:8080'
+      this.globalData.baseUrl = cfg.BASE_URL || cfg.BASE_URL_DEFAULT || ''
       console.log('[app] onLaunch baseUrl =', this.globalData.baseUrl)
     } catch (e) {
-      this.globalData.baseUrl = 'http://172.31.26.216:8080'
+      this.globalData.baseUrl = ''
     }
     // 启动时解析 scene（带参进入：太阳码 scene=distributor:{merchantId}:{memberId}）
     if (this.parseInviteFromScene) this.parseInviteFromScene()
