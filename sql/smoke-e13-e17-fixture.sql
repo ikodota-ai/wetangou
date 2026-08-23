@@ -81,10 +81,16 @@ INSERT INTO biz_product_category (category_id, merchant_id, category_name, indus
   (999302, 1, 'SMOKE_CAT_999302', 'DINING', '0', NOW())
 ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
 
+-- status='1'（停用）刻意为之：这两个店只用于 admin 端按 id 直取的越权断言
+-- （/biz/store/999302），不需要出现在 C 端 /api/store/list 里。
+-- 若建成 '0'（营业中），因 StoreMapper 排序是 `order by sort asc`、
+-- 而本 fixture 不给 sort（默认 0，比真实门店的 1/2 更小），
+-- 它会排到 /api/store/list 第一位 → 小程序首页选中这个没有商品的测试店
+-- → 首页空白 + console 报 `[goods] empty from server`。踩过一次，勿改回 '0'。
 INSERT INTO biz_store (store_id, merchant_id, store_name, status, create_time) VALUES
-  (999301, 2, 'SMOKE_STORE_999301', '0', NOW()),
-  (999302, 1, 'SMOKE_STORE_999302', '0', NOW())
-ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id);
+  (999301, 2, 'SMOKE_STORE_999301', '1', NOW()),
+  (999302, 1, 'SMOKE_STORE_999302', '1', NOW())
+ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id), status=VALUES(status);
 
 INSERT INTO biz_store_album (album_id, merchant_id, store_id, image_url, create_time) VALUES
   (999301, 2, 1, 'http://example.com/999301.jpg', NOW()),
