@@ -25,9 +25,10 @@ echo
 echo "[1] 启动 profile"
 PROF="${SPRING_PROFILES_ACTIVE:-}"
 if [ -z "$PROF" ]; then
-  warn "未设置 SPRING_PROFILES_ACTIVE；请确认启动命令里有 -Dspring.profiles.active=prod,aliyun-oss"
+  warn "未设置 SPRING_PROFILES_ACTIVE；请确认启动命令里有 -Dspring.profiles.active=prod"
 else
   case ",$PROF," in
+    *,aliyun-oss,*) bad "profile 含已删除的 aliyun-oss（当前=$PROF）→ 该文件已合并进 prod，请只写 prod" ;;
     *,prod,*) ok "profile 含 prod（$PROF）" ;;
     *)        bad "profile 缺 prod（当前=$PROF）→ mock 开关会退回读 sys_config" ;;
   esac
@@ -124,11 +125,48 @@ else
 fi
 
 # ---------- 8) OSS ----------
+# prod profile 的 access-key/secret-key 无默认值（${OSS_ACCESS_KEY} 裸占位），
+# 漏配会直接启动失败 Could not resolve placeholder —— 所以这里是 bad 不是 warn。
 echo "[8] OSS"
-if [ -z "${OSS_BUCKET:-}" ] || [ -z "${OSS_ACCESS_KEY:-}" ]; then
-  warn "OSS_BUCKET / OSS_ACCESS_KEY 未设置（若用 local 存储可忽略，但图片会存在本机磁盘）"
+STORAGE="${STORAGE_TYPE:-oss}"
+if [ "$STORAGE" = "local" ]; then
+  warn "STORAGE_TYPE=local → 图片存本机磁盘，多实例部署会丢图，仅单机可接受"
 else
-  ok "OSS bucket=$OSS_BUCKET"
+  MISS=""
+  for v in OSS_ACCESS_KEY OSS_SECRET_KEY OSS_BUCKET; do
+    eval "val=\${$v:-}"
+    [ -z "$val" ] && MISS="$MISS $v"
+  done
+  if [ -n "$MISS" ]; then
+    bad "OSS 变量缺失：$MISS → prod 启动会报 Could not resolve placeholder 直接失败"
+  else
+    ok "OSS bucket=$OSS_BUCKET endpoint=${OSS_ENDPOINT:-默认杭州}"
+  fi
+fi
+
+# ---------- 9) Redis ----------
+# 注意路径：Spring Boot 4 只认 spring.data.redis.*（旧的 spring.redis.* 静默失效）
+echo "[9] Redis"
+if [ -z "${REDIS_HOST:-}" ]; then
+  bad "REDIS_HOST 未设置 → 会连 localhost:6379，服务器上没本机 Redis 则启动即失败"
+elif [ "$REDIS_HOST" = "localhost" ] || [ "$REDIS_HOST" = "127.0.0.1" ]; then
+  warn "REDIS_HOST=$REDIS_HOST（本机 Redis；用阿里云 Redis 应填 r-xxx.redis.rds.aliyuncs.com 内网地址）"
+else
+  ok "REDIS_HOST=$REDIS_HOST"
+fi
+if [ -z "${REDIS_PASSWORD:-}" ]; then
+  warn "REDIS_PASSWORD 为空（阿里云 Redis 必须设密码；若为无密码的本机实例可忽略）"
+else
+  ok "REDIS_PASSWORD 已设置"
+fi
+
+# ---------- 10) 上传目录 ----------
+# 默认值原为开发机 /Users/mac/... 绝对路径，服务器上必然不存在
+echo "[10] 上传目录"
+if [ -z "${RUOYI_PROFILE_PATH:-}" ]; then
+  warn "RUOYI_PROFILE_PATH 未设置 → 用 prod 默认 /var/dytuangou/uploadPath，请确认该目录存在且可写"
+else
+  ok "RUOYI_PROFILE_PATH=$RUOYI_PROFILE_PATH"
 fi
 
 echo
