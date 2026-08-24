@@ -42,3 +42,12 @@ export function delMerchant(merchantId) {
     method: 'delete'
   })
 }
+
+// 生成支付回调地址（含 merchantId，便于回调时直接定位商户密钥解密）
+export function getPayNotifyUrl(merchantId) {
+  return request({
+    url: '/biz/merchant/cert/notifyUrl',
+    method: 'get',
+    params: { merchantId }
+  })
+}

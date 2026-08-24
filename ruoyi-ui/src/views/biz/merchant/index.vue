@@ -308,14 +308,43 @@
           <el-form-item label="证书序列号" prop="payCertSerial">
             <el-input v-model="wxForm.payCertSerial" placeholder="请输入证书序列号" />
           </el-form-item>
-          <el-form-item label="私钥路径" prop="payKeyPath">
-            <el-input v-model="wxForm.payKeyPath" placeholder="服务器上 apiclient_key.pem 的绝对路径" />
+          <el-form-item label="支付私钥" prop="payKeyPath">
+            <el-input v-model="wxForm.payKeyPath" placeholder="上传后自动填入，也可手填服务器绝对路径">
+              <el-upload
+                slot="append"
+                ref="keyUpload"
+                :action="uploadKeyUrl"
+                :headers="uploadHeaders"
+                :data="{ merchantId: wxForm.merchantId }"
+                :show-file-list="false"
+                :before-upload="beforeKeyUpload"
+                :on-success="onKeyUploadSuccess"
+                :on-error="onKeyUploadError"
+                accept=".pem"
+                style="display: inline-block;"
+              >
+                <el-button icon="el-icon-upload2" :loading="keyUploading">上传 pem</el-button>
+              </el-upload>
+            </el-input>
+            <div class="form-tip">
+              上传微信商户平台下载的 apiclient_key.pem。文件存到服务器上传目录之外的 cert/ 目录
+              （0600 权限，不在静态资源映射范围内，无法通过 URL 下载）。也可手填已存在的绝对路径。
+            </div>
           </el-form-item>
           <el-form-item label="APIv3密钥" prop="payApiV3Key">
             <el-input v-model="wxForm.payApiV3Key" placeholder="请输入 APIv3 密钥" show-password />
           </el-form-item>
           <el-form-item label="支付回调地址" prop="payNotifyUrl">
-            <el-input v-model="wxForm.payNotifyUrl" placeholder="如：https://域名/api/pay/notify" />
+            <el-input v-model="wxForm.payNotifyUrl" placeholder="点右侧按钮自动生成">
+              <el-button slot="append" icon="el-icon-magic-stick" :loading="notifyLoading" @click="genNotifyUrl">自动生成</el-button>
+            </el-input>
+            <div class="form-tip">
+              自动生成的是 /api/pay/notify/{商户ID} 形式：微信回调体是加密的，带上商户ID
+              可直接用该商户的 APIv3 密钥解密，无需先反查订单。
+              <span v-if="notifyNotHttps" style="color: #E6A23C;">
+                当前后台是 HTTP 访问，生成的地址不是 https —— 微信支付只接受 https 回调，请先为域名配置证书。
+              </span>
+            </div>
           </el-form-item>
         </template>
       </el-form>
@@ -328,8 +357,9 @@
 </template>
 
 <script>
-import { listMerchant, getMerchant, delMerchant, addMerchant, updateMerchant } from "@/api/biz/merchant"
+import { listMerchant, getMerchant, delMerchant, addMerchant, updateMerchant, getPayNotifyUrl } from "@/api/biz/merchant"
 import { listAgent } from "@/api/biz/agent"
+import { getToken } from "@/utils/auth"
 
 export default {
   name: "Merchant",
@@ -346,6 +376,13 @@ export default {
       title: "",
       open: false,
       wxOpen: false,
+      // 支付私钥上传：走 /biz/merchant/cert/uploadKey，成功后回填 payKeyPath
+      uploadKeyUrl: process.env.VUE_APP_BASE_API + "/biz/merchant/cert/uploadKey",
+      uploadHeaders: { Authorization: "Bearer " + getToken() },
+      keyUploading: false,
+      notifyLoading: false,
+      // 后台以 http 访问时生成的回调地址不是 https，微信支付会拒收，需提示
+      notifyNotHttps: false,
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -492,8 +529,57 @@ export default {
           payApiV3Key: data.payApiV3Key,
           payNotifyUrl: data.payNotifyUrl
         };
+        this.notifyNotHttps = false;
+        this.keyUploading = false;
+        this.notifyLoading = false;
         this.wxOpen = true;
       });
+    },
+    // 上传前校验：后端也会校验，这里先拦掉明显错误，省一次往返
+    beforeKeyUpload(file) {
+      if (!this.wxForm.merchantId) {
+        this.$modal.msgError("缺少商户ID，请重新打开微信配置")
+        return false
+      }
+      if (!/\.pem$/i.test(file.name)) {
+        this.$modal.msgError("只允许上传 .pem 文件")
+        return false
+      }
+      if (file.size > 32 * 1024) {
+        this.$modal.msgError("文件超过 32KB，不像是微信支付私钥")
+        return false
+      }
+      this.keyUploading = true
+      return true
+    },
+    onKeyUploadSuccess(res) {
+      this.keyUploading = false
+      // 后端校验失败时 HTTP 仍是 200，靠 code 区分
+      if (res.code !== 200) {
+        this.$modal.msgError(res.msg || "上传失败")
+        return
+      }
+      this.wxForm.payKeyPath = res.payKeyPath
+      this.$modal.msgSuccess("私钥已上传，路径已回填。还需点「确定」才会保存配置")
+    },
+    onKeyUploadError() {
+      this.keyUploading = false
+      this.$modal.msgError("上传失败，请检查网络或文件大小限制")
+    },
+    genNotifyUrl() {
+      if (!this.wxForm.merchantId) {
+        this.$modal.msgError("缺少商户ID，请重新打开微信配置")
+        return
+      }
+      this.notifyLoading = true
+      getPayNotifyUrl(this.wxForm.merchantId).then(res => {
+        this.notifyLoading = false
+        this.wxForm.payNotifyUrl = res.notifyUrl
+        this.notifyNotHttps = res.https === false
+        this.$modal.msgSuccess("已生成回调地址")
+      }).catch(() => {
+        this.notifyLoading = false
+      })
     },
     submitWxForm() {
       this.$refs["wxForm"].validate(valid => {
