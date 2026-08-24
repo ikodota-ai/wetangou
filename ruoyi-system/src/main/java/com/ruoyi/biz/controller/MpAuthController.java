@@ -60,6 +60,27 @@ public class MpAuthController extends BaseController
         return AjaxResult.success(mpAuth);
     }
 
+    /**
+     * 按 appid 查授权记录
+     *
+     * <p>前端 api/biz/mprelease.js 的 getMpAuth(appid) 调的是本端点。
+     * 必须声明在 /{authId} 之后无效——Spring 按精确度匹配，
+     * 但 /appid/{appid} 多一段路径，不会与 /{authId} 冲突。
+     * 此前缺失该端点时，请求会落到 /{authId} 上，
+     * appid 字符串转 Long 失败直接 500。</p>
+     */
+    @PreAuthorize("@ss.hasPermi('biz:mpauth:query')")
+    @GetMapping("/appid/{appid}")
+    public AjaxResult getInfoByAppid(@PathVariable("appid") String appid)
+    {
+        MpAuth mpAuth = mpAuthService.selectMpAuthByAppid(appid);
+        if (mpAuth != null)
+        {
+            TenantFilterHelper.assertDataScope(mpAuth.getMerchantId());
+        }
+        return AjaxResult.success(mpAuth);
+    }
+
     @PreAuthorize("@ss.hasPermi('biz:mpauth:add')")
     @Log(title = "小程序授权", businessType = BusinessType.INSERT)
     @PostMapping
