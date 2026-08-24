@@ -123,7 +123,7 @@ token:
   # 令牌密钥
   # 生产必须覆盖：export JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
   # 默认值仅供本地开发，上线沿用等于把签名密钥公开在仓库里。
-  secret: ${JWT_SECRET:abcdefghijklmnopqrstuvwxyz}
+  secret: ${JWT_SECRET:local-dev-only-please-override-in-production}
   # 令牌有效期（默认30分钟）
   expireTime: 30
   # 会员令牌有效期（分钟，默认7天）

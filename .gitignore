@@ -89,3 +89,6 @@ doc/*.sh
 sql/*.bak
 scripts/e2e/*.class
 miniprogram7/pages/login/.bak/
+
+# 前端部署包（本地产物，勿入库）
+ruoyi-ui/dist.zip
