@@ -7,10 +7,14 @@
 // 4) MOCK_ENABLED 常量保留仅为向后兼容，恒为 false。
 // 5) 若后端不可达，前端须显式报错，禁止静默回退 mock。
 
-// 微信开发者工具的 cronet 网络栈 + macOS SOCKS 代理会拦截 127.0.0.1 / localhost，
-// 用电脑的 LAN IP（en0 上的 172.20.10.2）绕开。当前为手机热点。
-// 切换网络/WiFi 后 IP 可能变，重新跑 ifconfig en0 | grep 'inet ' 取新值。
-// 真机调试改成电脑本机 IP；上线改成 HTTPS 域名。
+// 默认已切到线上 HTTPS 域名（daodian.lanaoboxiang.com）。
+// 微信小程序正式版/体验版只允许 https 且域名须在「开发管理-服务器域名」白名单内，
+// 所以默认值必须是 https，不能是内网 IP。
+//
+// 本地联调时不要改这里：开发者工具勾「不校验合法域名」后，
+// 在 Console 执行 wx.setStorageSync('resolvedBaseUrl','http://<电脑IP>:8080') 即可覆盖，
+// 改回线上则执行 wx.removeStorageSync('resolvedBaseUrl')。
+// 这样避免"本地调试改了默认值、忘了改回去就发版"这类事故。
 //
 // BASE_URL 解析顺序：ext.json 注入的 baseUrl > localStorage 缓存 > 下方默认值
 //
@@ -30,22 +34,17 @@ function resolveBaseUrlDefault() {
     var ext = wx.getExtConfigSync && wx.getExtConfigSync();
     if (ext && ext.baseUrl) return ext.baseUrl;
   } catch (e) {}
-  return 'http://172.20.10.2:8080';
+  return 'https://daodian.lanaoboxiang.com';
 }
 const BASE_URL_DEFAULT = resolveBaseUrlDefault();
 
-// 备选 IP 列表（按"手机可能访问到"顺序降序，新环境时把新 IP 加到最前）。
-// 真机扫码后若首个 IP 不可达，自动尝试下一个，避免每次换网络都要改代码。
-// 顺序含义：
-//   1) 热点模式（电脑连手机热点）下电脑拿到的 IP（en0）
-//   2) 局域网模式（电脑连 WiFi）下电脑拿到的 IP（en0/en1）
-//   3) 127.0.0.1（仅开发工具模拟器可用）
-// 4) 兜底：模拟器内通常可达
+// 备选地址列表：probeBaseUrl() 并发探测，首个可达者胜出。
+// 上线后刻意只留线上域名，不再列内网 IP —— 否则真机上探测到某个同网段 IP
+// 就会把 resolvedBaseUrl 缓存成 http 内网地址，正式版直接全站请求失败，
+// 且这种"偶发串到开发机"的故障极难排查。
+// 本地联调用 resolvedBaseUrl 手动覆盖（见上方说明），不依赖这个列表。
 const BASE_URL_FALLBACKS = [
-  'http://172.20.10.2:8080',  // 当前手机热点环境（电脑 en0）
-  'http://172.31.26.216:8080',// 历史 WiFi 局域网
-  'http://192.168.1.136:8080',// 历史 WiFi 局域网
-  'http://127.0.0.1:8080',    // 仅开发工具模拟器
+  'https://daodian.lanaoboxiang.com',
 ];
 
 // 健康检查端点：用 /api/ping (ApiPingController 已实装, 纯 JSON 不渲染图片, 0.5ms)

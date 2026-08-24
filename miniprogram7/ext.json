@@ -4,6 +4,6 @@
   "ext": {
     "merchantId": 1,
     "merchantName": "洞天团购",
-    "baseUrl": "http://172.20.10.2:8080"
+    "baseUrl": "https://daodian.lanaoboxiang.com"
   }
 }

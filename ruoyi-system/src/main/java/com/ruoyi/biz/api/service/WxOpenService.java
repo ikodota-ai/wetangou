@@ -173,12 +173,22 @@ public class WxOpenService
         String token = json.getString("authorizer_access_token");
         int ttl = Math.max(json.getIntValue("expires_in") - 300, 60);
         redisCache.setCacheObject(key, token, ttl, TimeUnit.SECONDS);
-        // 微信同时返回新的 refresh_token（轮换），写回数据库
+        // 微信同时返回新的 refresh_token（轮换），必须写回数据库。
+        // 原实现只打日志、注释说"由调用方落库"，但没有任何调用方做这件事，
+        // 结果轮换后库里仍是旧 refresh_token —— 旧值失效后提审/发布会直接 401。
+        // refresh_token 是长期凭据，落库失败不该连带整个取 token 流程失败，故单独 try。
         String newRefresh = json.getString("authorizer_refresh_token");
         if (StringUtils.isNotEmpty(newRefresh) && !newRefresh.equals(authorizerRefreshToken))
         {
             log.info("[WxOpenService] authorizer_refresh_token 已轮换，appid={}", appid);
-            // 调用方需在事务中落库；这里只 log，由调用方传回 service 处理
+            try
+            {
+                saveAuthorizerRefreshToken(appid, newRefresh);
+            }
+            catch (Exception e)
+            {
+                log.error("[WxOpenService] refresh_token 轮换落库失败 appid={}，下次调用仍会用旧值，需人工核对", appid, e);
+            }
         }
         return token;
     }
@@ -221,8 +231,25 @@ public class WxOpenService
     }
 
     /**
-     * 拼装 ext_json：注入 merchantId / appid / apiBaseUrl，小程序能识别当前商家
+     * 拼装 ext_json（<b>已废弃，请勿使用</b>）
+     *
+     * <p>零调用点。真正生效的是
+     * {@code MpReleaseServiceImpl.buildExtJson(Merchant)} —— 它产出的是带
+     * extAppid / extEnable / ext 的完整结构，并落到 biz_mp_release.ext_json。</p>
+     *
+     * <p>这里的实现还有两处错：<br>
+     * 1) 只返回 ext 内层，缺 extAppid / extEnable 外层，微信 /wxa/commit 不认；<br>
+     * 2) 域名键名写成 {@code apiBaseUrl}，而小程序端
+     * {@code miniprogram7/utils/config.js} 读的是 {@code ext.baseUrl}，键名对不上，
+     * 用它注入的话小程序拿不到域名会静默回落到默认值。</p>
+     *
+     * <p>保留而不删除：仅为避免外部若有反射/脚本引用而破坏兼容；
+     * 新代码一律走 MpReleaseServiceImpl。
+     * 确认无引用后可直接删掉本方法。</p>
+     *
+     * @deprecated 改用 {@code IMpReleaseService.buildExtJson(Long merchantId)}
      */
+    @Deprecated
     public JSONObject buildExtJson(Long merchantId, String appid, String apiBaseUrl)
     {
         JSONObject ext = new JSONObject();
@@ -234,6 +261,13 @@ public class WxOpenService
 
     /**
      * 调用 /wxa/commit 上传小程序代码
+     *
+     * <p><b>尚未接入</b>：当前零调用点。MpReleaseServiceImpl 已接
+     * submitAudit / release / revertRelease，独缺这一步，
+     * 而微信侧的顺序是 commit（上传代码模板）→ submitaudit（提审）→ release（发布），
+     * 没 commit 就提审会报「无待审核版本」。
+     * 接第三方平台代发布时必须在 submitAudit 之前调用本方法。
+     * 保留实现是为了那一步到来时直接可用，不是死代码。</p>
      *
      * @param authorizerAccessToken 授权方 token
      * @param appid                 授权方 appid
@@ -302,6 +336,10 @@ public class WxOpenService
     /**
      * 拿授权方小程序信息（昵称 / 头像 / 主体名 / 验证类型）
      * 用于授权回调中获取 refresh_token 后回填 biz_mp_auth
+     *
+     * <p><b>尚未接入</b>：当前零调用点。MpOpenCallbackController 处理授权回调时
+     * 只存了 refresh_token，没回填昵称/主体名，所以「小程序授权」列表里
+     * 这些字段要靠人工录入。后续应在授权回调成功后调用本方法自动补齐。</p>
      */
     public JSONObject getAuthorizerInfo(String authorizerAccessToken, String appid)
     {
@@ -315,6 +353,8 @@ public class WxOpenService
 
     /**
      * authorizer_refresh_token 轮换后落库
+     *
+     * <p>由 {@link #getAuthorizerAccessToken(String, String)} 在检测到轮换时调用。</p>
      */
     public void saveAuthorizerRefreshToken(String appid, String refreshToken)
     {
