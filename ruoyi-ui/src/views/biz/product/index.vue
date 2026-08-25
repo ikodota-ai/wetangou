@@ -633,10 +633,16 @@ export default {
       this.single = selection.length != 1;
       this.multiple = !selection.length;
     },
+    /**
+     * 新增：直接进「商品高级编辑」分段式创建页。
+     *
+     * 原来点新增是开本页的简易弹窗，但那个弹窗缺 maxPerOrder / bookingRequired
+     * 等后端强制必填项，GROUPON / VOUCHER / BOOKING 一律保存失败；
+     * 而分段式创建页字段是齐的，却只能从已有商品的「高级编辑」进去 ——
+     * 没有商品时无路可走，一个都建不出来。这里统一入口，避免维护两套表单。
+     */
     handleAdd() {
-      this.reset();
-      this.title = "添加商品";
-      this.open = true;
+      this.$router.push({ path: '/product/create' }).catch(() => {})
     },
     /** 高级编辑：跳到抖音来客 6 步编辑页（产品类型/售卖/交易/消费/扩展属性） */
     handleAdvancedEdit(row) {

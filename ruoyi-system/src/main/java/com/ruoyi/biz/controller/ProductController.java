@@ -35,6 +35,12 @@ import com.ruoyi.common.core.page.TableDataInfo;
 @RequestMapping("/biz/product")
 public class ProductController extends BaseController
 {
+    /** 上架 */
+    private static final String STATUS_ON = "0";
+
+    /** 下架（草稿态） */
+    private static final String STATUS_OFF = "1";
+
     @Autowired
     private IProductService productService;
 
@@ -94,7 +100,14 @@ public class ProductController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody Product product)
     {
-        ProductValidator.validate(product);
+        // 新建一律按草稿收：分段式创建页第 1 步只有品类/类型/名称，
+        // 库存、有效期、单次限购都在拿到 productId 之后的 tab 里填。
+        // 强行完整校验会导致「建不出第一个商品」的死锁。
+        if (product.getStatus() == null || product.getStatus().isEmpty())
+        {
+            product.setStatus(STATUS_OFF);
+        }
+        ProductValidator.validate(product, isDraft(product));
         int rows = productService.insertProduct(product);
         if (rows <= 0)
         {
@@ -112,8 +125,15 @@ public class ProductController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody Product product)
     {
-        ProductValidator.validate(product);
+        // 仍是下架态 → 继续当草稿改；一旦要上架，就必须补齐该类型的所有必填项。
+        ProductValidator.validate(product, isDraft(product));
         return toAjax(productService.updateProduct(product));
+    }
+
+    /** 下架态（含未指定）视为草稿：小程序端只查 status='0'，草稿不会暴露给用户 */
+    private static boolean isDraft(Product product)
+    {
+        return !STATUS_ON.equals(product.getStatus());
     }
 
     /**

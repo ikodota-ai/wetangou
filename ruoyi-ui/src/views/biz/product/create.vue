@@ -504,7 +504,7 @@ export default {
         sort: 0,
         validityDays: 30,
         productType: '0',
-        status: '0',
+        status: '1',   // 新建先落草稿（下架态）；后端对非上架态只做基础校验
         delFlag: '0',
         // v2 字段
         faceValue: null,

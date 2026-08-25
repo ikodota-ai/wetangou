@@ -20,7 +20,26 @@ import java.math.BigDecimal;
  */
 public class ProductValidator
 {
+    /**
+     * 完整校验（上架用）
+     */
     public static void validate(Product p)
+    {
+        validate(p, false);
+    }
+
+    /**
+     * 校验基础字段（草稿也必须满足）
+     *
+     * <p>为什么要区分草稿：admin 的「商品高级编辑」是分段式 ——
+     * 第 1 步只填品类/类型/名称就要落库拿 productId，后面的 tab 才填库存、
+     * 有效期、单次限购。若第 1 步就跑完整校验，会出现死锁：
+     * 保存需要 stock → stock 在第 2 步 → 第 2 步需要 productId → productId 要先保存成功。
+     * 结果是一个商品都建不出来。</p>
+     *
+     * @param draft true 时只校验基础字段，跳过按类型的必填项
+     */
+    public static void validate(Product p, boolean draft)
     {
         if (p == null) throw new ServiceException("商品为空");
         if (p.getTypeCode() == null || p.getTypeCode().isEmpty())
@@ -34,6 +53,12 @@ public class ProductValidator
         if (p.getPrice() == null || p.getPrice().compareTo(BigDecimal.ZERO) < 0)
         {
             throw new ServiceException("售价 price 必须 >= 0");
+        }
+        if (draft)
+        {
+            // 草稿只保证「能唯一标识一个商品」，其余留给上架前校验。
+            // 草稿一律是下架态，小程序端只查 status='0'，不会暴露给用户。
+            return;
         }
 
         String type = p.getTypeCode();
