@@ -159,6 +159,13 @@ if [ -z "${REDIS_PASSWORD:-}" ]; then
 else
   ok "REDIS_PASSWORD 已设置"
 fi
+# db0 是共用实例的默认落点：后台「清理全部」按钮走 keys("*")+delete，
+# 落在 db0 会连带删掉其它业务的 key。详见部署指南 §7.3
+if [ -z "${REDIS_DATABASE:-}" ] || [ "${REDIS_DATABASE}" = "0" ]; then
+  warn "REDIS_DATABASE=${REDIS_DATABASE:-未设置(默认0)} → 与其它业务共用 db 时禁止用 0，建议独占一个（如 3）"
+else
+  ok "REDIS_DATABASE=$REDIS_DATABASE（独占 db）"
+fi
 
 # ---------- 10) 上传目录 ----------
 # 默认值原为开发机 /Users/mac/... 绝对路径，服务器上必然不存在

@@ -1830,8 +1830,11 @@ SELECT 4, menu_id FROM sys_menu WHERE perms IN (
   'biz:user:list','biz:user:query'
 );
 
--- 2) 清 Redis 缓存
--- redis-cli -n 0 flushdb
+-- 2) 缓存处理
+-- 无需清 Redis：sys_menu 不走缓存，getRouters 每次实时查库。
+-- 改动 sys_role_menu 后，已登录账号的权限集合存在 login_tokens 里不会自动刷新，
+-- 让相关账号重新登录即可；要手工清只删登录态前缀，切勿 flushdb（生产 Redis 与其它业务共用）：
+--   redis-cli -n 3 --scan --pattern 'login_tokens:*' | xargs -r -n 200 redis-cli -n 3 del
 
 
 -- ############################################################
@@ -2836,8 +2839,11 @@ INSERT IGNORE INTO sys_role_menu(role_id, menu_id) VALUES(5,2108),(5,2109),(5,21
 -- 4) 清理悬空绑定
 DELETE rm FROM sys_role_menu rm LEFT JOIN sys_menu m ON rm.menu_id=m.menu_id WHERE m.menu_id IS NULL;
 
--- 5) 清 Redis 缓存（必须！否则 getRouters 返旧值）
--- redis-cli -n 0 flushdb
+-- 5) 缓存处理
+-- 无需清 Redis：sys_menu 不走缓存，getRouters 每次实时查库。
+-- 改动 sys_role_menu 后，已登录账号的权限集合存在 login_tokens 里不会自动刷新，
+-- 让相关账号重新登录即可；要手工清只删登录态前缀，切勿 flushdb（生产 Redis 与其它业务共用）：
+--   redis-cli -n 3 --scan --pattern 'login_tokens:*' | xargs -r -n 200 redis-cli -n 3 del
 
 -- A3: 补 'biz:mpconfig:list' 菜单 + 绑 platform/admin/agent 角色
 INSERT INTO sys_menu(menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark) 

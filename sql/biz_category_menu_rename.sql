@@ -17,8 +17,7 @@
 --
 -- 幂等：带 WHERE menu_name 条件，重复执行不会产生额外变更。
 --
--- 执行后必须清 Redis，否则 getRouters 仍返回缓存里的旧菜单名：
---   redis-cli -n 0 flushdb
+-- 无需清 Redis：菜单不走缓存，刷新后台页面即可看到新名字。
 -- ============================================================================
 
 UPDATE sys_menu SET menu_name = '行业品类'     WHERE menu_id = 2032 AND menu_name = '商品分类';

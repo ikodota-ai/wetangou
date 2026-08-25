@@ -37,5 +37,8 @@ SELECT 4, menu_id FROM sys_menu WHERE perms IN (
   'biz:user:list','biz:user:query'
 );
 
--- 2) 清 Redis 缓存
--- redis-cli -n 0 flushdb
+-- 2) 缓存处理
+-- 无需清 Redis：sys_menu 不走缓存，getRouters 每次实时查库。
+-- 改动 sys_role_menu 后，已登录账号的权限集合存在 login_tokens 里不会自动刷新，
+-- 让相关账号重新登录即可；要手工清只删登录态前缀，切勿 flushdb（生产 Redis 与其它业务共用）：
+--   redis-cli -n 3 --scan --pattern 'login_tokens:*' | xargs -r -n 200 redis-cli -n 3 del

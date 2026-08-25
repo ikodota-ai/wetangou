@@ -9,7 +9,7 @@
 --   2) 补齐 mpauth 的增删改导出按钮权限（原先只有 list + query）
 --   3) 角色绑定：admin(1)/platform(3) 此前完全没绑 2290，后台看不到该菜单
 -- 前置：ruoyi-ui/src/views/biz/mpauth/index.vue 已实装（否则点进去空白）
--- 执行后必须清 Redis：redis-cli -n 0 flushdb   否则 getRouters 返旧菜单
+-- 缓存：菜单本身不走缓存，无需 flushdb（详见 doc/部署上线指南.md §7.2）
 -- =============================================
 
 -- 1) 修乱码菜单名

@@ -23,7 +23,7 @@
 ```bash
 # 1. 打开 mock
 java -cp .:~/.m2/repository/com/mysql/mysql-connector-j/9.6.0/mysql-connector-j-9.6.0.jar EnableMock
-redis-cli -n 0 flushdb
+redis-cli -n 0 flushdb   # 仅限本地开发机；生产 Redis 与其它业务共用，禁止 flushdb
 
 # 2. 跑测试（见 doc/小程序API文档.md 中的端点）
 
