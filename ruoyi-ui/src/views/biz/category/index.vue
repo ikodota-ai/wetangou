@@ -131,7 +131,7 @@
       @pagination="getList"
     />
 
-    <!-- 添加或修改商品分类对话框 -->
+    <!-- 添加或修改行业品类对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
@@ -184,7 +184,7 @@ export default {
       showSearch: true,
       // 总条数
       total: 0,
-      // 商品分类表格数据
+      // 行业品类表格数据
       categoryList: [],
       // 弹出层标题
       title: "",
@@ -218,7 +218,7 @@ export default {
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
       return userType !== '2'
     },
-    /** 查询商品分类列表 */
+    /** 查询行业品类列表 */
     buildParams() {
       return {
         pageNum: this.queryParams.pageNum,
@@ -278,7 +278,7 @@ export default {
     handleAdd() {
       this.reset()
       this.open = true
-      this.title = "添加商品分类"
+      this.title = "添加行业品类"
     },
     /** 修改按钮操作 */
     handleUpdate(row) {
@@ -287,7 +287,7 @@ export default {
       getCategory(categoryId).then(response => {
         this.form = response.data
         this.open = true
-        this.title = "修改商品分类"
+        this.title = "修改行业品类"
       })
     },
     /** 提交按钮 */
@@ -313,7 +313,7 @@ export default {
     /** 删除按钮操作 */
     handleDelete(row) {
       const categoryIds = row.categoryId || this.ids
-      this.$modal.confirm('是否确认删除商品分类编号为"' + categoryIds + '"的数据项？').then(function() {
+      this.$modal.confirm('是否确认删除行业品类编号为"' + categoryIds + '"的数据项？').then(function() {
         return delCategory(categoryIds)
       }).then(() => {
         this.getList()
