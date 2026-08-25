@@ -106,7 +106,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                e.refund_rule_type     as ext_refund_rule_type
         from biz_product p
         left join biz_store s on s.store_id = p.store_id
-        left join biz_category c on c.category_id = p.category_id
+        left join biz_product_category c on c.category_id = p.category_id
         left join biz_product_ext e on e.product_id = p.product_id
     </sql>
 
