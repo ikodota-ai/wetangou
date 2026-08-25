@@ -147,6 +147,15 @@
     <el-dialog :title="title" :visible.sync="open" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
+          <!-- 商户账号自身就带 merchantId，后端会自动补，无需也不应让它选 -->
+          <el-col :span="24" v-if="showMerchantFilter">
+            <el-form-item label="所属商户" prop="merchantId">
+              <biz-select v-model="form.merchantId" type="merchant" width="100%" placeholder="请选择所属商户" />
+              <div class="form-tip" v-if="form.storeId">
+                门店归属不建议变更：已产生的订单、商品、员工都挂在原商户下。
+              </div>
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="门店名称" prop="storeName">
               <el-input v-model="form.storeName" placeholder="请输入门店名称" />
@@ -287,6 +296,12 @@ export default {
       showMerchantFilter: this.isShowMerchantFilter(),
       form: {},
       rules: {
+        // 商户账号不显示该字段、由后端按 token 补齐；
+        // 注意 v-if 移除 DOM 后 validate() 仍会校验规则，
+        // 所以这里必须按身份动态决定 required，否则商户账号提交会被卡住。
+        merchantId: [
+          { required: this.isShowMerchantFilter(), message: "请选择所属商户", trigger: "change" }
+        ],
         storeName: [
           { required: true, message: "门店名称不能为空", trigger: "blur" }
         ],
@@ -346,6 +361,7 @@ export default {
     reset() {
       this.form = {
         storeId: null,
+        merchantId: null,
         storeName: null,
         logo: null,
         province: null,
@@ -442,4 +458,5 @@ export default {
 
 <style scoped>
 .map-tip { font-size: 12px; color: #909399; margin-top: 4px; }
+.form-tip { font-size: 12px; color: #E6A23C; line-height: 1.5; }
 </style>

@@ -21,6 +21,7 @@ import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.utils.TenantContextHolder;
 import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -86,23 +87,64 @@ public class StoreController extends BaseController
 
     /**
      * 新增门店
+     *
+     * <p>merchantId 的确定规则（原先完全没处理，导致门店建出来 merchant_id 为 null，
+     * 既不出现在任何商户的门店列表里，也拿不到商品，小程序按商户查门店直接查不到）：
+     * <ul>
+     *   <li>商户账号：忽略前端传值，一律取 token 里的 merchantId —— 它只能给自己建店；</li>
+     *   <li>平台/代理商：必须显式指定；代理商只能指定名下商户（assertDataScope 拦越权）。</li>
+     * </ul></p>
      */
     @PreAuthorize("@ss.hasPermi('biz:store:add')")
     @Log(title = "门店", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody Store store)
     {
+        Long tokenMerchantId = TenantContextHolder.getMerchantId();
+        if (tokenMerchantId != null)
+        {
+            store.setMerchantId(tokenMerchantId);
+        }
+        if (store.getMerchantId() == null)
+        {
+            return AjaxResult.error("请选择所属商户：门店必须归属某个商户，否则不会出现在门店列表和小程序中");
+        }
+        TenantFilterHelper.assertDataScope(store.getMerchantId());
         return toAjax(storeService.insertStore(store));
     }
 
     /**
      * 修改门店
+     *
+     * <p>既要校验「改的是自己有权限的门店」，也要校验「不能把门店改到别家商户去」，
+     * 只查其中一边都能被绕过（前者可越权改他人门店，后者可把自家门店塞给别人）。</p>
      */
     @PreAuthorize("@ss.hasPermi('biz:store:edit')")
     @Log(title = "门店", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestBody Store store)
     {
+        Store origin = storeService.selectStoreByStoreId(store.getStoreId());
+        if (origin == null)
+        {
+            return AjaxResult.error("门店不存在");
+        }
+        // 1) 有没有权限动这家门店
+        TenantFilterHelper.assertDataScope(origin.getMerchantId());
+
+        Long tokenMerchantId = TenantContextHolder.getMerchantId();
+        if (tokenMerchantId != null)
+        {
+            // 商户账号不允许转移归属，直接钉回自身
+            store.setMerchantId(tokenMerchantId);
+        }
+        else if (store.getMerchantId() == null)
+        {
+            // 平台/代理商漏传时保持原归属，而不是把 merchant_id 清成 null
+            store.setMerchantId(origin.getMerchantId());
+        }
+        // 2) 改完之后的归属是否仍在权限范围内
+        TenantFilterHelper.assertDataScope(store.getMerchantId());
         return toAjax(storeService.updateStore(store));
     }
 
