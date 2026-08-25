@@ -156,12 +156,7 @@ Page({
         wx.showToast({ title: '首页 banner 加载失败：' + ((err && (err.msg || err.message)) || '网络异常'), icon: 'none', duration: 4000 })
       }
       // 保持 banners=[]（空数组），让 swiper 显示空白以便排查
-      this.setData({ banners: [] ,
-  onSwitchToStaff() {
-    // 已下线：身份切换入口移到「我的」页（pages/mine/index）
-    wx.switchTab({ url: '/pages/mine/index/index' })
-  }
-})
+      this.setData({ banners: [] });
     });
   },
   // 设施标签由后端翻译字典，前端不再硬编码中文

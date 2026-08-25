@@ -196,9 +196,9 @@ export default {
       this.$refs.form.validate((valid) => {
         if (!valid) return
         if (this.form.bannerId != null) {
-          updateBanner(this.form).then(() => { this.msgSuccess('修改成功'); this.open = false; this.getList() })
+          updateBanner(this.form).then(() => { this.$modal.msgSuccess('修改成功'); this.open = false; this.getList() })
         } else {
-          addBanner(this.form).then(() => { this.msgSuccess('新增成功'); this.open = false; this.getList() })
+          addBanner(this.form).then(() => { this.$modal.msgSuccess('新增成功'); this.open = false; this.getList() })
         }
       })
     },
@@ -206,7 +206,7 @@ export default {
       const ids = row && row.bannerId ? [row.bannerId] : this.ids
       this.$confirm('确认删除?', '提示', { type: 'warning' }).then(() => {
         return delBanner(ids.join(','))
-      }).then(() => { this.getList(); this.msgSuccess('删除成功') }).catch(() => {})
+      }).then(() => { this.getList(); this.$modal.msgSuccess('删除成功') }).catch(() => {})
     },
     cancel() { this.open = false },
     isShowMerchantFilter() {
