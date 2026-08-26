@@ -64,7 +64,16 @@ public class TenantIdentityResolver
         }
         if (TenantConstants.USER_TYPE_MERCHANT.equals(userType))
         {
-            Long merchantId = u.getMerchantId() == null ? TenantConstants.DEFAULT_MERCHANT_ID : u.getMerchantId();
+            Long merchantId = u.getMerchantId();
+            if (merchantId == null || merchantId <= 0L)
+            {
+                // 配置不全（user_type=2 但 merchant_id 空）→ 降级为无权限。
+                // 原先兜底成 DEFAULT_MERCHANT_ID=1，等于漏填配置就能读写商户1的全部数据，
+                // 且静默无告警；置 null 更糟——租户过滤会退化成不加 where、看到全平台。
+                log.error("[TenantIdentityResolver] userId={} 标记为商户账号但 merchant_id 为空，"
+                        + "已降级为无权限。请在 biz_merchant_user 补齐 merchant_id", userId);
+                return TenantContext.ofMerchant(TenantConstants.INVALID_MERCHANT_ID);
+            }
             return TenantContext.ofMerchant(merchantId);
         }
         return TenantContext.ofPlatform();

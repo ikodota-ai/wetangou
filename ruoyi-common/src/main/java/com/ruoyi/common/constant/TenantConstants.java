@@ -25,6 +25,16 @@ public class TenantConstants
     /** 存量单商户默认商户ID（小程序未传appid时兑底，避免退化为全平台可见） */
     public static final Long DEFAULT_MERCHANT_ID = 1L;
 
+    /**
+     * 无效商户ID：商户账号配置不全（biz_merchant_user.merchant_id 为空）时使用。
+     *
+     * <p>为什么不用 null：租户过滤对 merchantId==null 的商户上下文会退化成
+     * 「不加 where 条件」，等于看到全平台数据 —— 比兜底成商户1更危险。
+     * 用一个永不存在的负数，让所有查询命中空集、所有 assertDataScope 抛 403，
+     * 即「降级为无权限」而不是「降级为超级权限」。</p>
+     */
+    public static final Long INVALID_MERCHANT_ID = -1L;
+
     /** 商户信息缓存key前缀（按appid） */
     public static final String MERCHANT_APPID_KEY = "merchant:appid:";
 

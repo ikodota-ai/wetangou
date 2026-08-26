@@ -58,7 +58,13 @@ public class TenantServiceImpl implements ITenantService
             Long agentId = merchantUser.getAgentId();
             return TenantContext.ofAgent(agentId, getMerchantIdsByAgentId(agentId));
         }
-        return TenantContext.ofMerchant(merchantUser.getMerchantId());
+        Long merchantId = merchantUser.getMerchantId();
+        if (merchantId == null || merchantId <= 0L)
+        {
+            // 与 TenantIdentityResolver 保持一致：配置不全一律降级为无权限
+            return TenantContext.ofMerchant(TenantConstants.INVALID_MERCHANT_ID);
+        }
+        return TenantContext.ofMerchant(merchantId);
     }
 
     /**
