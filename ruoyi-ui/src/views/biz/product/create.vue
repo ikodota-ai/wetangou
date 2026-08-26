@@ -700,9 +700,16 @@ export default {
     const myMerchantId = (this.$store.state.user && this.$store.state.user.merchantId) || null
     if (myMerchantId) this.$set(this.form, 'merchantId', myMerchantId)
     this.loadMerchantOptions()
-    // 编辑模式：?productId=xxx
-    const pid = this.$route.query.productId
-    if (pid) this.loadProduct(pid)
+    this.applyRouteTarget()
+  },
+  /**
+   * 本页被 keep-alive 缓存（路由 meta 没设 noCache），而 AppMain 的
+   * :key 只用 $route.path、不含 query。所以第二次进来时组件是复用的，
+   * created 不会再执行 —— 表现就是「点任何一行编辑，打开的都是第一次
+   * 编辑过的那个商品」。必须在 activated 里重新按当前 query 对齐。
+   */
+  activated() {
+    this.applyRouteTarget()
   },
   mounted() {
     // 必须绑在真实滚动容器上（RuoYi 里是 .app-main 而不是 window），
@@ -732,6 +739,45 @@ export default {
     clearTimeout(this.scrollSpyTimer)
   },
   methods: {
+    /**
+     * 按当前路由 query 对齐页面要编辑的目标商品。
+     *
+     * created 和 activated 都会调：首次进入走 created，从缓存里复活走 activated。
+     * 用 productId 比对，相同就不重复请求（避免每次切标签都白拉一次接口）。
+     */
+    applyRouteTarget() {
+      const pid = this.$route.query.productId
+      const current = this.form.productId
+      if (pid) {
+        // 已经是这个商品就不重复加载
+        if (String(current || '') === String(pid)) return
+        this.resetPageState()
+        this.loadProduct(pid)
+      } else {
+        // 没带 productId 是「新增」。若上次编辑的残留还在，会出现
+        // 点了新增却看到上一个商品数据、一保存就把它改掉的问题。
+        if (current) this.resetPageState()
+      }
+    },
+    /**
+     * 把页面恢复到刚打开的状态。
+     *
+     * 用 $options.data() 取初始值而不是逐字段写：form 有 50+ 字段，
+     * 手写重置清单一定会跟不上字段增减，漏掉的那个就会串到下一个商品上。
+     * merchantId 要在重置后重新钉一次 —— 商户账号的商家就是自己。
+     */
+    resetPageState() {
+      const fresh = this.$options.data.call(this)
+      this.form = fresh.form
+      this.subitemGroups = []
+      this.comboItems = []
+      this.comboDrawer = false
+      this.basicCollapsed = false
+      this.activeTab = fresh.activeTab
+      const myMerchantId = (this.$store.state.user && this.$store.state.user.merchantId) || null
+      if (myMerchantId) this.$set(this.form, 'merchantId', myMerchantId)
+      if (this.$refs.basicForm) this.$refs.basicForm.clearValidate()
+    },
     /** 商户账号(userType=2)看不到商家下拉：它只能给自己建商品 */
     isShowMerchantSelect() {
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''

@@ -83,7 +83,22 @@
           <el-tag :type="typeTag(scope.row.typeCode)">{{ typeText(scope.row.typeCode) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="适用门店" align="center" prop="storeNames" min-width="160" show-overflow-tooltip />
+      <!-- 多门店要全部列出：原来是单行 + show-overflow-tooltip，配了 4 个门店时
+           只能看到前一两个，剩下的必须把鼠标悬上去才知道，很容易误以为没配全。
+           改成逐个标签换行展示，一眼看完。 -->
+      <el-table-column label="适用门店" align="center" prop="storeNames" min-width="200">
+        <template slot-scope="scope">
+          <div v-if="storeNameList(scope.row).length" class="store-tags">
+            <el-tag
+              v-for="(name, i) in storeNameList(scope.row)"
+              :key="i"
+              size="mini"
+              type="info"
+            >{{ name }}</el-tag>
+          </div>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="商品名称" align="left" prop="productName" min-width="180" show-overflow-tooltip />
       <el-table-column label="封面图" align="center" prop="cover" width="100">
         <template slot-scope="scope">
@@ -243,6 +258,17 @@ export default {
       };
       this.handleQuery();
     },
+    /**
+     * 拆后端返回的门店名串。
+     *
+     * 后端是 group_concat(separator '、')，所以按「、」拆。
+     * 兼容历史数据里可能出现的英文逗号分隔。
+     */
+    storeNameList(row) {
+      const raw = row && row.storeNames
+      if (!raw) return []
+      return String(raw).split(/[、,]/).map(v => v.trim()).filter(v => v)
+    },
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.productId);
       this.single = selection.length != 1;
@@ -318,3 +344,13 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+/* 门店标签允许换行：多门店时每个都完整显示，不再被单行裁掉 */
+.store-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+</style>
