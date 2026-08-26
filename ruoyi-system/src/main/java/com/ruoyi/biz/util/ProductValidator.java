@@ -50,7 +50,10 @@ public class ProductValidator
         {
             throw new ServiceException("商品名称不能为空");
         }
-        if (p.getPrice() == null || p.getPrice().compareTo(BigDecimal.ZERO) < 0)
+        // 填了就必须合法；没填留到上架前校验。
+        // 售价输入框在第 2 步「售卖信息」tab，第 1 步拿不到值，
+        // 若这里要求非空，会和「保存后才有 productId」形成死锁。
+        if (p.getPrice() != null && p.getPrice().compareTo(BigDecimal.ZERO) < 0)
         {
             throw new ServiceException("售价 price 必须 >= 0");
         }
@@ -59,6 +62,10 @@ public class ProductValidator
             // 草稿只保证「能唯一标识一个商品」，其余留给上架前校验。
             // 草稿一律是下架态，小程序端只查 status='0'，不会暴露给用户。
             return;
+        }
+        if (p.getPrice() == null)
+        {
+            throw new ServiceException("上架前必须填写售价 price");
         }
 
         String type = p.getTypeCode();
