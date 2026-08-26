@@ -65,8 +65,12 @@ module.exports = {
   footerContent: 'Copyright © 2018-2026 RuoYi. All Rights Reserved.',
 
   /**
-   * 腾讯地图 JavaScript API key（在 https://lbs.qq.com 控制台申请，需启用 WebServiceAPI 才能地址解析）
-   * 请替换为你自己的 key
+   * 腾讯地图 JavaScript API key（https://lbs.qq.com 申请，需启用 WebServiceAPI 才能做地址解析）
+   *
+   * 用 VUE_APP_TENCENT_MAP_KEY 注入，不要写死在这里：
+   * key 绑域名白名单且有免费额度上限，写死意味着换 key 得改代码重新打包，
+   * 而且额度是全平台共享的（不是每个商户一份），必须由平台统一管控。
+   * 地理编码结果已在 components/TencentMap 做了缓存，正常使用不会触达付费额度。
    */
-  tencentMapKey: process.env.VUE_APP_TENCENT_MAP_KEY || 'RKKBZ-SLSLP-JFND2-VCCT6-6IET2-XHFGS'
+  tencentMapKey: process.env.VUE_APP_TENCENT_MAP_KEY || ''
 }

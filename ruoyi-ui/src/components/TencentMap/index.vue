@@ -10,9 +10,9 @@
         placeholder="输入地址搜索定位"
         size="small"
         style="width: 240px; margin-right: 8px;"
-        @keyup.enter.native="searchAddress"
+        @keyup.enter.native="searchAddress()"
       />
-      <el-button size="small" @click="searchAddress">搜索</el-button>
+      <el-button size="small" @click="searchAddress()">搜索</el-button>
       <el-button size="small" @click="reverseGeocode" :disabled="!lng || !lat">根据坐标获取地址</el-button>
     </div>
     <div ref="mapContainer" class="map-container" :style="{ height: height }"></div>
@@ -28,6 +28,35 @@ import defaultSettings from '@/settings'
 
 const MAP_KEY = defaultSettings.tencentMapKey || 'YOUR_TENCENT_MAP_KEY'
 const TMap_URL = `https://map.qq.com/api/gljs?key=${MAP_KEY}`
+
+// ===== 地理编码结果缓存 =====
+// 腾讯地图 WebService 免费额度有限（个人 key 每日几千次），超了要付费。
+// 这里做两件事省配额：
+//   1) 模块级 Map 缓存，同一地址/坐标只请求一次，弹窗反复开关也命中；
+//   2) sessionStorage 持久化，页面刷新后仍复用。
+// 缓存的是「地址 <-> 经纬度」这种稳定映射，不存在时效问题。
+const GEO_CACHE_KEY = 'tmap_geo_cache_v1'
+const GEO_CACHE_MAX = 200
+const geoCache = new Map()
+try {
+  const saved = JSON.parse(sessionStorage.getItem(GEO_CACHE_KEY) || '{}')
+  Object.keys(saved).forEach(k => geoCache.set(k, saved[k]))
+} catch (e) { /* 缓存损坏就当空 */ }
+
+function geoCacheGet(key) {
+  return geoCache.get(key)
+}
+function geoCacheSet(key, value) {
+  // 超上限时丢最早的键，避免 sessionStorage 无限膨胀
+  if (geoCache.size >= GEO_CACHE_MAX) {
+    const oldest = geoCache.keys().next().value
+    if (oldest !== undefined) geoCache.delete(oldest)
+  }
+  geoCache.set(key, value)
+  try {
+    sessionStorage.setItem(GEO_CACHE_KEY, JSON.stringify(Object.fromEntries(geoCache)))
+  } catch (e) { /* 写不进去不影响功能 */ }
+}
 
 export default {
   name: 'TencentMap',
@@ -55,10 +84,11 @@ export default {
       }
     },
     address(val) {
-      if (val && this.loaded) {
-        this.searchKeyword = val
-        this.searchAddress()
-      }
+      if (!val || !this.loaded) return
+      // 只在地址文本真的改变时才重新定位；父组件重渲染导致的同值赋值不触发请求
+      if (val === this.searchKeyword) return
+      this.searchKeyword = val
+      this.searchAddress(true)
     }
   },
   mounted() {
@@ -109,9 +139,14 @@ export default {
         this.marker.setMap(this.map)
         this.marker.setGeometries(this.marker.geometries.map(g => ({ ...g, draggable: true })))
 
+        // 已有经纬度（编辑存量门店）→ 只回显地址文本，不再发地理编码请求。
+        // 原先无条件 searchAddress()，等于每次打开编辑弹窗都白烧一次配额，
+        // 而库里的坐标本来就是准的（且可能是人工拖动微调过的，反查结果反而会覆盖掉）。
         if (this.address) {
           this.searchKeyword = this.address
-          this.searchAddress()
+          if (!this.lng || !this.lat) {
+            this.searchAddress(true)
+          }
         }
       } catch (e) {
         console.error('地图初始化失败', e)
@@ -138,30 +173,48 @@ export default {
       })
     },
     // 地址 → 经纬度
-    async searchAddress() {
+    async searchAddress(silent = false) {
       const keyword = this.searchKeyword.trim()
       if (!keyword) { return }
+      // 命中缓存直接用，不发请求（省配额）
+      const cached = geoCacheGet('addr:' + keyword)
+      if (cached) {
+        this.setPoint(cached.lng, cached.lat)
+        if (!silent) this.$message.success('定位成功（缓存）')
+        return
+      }
       try {
         const url = `https://apis.map.qq.com/ws/geocoder/v1/?address=${encodeURIComponent(keyword)}&key=${MAP_KEY}`
         const res = await this.jsonp(url)
         if (res.status === 0 && res.result && res.result.location) {
           const loc = res.result.location
+          geoCacheSet('addr:' + keyword, { lng: loc.lng, lat: loc.lat })
           this.setPoint(loc.lng, loc.lat)
-          this.$message.success('定位成功')
-        } else {
+          if (!silent) this.$message.success('定位成功')
+        } else if (!silent) {
           this.$message.warning(res.message || '未找到该地址')
         }
       } catch (e) {
-        this.$message.error('地址解析失败，请检查地图 key 及域名白名单')
+        if (!silent) this.$message.error('地址解析失败，请检查地图 key 及域名白名单')
       }
     },
     // 经纬度 → 地址
     async reverseGeocode() {
       if (!this.lng || !this.lat) return
+      const locKey = 'loc:' + Number(this.lat).toFixed(6) + ',' + Number(this.lng).toFixed(6)
+      const cached = geoCacheGet(locKey)
+      if (cached && cached.address) {
+        this.searchKeyword = cached.address
+        this.$emit('addressResolved', cached.address)
+        this.emitValue()
+        this.$message.success('地址获取成功（缓存）')
+        return
+      }
       try {
         const url = `https://apis.map.qq.com/ws/geocoder/v1/?location=${this.lat},${this.lng}&key=${MAP_KEY}`
         const res = await this.jsonp(url)
         if (res.status === 0 && res.result && res.result.address) {
+          geoCacheSet(locKey, { address: res.result.address })
           this.searchKeyword = res.result.address
           this.$emit('addressResolved', res.result.address)
           this.emitValue()
