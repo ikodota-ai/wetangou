@@ -112,8 +112,65 @@ public class BizProductSubitemController extends BaseController
     @PutMapping("/group")
     public AjaxResult editGroup(@RequestBody ProductSubitemGroup group)
     {
+        if (group == null || group.getGroupId() == null) return error("缺少 groupId");
+        AjaxResult bad = checkPickRule(group);
+        if (bad != null) return bad;
         group.setUpdateBy(getUsername());
         return toAjax(groupService.update(group));
+    }
+
+    /**
+     * 校验「几选几」不得超过本组实际单品数。
+     *
+     * <p>pickRule 统一为 {@code ALL}（全部可选）或 {@code PICK_N}（可选 N 个）。
+     * 原先这里完全不校验，前端又是硬编码的 1选1/2选2/3选2 下拉，
+     * 于是只有 2 个单品的组也能存成「3选2」—— 这种组没法履约：
+     * 顾客界面会显示可挑 3 样，实际只有 2 样可挑，下单流程直接卡死。</p>
+     *
+     * <p>N 必须 &lt; 单品数：等于单品数就是全选，应该存 ALL 而不是 PICK_N，
+     * 两种表示同一件事会让后续统计（顾客实际可享几个）出现两套口径。</p>
+     *
+     * @return 校验不通过时返回错误 AjaxResult，通过返回 null
+     */
+    private AjaxResult checkPickRule(ProductSubitemGroup group)
+    {
+        String rule = group.getPickRule();
+        if (rule == null || rule.trim().isEmpty() || "ALL".equals(rule))
+        {
+            return null;
+        }
+        if (!rule.startsWith("PICK_"))
+        {
+            return error("选择规则格式不正确，应为 ALL 或 PICK_N");
+        }
+        int n;
+        try
+        {
+            n = Integer.parseInt(rule.substring("PICK_".length()));
+        }
+        catch (NumberFormatException e)
+        {
+            return error("选择规则格式不正确：" + rule);
+        }
+        if (n <= 0)
+        {
+            return error("可选数量必须大于 0");
+        }
+        int size = subitemService.selectByGroupId(group.getGroupId()).size();
+        if (size == 0)
+        {
+            return error("请先给该商品组添加单品，再设置几选几");
+        }
+        if (n > size)
+        {
+            return error("本组只有 " + size + " 个单品，不能设为选 " + n + " 个");
+        }
+        if (n == size)
+        {
+            // 等于全部时归一成 ALL，避免同一语义存两种值
+            group.setPickRule("ALL");
+        }
+        return null;
     }
 
     @Log(title = "商品搭配", businessType = BusinessType.DELETE)
@@ -169,7 +226,54 @@ public class BizProductSubitemController extends BaseController
     @DeleteMapping("/subitem/{subitemId}")
     public AjaxResult removeSubitem(@PathVariable("subitemId") Long subitemId)
     {
+        ProductSubitem exist = null;
+        try
+        {
+            exist = subitemService.selectById(subitemId);
+        }
+        catch (Exception ignore)
+        {
+            // 查不到不影响删除本身（DELETE 保持幂等）
+        }
         subitemService.deleteById(subitemId);
+        if (exist != null && exist.getGroupId() != null)
+        {
+            shrinkPickRule(exist.getGroupId());
+        }
         return success();
+    }
+
+    /**
+     * 删掉单品后把超出范围的「几选几」收回来。
+     *
+     * <p>场景：一个组有 3 个单品、规则是 PICK_2（3选2），删掉 1 个后只剩 2 个单品，
+     * 规则还写着选 2 个 —— 此时"选2"已经等于全选，却仍显示成"限选"，
+     * 顾客侧看到的可选数量和实际不符。删到只剩 1 个时更明显。</p>
+     *
+     * <p>所以删完自动收敛：N &gt;= 剩余单品数就归成 ALL。
+     * 不在这里报错阻止删除 —— 用户的意图是删单品，不该被规则挡住，
+     * 而且规则本来就是可以事后再调的。</p>
+     */
+    private void shrinkPickRule(Long groupId)
+    {
+        ProductSubitemGroup group = groupService.selectById(groupId);
+        if (group == null) return;
+        String rule = group.getPickRule();
+        if (rule == null || !rule.startsWith("PICK_")) return;
+        int n;
+        try
+        {
+            n = Integer.parseInt(rule.substring("PICK_".length()));
+        }
+        catch (NumberFormatException e)
+        {
+            return;
+        }
+        int size = subitemService.selectByGroupId(groupId).size();
+        if (n >= size)
+        {
+            group.setPickRule("ALL");
+            groupService.update(group);
+        }
     }
 }

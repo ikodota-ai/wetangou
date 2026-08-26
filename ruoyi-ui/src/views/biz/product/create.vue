@@ -158,6 +158,13 @@
           <!-- Tab: 商品信息（团购/代金/组合券包，组合券包显示组合搭配入口+头图）-->
           <el-tab-pane label="商品信息" name="product">
             <el-form :model="form" label-width="120px" size="small">
+              <!-- 商品名称放最前：它是这一组里最主要的字段，也是第 1 步填过后
+                   最常需要回头改的（第 1 步已折叠，不该为了改名字再展开） -->
+              <el-form-item label="商品名称" prop="productName">
+                <el-input v-model="form.productName" maxlength="60" show-word-limit :placeholder="namePlaceholder" />
+                <div v-if="isVoucher" class="dyl-tip">系统已按面值 {{ form.faceValue || 0 }} 元自动生成，可手动调整</div>
+              </el-form-item>
+
               <!-- 团购：商品搭配入口 + 单品/商品组管理 -->
               <template v-if="isGroupon">
                 <el-form-item label="商品搭配">
@@ -175,14 +182,6 @@
                     <i class="el-icon-edit"></i> 管理组合搭配（{{ comboItemsCount }}）
                   </el-button>
                   <div class="dyl-tip">共 {{ comboItemsCount }} 条搭配 · 总价值（用户侧划线价）¥{{ totalComboValue }}</div>
-                </el-form-item>
-              </template>
-
-              <!-- 代金券：代金券面值 + 名称自动生成 -->
-              <template v-if="isVoucher">
-                <el-form-item label="代金券名称">
-                  <el-input v-model="form.productName" :placeholder="autoVoucherName" />
-                  <div class="dyl-tip">系统已按面值 {{ form.faceValue || 0 }} 元自动生成，可手动调整</div>
                 </el-form-item>
               </template>
 
@@ -422,13 +421,31 @@
           <div v-for="g in subitemGroups" :key="g.groupId" class="dyl-combo-group">
             <div class="dyl-combo-group-head">
               <span>{{ g.groupName }}</span>
-              <el-tag size="mini">{{ g.pickRule }}</el-tag>
+              <el-tag size="mini" :type="isPickAll(g) ? 'success' : 'warning'">{{ pickRuleText(g) }}</el-tag>
               <el-button type="text" icon="el-icon-delete" @click="onDeleteGroup(g)" />
             </div>
             <div v-for="s in g.subitems" :key="s.subitemId" class="dyl-combo-subitem">
               {{ s.subitemName }} × {{ s.quantity }} · ¥{{ s.price }}
             </div>
             <el-button size="mini" plain icon="el-icon-plus" @click="openAddSubitem(g)">添加单品</el-button>
+            <!-- 几选几放在组的最后：选项要按本组实际单品数生成，
+                 所以必须等单品加完才有意义 -->
+            <div v-if="groupSize(g) > 0" class="dyl-combo-group-rule">
+              <span class="dyl-combo-group-rule-label">本组顾客可选</span>
+              <el-select
+                :value="g.pickRule || 'ALL'"
+                size="mini"
+                style="width: 150px"
+                @change="val => onGroupRuleChange(g, val)"
+              >
+                <el-option
+                  v-for="opt in pickRuleOptions(g)"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </div>
           </div>
           <el-button size="small" type="primary" plain icon="el-icon-plus" @click="openAddGroup" style="width: 100%; margin-top: 8px">+ 添加商品组</el-button>
         </div>
@@ -442,14 +459,13 @@
     <el-dialog title="添加商品组" :visible.sync="groupOpen" width="420px" append-to-body>
       <el-form :model="groupForm" label-width="100px" size="small">
         <el-form-item label="组名称"><el-input v-model="groupForm.groupName" placeholder="如：主食" /></el-form-item>
-        <el-form-item label="选择规则">
-          <el-select v-model="groupForm.pickRule" style="width: 100%">
-            <el-option label="全部可享" value="ALL" />
-            <el-option label="1选1" value="1选1" />
-            <el-option label="2选2" value="2选2" />
-            <el-option label="3选2" value="3选2" />
-          </el-select>
-        </el-form-item>
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          title="新建时默认「全部可选」，添加完单品后可在组内设置几选几"
+          style="margin-bottom: 12px"
+        />
         <el-form-item label="排序"><el-input-number v-model="groupForm.sort" :min="0" /></el-form-item>
       </el-form>
       <div slot="footer">
@@ -491,7 +507,7 @@ import { treeCategory } from '@/api/biz/category'
 import { addProduct, updateProduct, getProduct, changeProductStatus } from '@/api/biz/product'
 import { selectProductTypeList } from '@/api/biz/productType'
 import { listMerchant } from '@/api/biz/merchant'
-import { listGroups, addGroup, delGroup, addSubitem, delSubitem, listSubitemNameCandidates } from '@/api/biz/productSubitem'
+import { listGroups, addGroup, updateGroup, delGroup, addSubitem, delSubitem, listSubitemNameCandidates } from '@/api/biz/productSubitem'
 
 export default {
   name: 'ProductCreate',
@@ -623,16 +639,8 @@ export default {
       return (this.subitemGroups || []).reduce((sum, g) => sum + (g.subitems || []).length, 0)
     },
     totalPickCount() {
-      // 团购套餐的"实际可享"：全部可享=全部项；1选1=1
-      let total = 0
-      for (const g of (this.subitemGroups || [])) {
-        if (g.pickRule === 'ALL' || !g.pickRule) total += (g.subitems || []).length
-        else if (g.pickRule === '1选1') total += 1
-        else if (g.pickRule === '2选2') total += 2
-        else if (g.pickRule === '3选2') total += 2
-        else total += (g.subitems || []).length
-      }
-      return total
+      // 团购套餐的「实际可享」= 各组可选数之和
+      return (this.subitemGroups || []).reduce((sum, g) => sum + this.groupPickCount(g), 0)
     },
     comboItemsCount() { return (this.comboItems || []).length },
     totalComboValue() {
@@ -830,6 +838,68 @@ export default {
         this.$modal.msgError((e && (e.msg || e.message)) || '下架失败')
       }).finally(() => { this.publishing = false })
     },
+    // ===== 商品组「几选几」=====
+    // pickRule 统一用 'ALL'（全部可选）或 'PICK_N'（可选 N 个）。
+    // 存量数据里还有小程序端写进去的中文 '1选1' / '3选2'，读的时候要兼容。
+    //
+    // 注意「个数」按单品品种数算，不看 quantity：
+    // 一个组里有「红烧肉 ×2」「可乐 ×1」，是 2 个单品而不是 3 个 ——
+    // quantity 是这道菜给几份，跟顾客能挑几样是两件事。
+
+    /** 本组单品品种数 */
+    groupSize(g) {
+      return ((g && g.subitems) || []).length
+    },
+    /** 解析 pickRule 得到"可选几个"；无规则/ALL/超出范围都按全选 */
+    groupPickCount(g) {
+      const size = this.groupSize(g)
+      const rule = g && g.pickRule
+      if (!rule || rule === 'ALL') return size
+      const m = String(rule).match(/^PICK_(\d+)$/)
+      let n = m ? Number(m[1]) : null
+      if (n == null) {
+        // 兼容存量中文格式 'N选M'，取"选"后面那个数
+        const cn = String(rule).match(/选\s*(\d+)$/)
+        if (cn) n = Number(cn[1])
+      }
+      // 规则比实际单品数还大（改过单品但没改规则）按全选处理，不能返回比 size 大的数
+      if (n == null || n <= 0 || n >= size) return size
+      return n
+    },
+    isPickAll(g) {
+      return this.groupPickCount(g) >= this.groupSize(g)
+    },
+    /** 标签文案：3 个单品全选 → 「共3个单品：3选3」；选 2 → 「共3个单品：3选2」 */
+    pickRuleText(g) {
+      const size = this.groupSize(g)
+      if (size === 0) return '未添加单品'
+      return '共' + size + '个单品：' + size + '选' + this.groupPickCount(g)
+    },
+    /**
+     * 可选规则按本组单品数动态生成：3 个单品 → 全部可选(3选3) / 3选2 / 3选1。
+     * 原先是硬编码 1选1/2选2/3选2，跟实际单品数完全脱节 ——
+     * 2 个单品的组也能设成「3选2」，存进去就是没法履约的脏数据。
+     */
+    pickRuleOptions(g) {
+      const size = this.groupSize(g)
+      const opts = [{ value: 'ALL', label: '全部可选（' + size + '选' + size + '）' }]
+      for (let n = size - 1; n >= 1; n--) {
+        opts.push({ value: 'PICK_' + n, label: size + '选' + n })
+      }
+      return opts
+    },
+    /** 改规则立即落库，避免用户以为改了其实没保存 */
+    onGroupRuleChange(g, val) {
+      const old = g.pickRule
+      this.$set(g, 'pickRule', val)
+      updateGroup({ groupId: g.groupId, pickRule: val }).then(() => {
+        this.$modal.msgSuccess('已设为「' + this.pickRuleText(g) + '」')
+      }).catch(e => {
+        this.$set(g, 'pickRule', old)
+        this.$modal.msgError((e && (e.msg || e.message)) || '设置失败')
+      })
+    },
+
     // ===== 商品搭配 =====
     loadSubitems() {
       if (!this.form.productId) return
