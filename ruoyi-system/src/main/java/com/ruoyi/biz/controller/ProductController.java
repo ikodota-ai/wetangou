@@ -22,6 +22,7 @@ import com.ruoyi.biz.util.ProductValidator;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.biz.tenant.TenantFilterHelper;
+import com.ruoyi.common.utils.TenantContextHolder;
 import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -107,6 +108,17 @@ public class ProductController extends BaseController
         {
             product.setStatus(STATUS_OFF);
         }
+        Long tokenMerchantId = TenantContextHolder.getMerchantId();
+        if (tokenMerchantId != null)
+        {
+            // 商户账号只能给自己建商品，忽略前端传值防越权
+            product.setMerchantId(tokenMerchantId);
+        }
+        if (product.getMerchantId() == null || product.getMerchantId() == 0L)
+        {
+            return AjaxResult.error("请选择所属商家：商品必须归属某个商户，否则小程序按商户查商品拿不到它");
+        }
+        TenantFilterHelper.assertDataScope(product.getMerchantId());
         ProductValidator.validate(product, isDraft(product));
         int rows = productService.insertProduct(product);
         if (rows <= 0)
@@ -125,6 +137,27 @@ public class ProductController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody Product product)
     {
+        Product origin = productService.selectProductByProductId(product.getProductId());
+        if (origin == null)
+        {
+            return AjaxResult.error("商品不存在");
+        }
+        // 1) 有没有权限动这个商品
+        TenantFilterHelper.assertDataScope(origin.getMerchantId());
+
+        Long tokenMerchantId = TenantContextHolder.getMerchantId();
+        if (tokenMerchantId != null)
+        {
+            // 商户账号不允许把商品转给别家
+            product.setMerchantId(tokenMerchantId);
+        }
+        else if (product.getMerchantId() == null || product.getMerchantId() == 0L)
+        {
+            // 平台/代理商漏传时保持原归属，避免分段式编辑的后续 tab 把 merchant_id 清掉
+            product.setMerchantId(origin.getMerchantId());
+        }
+        // 2) 改完之后的归属是否仍在权限范围内
+        TenantFilterHelper.assertDataScope(product.getMerchantId());
         // 仍是下架态 → 继续当草稿改；一旦要上架，就必须补齐该类型的所有必填项。
         ProductValidator.validate(product, isDraft(product));
         return toAjax(productService.updateProduct(product));

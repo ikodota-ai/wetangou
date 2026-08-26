@@ -19,6 +19,9 @@
         </div>
         <div v-show="!basicCollapsed" class="dyl-card-body">
           <el-form :model="form" :rules="basicRules" ref="basicForm" label-width="120px" size="small">
+            <el-form-item v-if="showMerchantSelect" label="所属商家" prop="merchantId">
+              <biz-select v-model="form.merchantId" type="merchant" width="100%" placeholder="请选择所属商家" />
+            </el-form-item>
             <el-form-item label="商品品类" prop="categoryId">
               <el-cascader
                 v-model="form.categoryIdArr"
@@ -101,7 +104,7 @@
           <el-tab-pane v-if="isGroupon || isVoucher" :label="merchantTabLabel" name="merchant">
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="所属商家">
-                <el-input :value="merchantName" readonly />
+                <el-input :value="merchantLabel" readonly placeholder="未指定" />
               </el-form-item>
               <el-form-item label="收单方式">
                 <el-radio-group v-model="form.collectMethod">
@@ -454,6 +457,7 @@
 import { treeCategory } from '@/api/biz/category'
 import { addProduct, updateProduct, getProduct } from '@/api/biz/product'
 import { selectProductTypeList } from '@/api/biz/productType'
+import { listMerchant } from '@/api/biz/merchant'
 import { listGroups, addGroup, delGroup, addSubitem, delSubitem, listSubitemNameCandidates } from '@/api/biz/productSubitem'
 
 export default {
@@ -467,6 +471,9 @@ export default {
       typeList: [],
       savingBasic: false,
       basicRules: {
+        // required 按身份动态取值：商户账号看不到这个下拉，
+        // 若写死 required，el-form 在 v-if 移除 DOM 后仍会校验，提交会被卡死
+        merchantId: [{ required: this.isShowMerchantSelect(), message: '请选择所属商家', trigger: 'change' }],
         categoryId: [{ required: true, message: '请选择商品品类', trigger: 'change' }],
         typeCode: [{ required: true, message: '请选择商品类型', trigger: 'change' }],
         productName: [{ required: true, message: '请输入商品名称', trigger: 'blur' }]
@@ -486,9 +493,11 @@ export default {
       nameLoading: false,
       subitemForm: { productId: null, groupId: null, _groupName: '', subitemName: '', quantity: 1, price: 0 },
       // ===== 表单 =====
-      merchantName: '',
+      showMerchantSelect: this.isShowMerchantSelect(),
+      merchantOptions: [],
       form: {
         productId: null,
+        merchantId: null,
         categoryId: null,
         categoryIdArr: null,
         industryCode: '',
@@ -542,6 +551,13 @@ export default {
     }
   },
   computed: {
+    /** 第 2 步只读回显：按 form.merchantId 找商户名，找不到就显示 ID 而不是登录账号名 */
+    merchantLabel() {
+      const id = this.form.merchantId
+      if (!id) return ''
+      const hit = (this.merchantOptions || []).find(m => m.merchantId === id)
+      return hit ? hit.merchantName : ('商户 #' + id)
+    },
     enabledTypeList() { return (this.typeList || []).filter(t => t.status === '0' || t.status === 0) },
     typeName() {
       const t = (this.typeList || []).find(x => x.typeCode === this.form.typeCode)
@@ -603,12 +619,27 @@ export default {
   created() {
     this.loadCategory()
     this.loadTypeList()
-    this.merchantName = (this.$store.state.user && (this.$store.state.user.merchantName || this.$store.state.user.name)) || '当前商家'
+    // 商户账号：商家就是自己，直接钉住 token 里的 merchantId
+    // （原先这里用 store.user.name 兜底，平台账号会显示成登录名 "admin"）
+    const myMerchantId = (this.$store.state.user && this.$store.state.user.merchantId) || null
+    if (myMerchantId) this.$set(this.form, 'merchantId', myMerchantId)
+    this.loadMerchantOptions()
     // 编辑模式：?productId=xxx
     const pid = this.$route.query.productId
     if (pid) this.loadProduct(pid)
   },
   methods: {
+    /** 商户账号(userType=2)看不到商家下拉：它只能给自己建商品 */
+    isShowMerchantSelect() {
+      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
+      return userType !== '2'
+    },
+    /** 拉商户列表，仅用于第 2 步只读回显商家名（下拉本身由 BizSelect 自己拉） */
+    loadMerchantOptions() {
+      listMerchant({ pageNum: 1, pageSize: 200 }).then(res => {
+        this.merchantOptions = (res && (res.rows || res.data)) || []
+      }).catch(() => { this.merchantOptions = [] })
+    },
     loadCategory() {
       // /biz/category/list 返回的是扁平分页数据，el-cascader 需要 children 嵌套树
       treeCategory().then(res => {
