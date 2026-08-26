@@ -192,7 +192,7 @@ const api = {
   // 商家端-创建商品（P1-2）
   productTypeAppCreatable: () => request('/biz/productType/appCreatable'),
   productAdd: (data) => request('/api/product/add', { method: 'POST', data }),
-  // 商品编辑（小程序建品后回填 totalValue / subitemPickRuleJson）
+  // 商品编辑（小程序建品后回填 totalValue / ext.comboItemsJson 等）
   productUpdate: (data) => request('/api/product', { method: 'PUT', data }),
   // 上下架
   productToggle: (data) => request('/api/product/status', { method: 'PUT', data }),

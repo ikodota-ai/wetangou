@@ -25,6 +25,8 @@ import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.common.utils.TenantContextHolder;
 import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
+import com.ruoyi.common.utils.bean.BeanUtils;
+import java.lang.reflect.Method;
 
 /**
  * 商品Controller
@@ -158,8 +160,20 @@ public class ProductController extends BaseController
         }
         // 2) 改完之后的归属是否仍在权限范围内
         TenantFilterHelper.assertDataScope(product.getMerchantId());
-        // 仍是下架态 → 继续当草稿改；一旦要上架，就必须补齐该类型的所有必填项。
-        ProductValidator.validate(product, isDraft(product));
+        // 3) 校验对象必须是「改完之后的那一行」，而不是请求体本身。
+        //
+        // updateProduct 的 SQL 是逐字段判 null 的局部更新，所以请求体里没带的
+        // 字段在库里会保持原值。可校验以前直接拿请求体来判，于是只改一两个字段的
+        // 局部 PUT（比如商品搭配抽屉只提交 productId + 搭配明细）就会因为
+        // typeCode/productName 为 null 被判成「商品类型 typeCode 不能为空」而存不进去，
+        // 尽管这两个字段在库里明明是好的。
+        //
+        // 反方向还有个更隐蔽的问题：status 没带时 isDraft 会把请求判成草稿，
+        // 于是一个已上架商品可以靠「不带 status 的局部 PUT」把售价改成 0 而绕过上架校验，
+        // 顾客侧就会看到点进去下不了单的商品。用合并后的视图判，这两个方向一起解决。
+        Product merged = mergeOntoOrigin(origin, product);
+        // 合并后仍是下架态 → 继续当草稿改；一旦要上架，就必须补齐该类型的所有必填项。
+        ProductValidator.validate(merged, isDraft(merged));
         return toAjax(productService.updateProduct(product));
     }
 
@@ -209,6 +223,50 @@ public class ProductController extends BaseController
             }
         }
         return toAjax(productService.updateProduct(origin));
+    }
+
+    /**
+     * 把局部请求体盖到数据库原值上，得到「这次更新之后库里会长什么样」。
+     *
+     * <p>为什么要反射逐属性合并：updateProduct 的 SQL 对每个字段都是
+     * {@code <if test="xxx != null">} 的局部更新，未提交的字段保留原值。
+     * 校验必须和这套持久化语义完全对齐，否则就会出现「库里数据是好的、
+     * 但因为请求体没带这个字段而校验失败」。手写几十个字段的 if 判断迟早
+     * 会和 Product 的字段增减脱节，反射能保证两者永远一致。</p>
+     *
+     * <p>直接改 {@code origin} 不会影响落库：真正写进数据库的是 {@code incoming}，
+     * origin 只是这一次请求里用来做校验的临时视图。</p>
+     */
+    private static Product mergeOntoOrigin(Product origin, Product incoming)
+    {
+        try
+        {
+            List<Method> setters = BeanUtils.getSetterMethods(origin);
+            for (Method getter : BeanUtils.getGetterMethods(incoming))
+            {
+                Object value = getter.invoke(incoming);
+                // null 表示「这次没提交这个字段」，保留 origin 的原值
+                if (value == null)
+                {
+                    continue;
+                }
+                for (Method setter : setters)
+                {
+                    if (BeanUtils.isMethodPropEquals(getter.getName(), setter.getName())
+                            && setter.getParameterTypes()[0].isAssignableFrom(getter.getReturnType()))
+                    {
+                        setter.invoke(origin, value);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            // 合并失败就退回请求体本身：宁可校验严一点报错，也不能静默放过非法数据
+            return incoming;
+        }
+        return origin;
     }
 
     /** 下架态（含未指定）视为草稿：小程序端只查 status='0'，草稿不会暴露给用户 */

@@ -765,6 +765,9 @@ export default {
         this.form.storeIdList = p.storeIds ? String(p.storeIds).split(',').filter(v => v).map(v => Number(v)) : []
         this.basicCollapsed = true
         this.activeTab = this.isCombo ? 'basic' : 'basicG'
+        // 组合搭配回显：不还原的话，编辑已有商品时抽屉是空的，
+        // 一保存就会把之前配好的搭配覆盖成空数组。
+        this.comboItems = this.parseComboItems(p.ext && p.ext.comboItemsJson)
         if (this.isGroupon || this.isCombo) this.loadSubitems()
       }).catch(e => {
         this.$modal.msgError((e && (e.msg || e.message)) || '商品加载失败')
@@ -1112,11 +1115,35 @@ export default {
       }).catch(() => {})
     },
     blankCombo() { return { name: '', subitemType: 'GROUPON', pickQuantity: 1, pickRule: 'ALL', price: 0 } },
+    /** 解析库里存的搭配 JSON；脏数据不能让整个编辑页打不开，所以异常一律退回空列表 */
+    parseComboItems(raw) {
+      if (!raw) return []
+      try {
+        const arr = JSON.parse(raw)
+        return Array.isArray(arr) ? arr : []
+      } catch (e) {
+        return []
+      }
+    },
     saveCombo() {
+      // 团购走的是商品组/单品接口，加子品时就已经各自落库了，这里只需关抽屉。
+      // 继续发商品 PUT 只会白跑一次请求。
+      if (!this.isCombo) {
+        this.comboDrawer = false
+        return
+      }
       this.savingCombo = true
-      // 简单：把 comboItems 序列化到 form.subitemPickRuleJson 字段
-      this.form.subitemPickRuleJson = JSON.stringify(this.comboItems)
-      updateProduct({ productId: this.form.productId, subitemPickRuleJson: this.form.subitemPickRuleJson }).then(() => {
+      // 搭配明细存 ext.comboItemsJson（对应 biz_product_ext.combo_items_json）。
+      // 以前写的是 subitemPickRuleJson —— 后端 Product 上根本没有这个属性，
+      // Jackson 直接把它丢掉，所以搭配从来没真的存进过数据库。
+      const payload = {
+        productId: this.form.productId,
+        typeCode: this.form.typeCode,
+        totalValue: this.totalComboValue,
+        ext: { comboItemsJson: JSON.stringify(this.comboItems) }
+      }
+      updateProduct(payload).then(() => {
+        this.form.totalValue = this.totalComboValue
         this.$modal.msgSuccess('搭配已保存')
         this.comboDrawer = false
       }).catch(e => this.$modal.msgError((e && (e.msg || e.message)) || '保存失败'))
@@ -1127,7 +1154,9 @@ export default {
 </script>
 
 <style scoped>
-.dyl-create { max-width: 960px; margin: 0 auto; padding: 12px; background: #f5f5f7; min-height: 100vh; }
+/* 不能用 100vh：本页渲染在 .app-main 内部，而 .app-main 的可视高度已经
+   减掉了固定头（navbar 50 + tagsView 34），用 100vh 会多撑出 84px 空白。 */
+.dyl-create { max-width: 960px; margin: 0 auto; padding: 12px; background: #f5f5f7; min-height: 100%; }
 .dyl-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 12px; }
 .dyl-title { font-size: 18px; font-weight: 600; color: #161823; }
 .dyl-card { margin-bottom: 12px; border-radius: 8px; }
@@ -1139,15 +1168,25 @@ export default {
 .dyl-card-step2 { padding-bottom: 60px; }
 /* 吸顶锚点导航（替代原 el-tabs）*/
 /* sticky 元素本身不能设 overflow —— 设了会创建新的滚动上下文导致吸顶失效，
-   所以横向滚动放到内层 track 上。 */
+   所以横向滚动放到内层 track 上。
+
+   z-index 必须低于外层 .fixed-header（导航栏+页签，z-index: 9）：
+   吸顶导航是在 .app-main 内部滚动的，而 .app-main 已经被 margin-top 推到
+   固定头下方。如果这里的层级比固定头高，滚上去时导航会盖到页签上面，
+   看着就像"位置偏高、把页签挡了"。取 8 让它始终压在页签之下。 */
 .dyl-anchor-nav {
-  position: sticky; top: 0; z-index: 90;
+  position: sticky; top: 0; z-index: 8;
   background: #fff; border-bottom: 1px solid #ebeef5;
   margin: -20px -20px 16px; padding: 12px 20px;
 }
 .dyl-anchor-track {
   display: flex; gap: 4px; overflow-x: auto; white-space: nowrap;
 }
+/* 吸顶时补回卡片圆角，否则贴住时上缘会露出方角 */
+.dyl-anchor-nav { border-radius: 8px 8px 0 0; }
+/* 细横条滚动条，避免导航条被系统滚动条压高 */
+.dyl-anchor-track::-webkit-scrollbar { height: 4px; }
+.dyl-anchor-track::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 2px; }
 .dyl-anchor-item {
   flex-shrink: 0; padding: 6px 14px; font-size: 13px; color: #606266;
   cursor: pointer; border-radius: 4px; transition: all .2s;

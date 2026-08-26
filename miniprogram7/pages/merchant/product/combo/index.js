@@ -152,7 +152,16 @@ Page({
   onSave() {
     if (this.data.isCombo) {
       const total = this.data.comboItems.reduce((s, c) => s + (c.pickQuantity || 0) * (c.price || 0), 0)
-      api.productUpdate({ productId: this.data.productId, totalValue: total, subitemPickRuleJson: JSON.stringify(this.data.comboItems) })
+      // 搭配明细存 ext.comboItemsJson（对应 biz_product_ext.combo_items_json）。
+      // 原来传的 subitemPickRuleJson 后端 Product 上没有这个属性，会被直接忽略，
+      // 表现是「提示已保存但下次进来还是空的」。typeCode 必须一起带上：
+      // 后端按类型做必填校验，缺了会被判成商品类型为空。
+      api.productUpdate({
+        productId: this.data.productId,
+        typeCode: this.data.typeCode || 'COMBO',
+        totalValue: total,
+        ext: { comboItemsJson: JSON.stringify(this.data.comboItems) }
+      })
         .then(() => { wx.showToast({ title: '已保存' }); setTimeout(() => wx.navigateBack(), 600) })
         .catch(e => wx.showToast({ title: (e && e.msg) || '保存失败', icon: 'none' }))
     } else {

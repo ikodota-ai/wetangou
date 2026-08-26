@@ -26,6 +26,9 @@ public class ProductServiceImpl implements IProductService
     @Autowired
     private com.ruoyi.biz.mapper.StoreMapper storeMapper;
 
+    @Autowired
+    private com.ruoyi.biz.service.IProductExtService productExtService;
+
     /**
      * 查询商品
      * 
@@ -62,7 +65,12 @@ public class ProductServiceImpl implements IProductService
         assertStoresBelongToMerchant(product);
         syncPrimaryStore(product);
         product.setCreateTime(DateUtils.getNowDate());
-        return productMapper.insertProduct(product);
+        int rows = productMapper.insertProduct(product);
+        if (rows > 0)
+        {
+            saveExt(product);
+        }
+        return rows;
     }
 
     /**
@@ -77,7 +85,12 @@ public class ProductServiceImpl implements IProductService
         assertStoresBelongToMerchant(product);
         syncPrimaryStore(product);
         product.setUpdateTime(DateUtils.getNowDate());
-        return productMapper.updateProduct(product);
+        int rows = productMapper.updateProduct(product);
+        if (rows > 0)
+        {
+            saveExt(product);
+        }
+        return rows;
     }
 
     /**
@@ -174,5 +187,28 @@ public class ProductServiceImpl implements IProductService
     public int deleteProductByProductId(Long productId)
     {
         return productMapper.deleteProductByProductId(productId);
+    }
+
+    /**
+     * 落扩展字段（biz_product_ext）。
+     *
+     * <p>放在 service 而不是各 controller 里，是因为写商品有两个入口
+     * （admin 的 /biz/product 和小程序商家端的 /api/product），扩展字段
+     * 只在其中一个入口落库的话，同一个商品从哪个端保存就决定了数据会不会丢，
+     * 这类差异排查起来非常费劲。</p>
+     *
+     * <p>ext 为 null 表示这次请求不涉及扩展字段，直接跳过 —— 不能当成
+     * 「要清空」，否则分段式编辑里任何一次只改主表的局部保存都会把
+     * 商品搭配等扩展数据抹掉。</p>
+     */
+    private void saveExt(Product product)
+    {
+        com.ruoyi.biz.domain.ProductExt ext = product.getExt();
+        if (ext == null)
+        {
+            return;
+        }
+        ext.setProductId(product.getProductId());
+        productExtService.save(ext);
     }
 }
