@@ -67,10 +67,23 @@
        代金券 6 tab = 商品类型/商家/商品/售卖/交易/消费
        组合券包 6 tab = 基础/商品/商品资质/售卖/交易/消费 -->
       <el-card v-if="form.typeCode && form.productId" class="dyl-card dyl-card-step2" shadow="never">
-        <el-tabs v-model="activeTab" class="dyl-tabs" :class="tabCountClass">
+        <!-- 吸顶锚点导航：点了滚到对应区块，滚动时反过来高亮当前区块。
+             原先是 el-tabs，每填完一段都要手动点下一个 tab；
+             改成一页连续滚动后，填写节奏不再被点击打断。 -->
+        <div class="dyl-anchor-nav" ref="anchorNav">
+          <span
+            v-for="sec in visibleSections"
+            :key="sec.name"
+            class="dyl-anchor-item"
+            :class="{ active: activeTab === sec.name }"
+            @click="scrollToSection(sec.name)"
+          >{{ sec.label }}</span>
+        </div>
+        <div class="dyl-sec-list" ref="secList">
           <!-- Tab: 商家信息（团购/代金）/ 信息（组合券包，基础+商家合并）-->
                               <!-- Tab: 基础信息（团购/代金，含已锁的品类+类型+名称）-->
-          <el-tab-pane v-if="isGroupon || isVoucher" label="基础信息" name="basicG">
+          <section v-if="isGroupon || isVoucher" class="dyl-sec" :ref="'sec_basicG'" data-sec="basicG">
+            <div class="dyl-sec-title">基础信息</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="商品品类">
                 <el-input :value="categoryNameOf(form.categoryId)" readonly />
@@ -86,10 +99,11 @@
                 <div class="dyl-tip">输入面值后，代金券名称将自动按面值生成</div>
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
 <!-- Tab: 基础信息（组合券包无商家 tab，基础信息独立）-->
-          <el-tab-pane v-if="isCombo" label="基础信息" name="basic">
+          <section v-if="isCombo" class="dyl-sec" :ref="'sec_basic'" data-sec="basic">
+            <div class="dyl-sec-title">基础信息</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="商品类型"><el-input :value="typeName" readonly /></el-form-item>
               <el-form-item label="商品名称" prop="productName">
@@ -99,9 +113,10 @@
                 <el-input v-model="form.subtitle" maxlength="100" show-word-limit placeholder="副标题" />
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
-          <el-tab-pane v-if="isGroupon || isVoucher" :label="merchantTabLabel" name="merchant">
+          <section v-if="isGroupon || isVoucher" class="dyl-sec" :ref="'sec_merchant'" data-sec="merchant">
+            <div class="dyl-sec-title">{{ merchantTabLabel }}</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="所属商家">
                 <el-input :value="merchantLabel" readonly placeholder="未指定" />
@@ -130,9 +145,10 @@
                 <div v-if="form.merchantId" class="dyl-tip">只能选该商家名下的门店，换商家会清空已选门店</div>
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
           <!-- Tab: 商品资质（组合券包独有）-->
-          <el-tab-pane v-if="isCombo" label="商品资质" name="qualify">
+          <section v-if="isCombo" class="dyl-sec" :ref="'sec_qualify'" data-sec="qualify">
+            <div class="dyl-sec-title">商品资质</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="子品类型管理">
                 <el-button size="small" type="primary" plain @click="comboDrawer = true">
@@ -153,10 +169,11 @@
                 </el-checkbox-group>
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
           <!-- Tab: 商品信息（团购/代金/组合券包，组合券包显示组合搭配入口+头图）-->
-          <el-tab-pane label="商品信息" name="product">
+          <section class="dyl-sec" :ref="'sec_product'" data-sec="product">
+            <div class="dyl-sec-title">商品信息</div>
             <el-form :model="form" label-width="120px" size="small">
               <!-- 商品名称放最前：它是这一组里最主要的字段，也是第 1 步填过后
                    最常需要回头改的（第 1 步已折叠，不该为了改名字再展开） -->
@@ -206,10 +223,11 @@
                 <el-input v-model="form.detail" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="选填，对商品的补充说明" />
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
           <!-- Tab: 售卖信息（团购+代金）-->
-          <el-tab-pane v-if="isGroupon || isVoucher" label="售卖信息" name="sale">
+          <section v-if="isGroupon || isVoucher" class="dyl-sec" :ref="'sec_sale'" data-sec="sale">
+            <div class="dyl-sec-title">售卖信息</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="投放渠道">
                 <el-checkbox-group v-model="form.saleChannels">
@@ -224,17 +242,12 @@
               <el-form-item label="商品售卖日期">
                 <el-date-picker v-model="form.saleDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
               </el-form-item>
-              <el-form-item label="券码类型">
-                <el-radio-group v-model="form.codeType">
-                  <el-radio label="DOUYIN">抖音券</el-radio>
-                  <el-radio label="MERCHANT">商家券</el-radio>
-                </el-radio-group>
-              </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
           <!-- Tab: 售卖信息（组合券包独有 — 含商家平台子品ID）-->
-          <el-tab-pane v-if="isCombo" label="售卖信息" name="sale">
+          <section v-if="isCombo" class="dyl-sec" :ref="'sec_sale'" data-sec="sale">
+            <div class="dyl-sec-title">售卖信息</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="售价（系统算）">
                 <el-input :value="autoComboPrice" readonly>
@@ -248,21 +261,17 @@
               <el-form-item label="商品售卖日期">
                 <el-date-picker v-model="form.saleDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
               </el-form-item>
-              <el-form-item label="券码类型">
-                <el-radio-group v-model="form.codeType">
-                  <el-radio label="DOUYIN">抖音券</el-radio>
-                </el-radio-group>
-              </el-form-item>
               <el-form-item label="商家平台子品ID">
                 <el-input v-model="form.outerSubitemId" placeholder="平台子品标识（可选）" />
               </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
           
 
           <!-- Tab: 交易规则（团购+代金）-->
-          <el-tab-pane v-if="isGroupon || isVoucher" label="交易规则" name="trade">
+          <section v-if="isGroupon || isVoucher" class="dyl-sec" :ref="'sec_trade'" data-sec="trade">
+            <div class="dyl-sec-title">交易规则</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="顾客可消费日期">
                 <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
@@ -287,11 +296,18 @@
               <el-form-item label="预约规则">
                 <el-switch v-model="form.bookingRequired" :active-value="1" :inactive-value="0" active-text="需要预约" />
               </el-form-item>
+              <el-form-item label="券码类型">
+                <el-radio-group v-model="form.codeType">
+                  <el-radio label="DOUYIN">抖音券</el-radio>
+                  <el-radio label="MERCHANT">商家券</el-radio>
+                </el-radio-group>
+              </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
           <!-- Tab: 交易规则（组合券包 — 不含消费时段/不可消费日期）-->
-          <el-tab-pane v-if="isCombo" label="交易规则" name="trade">
+          <section v-if="isCombo" class="dyl-sec" :ref="'sec_trade'" data-sec="trade">
+            <div class="dyl-sec-title">交易规则</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="顾客可消费日期">
                 <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
@@ -306,11 +322,17 @@
                   <el-option label="不可退" value="NONE" />
                 </el-select>
               </el-form-item>
+              <el-form-item label="券码类型">
+                <el-radio-group v-model="form.codeType">
+                  <el-radio label="DOUYIN">抖音券</el-radio>
+                </el-radio-group>
+              </el-form-item>
             </el-form>
-          </el-tab-pane>
+          </section>
 
           <!-- Tab: 消费规则（团购+代金+组合券包都有）-->
-          <el-tab-pane v-if="isGroupon || isVoucher || isCombo" label="消费规则" name="consume">
+          <section v-if="isGroupon || isVoucher || isCombo" class="dyl-sec" :ref="'sec_consume'" data-sec="consume">
+            <div class="dyl-sec-title">消费规则</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="店内其他优惠">
                 <el-radio-group v-model="form.storeOtherDiscount">
@@ -340,8 +362,8 @@
                 <el-input v-model="form.notice" type="textarea" :rows="3" maxlength="300" show-word-limit />
               </el-form-item>
             </el-form>
-          </el-tab-pane>
-        </el-tabs>
+          </section>
+        </div>
 
         <div class="dyl-step2-footer">
           <span class="dyl-status-hint">
@@ -532,6 +554,8 @@ export default {
       saving: false,
       // ===== 子品/搭配 =====
       publishing: false,
+      suppressScrollSpy: false,
+      scrollSpyTimer: null,
       comboDrawer: false,
       savingCombo: false,
       subitemGroups: [],
@@ -617,9 +641,6 @@ export default {
     isVoucher() { return this.form.typeCode === 'VOUCHER' },
     isCombo() { return this.form.typeCode === 'COMBO' },
     isHuixiang() { return this.form.typeCode === 'HUIXIANG_CARD' },
-    tabCountClass() {
-      return 'dyl-tabs-6'  // 3 类型都 6 tab,水平滚动
-    },
     // 代金券首 tab 特殊命名
     merchantTabLabel() {
       if (this.isGroupon) return '商家信息'
@@ -634,6 +655,23 @@ export default {
       const v = this.form.faceValue
       if (v && Number(v) > 0) return `${Number(v).toFixed(0)}元代金券`
       return '代金券'
+    },
+    /**
+     * 锚点导航项，条件必须与各 section 的 v-if 一致。
+     * 商品类型决定显示哪些区块（团购/代金券/组合券包各不相同），
+     * 所以这里按 isGroupon / isVoucher / isCombo 过滤。
+     */
+    visibleSections() {
+      const list = []
+      if (this.isGroupon || this.isVoucher) list.push({ name: 'basicG', label: '基础信息' })
+      if (this.isCombo) list.push({ name: 'basic', label: '基础信息' })
+      if (this.isGroupon || this.isVoucher) list.push({ name: 'merchant', label: this.merchantTabLabel })
+      if (this.isCombo) list.push({ name: 'qualify', label: '商品资质' })
+      list.push({ name: 'product', label: '商品信息' })
+      list.push({ name: 'sale', label: '售卖信息' })
+      list.push({ name: 'trade', label: '交易规则' })
+      list.push({ name: 'consume', label: '消费规则' })
+      return list
     },
     subitemGroupsCount() {
       return (this.subitemGroups || []).reduce((sum, g) => sum + (g.subitems || []).length, 0)
@@ -669,6 +707,15 @@ export default {
     // 编辑模式：?productId=xxx
     const pid = this.$route.query.productId
     if (pid) this.loadProduct(pid)
+  },
+  mounted() {
+    // passive：只读滚动位置不阻止默认行为，避免拖慢滚动
+    window.addEventListener('scroll', this.onScrollSpy, { passive: true })
+  },
+  beforeDestroy() {
+    // 不移除会在离开页面后继续跑，并因 $refs 已销毁而报错
+    window.removeEventListener('scroll', this.onScrollSpy)
+    clearTimeout(this.scrollSpyTimer)
   },
   methods: {
     /** 商户账号(userType=2)看不到商家下拉：它只能给自己建商品 */
@@ -838,6 +885,57 @@ export default {
         this.$modal.msgError((e && (e.msg || e.message)) || '下架失败')
       }).finally(() => { this.publishing = false })
     },
+    // ===== 锚点导航（滚动 ↔ 高亮 双向联动）=====
+
+    /** 取某个 section 的真实 DOM（:ref 在 v-for/v-if 下可能是数组） */
+    sectionEl(name) {
+      const r = this.$refs['sec_' + name]
+      if (!r) return null
+      return Array.isArray(r) ? r[0] : r
+    },
+    /** 点导航 → 滚到对应区块 */
+    scrollToSection(name) {
+      const el = this.sectionEl(name)
+      if (!el) return
+      // 点击期间暂停滚动监听：平滑滚动过程会连续穿过中间区块，
+      // 不抑制的话高亮会一路乱跳，最后才落到目标上。
+      this.suppressScrollSpy = true
+      this.activeTab = name
+      const top = el.getBoundingClientRect().top + window.pageYOffset - this.anchorOffset()
+      window.scrollTo({ top, behavior: 'smooth' })
+      clearTimeout(this.scrollSpyTimer)
+      this.scrollSpyTimer = setTimeout(() => { this.suppressScrollSpy = false }, 600)
+    },
+    /** 吸顶导航自身的高度，滚动定位要把它让出来，否则标题被盖住 */
+    anchorOffset() {
+      const nav = this.$refs.anchorNav
+      return (nav ? nav.offsetHeight : 0) + 12
+    },
+    /**
+     * 滚动 → 高亮当前区块。
+     *
+     * 判定方式是「最后一个顶部已越过判定线的区块」，而不是找最接近的：
+     * 区块高度差异很大（商品信息很长、商品资质很短），按距离最近算会在
+     * 长区块内部就提前跳到下一个。
+     */
+    onScrollSpy() {
+      if (this.suppressScrollSpy) return
+      const line = this.anchorOffset() + 20
+      let current = null
+      for (const sec of this.visibleSections) {
+        const el = this.sectionEl(sec.name)
+        if (!el) continue
+        if (el.getBoundingClientRect().top - line <= 0) current = sec.name
+      }
+      // 滚到底部时把最后一个区块点亮：最后一块可能不够高，
+      // 顶部永远越不过判定线，不特殊处理就永远高亮不到它。
+      const atBottom = window.innerHeight + window.pageYOffset >= document.body.scrollHeight - 40
+      if (atBottom && this.visibleSections.length) {
+        current = this.visibleSections[this.visibleSections.length - 1].name
+      }
+      if (current && current !== this.activeTab) this.activeTab = current
+    },
+
     // ===== 商品组「几选几」=====
     // pickRule 统一用 'ALL'（全部可选）或 'PICK_N'（可选 N 个）。
     // 存量数据里还有小程序端写进去的中文 '1选1' / '3选2'，读的时候要兼容。
@@ -974,10 +1072,26 @@ export default {
 .dyl-card-arrow { margin-left: auto; color: #999; }
 .dyl-step1-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
 .dyl-card-step2 { padding-bottom: 60px; }
-.dyl-tabs ::v-deep .el-tabs__header { margin-bottom: 16px; }
-.dyl-tabs-6 ::v-deep .el-tabs__nav-scroll { overflow-x: auto !important; }
-.dyl-tabs-6 ::v-deep .el-tabs__nav { white-space: nowrap !important; }
-.dyl-tabs-6 ::v-deep .el-tabs__item { padding: 0 14px !important; font-size: 13px; flex-shrink: 0; }
+/* 吸顶锚点导航（替代原 el-tabs）*/
+.dyl-anchor-nav {
+  position: sticky; top: 0; z-index: 90;
+  display: flex; gap: 4px; overflow-x: auto; white-space: nowrap;
+  background: #fff; border-bottom: 1px solid #ebeef5;
+  margin: -20px -20px 16px; padding: 12px 20px;
+}
+.dyl-anchor-item {
+  flex-shrink: 0; padding: 6px 14px; font-size: 13px; color: #606266;
+  cursor: pointer; border-radius: 4px; transition: all .2s;
+}
+.dyl-anchor-item:hover { color: #409EFF; background: #ecf5ff; }
+.dyl-anchor-item.active { color: #fff; background: #409EFF; font-weight: 500; }
+
+/* 连续区块：区块之间给足留白，滚动时能明显看出分段 */
+.dyl-sec { padding-bottom: 8px; }
+.dyl-sec + .dyl-sec { margin-top: 28px; border-top: 1px dashed #ebeef5; padding-top: 20px; }
+.dyl-sec-title { font-size: 15px; font-weight: 600; color: #303133; margin-bottom: 16px; padding-left: 9px; border-left: 3px solid #409EFF; }
+/* 锚点滚动时把吸顶导航的高度让出来，否则标题被导航盖住 */
+.dyl-sec { scroll-margin-top: 60px; }
 
 .dyl-tip { color: #999; font-size: 12px; margin-top: 4px; }
 .dyl-tip-inline { color: #999; font-size: 12px; margin-left: 12px; }
