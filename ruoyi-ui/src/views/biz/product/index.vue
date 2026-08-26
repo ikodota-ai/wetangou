@@ -198,6 +198,15 @@ export default {
     this.getList();
     this.loadTypeList();
   },
+  /**
+   * 本页被 keep-alive 缓存，从编辑页返回时组件是复活的、created 不会再跑，
+   * 所以不重新拉一次列表就还是改动前的旧数据 —— 看着像"编辑没生效"。
+   * 保留当前分页和查询条件刷新，不要重置回第一页，
+   * 否则在第 3 页改完一个商品就被弹回第 1 页，还得自己翻回去。
+   */
+  activated() {
+    this.getList();
+  },
   methods: {
     /** v2 字典：拉取商品类型列表（v-for 下拉数据源） */
     loadTypeList() {

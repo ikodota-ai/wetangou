@@ -215,6 +215,15 @@ public class ProductController extends BaseController
         origin.setStatus(status);
         if (STATUS_ON.equals(status))
         {
+            // 先查归属：merchant_id 为 0/空的是历史遗留的孤儿商品。
+            // 不先拦的话会一路走到门店归属校验，然后报「门店 X 不属于该商家」——
+            // 而用户看到的门店明明就是自己的，根本无从判断真正缺的是商品归属，
+            // 所以这里直接把话说清楚。顺带也堵住了「孤儿商品被上架后
+            // 小程序按商户查不到、顾客永远看不见」的问题。
+            if (origin.getMerchantId() == null || origin.getMerchantId() == 0L)
+            {
+                return AjaxResult.error("该商品未归属任何商家，无法上架：请先在编辑页选择所属商家后再上架");
+            }
             // 上架要对顾客可见，必填项必须齐；报错信息由 ProductValidator 指明缺哪个字段
             ProductValidator.validate(origin, false);
             if (com.ruoyi.common.utils.StringUtils.isEmpty(origin.getStoreIds()))
