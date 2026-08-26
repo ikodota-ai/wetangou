@@ -71,13 +71,15 @@
              原先是 el-tabs，每填完一段都要手动点下一个 tab；
              改成一页连续滚动后，填写节奏不再被点击打断。 -->
         <div class="dyl-anchor-nav" ref="anchorNav">
-          <span
-            v-for="sec in visibleSections"
-            :key="sec.name"
-            class="dyl-anchor-item"
-            :class="{ active: activeTab === sec.name }"
-            @click="scrollToSection(sec.name)"
-          >{{ sec.label }}</span>
+          <div class="dyl-anchor-track">
+            <span
+              v-for="sec in visibleSections"
+              :key="sec.name"
+              class="dyl-anchor-item"
+              :class="{ active: activeTab === sec.name }"
+              @click="scrollToSection(sec.name)"
+            >{{ sec.label }}</span>
+          </div>
         </div>
         <div class="dyl-sec-list" ref="secList">
           <!-- Tab: 商家信息（团购/代金）/ 信息（组合券包，基础+商家合并）-->
@@ -91,9 +93,6 @@
               <el-form-item label="商品类型">
                 <el-input :value="typeName" readonly />
               </el-form-item>
-              <el-form-item label="商品名称" prop="productName">
-                <el-input v-model="form.productName" maxlength="60" show-word-limit placeholder="请输入商品名称" />
-              </el-form-item>
               <el-form-item v-if="isVoucher" label="代金券面值" prop="faceValue">
                 <el-input-number v-model="form.faceValue" :min="0.01" :precision="2" :step="1" controls-position="right" style="width: 100%" />
                 <div class="dyl-tip">输入面值后，代金券名称将自动按面值生成</div>
@@ -106,9 +105,6 @@
             <div class="dyl-sec-title">基础信息</div>
             <el-form :model="form" label-width="120px" size="small">
               <el-form-item label="商品类型"><el-input :value="typeName" readonly /></el-form-item>
-              <el-form-item label="商品名称" prop="productName">
-                <el-input v-model="form.productName" maxlength="60" show-word-limit placeholder="请输入商品名称" />
-              </el-form-item>
               <el-form-item label="副标题">
                 <el-input v-model="form.subtitle" maxlength="100" show-word-limit placeholder="副标题" />
               </el-form-item>
@@ -709,12 +705,30 @@ export default {
     if (pid) this.loadProduct(pid)
   },
   mounted() {
-    // passive：只读滚动位置不阻止默认行为，避免拖慢滚动
-    window.addEventListener('scroll', this.onScrollSpy, { passive: true })
+    // 必须绑在真实滚动容器上（RuoYi 里是 .app-main 而不是 window），
+    // 绑错对象的话滚动时收不到任何事件，高亮完全不动。
+    // nextTick 等第 2 步的 DOM 渲染出来再找容器。
+    this.$nextTick(() => {
+      const sp = this.scrollParent()
+      // passive：只读滚动位置不阻止默认行为，避免拖慢滚动
+      sp.addEventListener('scroll', this.onScrollSpy, { passive: true })
+      this._boundScroller = sp
+    })
+  },
+  watch: {
+    // 第 2 步是 v-if="form.typeCode && form.productId" —— 新建流程里
+    // mounted 时它还不存在，容器高度不够会被判成不可滚动。
+    // 等第 2 步真正渲染出来后重新探测并绑定。
+    'form.productId'(val) {
+      if (!val) return
+      this.$nextTick(() => this.rebindScroller())
+    }
   },
   beforeDestroy() {
     // 不移除会在离开页面后继续跑，并因 $refs 已销毁而报错
-    window.removeEventListener('scroll', this.onScrollSpy)
+    if (this._boundScroller) {
+      this._boundScroller.removeEventListener('scroll', this.onScrollSpy)
+    }
     clearTimeout(this.scrollSpyTimer)
   },
   methods: {
@@ -893,6 +907,43 @@ export default {
       if (!r) return null
       return Array.isArray(r) ? r[0] : r
     },
+    /**
+     * 找真正在滚动的祖先容器。
+     *
+     * 这里不能想当然用 window：RuoYi 的布局里 .app-main 自己是
+     * overflow-y: auto，页面滚动发生在它内部，window 根本不会触发 scroll，
+     * 吸顶和高亮就都不工作。所以往上找第一个真正可滚动的祖先，
+     * 找不到才回退到 window（比硬编码 '.app-main' 稳，布局改了也不会失效）。
+     */
+    scrollParent() {
+      if (this._scrollParent) return this._scrollParent
+      let node = this.$el && this.$el.parentElement
+      while (node && node !== document.body) {
+        const oy = window.getComputedStyle(node).overflowY
+        if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) {
+          this._scrollParent = node
+          return node
+        }
+        node = node.parentElement
+      }
+      // 没找到时不缓存：第 2 步还没渲染（新建流程缺 productId）时内容不够高，
+      // 会被判成不可滚动，缓存下来就再也不会重新探测了
+      return window
+    },
+    /** 重新探测滚动容器并搬移监听（第 2 步渲染后调用） */
+    rebindScroller() {
+      const prev = this._boundScroller
+      this._scrollParent = null
+      const sp = this.scrollParent()
+      if (prev === sp) return
+      if (prev) prev.removeEventListener('scroll', this.onScrollSpy)
+      sp.addEventListener('scroll', this.onScrollSpy, { passive: true })
+      this._boundScroller = sp
+    },
+    /** 容器当前滚动距离（window 和普通元素取法不同） */
+    scrollTopOf(sp) {
+      return sp === window ? (window.pageYOffset || document.documentElement.scrollTop) : sp.scrollTop
+    },
     /** 点导航 → 滚到对应区块 */
     scrollToSection(name) {
       const el = this.sectionEl(name)
@@ -901,8 +952,16 @@ export default {
       // 不抑制的话高亮会一路乱跳，最后才落到目标上。
       this.suppressScrollSpy = true
       this.activeTab = name
-      const top = el.getBoundingClientRect().top + window.pageYOffset - this.anchorOffset()
-      window.scrollTo({ top, behavior: 'smooth' })
+      const sp = this.scrollParent()
+      const offset = this.anchorOffset()
+      if (sp === window) {
+        const top = el.getBoundingClientRect().top + this.scrollTopOf(sp) - offset
+        window.scrollTo({ top, behavior: 'smooth' })
+      } else {
+        // 元素容器要换算成「相对容器」的偏移，不能直接用视口坐标
+        const top = el.getBoundingClientRect().top - sp.getBoundingClientRect().top + sp.scrollTop - offset
+        sp.scrollTo({ top, behavior: 'smooth' })
+      }
       clearTimeout(this.scrollSpyTimer)
       this.scrollSpyTimer = setTimeout(() => { this.suppressScrollSpy = false }, 600)
     },
@@ -920,7 +979,11 @@ export default {
      */
     onScrollSpy() {
       if (this.suppressScrollSpy) return
-      const line = this.anchorOffset() + 20
+      const sp = this.scrollParent()
+      // 判定线用「容器顶部 + 导航高度」，容器不是 window 时视口坐标 0 并不是
+      // 容器的顶部，必须减掉容器自身的位置
+      const baseTop = sp === window ? 0 : sp.getBoundingClientRect().top
+      const line = baseTop + this.anchorOffset() + 20
       let current = null
       for (const sec of this.visibleSections) {
         const el = this.sectionEl(sec.name)
@@ -929,7 +992,9 @@ export default {
       }
       // 滚到底部时把最后一个区块点亮：最后一块可能不够高，
       // 顶部永远越不过判定线，不特殊处理就永远高亮不到它。
-      const atBottom = window.innerHeight + window.pageYOffset >= document.body.scrollHeight - 40
+      const atBottom = sp === window
+        ? window.innerHeight + this.scrollTopOf(sp) >= document.body.scrollHeight - 40
+        : sp.scrollTop + sp.clientHeight >= sp.scrollHeight - 40
       if (atBottom && this.visibleSections.length) {
         current = this.visibleSections[this.visibleSections.length - 1].name
       }
@@ -1073,11 +1138,15 @@ export default {
 .dyl-step1-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
 .dyl-card-step2 { padding-bottom: 60px; }
 /* 吸顶锚点导航（替代原 el-tabs）*/
+/* sticky 元素本身不能设 overflow —— 设了会创建新的滚动上下文导致吸顶失效，
+   所以横向滚动放到内层 track 上。 */
 .dyl-anchor-nav {
   position: sticky; top: 0; z-index: 90;
-  display: flex; gap: 4px; overflow-x: auto; white-space: nowrap;
   background: #fff; border-bottom: 1px solid #ebeef5;
   margin: -20px -20px 16px; padding: 12px 20px;
+}
+.dyl-anchor-track {
+  display: flex; gap: 4px; overflow-x: auto; white-space: nowrap;
 }
 .dyl-anchor-item {
   flex-shrink: 0; padding: 6px 14px; font-size: 13px; color: #606266;
