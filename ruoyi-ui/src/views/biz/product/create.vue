@@ -113,7 +113,21 @@
                 </el-radio-group>
               </el-form-item>
               <el-form-item label="适用门店" prop="storeIdList">
-                <biz-select v-model="form.storeIdList" type="store" multiple />
+                <biz-select
+                  v-if="form.merchantId"
+                  v-model="form.storeIdList"
+                  :merchant-id="form.merchantId"
+                  type="store"
+                  multiple
+                />
+                <el-alert
+                  v-else
+                  title="请先在上方「基础信息」选择所属商家，再选适用门店"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
+                <div v-if="form.merchantId" class="dyl-tip">只能选该商家名下的门店，换商家会清空已选门店</div>
               </el-form-item>
             </el-form>
           </el-tab-pane>
