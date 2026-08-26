@@ -1165,25 +1165,32 @@ export default {
 .dyl-card-tag { margin-left: 12px; font-size: 12px; color: #fe2c55; background: #ffe7eb; padding: 2px 8px; border-radius: 4px; }
 .dyl-card-arrow { margin-left: auto; color: #999; }
 .dyl-step1-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
-.dyl-card-step2 { padding-bottom: 60px; }
+/* overflow: visible 是吸顶能否生效的关键，不是样式偏好。
+   element-ui 给 .el-card 设了 overflow: hidden，而吸顶导航就在这张卡片里。
+   祖先一旦裁剪内容，它就成了 sticky 的"滚动容器"，可这张卡片自己从不滚动，
+   于是导航会跟着内容一路向上跑出可视区 —— 表现就是滚动时导航冲到页签
+   底下不见了，像是"吸顶位置偏高被页签挡住"。
+   Chrome 实测：祖先 hidden 时滚 800px，导航 top 从 157 掉到 -643（完全失效）；
+   改 visible 后稳定停在容器顶部 84px。
+   注意这条必须落在 .el-card 这一层，写在导航自己身上是无效的（同样实测过：
+   导航自身有没有 overflow 对吸顶毫无影响，起决定作用的只有祖先）。 */
+.dyl-card-step2 { padding-bottom: 60px; overflow: visible; }
 /* 吸顶锚点导航（替代原 el-tabs）*/
-/* sticky 元素本身不能设 overflow —— 设了会创建新的滚动上下文导致吸顶失效，
-   所以横向滚动放到内层 track 上。
-
-   z-index 必须低于外层 .fixed-header（导航栏+页签，z-index: 9）：
-   吸顶导航是在 .app-main 内部滚动的，而 .app-main 已经被 margin-top 推到
-   固定头下方。如果这里的层级比固定头高，滚上去时导航会盖到页签上面，
-   看着就像"位置偏高、把页签挡了"。取 8 让它始终压在页签之下。 */
+/* 横向滚动放在内层 track 而不是导航本身：纯粹为了让滚动条只出现在按钮那一行，
+   不影响导航整体的内边距和圆角。 */
+/* z-index 只需压住卡片内跟着滚动的表单内容即可。
+   不必担心盖住外层页签：本页渲染在 .app-main 内，而 .app-main 自己
+   overflow-y: auto 会裁剪内容，导航不可能溢出到固定头区域。 */
 .dyl-anchor-nav {
   position: sticky; top: 0; z-index: 8;
   background: #fff; border-bottom: 1px solid #ebeef5;
   margin: -20px -20px 16px; padding: 12px 20px;
+  /* 吸顶时补回卡片圆角，否则贴住时上缘会露出方角 */
+  border-radius: 8px 8px 0 0;
 }
 .dyl-anchor-track {
   display: flex; gap: 4px; overflow-x: auto; white-space: nowrap;
 }
-/* 吸顶时补回卡片圆角，否则贴住时上缘会露出方角 */
-.dyl-anchor-nav { border-radius: 8px 8px 0 0; }
 /* 细横条滚动条，避免导航条被系统滚动条压高 */
 .dyl-anchor-track::-webkit-scrollbar { height: 4px; }
 .dyl-anchor-track::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 2px; }
