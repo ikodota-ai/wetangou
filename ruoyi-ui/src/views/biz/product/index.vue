@@ -104,7 +104,7 @@
       </el-table-column>
       <el-table-column label="排序" align="center" prop="sort" width="80" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="160" />
-      <el-table-column label="操作" align="center" width="120" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
         <template slot-scope="scope">
           <el-button
             size="mini"
@@ -113,6 +113,22 @@
             @click="handleUpdate(scope.row)"
             v-hasPermi="['biz:product:edit']"
           >编辑</el-button>
+          <el-button
+            v-if="scope.row.status !== '0'"
+            size="mini"
+            type="text"
+            icon="el-icon-top"
+            @click="handleChangeStatus(scope.row, '0')"
+            v-hasPermi="['biz:product:edit']"
+          >上架</el-button>
+          <el-button
+            v-else
+            size="mini"
+            type="text"
+            icon="el-icon-bottom"
+            @click="handleChangeStatus(scope.row, '1')"
+            v-hasPermi="['biz:product:edit']"
+          >下架</el-button>
           <el-button
             size="mini"
             type="text"
@@ -136,7 +152,7 @@
 </template>
 
 <script>
-import { listProduct, delProduct } from "@/api/biz/product"
+import { listProduct, delProduct, changeProductStatus } from "@/api/biz/product"
 import { selectProductTypeList } from "@/api/biz/productType"
 
 export default {
@@ -260,6 +276,32 @@ export default {
         return;
       }
       this.$router.push({ path: '/product/create', query: { productId } }).catch(() => {})
+    },
+    /**
+     * 上架 / 下架。
+     *
+     * 新建商品一律落草稿（下架态）—— 分段式创建第 1 步只填品类/类型/名称就要
+     * 落库拿 productId，那时必填项还没填完，不可能直接上架。所以上架必然是个
+     * 独立动作，这里给列表页一个快捷入口，不用进编辑页。
+     *
+     * 上架时后端会跑完整必填校验，缺字段会明确返回缺哪一项，此时提示用户去
+     * 编辑页补全。
+     */
+    handleChangeStatus(row, status) {
+      const action = status === '0' ? '上架' : '下架';
+      const tip = status === '0'
+        ? '确认上架商品「' + row.productName + '」？上架后顾客即可在小程序看到并下单'
+        : '确认下架商品「' + row.productName + '」？下架后顾客将无法看到和下单';
+      this.$modal.confirm(tip).then(() => {
+        return changeProductStatus(row.productId, status);
+      }).then(() => {
+        this.$modal.msgSuccess(action + '成功');
+        this.getList();
+      }).catch(e => {
+        // 取消确认时 e 为 'cancel'，不该弹错误
+        if (!e || e === 'cancel') return;
+        this.$modal.msgError((e && (e.msg || e.message)) || (action + '失败'));
+      });
     },
     handleDelete(row) {
       const productIds = row.productId || this.ids;

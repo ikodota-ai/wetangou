@@ -35,6 +35,16 @@ export function updateProduct(data) {
   })
 }
 
+// 上架 / 下架（status: '0' 上架 / '1' 下架）
+// 上架时后端会跑完整必填校验，缺字段会返回具体缺哪一项
+export function changeProductStatus(productId, status) {
+  return request({
+    url: '/biz/product/status',
+    method: 'put',
+    data: { productId, status }
+  })
+}
+
 // 删除商品
 export function delProduct(productId) {
   return request({

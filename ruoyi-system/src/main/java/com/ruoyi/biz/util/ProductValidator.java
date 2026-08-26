@@ -63,24 +63,26 @@ public class ProductValidator
             // 草稿一律是下架态，小程序端只查 status='0'，不会暴露给用户。
             return;
         }
-        if (p.getPrice() == null)
+        // 注意判 0 而不只是 null：price 建表带 DEFAULT '0.00'，没填在库里就是 0。
+        // 0 元商品若真要做，应当走专门的免费领取活动，而不是普通商品上架。
+        if (p.getPrice() == null || p.getPrice().compareTo(BigDecimal.ZERO) <= 0)
         {
-            throw new ServiceException("上架前必须填写售价 price");
+            throw new ServiceException("上架前必须填写售价 price（且需大于 0）");
         }
 
         String type = p.getTypeCode();
         switch (type)
         {
             case "GROUPON":
-                requireNonNull(p.getStock(), "GROUPON 需填库存 stock");
-                requireNonNull(p.getValidityDays(), "GROUPON 需填有效期 validityDays");
-                requireNonNull(p.getMaxPerOrder(), "GROUPON 需填单次限购 maxPerOrder");
+                requirePositive(p.getStock(), "GROUPON 需填库存 stock");
+                requirePositive(p.getValidityDays(), "GROUPON 需填有效期 validityDays");
+                requirePositive(p.getMaxPerOrder(), "GROUPON 需填单次限购 maxPerOrder");
                 break;
 
             case "VOUCHER":
-                requireNonNull(p.getFaceValue(), "VOUCHER 需填面值 faceValue");
+                requirePositiveAmount(p.getFaceValue(), "VOUCHER 需填面值 faceValue");
                 requireNonNull(p.getMinConsume(), "VOUCHER 需填最低消费 minConsume");
-                requireNonNull(p.getMaxPerOrder(), "VOUCHER 需填单次限购 maxPerOrder");
+                requirePositive(p.getMaxPerOrder(), "VOUCHER 需填单次限购 maxPerOrder");
                 if (p.getFaceValue().compareTo(p.getPrice()) < 0)
                 {
                     throw new ServiceException("VOUCHER 面值不能小于售价");
@@ -88,8 +90,8 @@ public class ProductValidator
                 break;
 
             case "COMBO":
-                requireNonNull(p.getTotalValue(), "COMBO 需填总价值 totalValue");
-                requireNonNull(p.getValidityDays(), "COMBO 需填有效期 validityDays");
+                requirePositiveAmount(p.getTotalValue(), "COMBO 需填总价值 totalValue");
+                requirePositive(p.getValidityDays(), "COMBO 需填有效期 validityDays");
                 if (p.getSubitemPickRule() == null || p.getSubitemPickRule().trim().isEmpty())
                 {
                     throw new ServiceException("COMBO 需填搭配规则 subitemPickRule");
@@ -101,25 +103,25 @@ public class ProductValidator
                 {
                     throw new ServiceException("BOOKING 类型必须设 bookingRequired=1");
                 }
-                requireNonNull(p.getMaxPerOrder(), "BOOKING 需填单次限购 maxPerOrder");
-                requireNonNull(p.getValidityDays(), "BOOKING 需填有效期 validityDays");
+                requirePositive(p.getMaxPerOrder(), "BOOKING 需填单次限购 maxPerOrder");
+                requirePositive(p.getValidityDays(), "BOOKING 需填有效期 validityDays");
                 break;
 
             case "STORED_CARD":
-                requireNonNull(p.getFaceValue(), "STORED_CARD 需填面值 faceValue");
+                requirePositiveAmount(p.getFaceValue(), "STORED_CARD 需填面值 faceValue");
                 requireNonNull(p.getMinConsume(), "STORED_CARD 需填最低消费 minConsume");
-                requireNonNull(p.getValidityDays(), "STORED_CARD 需填有效期 validityDays");
+                requirePositive(p.getValidityDays(), "STORED_CARD 需填有效期 validityDays");
                 break;
 
             case "TIMECARD":
-                requireNonNull(p.getTotalTimes(), "TIMECARD 需填总次数 totalTimes");
-                requireNonNull(p.getValidityDays(), "TIMECARD 需填有效期 validityDays");
+                requirePositive(p.getTotalTimes(), "TIMECARD 需填总次数 totalTimes");
+                requirePositive(p.getValidityDays(), "TIMECARD 需填有效期 validityDays");
                 break;
 
             case "PERIOD_CARD":
                 requireNonNull(p.getPeriodType(), "PERIOD_CARD 需填周期类型 periodType (MONTH/QUARTER/YEAR)");
-                requireNonNull(p.getPeriodCount(), "PERIOD_CARD 需填周期数 periodCount");
-                requireNonNull(p.getValidityDays(), "PERIOD_CARD 需填有效期 validityDays");
+                requirePositive(p.getPeriodCount(), "PERIOD_CARD 需填周期数 periodCount");
+                requirePositive(p.getValidityDays(), "PERIOD_CARD 需填有效期 validityDays");
                 break;
 
             default:
@@ -130,5 +132,26 @@ public class ProductValidator
     private static void requireNonNull(Object v, String msg)
     {
         if (v == null) throw new ServiceException(msg);
+    }
+
+    /**
+     * 数量型字段「必须填且必须 &gt; 0」。
+     *
+     * <p>不能只判 null：biz_product 的 price / stock / validity_days /
+     * max_per_order / face_value 在建表时都带了 DEFAULT（0、0、30、1、0.00），
+     * 所以「用户没填」在库里表现为 0 而不是 null，只判 null 永远拦不住。
+     * 后果是库存 0、售价 0 的残缺商品能通过上架校验暴露给顾客：
+     * 商品在小程序可见、可点进详情，但下单必然失败（库存不足），
+     * 顾客只会认为"这家店的小程序是坏的"。</p>
+     */
+    private static void requirePositive(Number v, String msg)
+    {
+        if (v == null || v.longValue() <= 0) throw new ServiceException(msg);
+    }
+
+    /** 金额型字段「必须填且必须 &gt; 0」，同样是因为建表带了 DEFAULT '0.00' */
+    private static void requirePositiveAmount(BigDecimal v, String msg)
+    {
+        if (v == null || v.compareTo(BigDecimal.ZERO) <= 0) throw new ServiceException(msg);
     }
 }

@@ -163,6 +163,54 @@ public class ProductController extends BaseController
         return toAjax(productService.updateProduct(product));
     }
 
+    /**
+     * 上架 / 下架。
+     *
+     * <p>为什么需要这个独立端点：商品新建一律落草稿（下架态），因为分段式创建
+     * 第 1 步只填品类/类型/名称就要落库拿 productId，此时必填项还没填完，
+     * 不可能直接上架。所以「上架」必然是个独立的后续动作。</p>
+     *
+     * <p>上架时跑完整校验（{@code draft=false}）：草稿允许字段不全，但一旦要
+     * 对顾客可见，该类型的必填项必须齐 —— 否则小程序会拿到没有库存/没有有效期
+     * 的商品，下单流程直接崩。下架反过来不校验：已经有问题的商品必须允许随时
+     * 撤下来，如果下架也要求字段齐全，就会出现「烂数据商品下不掉」的死锁。</p>
+     *
+     * @param product 只需 productId + status（0 上架 / 1 下架）
+     */
+    @PreAuthorize("@ss.hasPermi('biz:product:edit')")
+    @Log(title = "商品", businessType = BusinessType.UPDATE)
+    @PutMapping("/status")
+    public AjaxResult changeStatus(@RequestBody Product product)
+    {
+        if (product == null || product.getProductId() == null)
+        {
+            return AjaxResult.error("商品ID不能为空");
+        }
+        String status = product.getStatus();
+        if (!STATUS_ON.equals(status) && !STATUS_OFF.equals(status))
+        {
+            return AjaxResult.error("status 必须是 0（上架）或 1（下架）");
+        }
+        Product origin = productService.selectProductByProductId(product.getProductId());
+        if (origin == null)
+        {
+            return AjaxResult.error("商品不存在");
+        }
+        TenantFilterHelper.assertDataScope(origin.getMerchantId());
+
+        origin.setStatus(status);
+        if (STATUS_ON.equals(status))
+        {
+            // 上架要对顾客可见，必填项必须齐；报错信息由 ProductValidator 指明缺哪个字段
+            ProductValidator.validate(origin, false);
+            if (com.ruoyi.common.utils.StringUtils.isEmpty(origin.getStoreIds()))
+            {
+                return AjaxResult.error("上架前请先选择适用门店，否则顾客在任何门店都看不到该商品");
+            }
+        }
+        return toAjax(productService.updateProduct(origin));
+    }
+
     /** 下架态（含未指定）视为草稿：小程序端只查 status='0'，草稿不会暴露给用户 */
     private static boolean isDraft(Product product)
     {

@@ -345,8 +345,27 @@
         </el-tabs>
 
         <div class="dyl-step2-footer">
-          <el-button type="primary" size="medium" :loading="saving" @click="saveAll">保存全部</el-button>
-          <el-button @click="goBack">取消</el-button>
+          <span class="dyl-status-hint">
+            当前状态：
+            <el-tag :type="form.status === '0' ? 'success' : 'danger'" size="small">
+              {{ form.status === '0' ? '已上架' : '未上架（草稿）' }}
+            </el-tag>
+            <span v-if="form.status !== '0'" class="dyl-tip" style="margin-left:8px">
+              草稿不会展示给顾客，填完必填项后点「保存并上架」
+            </span>
+          </span>
+          <div>
+            <el-button type="primary" size="medium" :loading="saving" @click="saveAll">保存草稿</el-button>
+            <el-button
+              v-if="form.status !== '0'"
+              type="success"
+              size="medium"
+              :loading="publishing"
+              @click="saveAndPublish"
+            >保存并上架</el-button>
+            <el-button v-else size="medium" :loading="publishing" @click="unpublish">下架</el-button>
+            <el-button @click="goBack">取消</el-button>
+          </div>
         </div>
       </el-card>
     </div>
@@ -469,7 +488,7 @@
 
 <script>
 import { treeCategory } from '@/api/biz/category'
-import { addProduct, updateProduct, getProduct } from '@/api/biz/product'
+import { addProduct, updateProduct, getProduct, changeProductStatus } from '@/api/biz/product'
 import { selectProductTypeList } from '@/api/biz/productType'
 import { listMerchant } from '@/api/biz/merchant'
 import { listGroups, addGroup, delGroup, addSubitem, delSubitem, listSubitemNameCandidates } from '@/api/biz/productSubitem'
@@ -496,6 +515,7 @@ export default {
       activeTab: 'basicG',
       saving: false,
       // ===== 子品/搭配 =====
+      publishing: false,
       comboDrawer: false,
       savingCombo: false,
       subitemGroups: [],
@@ -772,6 +792,44 @@ export default {
         this.$modal.msgError((e && (e.msg || e.message)) || '保存失败')
       }).finally(() => { this.saving = false })
     },
+    /**
+     * 保存并上架。
+     *
+     * 新建商品一律先落草稿（下架态）—— 第 1 步只填品类/类型/名称就要落库拿
+     * productId，那时必填项还没填完，不可能直接上架。所以上架是个独立动作，
+     * 这里把「保存 + 上架」串起来，避免用户填完了还得回列表再点一次上架。
+     *
+     * 先 saveProduct 落当前填写内容，再单独调 status 端点上架：
+     * 上架端点会跑完整必填校验，缺字段会明确返回缺哪一项，用户留在本页即可补。
+     */
+    saveAndPublish() {
+      if (!this.form.productId) {
+        this.$modal.msgError('请先完成基础信息')
+        return
+      }
+      this.publishing = true
+      this.saveProduct().then(() => {
+        return changeProductStatus(this.form.productId, '0')
+      }).then(() => {
+        this.$set(this.form, 'status', '0')
+        this.$modal.msgSuccess('已上架，顾客现在可以在小程序看到该商品')
+        this.goBack()
+      }).catch(e => {
+        // 上架校验失败时不跳走，让用户就地补字段
+        this.$modal.msgError((e && (e.msg || e.message)) || '上架失败')
+      }).finally(() => { this.publishing = false })
+    },
+    /** 下架：不跑必填校验，已经有问题的商品必须允许随时撤下来 */
+    unpublish() {
+      if (!this.form.productId) return
+      this.publishing = true
+      changeProductStatus(this.form.productId, '1').then(() => {
+        this.$set(this.form, 'status', '1')
+        this.$modal.msgSuccess('已下架，顾客将不再看到该商品')
+      }).catch(e => {
+        this.$modal.msgError((e && (e.msg || e.message)) || '下架失败')
+      }).finally(() => { this.publishing = false })
+    },
     // ===== 商品搭配 =====
     loadSubitems() {
       if (!this.form.productId) return
@@ -853,7 +911,8 @@ export default {
 
 .dyl-tip { color: #999; font-size: 12px; margin-top: 4px; }
 .dyl-tip-inline { color: #999; font-size: 12px; margin-left: 12px; }
-.dyl-step2-footer { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,.04); z-index: 100; text-align: right; }
+.dyl-step2-footer { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,.04); z-index: 100; display: flex; align-items: center; justify-content: space-between; }
+.dyl-status-hint { font-size: 13px; color: #606266; }
 .dyl-step2-footer .el-button + .el-button { margin-left: 8px; }
 .dyl-type-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-height: 500px; overflow-y: auto; }
 .dyl-type-item { position: relative; padding: 16px; border: 1px solid #f0f0f0; border-radius: 8px; cursor: pointer; transition: all .2s; }
