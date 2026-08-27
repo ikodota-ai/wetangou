@@ -73,10 +73,14 @@
           <text class="row-label">收款方式 <text class="readonly-tag">不可编辑</text></text>
           <text class="readonly-value">总部统一收款</text>
         </view>
-        <view wx:for="{{sectionMerchant}}" wx:key="key" class="row" bindtap="onPickStoreProxy" data-key="{{item.key}}">
-          <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
+        <!-- 适用门店：多选。原先是单选（storeIds 只塞一个 storeId），
+             连锁商户的同一个套餐在第 2 家门店就没法卖。 -->
+        <view class="row" bindtap="onOpenStoreSheet">
+          <view class="row-label"><text class="required">*</text> <text>适用门店</text></view>
           <view class="row-value">
-            <text class="{{form[item.key]  ? 'value' : 'placeholder'}}">{{storeOptions[storeIdx].label || '请选择'}}</text>
+            <text class="{{form.storeIdList.length ? 'value' : 'placeholder'}}">
+              {{form.storeIdList.length ? ('已选 ' + form.storeIdList.length + ' 家') : '请选择'}}
+            </text>
             <text class="arrow">›</text>
           </view>
         </view>
@@ -112,7 +116,7 @@
           </view>
 
           <!-- digit/number input -->
-          <view wx:elif="{{item.type === 'digit' || item.type === 'number'}}" class="row" bindtap="onTapNumberField" data-key="{{item.key}}">
+          <view wx:elif="{{item.type === 'digit' || item.type === 'number'}}" class="row">
             <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value with-input">
               <text wx:if="{{item.prefix}}" class="ipt-prefix">{{item.prefix}}</text>
@@ -127,7 +131,7 @@
           </view>
 
           <!-- period picker -->
-          <view wx:elif="{{item.type === 'period-picker'}}" class="row" bindtap="onTapPeriodField" data-key="{{item.key}}">
+          <view wx:elif="{{item.type === 'period-picker'}}" class="row">
             <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value">
               <text class="placeholder">请选择</text>
@@ -143,7 +147,7 @@
       <view class="card">
         <view class="card-title">售卖信息</view>
         <view wx:for="{{sectionSale}}" wx:key="key">
-          <view wx:if="{{item.type === 'number'}}" class="row" bindtap="onTapNumberField" data-key="{{item.key}}">
+          <view wx:if="{{item.type === 'number'}}" class="row">
             <view class="row-label"><block wx:if="{{item.required}}"><text class="required">*</text> </block><text>{{item.label}}</text></view>
             <view class="row-value with-input">
               <input class="ipt-inline"
@@ -156,18 +160,27 @@
             </view>
           </view>
         </view>
-        <view class="rule-row" bindtap="onTapDateField" data-key="saleDate">
-          <view class="row-label"><text class="required">*</text> <text>商品售卖日期</text></view>
+        <!-- 投放渠道：从 biz_sale_channel 字典拉，按分组展示 + 每条带投放规则说明 -->
+        <view class="rule-row" bindtap="onOpenChannelSheet">
+          <view class="row-label"><text>投放渠道</text></view>
           <view class="row-value">
-            <text class="placeholder">不限时间</text>
+            <text class="{{form.saleChannels.length ? 'value' : 'placeholder'}}">{{channelSummary || '未选择'}}</text>
             <text class="arrow">›</text>
           </view>
         </view>
-        <view class="rule-row" bindtap="onTapRuleField" data-key="refundPolicy">
+        <view class="row">
+          <text class="row-label">职人带货</text>
+          <switch checked="{{form.staffPromote === 1}}" data-key="staffPromote"
+                  bindchange="onSwitch" color="#1677FF" />
+        </view>
+        <view class="row-tip">开启后，允许门店职人在自己的橱窗里带货本商品</view>
+        <!-- 售后政策：原先绑的 onTapRuleField 在 js 里根本不存在，点了没反应 -->
+        <view class="row column">
           <text class="row-label">售后政策</text>
-          <view class="row-value">
-            <text class="placeholder">请输入</text>
-            <text class="arrow">›</text>
+          <view class="opt-group">
+            <view class="opt {{form.refundPolicy === 'ANYTIME' ? 'on' : ''}}" data-code="ANYTIME" bindtap="onPickRefundPolicy">支持随时退</view>
+            <view class="opt {{form.refundPolicy === 'BEFORE_EXPIRE' ? 'on' : ''}}" data-code="BEFORE_EXPIRE" bindtap="onPickRefundPolicy">仅过期前可退</view>
+            <view class="opt {{form.refundPolicy === 'NONE' ? 'on' : ''}}" data-code="NONE" bindtap="onPickRefundPolicy">不可退</view>
           </view>
         </view>
       </view>
@@ -181,8 +194,25 @@
           <view class="row-label"><text class="required">*</text> <text>顾客可消费日期</text></view>
           <view class="row-value">
             <text>自购买次日起 {{form.validityDays || 360}} 天，购买当天默认可用</text>
-            <text class="link">编辑 ›</text>
           </view>
+        </view>
+        <!-- 券码类型：与后台一致的 MERCHANT/PLATFORM（后台原先写的 DOUYIN 是照抄抖音来客的） -->
+        <view class="row column">
+          <text class="row-label">券码类型</text>
+          <view class="opt-group">
+            <view class="opt {{form.codeType === 'MERCHANT' ? 'on' : ''}}" data-code="MERCHANT" bindtap="onPickCodeType">商家券</view>
+            <view class="opt {{form.codeType === 'PLATFORM' ? 'on' : ''}}" data-code="PLATFORM" bindtap="onPickCodeType">平台券</view>
+          </view>
+          <text class="row-tip">商家券由本商户自行核销；平台券由平台统一发码</text>
+        </view>
+        <view class="row">
+          <text class="row-label">可与店内优惠同享</text>
+          <switch checked="{{form.mutexWithStorePromotion === 0}}" bindchange="onToggleMutex" color="#1677FF" />
+        </view>
+        <view class="row column">
+          <text class="row-label">额外费用说明</text>
+          <input class="row-input" maxlength="200" placeholder="如需另付服务费/餐位费，请在此说明"
+                 value="{{form.extraFeeDesc}}" data-key="extraFeeDesc" bindinput="onField" />
         </view>
         <view wx:for="{{sectionTrade}}" wx:key="key">
           <view wx:if="{{item.type === 'number'}}" class="row">
@@ -227,7 +257,7 @@
       <view class="btn-preview" bindtap="onPreview">预览</view>
       <view class="btn-submit {{!canSubmit || submitting ? 'disabled' : ''}}"
             bindtap="onSubmit">
-        {{submitting ? '保存中…' : '提交审核'}}
+        {{submitting ? '保存中…' : (isEdit ? '保存修改' : '保存为草稿')}}
       </view>
     </view>
   </block>
@@ -273,6 +303,58 @@
       </view>
       <view class="sheet-foot">
         <view class="sheet-btn" bindtap="onCloseTypeSheet">确认</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 弹窗: 适用门店（多选） ============ -->
+  <view wx:if="{{storeSheet}}" class="sheet-mask" bindtap="onCloseStoreSheet">
+    <view class="sheet" catchtap="">
+      <view class="sheet-head">
+        <text class="sheet-title">适用门店</text>
+        <text class="sheet-close" bindtap="onCloseStoreSheet">×</text>
+      </view>
+      <view class="sheet-body">
+        <view class="sheet-tip">可多选。只有勾选的门店能核销本商品</view>
+        <view wx:for="{{storePickList}}" wx:key="id"
+              class="sheet-item pick"
+              data-id="{{item.id}}"
+              bindtap="onToggleStore">
+          <text>{{item.label}}</text>
+          <text class="pick-mark {{item.checked ? 'on' : ''}}">{{item.checked ? '✓' : ''}}</text>
+        </view>
+      </view>
+      <view class="sheet-foot">
+        <view class="sheet-btn" bindtap="onCloseStoreSheet">确认（已选 {{form.storeIdList.length}} 家）</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 弹窗: 投放渠道（分组多选） ============ -->
+  <view wx:if="{{channelSheet}}" class="sheet-mask" bindtap="onCloseChannelSheet">
+    <view class="sheet" catchtap="">
+      <view class="sheet-head">
+        <text class="sheet-title">投放渠道</text>
+        <text class="sheet-close" bindtap="onCloseChannelSheet">×</text>
+      </view>
+      <view class="sheet-body">
+        <view wx:if="{{!channelGroups.length}}" class="sheet-tip">渠道字典暂不可用，保存后按平台默认渠道投放</view>
+        <view wx:for="{{channelGroups}}" wx:key="name" class="ch-group">
+          <view class="ch-group-title">{{item.label}}</view>
+          <view wx:for="{{item.items}}" wx:for-item="ch" wx:key="channelCode"
+                class="sheet-item pick"
+                data-code="{{ch.channelCode}}"
+                bindtap="onToggleChannel">
+            <view class="ch-text">
+              <text>{{ch.channelName}}</text>
+              <text wx:if="{{ch.channelDesc}}" class="ch-desc">{{ch.channelDesc}}</text>
+            </view>
+            <text class="pick-mark {{ch.checked ? 'on' : ''}}">{{ch.checked ? '✓' : ''}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="sheet-foot">
+        <view class="sheet-btn" bindtap="onCloseChannelSheet">确认</view>
       </view>
     </view>
   </view>

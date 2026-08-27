@@ -17,13 +17,15 @@
     </view>
   </view>
 
-  <!-- 状态 Tab（横向 scroll） -->
+  <!-- 状态 Tab。原先照抄抖音来客摆了「审核中/待商家审核/审核驳回」3 个 tab，
+       但本系统 biz_product.status 只有 0 上架 / 1 下架，没有审核流：
+       点这 3 个 tab 时 status 传空串，后端返回的是「全部商品」，
+       商家会以为自己有一堆商品卡在审核中。这里按真实状态收成 3 个。
+       另外原先只有 idx=0 写了 active 判断，切到别的 tab 高亮不动。 -->
   <scroll-view class="status-bar" scroll-x="true" enhanced show-scrollbar="{{false}}">
-    <view class="status-tab {{statusTab === 0 ? 'active' : ''}}" bindtap="onStatusTab" data-idx="0">已上架 <text class="cnt">{{counts.onShelf}}</text></view>
-    <view class="status-tab" bindtap="onStatusTab" data-idx="1">审核中 <text class="cnt">0</text></view>
-    <view class="status-tab" bindtap="onStatusTab" data-idx="2">待商家审核 <text class="cnt">0</text></view>
-    <view class="status-tab" bindtap="onStatusTab" data-idx="3">审核驳回 <text class="cnt">0</text></view>
-    <view class="status-tab" bindtap="onStatusTab" data-idx="4">已下架 <text class="cnt">{{counts.offShelf}}</text></view>
+    <view class="status-tab {{statusTab === 0 ? 'active' : ''}}" bindtap="onStatusTab" data-idx="0">全部 <text class="cnt">{{counts.total}}</text></view>
+    <view class="status-tab {{statusTab === 1 ? 'active' : ''}}" bindtap="onStatusTab" data-idx="1">已上架 <text class="cnt">{{counts.onShelf}}</text></view>
+    <view class="status-tab {{statusTab === 2 ? 'active' : ''}}" bindtap="onStatusTab" data-idx="2">未上架 <text class="cnt">{{counts.offShelf}}</text></view>
   </scroll-view>
 
   <!-- 工具栏 -->
@@ -73,7 +75,13 @@
       <view class="item-bot">
         <text class="more">更多</text>
         <view class="ops">
-          <view class="op" bindtap="onEditTime" data-id="{{item.productId}}">改时间</view>
+          <!-- 上下架：商家端新建的商品落草稿（status=1），必须有上架入口，
+               否则商家建完在小程序里永远上不了架、只能去 PC 后台 -->
+          <view class="op {{item.status === '0' ? '' : 'primary'}}"
+                bindtap="onToggleShelf"
+                data-id="{{item.productId}}"
+                data-status="{{item.status}}"
+                data-name="{{item.productName}}">{{item.status === '0' ? '下架' : '上架'}}</view>
           <view class="op" bindtap="onEditStock" data-id="{{item.productId}}">改库存</view>
           <view class="op primary" bindtap="onEdit" data-id="{{item.productId}}">编辑</view>
         </view>

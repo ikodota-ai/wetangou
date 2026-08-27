@@ -38,6 +38,11 @@ import com.ruoyi.common.utils.image.ImageUrlUtils;
 @RequestMapping("/api/product")
 public class ApiProductController
 {
+    /** 上架 */
+    private static final String STATUS_ON = "0";
+    /** 下架 / 草稿 */
+    private static final String STATUS_OFF = "1";
+
     @Autowired
     private IProductService productService;
     @Autowired
@@ -48,6 +53,9 @@ public class ApiProductController
 
     @Autowired
     private IProductSubitemGroupService subitemGroupService;
+
+    @Autowired
+    private com.ruoyi.biz.service.ISaleChannelService channelService;
 
     /**
      * 商品列表（按商户 / 门店 / 分类 / 类型筛选，仅上架）
@@ -148,31 +156,28 @@ public class ApiProductController
         if (body.getProductName() == null || body.getProductName().trim().isEmpty()) {
             throw new ServiceException("商品名称不能为空");
         }
-        if (body.getPrice() == null) {
-            throw new ServiceException("售价不能为空");
-        }
-        // 走通用类型必填校验（GROUPON/VOUCHER/COMBO 等）
-        ProductValidator.validate(body);
-        // 类型特定必填
-        if (("TIMECARD".equals(tc) || "HUIXIANG_CARD".equals(tc)) && (body.getTotalTimes() == null || body.getTotalTimes() <= 0)) {
-            throw new ServiceException(tc + " 必须填写总次数");
-        }
-        if ("PERIOD_CARD".equals(tc)) {
-            if (body.getPeriodType() == null || body.getPeriodType().trim().isEmpty()) {
-                throw new ServiceException("周期卡必须选择周期类型");
-            }
-            if (body.getPeriodCount() == null || body.getPeriodCount() <= 0) {
-                throw new ServiceException("周期卡必须填写周期数");
-            }
-        }
-        // 默认值兜底
+        // 默认值兜底。新建一律按草稿（下架）收 —— 与后台 admin 端 ProductController.add 一致。
         if (body.getProductType() == null) body.setProductType("0");
-        if (body.getStatus() == null) body.setStatus("0");
+        if (body.getStatus() == null) body.setStatus(STATUS_OFF);
         if (body.getDelFlag() == null) body.setDelFlag("0");
         if (body.getSales() == null) body.setSales(0L);
         if (body.getStock() == null) body.setStock(0L);
         if (body.getSort() == null) body.setSort(0);
         if (body.getCreateBy() == null) body.setCreateBy("merchant_" + me.getMemberId());
+
+        // 草稿只校验基础字段；上架态才跑该类型的完整必填。
+        //
+        // 原先这里无条件 ProductValidator.validate(body) 跑完整校验，跟商家端
+        // 「先存草稿、之后补齐再上架」的流程是矛盾的：商家在手机上刚填完名称和价格
+        // 点「保存为草稿」，直接被「GROUPON 需填库存 stock」顶回来，草稿一条都存不下。
+        // 后台 admin 端一直是 validate(product, isDraft(product))，只有商家端这条链路
+        // 卡着完整校验 —— 而商品维护的主场景恰恰在商家端。
+        // 上架时的完整校验由 toggleStatus 负责，顾客可见性不会因此放松。
+        boolean draft = !STATUS_ON.equals(body.getStatus());
+        ProductValidator.validate(body, draft);
+        if (!draft) {
+            assertTypeSpecificRequired(tc, body);
+        }
 
         int rows = productService.insertProduct(body);
         if (rows <= 0) {
@@ -189,6 +194,12 @@ public class ApiProductController
 
     /**
      * 商家端：编辑商品（小程序端搭配保存后回填 totalValue / subitemPickRuleJson 等）
+     *
+     * <p>校验对象必须是「改完之后的那一行」而不是请求体本身：updateProduct 是逐字段
+     * 判 null 的局部更新，请求体没带的字段在库里保持原值。原先这里一个校验都没有，
+     * 商家在手机上把一个已上架商品的售价改成 0、库存改成 0 都能存下去 ——
+     * 商品仍对顾客可见，但点进详情下单必然失败。admin 端一直是 merge + validate，
+     * 只有商家端这条链路裸奔。</p>
      */
     @LoginRequired
     @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
@@ -210,38 +221,70 @@ public class ApiProductController
             throw new ServiceException("无权编辑该商品");
         }
         body.setMerchantId(me.getMerchantId());
+        // 合并后仍是下架态 → 当草稿改；改完是上架态 → 必须补齐该类型全部必填项。
+        // 单独再查一次而不复用 exist：mergeOntoOrigin 会把请求体的值写进传入对象，
+        // 复用 exist 会让上面刚做完归属判定的那份数据被改脏。
+        Product merged = ProductValidator.mergeOntoOrigin(
+                productService.selectProductByProductId(body.getProductId()), body);
+        boolean draft = ProductValidator.isDraft(merged);
+        ProductValidator.validate(merged, draft);
+        if (!draft) {
+            assertTypeSpecificRequired(merged.getTypeCode(), merged);
+        }
         int rows = productService.updateProduct(body);
         if (rows > 0) saveExtByTypeCode(body);
         return rows > 0 ? AjaxResult.success() : AjaxResult.error("保存失败");
     }
 
     /**
-     * 按 typeCode 分流保存到 biz_product_ext
+     * 按 typeCode 分流保存到 biz_product_ext。
+     *
+     * <p>这里以请求体带上来的 {@code body.getExt()} 为基础，再补类型相关的默认值 ——
+     * 原先的写法是 {@code new ProductExt()} 从零构造，直接把商家端提交的 ext
+     * 整个丢掉：小程序传了投放渠道 / 券码类型 / 消费时段也一个都存不进去。
+     * 后台 admin 端走的是 ProductServiceImpl.saveExt（会用 body 的 ext），
+     * 只有小程序这条链路漏了，属于「补了后台忘了小程序」的典型。</p>
+     *
+     * <p>补默认值都用「原值为 null 才补」，避免把商家显式选的值覆盖成默认。</p>
      */
     private void saveExtByTypeCode(Product body) {
         if (body == null || body.getProductId() == null) return;
-        ProductExt ext = new ProductExt();
+        ProductExt ext = body.getExt() != null ? body.getExt() : new ProductExt();
         ext.setProductId(body.getProductId());
-        // 公共
-        ext.setDailyUseLimit(0);
-        ext.setRefundRuleType("ANYTIME");
+        // 公共默认值：只在商家端没传时兜底
+        if (ext.getDailyUseLimit() == null) ext.setDailyUseLimit(0);
+        if (ext.getRefundRuleType() == null) ext.setRefundRuleType("ANYTIME");
+        if (ext.getCodeType() == null) ext.setCodeType("MERCHANT");
+        if (ext.getStaffPromote() == null) ext.setStaffPromote(0);
+        // 投放渠道：商家端没传就套平台字典的默认勾选，
+        // 否则这批商品的 sale_channels 是空的，等顾客端真按渠道过滤时会整批消失
+        if (ext.getSaleChannels() == null || ext.getSaleChannels().trim().isEmpty()) {
+            ext.setSaleChannels(channelService.defaultChannelCodes());
+        }
         String tc = body.getTypeCode();
-        if (tc == null) return;
-        if ("VOUCHER".equals(tc)) {
-            ext.setVoucherAutoName(1);
-            ext.setVoucherMinConsume(body.getMinConsume());
-        } else if ("COMBO".equals(tc)) {
-            ext.setComboTotalValue(body.getTotalValue());
-            ext.setComboSaleType("LIMIT");
-            ext.setComboAutoExtendDays(30);
-        } else if ("GROUPON".equals(tc)) {
-            ext.setGrouponPickRule("ALL");
+        if (tc != null) {
+            if ("VOUCHER".equals(tc)) {
+                if (ext.getVoucherAutoName() == null) ext.setVoucherAutoName(1);
+                if (ext.getVoucherMinConsume() == null) ext.setVoucherMinConsume(body.getMinConsume());
+            } else if ("COMBO".equals(tc)) {
+                if (ext.getComboTotalValue() == null) ext.setComboTotalValue(body.getTotalValue());
+                if (ext.getComboSaleType() == null) ext.setComboSaleType("LIMIT");
+                if (ext.getComboAutoExtendDays() == null) ext.setComboAutoExtendDays(30);
+            } else if ("GROUPON".equals(tc)) {
+                if (ext.getGrouponPickRule() == null) ext.setGrouponPickRule("ALL");
+            }
         }
         extService.save(ext);
     }
 
     /**
      * 商家端：商品上下架
+     *
+     * <p>上架前必须跑完整校验：商家端建的商品现在默认落草稿（status=1），
+     * 字段不一定填齐就会走到这里。原先这里只校验了 status 取值和商户归属，
+     * 缺 stock / validityDays / maxPerOrder 也能直接上架 —— 商品对顾客可见了，
+     * 但点进去下不了单。后台 admin 端的 changeStatus 一直是跑
+     * ProductValidator + storeIds 校验的，只有小程序这条链路漏了。</p>
      */
     @LoginRequired
     @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
@@ -265,11 +308,43 @@ public class ApiProductController
         if (exist.getMerchantId() == null || !exist.getMerchantId().equals(me.getMerchantId())) {
             throw new ServiceException("无权操作该商品");
         }
+        if ("0".equals(body.getStatus())) {
+            ProductValidator.validate(exist);
+            assertTypeSpecificRequired(exist.getTypeCode(), exist);
+            if (exist.getStoreIds() == null || exist.getStoreIds().trim().isEmpty()) {
+                throw new ServiceException("上架前请先选择适用门店，否则顾客在任何门店都看不到该商品");
+            }
+        }
         exist.setStatus(body.getStatus());
         int rows = productService.updateProduct(exist);
         return rows > 0 ? AjaxResult.success() : AjaxResult.error("操作失败");
     }
 
+    /**
+     * ProductValidator 之外、商家端额外要求的类型必填。
+     *
+     * <p>抽成方法是为了让「新建时直接上架」和「草稿转上架」两条入口用同一套规则 ——
+     * 原先这段只写在 add 里，从 status 端点上架完全不查，同一个商品走不同入口
+     * 得到的可见性标准不一样。</p>
+     */
+    private void assertTypeSpecificRequired(String typeCode, Product p) {
+        String tc = typeCode == null ? "" : typeCode.trim();
+        if (p.getPrice() == null) {
+            throw new ServiceException("售价不能为空");
+        }
+        if (("TIMECARD".equals(tc) || "HUIXIANG_CARD".equals(tc))
+                && (p.getTotalTimes() == null || p.getTotalTimes() <= 0)) {
+            throw new ServiceException(tc + " 必须填写总次数");
+        }
+        if ("PERIOD_CARD".equals(tc)) {
+            if (p.getPeriodType() == null || p.getPeriodType().trim().isEmpty()) {
+                throw new ServiceException("周期卡必须选择周期类型");
+            }
+            if (p.getPeriodCount() == null || p.getPeriodCount() <= 0) {
+                throw new ServiceException("周期卡必须填写周期数");
+            }
+        }
+    }
 
     /**
      * 把商品列表的图片字段（cover/images）转成绝对 URL，

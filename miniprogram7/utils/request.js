@@ -191,6 +191,8 @@ const api = {
   categoryList: (params) => request('/api/product/category/list', { data: params }),
   // 商家端-创建商品（P1-2）
   productTypeAppCreatable: () => request('/biz/productType/appCreatable'),
+  // 投放渠道字典（商家端建品勾选用；平台级配置，商户只读）
+  saleChannelEnabled: () => request('/biz/saleChannel/enabled'),
   productAdd: (data) => request('/api/product/add', { method: 'POST', data }),
   // 商品编辑（小程序建品后回填 totalValue / ext.comboItemsJson 等）
   productUpdate: (data) => request('/api/product', { method: 'PUT', data }),

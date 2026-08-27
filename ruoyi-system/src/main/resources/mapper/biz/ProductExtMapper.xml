@@ -16,6 +16,15 @@
         <result property="grouponActualCount"   column="groupon_actual_count"   />
         <result property="dailyUseLimit"        column="daily_use_limit"        />
         <result property="refundRuleType"       column="refund_rule_type"       />
+        <result property="saleChannels" column="sale_channels" />
+        <result property="staffPromote" column="staff_promote" />
+        <result property="codeType" column="code_type" />
+        <result property="consumeStartDate" column="consume_start_date" />
+        <result property="consumeEndDate" column="consume_end_date" />
+        <result property="excludeDates" column="exclude_dates" />
+        <result property="dailyTimeStart" column="daily_time_start" />
+        <result property="dailyTimeEnd" column="daily_time_end" />
+        <result property="voucherRules" column="voucher_rules" />
         <result property="createTime"           column="create_time"           />
         <result property="updateTime"           column="update_time"           />
     </resultMap>
@@ -39,6 +48,15 @@
             <if test="grouponActualCount != null">groupon_actual_count,</if>
             <if test="dailyUseLimit != null">daily_use_limit,</if>
             <if test="refundRuleType != null">refund_rule_type,</if>
+            <if test="saleChannels != null">sale_channels,</if>
+            <if test="staffPromote != null">staff_promote,</if>
+            <if test="codeType != null">code_type,</if>
+            <if test="consumeStartDate != null">consume_start_date,</if>
+            <if test="consumeEndDate != null">consume_end_date,</if>
+            <if test="excludeDates != null">exclude_dates,</if>
+            <if test="dailyTimeStart != null">daily_time_start,</if>
+            <if test="dailyTimeEnd != null">daily_time_end,</if>
+            <if test="voucherRules != null">voucher_rules,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="productId != null">#{productId},</if>
@@ -55,6 +73,15 @@
             <if test="grouponActualCount != null">#{grouponActualCount},</if>
             <if test="dailyUseLimit != null">#{dailyUseLimit},</if>
             <if test="refundRuleType != null">#{refundRuleType},</if>
+            <if test="saleChannels != null">#{saleChannels},</if>
+            <if test="staffPromote != null">#{staffPromote},</if>
+            <if test="codeType != null">#{codeType},</if>
+            <if test="consumeStartDate != null">#{consumeStartDate},</if>
+            <if test="consumeEndDate != null">#{consumeEndDate},</if>
+            <if test="excludeDates != null">#{excludeDates},</if>
+            <if test="dailyTimeStart != null">#{dailyTimeStart},</if>
+            <if test="dailyTimeEnd != null">#{dailyTimeEnd},</if>
+            <if test="voucherRules != null">#{voucherRules},</if>
         </trim>
     </insert>
     <update id="update" parameterType="ProductExt">
@@ -73,6 +100,15 @@
             <if test="grouponActualCount != null">groupon_actual_count = #{grouponActualCount},</if>
             <if test="dailyUseLimit != null">daily_use_limit = #{dailyUseLimit},</if>
             <if test="refundRuleType != null">refund_rule_type = #{refundRuleType},</if>
+            <if test="saleChannels != null">sale_channels = #{saleChannels},</if>
+            <if test="staffPromote != null">staff_promote = #{staffPromote},</if>
+            <if test="codeType != null">code_type = #{codeType},</if>
+            <if test="consumeStartDate != null">consume_start_date = #{consumeStartDate},</if>
+            <if test="consumeEndDate != null">consume_end_date = #{consumeEndDate},</if>
+            <if test="excludeDates != null">exclude_dates = #{excludeDates},</if>
+            <if test="dailyTimeStart != null">daily_time_start = #{dailyTimeStart},</if>
+            <if test="dailyTimeEnd != null">daily_time_end = #{dailyTimeEnd},</if>
+            <if test="voucherRules != null">voucher_rules = #{voucherRules},</if>
         </set>
         where product_id = #{productId}
     </update>

@@ -74,6 +74,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <result property="grouponActualCount" column="groupon_actual_count" />
             <result property="dailyUseLimit"      column="daily_use_limit"      />
             <result property="refundRuleType"     column="refund_rule_type"     />
+            <result property="saleChannels" column="sale_channels" />
+            <result property="staffPromote" column="staff_promote" />
+            <result property="codeType" column="code_type" />
+            <result property="consumeStartDate" column="consume_start_date" />
+            <result property="consumeEndDate" column="consume_end_date" />
+            <result property="excludeDates" column="exclude_dates" />
+            <result property="dailyTimeStart" column="daily_time_start" />
+            <result property="dailyTimeEnd" column="daily_time_end" />
+            <result property="voucherRules" column="voucher_rules" />
         </association>
     </resultMap>
 
@@ -103,7 +112,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                e.groupon_pick_rule    as ext_groupon_pick_rule,
                e.groupon_actual_count as ext_groupon_actual_count,
                e.daily_use_limit      as ext_daily_use_limit,
-               e.refund_rule_type     as ext_refund_rule_type
+               e.refund_rule_type     as ext_refund_rule_type,
+               e.sale_channels as ext_sale_channels,
+               e.staff_promote as ext_staff_promote,
+               e.code_type as ext_code_type,
+               e.consume_start_date as ext_consume_start_date,
+               e.consume_end_date as ext_consume_end_date,
+               e.exclude_dates as ext_exclude_dates,
+               e.daily_time_start as ext_daily_time_start,
+               e.daily_time_end as ext_daily_time_end,
+               e.voucher_rules as ext_voucher_rules
         from biz_product p
         left join biz_store s on s.store_id = p.store_id
         left join biz_product_category c on c.category_id = p.category_id

@@ -2,7 +2,10 @@ package com.ruoyi.biz.util;
 
 import com.ruoyi.biz.domain.Product;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.bean.BeanUtils;
 import java.math.BigDecimal;
+import java.lang.reflect.Method;
+import java.util.List;
 
 /**
  * 商品创建/编辑时的类型必填校验
@@ -20,6 +23,74 @@ import java.math.BigDecimal;
  */
 public class ProductValidator
 {
+    /** 上架 */
+    public static final String STATUS_ON = "0";
+    /** 下架 / 草稿 */
+    public static final String STATUS_OFF = "1";
+
+    /** 非上架态一律当草稿：字段允许不全 */
+    public static boolean isDraft(Product product)
+    {
+        return product == null || !STATUS_ON.equals(product.getStatus());
+    }
+
+    /**
+     * 把局部请求体盖到数据库原值上，得到「这次更新之后库里会长什么样」。
+     *
+     * <p>为什么要反射逐属性合并：updateProduct 的 SQL 对每个字段都是
+     * {@code <if test="xxx != null">} 的局部更新，未提交的字段保留原值。
+     * 校验必须和这套持久化语义完全对齐，否则会出现两个方向的错：
+     * <ul>
+     *   <li>只改一两个字段的局部 PUT（商品搭配抽屉只提交 productId + 明细）
+     *       会因为 typeCode/productName 为 null 被判「不能为空」而存不进去，
+     *       尽管这两个字段在库里明明是好的；</li>
+     *   <li>反方向更隐蔽：status 没带时会被判成草稿，于是一个已上架商品能靠
+     *       「不带 status 的局部 PUT」把售价改成 0 绕过上架校验，
+     *       顾客侧就会看到点进去下不了单的商品。</li>
+     * </ul>
+     *
+     * <p>这段原先是 admin 端 ProductController 的 private static，小程序商家端
+     * 的 edit 端点因此复用不到，完全不做校验 —— 商家在手机上把已上架商品的
+     * 价格改成 0 是能存下去的。商品维护主场景在商家端，两端必须同一套规则，
+     * 所以下沉到这里。</p>
+     *
+     * <p>直接改 {@code origin} 不影响落库：真正写进数据库的是 incoming，
+     * origin 只是这一次请求里用来做校验的临时视图。</p>
+     */
+    public static Product mergeOntoOrigin(Product origin, Product incoming)
+    {
+        if (origin == null) return incoming;
+        if (incoming == null) return origin;
+        try
+        {
+            List<Method> setters = BeanUtils.getSetterMethods(origin);
+            for (Method getter : BeanUtils.getGetterMethods(incoming))
+            {
+                Object value = getter.invoke(incoming);
+                // null 表示「这次没提交这个字段」，保留 origin 的原值
+                if (value == null)
+                {
+                    continue;
+                }
+                for (Method setter : setters)
+                {
+                    if (BeanUtils.isMethodPropEquals(getter.getName(), setter.getName())
+                            && setter.getParameterTypes()[0].isAssignableFrom(getter.getReturnType()))
+                    {
+                        setter.invoke(origin, value);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            // 合并失败就退回请求体本身：宁可校验严一点报错，也不能静默放过非法数据
+            return incoming;
+        }
+        return origin;
+    }
+
     /**
      * 完整校验（上架用）
      */

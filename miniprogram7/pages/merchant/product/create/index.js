@@ -1,5 +1,10 @@
 /**
- * 商家端商品创建 — 抖音来客复刻
+ * 商家端商品创建 / 编辑 — 抖音来客复刻
+ *
+ * ⚠️ 本页原先只能新增，不能编辑：列表页 onEdit 会带 ?productId=xxx 跳过来，
+ * 但这里的 onLoad() 完全没读这个参数，整个文件也只有 productAdd 没有 productUpdate。
+ * 结果是商家点「编辑」打开的是一张空表单，填完保存又新建了一个重复商品 ——
+ * 是会污染数据的真实缺陷。本轮补齐编辑态（回填 + PUT + 类型锁定）。
  *
  * 第 1 页 /pick：选「商品品类」+「商品类型」（底部弹窗）
  * 第 2 页 /form：tab 切换的 5 tab 长表单
@@ -215,6 +220,9 @@ const FIELDS_BY_TYPE = {
 
 Page({
   data: {
+    // 编辑态：productId 有值就是改已有商品，走 PUT；否则 POST 新建
+    productId: null,
+    isEdit: false,
     // step: 1 = 选类型页, 2 = tab 表单页
     step: 1,
     activeTab: 0,           // 0/1/2/3/4
@@ -237,7 +245,14 @@ Page({
     storeId: null,
     storeIds: [],
     storeOptions: [{ id: 0, label: '请选择门店' }],
-    storeIdx: 0,
+    // 适用门店改多选（后台一直是多选，商家端原先只能单选，
+    // 同一个套餐在连锁的第 2 家店就没法卖）
+    storePickList: [],        // [{ id, label, checked }]
+    storeSheet: false,
+    // 投放渠道字典（平台级配置，按 channelGroup 分组展示）
+    channelGroups: [],
+    channelSheet: false,
+    channelSummary: '',
     categoryOptions: [{ id: 0, label: '不选' }],
     categoryIdx: 0,
     periodOptions: PERIOD_OPTIONS,
@@ -245,16 +260,24 @@ Page({
 
     form: {
       storeId: 0, categoryId: 0,
+      storeIdList: [],
       productName: '', subtitle: '',
       marketPrice: '', price: '', faceValue: '', minConsume: '', totalTimes: '',
       periodType: 'MONTH', periodCount: 1,
       stock: 0, limitPerUser: 0, maxPerOrder: 1, validityDays: 30,
       bookingRequired: 0, requireXiaoxin: 0,
-      notice: ''
+      notice: '',
+      // 与后台对齐的字段（原先商家端 21 个字段，后台 33 个）
+      saleChannels: [],
+      staffPromote: 0,
+      codeType: 'MERCHANT',
+      refundPolicy: 'ANYTIME',
+      collectMethod: 'PLATFORM',
+      mutexWithStorePromotion: 1,
+      extraFeeDesc: ''
     },
 
     fields: { base: [], price: [], sale: [], detail: [] },
-    sectionMerchant: [],
     sectionProduct: [],
     sectionSale: [],
     sectionTrade: [],
@@ -263,9 +286,111 @@ Page({
     submitting: false
   },
 
-  onLoad() {
+  onLoad(query) {
     this._initMerchantContext()
     this._loadCategories()
+    this._loadChannels()
+    // 列表页「编辑」带过来的 productId。原先这里没读，导致编辑变新增。
+    const pid = query && query.productId ? Number(query.productId) : null
+    if (pid) {
+      this.setData({ productId: pid, isEdit: true })
+      wx.setNavigationBarTitle({ title: '编辑商品' })
+      this._loadProduct(pid)
+    }
+  },
+
+  /**
+   * 编辑态回填。
+   *
+   * 直接跳到第 2 步：品类和类型都已经定了，不能再让商家重选 ——
+   * 换类型等于换一套必填字段和核销逻辑，已卖出的券会对不上。
+   * 所以编辑时第 1 步整个跳过，类型在 tab0 里只读展示。
+   */
+  _loadProduct(pid) {
+    wx.showLoading({ title: '加载中...', mask: true })
+    api.productDetail(pid).then(res => {
+      wx.hideLoading()
+      const p = (res && (res.data || res)) || {}
+      const ext = p.ext || {}
+      const tc = p.typeCode || 'GROUPON'
+      const item = TYPE_LIST.find(t => t.typeCode === tc)
+      const num = (v) => (v === null || v === undefined ? '' : String(v))
+
+      const form = Object.assign({}, this.data.form, {
+        storeId: p.storeId || 0,
+        storeIdList: p.storeIds ? String(p.storeIds).split(',').filter(v => v).map(Number) : (p.storeId ? [p.storeId] : []),
+        categoryId: p.categoryId || 0,
+        productName: p.productName || '',
+        subtitle: p.subtitle || '',
+        price: num(p.price),
+        marketPrice: num(p.marketPrice),
+        faceValue: num(p.faceValue),
+        minConsume: num(p.minConsume),
+        totalTimes: num(p.totalTimes),
+        periodType: p.periodType || 'MONTH',
+        periodCount: p.periodCount || 1,
+        stock: p.stock == null ? 0 : p.stock,
+        limitPerUser: p.limitPerUser == null ? 0 : p.limitPerUser,
+        maxPerOrder: p.maxPerOrder == null ? 1 : p.maxPerOrder,
+        validityDays: p.validityDays == null ? 30 : p.validityDays,
+        bookingRequired: p.bookingRequired ? 1 : 0,
+        requireXiaoxin: p.requireXiaoxin ? 1 : 0,
+        notice: p.notice || '',
+        refundPolicy: p.refundPolicy || 'ANYTIME',
+        collectMethod: p.collectMethod || 'PLATFORM',
+        mutexWithStorePromotion: p.mutexWithStorePromotion === 0 ? 0 : 1,
+        extraFeeDesc: p.extraFeeDesc || '',
+        saleChannels: ext.saleChannels ? String(ext.saleChannels).split(',').filter(v => v) : [],
+        staffPromote: ext.staffPromote ? 1 : 0,
+        codeType: ext.codeType || 'MERCHANT'
+      })
+      // 字数计数器：WXML 用 form[key + '__len']，不补的话编辑态计数全是 0
+      ;['productName', 'subtitle', 'notice'].forEach(k => { form[k + '__len'] = String(form[k] || '').length })
+
+      this.setData({
+        pickedType: tc,
+        pickedTypeName: (item && item.typeName) || tc,
+        pickedTypeDesc: TYPE_DESC[tc] || '',
+        pickedCategory: p.categoryName || '（沿用原品类）',
+        form,
+        step: 2,
+        activeTab: 0
+      })
+      this._rebuildFields()
+      this._syncStorePickList()
+      this._syncChannelSummary()
+      this._recomputeSubmit()
+    }).catch(err => {
+      wx.hideLoading()
+      wx.showModal({
+        title: '加载失败',
+        content: (err && (err.msg || err.message)) || '商品不存在或无权访问',
+        showCancel: false,
+        success: () => wx.navigateBack({ delta: 1 })
+      })
+    })
+  },
+
+  /** 拉投放渠道字典。默认勾选由服务端算，新建才套默认；编辑以商品已存的为准 */
+  _loadChannels() {
+    api.saleChannelEnabled().then(res => {
+      const list = (res && res.data) || []
+      const labels = { SELF: '自有渠道', SOCIAL: '社交分享', OFFLINE: '线下物料' }
+      const map = {}
+      const order = []
+      list.forEach(c => {
+        const g = c.channelGroup || 'OTHER'
+        if (!map[g]) { map[g] = []; order.push(g) }
+        map[g].push(c)
+      })
+      const groups = order.map(g => ({ name: g, label: labels[g] || g, items: map[g] }))
+      const patch = { channelGroups: groups }
+      if (!this.data.isEdit && !(this.data.form.saleChannels || []).length) {
+        const def = (res && res.defaultCodes) || ''
+        patch['form.saleChannels'] = def ? def.split(',').filter(v => v) : []
+      }
+      this.setData(patch, () => this._syncChannelSummary())
+    }).catch(() => { this.setData({ channelGroups: [] }) })
   },
 
   _initMerchantContext() {
@@ -280,6 +405,69 @@ Page({
       storeName: staff.storeName || '',
       storeId, storeIds, storeOptions: opts,
       'form.storeId': storeIds && storeIds.length ? storeIds[0] : 0
+    }, () => {
+      // 新建时默认勾上当前门店，省掉一次点击；编辑态由 _loadProduct 覆盖
+      if (!this.data.isEdit && storeIds && storeIds.length) {
+        this.setData({ 'form.storeIdList': [storeIds[0]] })
+      }
+      this._syncStorePickList()
+    })
+  },
+
+  /** 把 form.storeIdList 同步成弹窗要的 [{id,label,checked}] */
+  _syncStorePickList() {
+    const chosen = this.data.form.storeIdList || []
+    const list = (this.data.storeIds || []).map(id => {
+      const opt = (this.data.storeOptions || []).find(o => o.id === id)
+      return { id, label: (opt && opt.label) || ('门店' + id), checked: chosen.indexOf(id) >= 0 }
+    })
+    this.setData({ storePickList: list })
+  },
+
+  onOpenStoreSheet() {
+    if (!(this.data.storeIds || []).length) {
+      wx.showToast({ title: '当前账号未绑定门店', icon: 'none' }); return
+    }
+    this._syncStorePickList()
+    this.setData({ storeSheet: true })
+  },
+  onCloseStoreSheet() { this.setData({ storeSheet: false }) },
+
+  onToggleStore(e) {
+    const id = Number(e.currentTarget.dataset.id)
+    const cur = (this.data.form.storeIdList || []).slice()
+    const i = cur.indexOf(id)
+    if (i >= 0) cur.splice(i, 1); else cur.push(id)
+    this.setData({ 'form.storeIdList': cur }, () => {
+      this._syncStorePickList()
+      this._recomputeSubmit()
+    })
+  },
+
+  onOpenChannelSheet() { this.setData({ channelSheet: true }) },
+  onCloseChannelSheet() { this.setData({ channelSheet: false }) },
+
+  onToggleChannel(e) {
+    const code = e.currentTarget.dataset.code
+    const cur = (this.data.form.saleChannels || []).slice()
+    const i = cur.indexOf(code)
+    if (i >= 0) cur.splice(i, 1); else cur.push(code)
+    this.setData({ 'form.saleChannels': cur }, () => this._syncChannelSummary())
+  },
+
+  /** 渠道行的摘要文案 + 每个渠道的勾选态（WXML 里没法直接算 indexOf） */
+  _syncChannelSummary() {
+    const chosen = this.data.form.saleChannels || []
+    const groups = (this.data.channelGroups || []).map(g => ({
+      name: g.name,
+      label: g.label,
+      items: g.items.map(c => Object.assign({}, c, { checked: chosen.indexOf(c.channelCode) >= 0 }))
+    }))
+    const names = []
+    groups.forEach(g => g.items.forEach(c => { if (c.checked) names.push(c.channelName) }))
+    this.setData({
+      channelGroups: groups,
+      channelSummary: names.length ? names.join('、') : '未选择'
     })
   },
 
@@ -296,9 +484,8 @@ Page({
     const t = this.data.pickedType
     const all = FIELDS_BY_TYPE[t]
     if (!all) return
-    const merchant = [{ key: 'storeId', label: '适用门店', required: true, type: 'store-picker', section: 'merchant' }]
     // 应用默认值
-    ;[...all.base, ...all.price, ...all.sale, ...all.detail, ...merchant].forEach(f => {
+    ;[...all.base, ...all.price, ...all.sale, ...all.detail].forEach(f => {
       if (f.default !== undefined && (this.data.form[f.key] === '' || this.data.form[f.key] == null)) {
         this.setData({ ['form.' + f.key]: f.default })
       }
@@ -307,7 +494,6 @@ Page({
     const mark = (arr) => arr.map(f => Object.assign({}, f, { isTextarea: f.type === 'textarea' }))
     this.setData({
       fields: all,
-      sectionMerchant: mark(merchant),
       sectionProduct: mark([...all.base, ...all.price]),
       sectionSale: mark(all.sale.filter(f => f.section === 'sale')),
       sectionTrade: mark([...all.detail, ...all.sale.filter(f => f.section === 'trade')])
@@ -350,6 +536,11 @@ Page({
   },
 
   onBack() {
+    // 编辑态不允许回到第 1 步改品类/类型：换类型等于换一套必填字段和核销规则，
+    // 已卖出的券会对不上
+    if (this.data.isEdit) {
+      wx.showToast({ title: '编辑商品不能修改品类和类型', icon: 'none' }); return
+    }
     this.setData({ step: 1 })
   },
 
@@ -372,13 +563,22 @@ Page({
     const key = e.currentTarget.dataset.key
     if (e.currentTarget.dataset.disabled === 'true') return
     this.setData({ ['form.' + key]: e.detail.value ? 1 : 0 })
+    this._recomputeSubmit()
   },
 
-  onPickStore(e) {
-    const idx = Number(e.detail.value)
-    const opt = this.data.storeOptions[idx]
-    this.setData({ storeIdx: idx, 'form.storeId': opt.id })
-    this._recomputeSubmit()
+  /** 券码类型：商家券 / 平台券 */
+  onPickCodeType(e) {
+    this.setData({ 'form.codeType': e.currentTarget.dataset.code })
+  },
+
+  /** 售后政策 */
+  onPickRefundPolicy(e) {
+    this.setData({ 'form.refundPolicy': e.currentTarget.dataset.code })
+  },
+
+  /** 是否可与店内其他优惠同享（库里存的是「互斥」，取值要反过来） */
+  onToggleMutex(e) {
+    this.setData({ 'form.mutexWithStorePromotion': e.detail.value ? 0 : 1 })
   },
 
   onPickCategory(e) {
@@ -396,13 +596,14 @@ Page({
   _recomputeSubmit() {
     const f = this.data.fields
     if (!f) { this.setData({ canSubmit: false }); return }
-    const all = [...(f.base || []), ...(f.price || []), ...(f.sale || []), ...(f.detail || []),
-                 { key: 'storeId', required: true }]
+    const all = [...(f.base || []), ...(f.price || []), ...(f.sale || []), ...(f.detail || [])]
     const missing = all.filter(x => x.required).filter(x => {
       const v = this.data.form[x.key]
       return v === '' || v == null
     })
-    this.setData({ canSubmit: missing.length === 0 })
+    // 适用门店改多选后，「选了至少一家」才算填了
+    const noStore = !(this.data.form.storeIdList || []).length
+    this.setData({ canSubmit: missing.length === 0 && !noStore })
   },
 
   onPreview() {
@@ -428,10 +629,14 @@ Page({
 
   _doSubmit() {
     this.setData({ submitting: true })
+    const isEdit = this.data.isEdit
     wx.showLoading({ title: '保存中...', mask: true })
     const f = this.data.form
+    const stores = (f.storeIdList || []).length ? f.storeIdList : (f.storeId ? [f.storeId] : [])
     const body = {
-      storeIds: String(f.storeId),
+      // 适用门店：多选逗号串，与后台一致（后端 syncPrimaryStore 会取第一个当主门店，
+      // 并且 ProductServiceImpl.assertStoresBelongToMerchant 会校验都属于本商户）
+      storeIds: stores.join(','),
       categoryId: f.categoryId === 0 ? null : f.categoryId,
       typeCode: this.data.pickedType,
       productName: (f.productName || '').trim(),
@@ -450,21 +655,65 @@ Page({
       bookingRequired: f.bookingRequired ? 1 : 0,
       requireXiaoxin: f.requireXiaoxin ? 1 : 0,
       notice: (f.notice || '').trim(),
+      // 与后台对齐的字段（原先商家端不传，主表 DEFAULT 顶上，运营在后台看到的是默认值）
+      refundPolicy: f.refundPolicy || 'ANYTIME',
+      collectMethod: f.collectMethod || 'PLATFORM',
+      mutexWithStorePromotion: f.mutexWithStorePromotion === 0 ? 0 : 1,
+      extraFeeDesc: (f.extraFeeDesc || '').trim(),
       productType: this._mapProductType(this.data.pickedType),
-      status: '0', delFlag: '0', sales: 0, sort: 0
+      delFlag: '0',
+      // 落 biz_product_ext（后端 saveExtByTypeCode 会以这个为基础补类型默认值）
+      ext: {
+        saleChannels: (f.saleChannels || []).join(','),
+        staffPromote: f.staffPromote ? 1 : 0,
+        codeType: f.codeType || 'MERCHANT'
+      }
     }
-    api.productAdd(body)
-      .then(() => {
-        wx.hideLoading()
-        this.setData({ submitting: false })
-        wx.showToast({ title: '已创建', icon: 'success' })
+
+    if (isEdit) {
+      body.productId = this.data.productId
+      // 编辑不带 status：后端 admin 端的局部 PUT 语义是「null 表示这次没提交，保留原值」，
+      // 带上 status 会把商家已上架的商品意外改成草稿
+    } else {
+      // 新建落草稿（下架态），与后台一致。
+      // 原先商家端直接写 status:'0' 上架 —— 但商家端字段比后台少，
+      // 常常缺必填项就直接对顾客可见了，点进去下不了单。
+      // 现在统一走「先存草稿 → 补齐 → 上架」，上架时后端跑完整校验。
+      body.status = '1'
+      body.sales = 0
+      body.sort = 0
+    }
+
+    const req = isEdit ? api.productUpdate(body) : api.productAdd(body)
+    req.then(() => {
+      wx.hideLoading()
+      this.setData({ submitting: false })
+      if (isEdit) {
+        wx.showToast({ title: '已保存', icon: 'success' })
         setTimeout(() => wx.navigateBack({ delta: 1 }), 600)
+        return
+      }
+      wx.showModal({
+        title: '已保存为草稿',
+        content: '商品已创建但尚未上架。确认信息无误后可在商品列表中上架。',
+        confirmText: '知道了',
+        showCancel: false,
+        success: () => {
+          // 让列表页知道刚建了草稿，回去要切到「未上架」tab，
+          // 否则商家停在「已上架」tab 一条都看不到，会以为没保存成功
+          wx.setStorageSync('productDraftCreated', 1)
+          wx.navigateBack({ delta: 1 })
+        }
       })
-      .catch((err) => {
-        wx.hideLoading()
-        this.setData({ submitting: false })
-        wx.showModal({ title: '创建失败', content: (err && (err.msg || err.message)) || '未知错误', showCancel: false })
+    }).catch((err) => {
+      wx.hideLoading()
+      this.setData({ submitting: false })
+      wx.showModal({
+        title: isEdit ? '保存失败' : '创建失败',
+        content: (err && (err.msg || err.message)) || '未知错误',
+        showCancel: false
       })
+    })
   },
 
   _mapProductType(typeCode) {

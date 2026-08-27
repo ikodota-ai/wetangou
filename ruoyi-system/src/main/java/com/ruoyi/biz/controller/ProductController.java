@@ -25,8 +25,6 @@ import com.ruoyi.biz.tenant.TenantFilterHelper;
 import com.ruoyi.common.utils.TenantContextHolder;
 import com.ruoyi.common.core.domain.BaseEntity;
 import com.ruoyi.common.core.page.TableDataInfo;
-import com.ruoyi.common.utils.bean.BeanUtils;
-import java.lang.reflect.Method;
 
 /**
  * 商品Controller
@@ -235,53 +233,21 @@ public class ProductController extends BaseController
     }
 
     /**
-     * 把局部请求体盖到数据库原值上，得到「这次更新之后库里会长什么样」。
+     * 局部请求体合到库里原值上，得到「改完之后长什么样」。
      *
-     * <p>为什么要反射逐属性合并：updateProduct 的 SQL 对每个字段都是
-     * {@code <if test="xxx != null">} 的局部更新，未提交的字段保留原值。
-     * 校验必须和这套持久化语义完全对齐，否则就会出现「库里数据是好的、
-     * 但因为请求体没带这个字段而校验失败」。手写几十个字段的 if 判断迟早
-     * 会和 Product 的字段增减脱节，反射能保证两者永远一致。</p>
-     *
-     * <p>直接改 {@code origin} 不会影响落库：真正写进数据库的是 {@code incoming}，
-     * origin 只是这一次请求里用来做校验的临时视图。</p>
+     * <p>实现下沉到 {@link ProductValidator#mergeOntoOrigin}，因为小程序商家端的
+     * edit 端点也要用同一套语义 —— 原先这里是 private static，商家端复用不到，
+     * 结果那条链路完全不校验。</p>
      */
     private static Product mergeOntoOrigin(Product origin, Product incoming)
     {
-        try
-        {
-            List<Method> setters = BeanUtils.getSetterMethods(origin);
-            for (Method getter : BeanUtils.getGetterMethods(incoming))
-            {
-                Object value = getter.invoke(incoming);
-                // null 表示「这次没提交这个字段」，保留 origin 的原值
-                if (value == null)
-                {
-                    continue;
-                }
-                for (Method setter : setters)
-                {
-                    if (BeanUtils.isMethodPropEquals(getter.getName(), setter.getName())
-                            && setter.getParameterTypes()[0].isAssignableFrom(getter.getReturnType()))
-                    {
-                        setter.invoke(origin, value);
-                        break;
-                    }
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            // 合并失败就退回请求体本身：宁可校验严一点报错，也不能静默放过非法数据
-            return incoming;
-        }
-        return origin;
+        return ProductValidator.mergeOntoOrigin(origin, incoming);
     }
 
     /** 下架态（含未指定）视为草稿：小程序端只查 status='0'，草稿不会暴露给用户 */
     private static boolean isDraft(Product product)
     {
-        return !STATUS_ON.equals(product.getStatus());
+        return ProductValidator.isDraft(product);
     }
 
     /**

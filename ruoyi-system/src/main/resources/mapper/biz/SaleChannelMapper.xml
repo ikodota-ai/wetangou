@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.biz.mapper.SaleChannelMapper">
+
+    <resultMap type="SaleChannel" id="SaleChannelResult">
+        <result property="channelCode"   column="channel_code"  />
+        <result property="channelName"   column="channel_name"  />
+        <result property="channelGroup"  column="channel_group" />
+        <result property="channelDesc"   column="channel_desc"  />
+        <result property="icon"          column="icon"          />
+        <result property="sort"          column="sort"          />
+        <result property="isDefault"     column="is_default"    />
+        <result property="status"        column="status"        />
+        <result property="createTime"    column="create_time"   />
+        <result property="updateTime"    column="update_time"   />
+    </resultMap>
+
+    <sql id="selectVo">
+        select channel_code, channel_name, channel_group, channel_desc, icon,
+               sort, is_default, status, create_time, update_time
+        from biz_sale_channel
+    </sql>
+
+    <select id="selectSaleChannelList" parameterType="SaleChannel" resultMap="SaleChannelResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="channelCode != null and channelCode != ''"> and channel_code = #{channelCode}</if>
+            <if test="channelName != null and channelName != ''"> and channel_name like concat('%', #{channelName}, '%')</if>
+            <if test="channelGroup != null and channelGroup != ''"> and channel_group = #{channelGroup}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by sort asc, channel_code asc
+    </select>
+
+    <select id="selectByCode" parameterType="String" resultMap="SaleChannelResult">
+        <include refid="selectVo"/>
+        where channel_code = #{channelCode}
+    </select>
+
+    <insert id="insertSaleChannel" parameterType="SaleChannel">
+        insert into biz_sale_channel
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="channelCode != null and channelCode != ''">channel_code,</if>
+            <if test="channelName != null and channelName != ''">channel_name,</if>
+            <if test="channelGroup != null">channel_group,</if>
+            <if test="channelDesc != null">channel_desc,</if>
+            <if test="icon != null">icon,</if>
+            <if test="sort != null">sort,</if>
+            <if test="isDefault != null">is_default,</if>
+            <if test="status != null">status,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="channelCode != null and channelCode != ''">#{channelCode},</if>
+            <if test="channelName != null and channelName != ''">#{channelName},</if>
+            <if test="channelGroup != null">#{channelGroup},</if>
+            <if test="channelDesc != null">#{channelDesc},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="sort != null">#{sort},</if>
+            <if test="isDefault != null">#{isDefault},</if>
+            <if test="status != null">#{status},</if>
+        </trim>
+    </insert>
+
+    <update id="updateSaleChannel" parameterType="SaleChannel">
+        update biz_sale_channel
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="channelName != null and channelName != ''">channel_name = #{channelName},</if>
+            <if test="channelGroup != null">channel_group = #{channelGroup},</if>
+            <if test="channelDesc != null">channel_desc = #{channelDesc},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="sort != null">sort = #{sort},</if>
+            <if test="isDefault != null">is_default = #{isDefault},</if>
+            <if test="status != null">status = #{status},</if>
+        </trim>
+        where channel_code = #{channelCode}
+    </update>
+
+    <delete id="deleteByCodes" parameterType="String">
+        delete from biz_sale_channel where channel_code in
+        <foreach item="code" collection="array" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+    </delete>
+
+</mapper>

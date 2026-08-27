@@ -225,11 +225,19 @@
           <section v-if="isGroupon || isVoucher" class="dyl-sec" :ref="'sec_sale'" data-sec="sale">
             <div class="dyl-sec-title">售卖信息</div>
             <el-form :model="form" label-width="120px" size="small">
+              <!-- 投放渠道：从 biz_sale_channel 字典拉，按 channelGroup 分组 + 每条带规则说明。
+                   原先这里硬编码「抖音/今日头条/其他」，是照抄抖音来客的渠道名，
+                   与本项目（微信小程序生态）不符；而且该字段后端无属性，勾了直接丢。 -->
               <el-form-item label="投放渠道">
+                <div v-if="!channelGroups.length" class="dyl-tip">渠道字典为空，请联系平台管理员在「投放渠道」中配置</div>
                 <el-checkbox-group v-model="form.saleChannels">
-                  <el-checkbox label="DOUPIN">抖音</el-checkbox>
-                  <el-checkbox label="TOUTIAO">今日头条</el-checkbox>
-                  <el-checkbox label="OTHER">其他</el-checkbox>
+                  <div v-for="g in channelGroups" :key="g.name" class="dyl-ch-group">
+                    <div class="dyl-ch-group-title">{{ g.label }}</div>
+                    <div v-for="c in g.items" :key="c.channelCode" class="dyl-ch-item">
+                      <el-checkbox :label="c.channelCode">{{ c.channelName }}</el-checkbox>
+                      <div v-if="c.channelDesc" class="dyl-ch-desc">{{ c.channelDesc }}</div>
+                    </div>
+                  </div>
                 </el-checkbox-group>
               </el-form-item>
               <el-form-item label="职人带货">
@@ -294,8 +302,8 @@
               </el-form-item>
               <el-form-item label="券码类型">
                 <el-radio-group v-model="form.codeType">
-                  <el-radio label="DOUYIN">抖音券</el-radio>
-                  <el-radio label="MERCHANT">商家券</el-radio>
+                  <el-radio label="MERCHANT">商家券（本商户自行核销）</el-radio>
+                  <el-radio label="PLATFORM">平台券（平台统一发码）</el-radio>
                 </el-radio-group>
               </el-form-item>
             </el-form>
@@ -320,7 +328,8 @@
               </el-form-item>
               <el-form-item label="券码类型">
                 <el-radio-group v-model="form.codeType">
-                  <el-radio label="DOUYIN">抖音券</el-radio>
+                  <el-radio label="MERCHANT">商家券（本商户自行核销）</el-radio>
+                  <el-radio label="PLATFORM">平台券（平台统一发码）</el-radio>
                 </el-radio-group>
               </el-form-item>
             </el-form>
@@ -524,6 +533,7 @@
 import { treeCategory } from '@/api/biz/category'
 import { addProduct, updateProduct, getProduct, changeProductStatus } from '@/api/biz/product'
 import { selectProductTypeList } from '@/api/biz/productType'
+import { enabledSaleChannel } from '@/api/biz/saleChannel'
 import { listMerchant } from '@/api/biz/merchant'
 import { listGroups, addGroup, updateGroup, delGroup, addSubitem, delSubitem, listSubitemNameCandidates } from '@/api/biz/productSubitem'
 
@@ -562,6 +572,9 @@ export default {
       nameOptions: [],
       nameLoading: false,
       subitemForm: { productId: null, groupId: null, _groupName: '', subitemName: '', quantity: 1, price: 0 },
+      // ===== 投放渠道字典 =====
+      channelList: [],
+      channelDefaultCodes: '',
       // ===== 表单 =====
       showMerchantSelect: this.isShowMerchantSelect(),
       merchantOptions: [],
@@ -597,10 +610,10 @@ export default {
         // tab 字段
         storeIdList: [],
         collectMethod: 'HEAD',
-        saleChannels: ['DOUPIN'],
+        saleChannels: [],          // 由 loadChannels() 用字典的 defaultCodes 填充
         staffPromote: 0,
         saleDateRange: [],
-        codeType: 'DOUYIN',
+        codeType: 'MERCHANT',
         outerSubitemId: '',
         consumeDateRange: [],
         excludeDateRange: [],
@@ -683,13 +696,21 @@ export default {
     autoComboPrice() {
       // 简单：90% 折扣
       return (Number(this.totalComboValue || 0) * 0.9).toFixed(2)
-    }
-  },
-  watch: {
-    'form.faceValue'(v) {
-      if (this.isVoucher && v && !this.form.productName) {
-        this.form.productName = this.autoVoucherName
-      }
+    },
+    /**
+     * 投放渠道按 channelGroup 分组，供模板两层渲染。
+     * 抖音来客的投放渠道子页就是分组列表（不是扁平多选），每条下方还有规则说明。
+     */
+    channelGroups() {
+      const labels = { SELF: '自有渠道', SOCIAL: '社交分享', OFFLINE: '线下物料' }
+      const map = {}
+      const order = []
+      ;(this.channelList || []).forEach(c => {
+        const g = c.channelGroup || 'OTHER'
+        if (!map[g]) { map[g] = []; order.push(g) }
+        map[g].push(c)
+      })
+      return order.map(g => ({ name: g, label: labels[g] || g, items: map[g] }))
     }
   },
   created() {
@@ -700,6 +721,7 @@ export default {
     const myMerchantId = (this.$store.state.user && this.$store.state.user.merchantId) || null
     if (myMerchantId) this.$set(this.form, 'merchantId', myMerchantId)
     this.loadMerchantOptions()
+    this.loadChannels()
     this.applyRouteTarget()
   },
   /**
@@ -722,7 +744,18 @@ export default {
       this._boundScroller = sp
     })
   },
+  /*
+   * 合并自原先两个 watch 块。
+   * 原来 data 之后有一个 watch（form.faceValue 自动命名），methods 之前又有一个 watch
+   * （form.productId 重绑滚动容器）—— 同一个对象字面量里出现两个同名 key，
+   * 后者直接覆盖前者，所以「填了面值自动带出 xx元代金券」这个功能从来没生效过。
+   */
   watch: {
+    'form.faceValue'(v) {
+      if (this.isVoucher && v && !this.form.productName) {
+        this.form.productName = this.autoVoucherName
+      }
+    },
     // 第 2 步是 v-if="form.typeCode && form.productId" —— 新建流程里
     // mounted 时它还不存在，容器高度不够会被判成不可滚动。
     // 等第 2 步真正渲染出来后重新探测并绑定。
@@ -800,6 +833,20 @@ export default {
         this.typeList = (res.rows || []).filter(t => t.status === '0' || t.status === 0)
       })
     },
+    /**
+     * 拉投放渠道字典。默认勾选项由服务端算（is_default=1 且启用中），
+     * 不在前端写死：平台停用某个渠道后，前端不该还把它当默认值提上来。
+     * 只有新建（还没有 productId）才套默认值，编辑时以商品已存的渠道为准。
+     */
+    loadChannels() {
+      enabledSaleChannel().then(res => {
+        this.channelList = (res && res.data) || []
+        this.channelDefaultCodes = (res && res.defaultCodes) || ''
+        if (!this.form.productId && !(this.form.saleChannels || []).length) {
+          this.form.saleChannels = this.channelDefaultCodes ? this.channelDefaultCodes.split(',').filter(v => v) : []
+        }
+      }).catch(() => { this.channelList = [] })
+    },
     loadProduct(pid) {
       getProduct(pid).then(res => {
         // request 拦截器返回整个 AjaxResult，商品在 res.data
@@ -814,6 +861,7 @@ export default {
         // 组合搭配回显：不还原的话，编辑已有商品时抽屉是空的，
         // 一保存就会把之前配好的搭配覆盖成空数组。
         this.comboItems = this.parseComboItems(p.ext && p.ext.comboItemsJson)
+        this.unpackExtToForm(p)
         if (this.isGroupon || this.isCombo) this.loadSubitems()
       }).catch(e => {
         this.$modal.msgError((e && (e.msg || e.message)) || '商品加载失败')
@@ -825,7 +873,101 @@ export default {
       const payload = Object.assign({}, this.form)
       payload.storeIds = (this.form.storeIdList || []).join(',')
       delete payload.categoryIdArr
+      this.packFormToExt(payload)
       return payload.productId ? updateProduct(payload) : addProduct(payload)
+    },
+
+    /**
+     * 把表单里那些「后端属性名/结构对不上」的字段映射成后端认识的形状。
+     *
+     * 背景：这一批输入框在页面上早就有，但提交后被 Jackson 直接丢掉 ——
+     * 因为 Product / ProductExt 域里没有同名属性。运营填完保存没有任何报错，
+     * 库里却什么都没存。佐证：全库 357 个商品里只有 2 个有 extra_fee_desc、
+     * 35 个有 sale_start_date，说明这些框从上线起就没生效过。
+     *
+     * 分两类处理：
+     *  1) 主表已有同义属性，只是名字/结构不一致 → 直接改名或拆数组
+     *     saleDateRange[]      → saleStartDate / saleEndDate
+     *     extraFee             → extraFeeDesc
+     *     storeOtherDiscount   → mutexWithStorePromotion（SHARE=0 同享 / EXCLUSIVE=1 不同享）
+     *  2) 主表确实没有 → 落 biz_product_ext（v4 已加列）
+     */
+    packFormToExt(payload) {
+      const f = this.form
+      const pick = (arr, i) => (Array.isArray(arr) && arr.length > i ? arr[i] : null)
+
+      // --- 1) 主表同义字段 ---
+      payload.saleStartDate = pick(f.saleDateRange, 0)
+      payload.saleEndDate = pick(f.saleDateRange, 1)
+      payload.extraFeeDesc = f.extraFee || ''
+      // 页面是「与店内优惠同享 / 不与店内优惠同享」，库里是 tinyint 的「互斥」语义，取值要反过来
+      payload.mutexWithStorePromotion = f.storeOtherDiscount === 'SHARE' ? 0 : 1
+
+      // --- 2) 落 ext ---
+      const ext = Object.assign({}, payload.ext || {})
+      ext.saleChannels = (f.saleChannels || []).join(',')
+      ext.staffPromote = f.staffPromote ? 1 : 0
+      ext.codeType = f.codeType || 'MERCHANT'
+      ext.consumeStartDate = pick(f.consumeDateRange, 0)
+      ext.consumeEndDate = pick(f.consumeDateRange, 1)
+      // 不可消费日期：库里存 JSON 数组，为将来支持多段排除留出结构
+      // （抖音来客这一项可以加多段，我们先存一段但用同样的容器）
+      const exStart = pick(f.excludeDateRange, 0)
+      const exEnd = pick(f.excludeDateRange, 1)
+      ext.excludeDates = exStart && exEnd ? JSON.stringify([[exStart, exEnd]]) : ''
+      ext.dailyTimeStart = pick(f.dailyTimeRange, 0) || ''
+      ext.dailyTimeEnd = pick(f.dailyTimeRange, 1) || ''
+      ext.voucherRules = (f.voucherRules || []).join(',')
+      // 券类型（通兑/单品类）与「适用范围」共用 ext.voucherScopeType：
+      // 代金券类型走 voucherType，消费规则里的适用范围走 scopeType，两者不会同屏出现
+      ext.voucherScopeType = this.isVoucher ? (f.scopeType || 'ALL') : (f.voucherType || 'GENERAL')
+      payload.ext = ext
+
+      // 这些 key 后端没有，留着只会在日志里刷未知属性告警
+      ;['saleDateRange', 'extraFee', 'storeOtherDiscount', 'consumeDateRange',
+        'excludeDateRange', 'dailyTimeRange', 'voucherRules', 'voucherType',
+        'scopeType', 'saleChannels', 'staffPromote', 'codeType'
+      ].forEach(k => { delete payload[k] })
+      return payload
+    },
+
+    /** packFormToExt 的逆操作：编辑已有商品时把库里的值还原成表单形状 */
+    unpackExtToForm(p) {
+      const ext = (p && p.ext) || {}
+      const range = (a, b) => (a && b ? [a, b] : [])
+
+      this.$set(this.form, 'saleDateRange', range(p.saleStartDate, p.saleEndDate))
+      this.$set(this.form, 'extraFee', p.extraFeeDesc || '')
+      this.$set(this.form, 'storeOtherDiscount', p.mutexWithStorePromotion === 0 ? 'SHARE' : 'EXCLUSIVE')
+
+      // 渠道：库里有值就用库里的；为空（老数据）才退回字典默认，
+      // 否则编辑一个老商品会看到「一个渠道都没勾」的假象
+      const chs = ext.saleChannels ? String(ext.saleChannels).split(',').filter(v => v) : []
+      this.$set(this.form, 'saleChannels', chs.length ? chs : (this.channelDefaultCodes ? this.channelDefaultCodes.split(',').filter(v => v) : []))
+      this.$set(this.form, 'staffPromote', ext.staffPromote ? 1 : 0)
+      this.$set(this.form, 'codeType', ext.codeType || 'MERCHANT')
+      this.$set(this.form, 'consumeDateRange', range(ext.consumeStartDate, ext.consumeEndDate))
+      this.$set(this.form, 'excludeDateRange', this.parseExcludeDates(ext.excludeDates))
+      this.$set(this.form, 'dailyTimeRange', range(ext.dailyTimeStart, ext.dailyTimeEnd))
+      this.$set(this.form, 'voucherRules', ext.voucherRules ? String(ext.voucherRules).split(',').filter(v => v) : [])
+      const scope = ext.voucherScopeType || ''
+      if (this.isVoucher) {
+        this.$set(this.form, 'scopeType', scope || 'ALL')
+      } else {
+        this.$set(this.form, 'voucherType', scope || 'GENERAL')
+      }
+    },
+
+    /** ext.excludeDates 存的是 [[start,end], ...]，表单目前只用第一段 */
+    parseExcludeDates(json) {
+      if (!json) return []
+      try {
+        const arr = JSON.parse(json)
+        if (Array.isArray(arr) && arr.length && Array.isArray(arr[0]) && arr[0].length === 2) {
+          return [arr[0][0], arr[0][1]]
+        }
+      } catch (e) { /* 脏数据当空处理，不要因为一条坏 JSON 打不开编辑页 */ }
+      return []
     },
     onCategoryChange(v) {
       // cascader 绑的是 categoryIdArr，但表单校验和提交用的是 categoryId，必须同步
@@ -1256,6 +1398,13 @@ export default {
 
 .dyl-tip { color: #999; font-size: 12px; margin-top: 4px; }
 .dyl-tip-inline { color: #999; font-size: 12px; margin-left: 12px; }
+.dyl-ch-group { margin-bottom: 10px; }
+.dyl-ch-group + .dyl-ch-group { padding-top: 8px; border-top: 1px dashed #f0f0f0; }
+.dyl-ch-group-title { font-size: 12px; color: #909399; margin-bottom: 4px; }
+.dyl-ch-item { line-height: 1.4; margin-bottom: 6px; }
+/* 字段级说明：抖音来客每个渠道条目下方都有一行灰字解释投放规则，
+   我们原先一条说明都没有，运营只能靠猜 */
+.dyl-ch-desc { color: #999; font-size: 12px; padding-left: 24px; }
 .dyl-step2-footer { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,.04); z-index: 100; display: flex; align-items: center; justify-content: space-between; }
 .dyl-status-hint { font-size: 13px; color: #606266; }
 .dyl-step2-footer .el-button + .el-button { margin-left: 8px; }
