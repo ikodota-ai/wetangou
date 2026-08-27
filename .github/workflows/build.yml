@@ -63,6 +63,10 @@ jobs:
       - name: Lint sql seed idempotency
         run: bash .github/scripts/lint-sql-seed.sh
 
+      # 挡住「.vue 只剩 template、script 被误删」——webpack 不报错但页面白板
+      - name: Lint Vue SFC structure
+        run: bash .github/scripts/lint-vue-sfc.sh
+
       - name: Backend - mvn package
         run: mvn -B -e -ntp clean package
         env:
