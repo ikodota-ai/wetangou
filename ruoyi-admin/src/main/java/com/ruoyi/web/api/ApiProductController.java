@@ -80,6 +80,70 @@ public class ApiProductController
     }
 
     /**
+     * 商家端-商品列表（分页 + 按状态筛选）。
+     *
+     * <p>为什么不复用 {@code /list}：那个端点是给顾客端用的，写死了
+     * {@code status="0"} 只返上架商品、而且不分页一次全返。商家端拿它做列表有两个
+     * 死结：一是看不到自己的草稿（建品后落草稿，列表里一条都没有，商家以为没保存成功），
+     * 二是没有 total，「已上架 / 未上架」的 tab 角标只能拿当前页自己数 ——
+     * 站在「已上架」tab 时请求带 status=0 返回的全是上架品，「未上架」角标恒为 0，
+     * 商品超过一页时上架角标也是错的。
+     *
+     * <p>顾客端那个端点保持原样不动（改成分页会破坏 app.js 里 loadGoods /
+     * loadAllPickupGoods 的 {@code res.data} 数组读法）。</p>
+     *
+     * <p>merchantId 一律取 token 里的，忽略前端传值：否则商家改个 query 参数
+     * 就能翻别家商户的商品列表。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @GetMapping("/merchant/list")
+    public AjaxResult merchantList(@RequestParam(required = false) Long storeId,
+                                   @RequestParam(required = false) Long categoryId,
+                                   @RequestParam(required = false) String typeCode,
+                                   @RequestParam(required = false) String status,
+                                   @RequestParam(required = false) String keyword,
+                                   @RequestParam(defaultValue = "1") int pageNum,
+                                   @RequestParam(defaultValue = "20") int pageSize)
+    {
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        if (me == null) {
+            throw new ServiceException("未登录");
+        }
+        Long merchantId = me.getMerchantId();
+        if (merchantId == null || merchantId <= 0) {
+            throw new ServiceException("当前账号未绑定商户");
+        }
+        Product query = new Product();
+        query.setMerchantId(merchantId);
+        query.setStoreId(storeId);
+        query.setCategoryId(categoryId);
+        query.setTypeCode(typeCode);
+        // status 不传 = 全部（草稿 + 上架），这是「全部」tab 要的
+        if (status != null && !status.trim().isEmpty()) {
+            query.setStatus(status.trim());
+        }
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            query.setProductName(keyword.trim());
+        }
+        // 手写分页而不是 startPage()：PageHelper 只对紧随其后的第一条 SQL 生效，
+        // 而 selectProductList 的 resultMap 带 ext 的 association（一次查询里含 join），
+        // 用 PageHelper 的 count 改写在这种嵌套映射上容易把 total 数错。
+        // 商家端单个商户的商品量级（百级）全量查回来再切片，代价可接受。
+        List<Product> all = productService.selectProductList(query);
+        int total = all == null ? 0 : all.size();
+        int size = pageSize <= 0 ? 20 : Math.min(pageSize, 100);
+        int from = Math.max(0, (Math.max(pageNum, 1) - 1) * size);
+        List<Product> page = from >= total
+                ? java.util.Collections.emptyList()
+                : all.subList(from, Math.min(from + size, total));
+        AjaxResult r = AjaxResult.success();
+        r.put("rows", fillImageUrls(new java.util.ArrayList<>(page)));
+        r.put("total", total);
+        return r;
+    }
+
+    /**
      * 商品详情
      */
     @GetMapping("/{productId}")

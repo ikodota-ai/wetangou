@@ -187,6 +187,9 @@ const api = {
   bannerList: (params) => request('/api/banner/list', { data: params }),
   // 商品
   productList: (params) => request('/api/product/list', { data: params }),
+  // 商家端商品列表：分页 + 能查草稿。顾客端那个 /api/product/list 写死 status=0
+  // 且不分页，商家端拿它做列表看不到自己的草稿、也拿不到 total 做 tab 角标。
+  merchantProductList: (params) => request('/api/product/merchant/list', { data: params }),
   productDetail: (id) => request(`/api/product/${id}`),
   categoryList: (params) => request('/api/product/category/list', { data: params }),
   // 商家端-创建商品（P1-2）

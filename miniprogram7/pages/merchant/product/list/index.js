@@ -17,7 +17,7 @@ Page({
   },
   onShow() {
     // 建品页存草稿后回来：默认停在「已上架」tab 会一条都看不到，
-    // 商家会以为刚才没保存成功。所以由建品页留个标记，回来直接切到「已下架」。
+    // 商家会以为刚才没保存成功。所以由建品页留个标记，回来直接切到「未上架」。
     const flag = wx.getStorageSync('productDraftCreated')
     if (flag) {
       wx.removeStorageSync('productDraftCreated')
@@ -37,13 +37,15 @@ Page({
     const params = {
       pageNum: 1,
       pageSize: 20,
-      merchantId: staff.merchantId,
       storeId: staff.storeId || undefined,
       typeCode: this.data.mainTab === 0 ? 'GROUPON' : undefined  // 团购=GROUPON
     }
     const st = ['', '0', '1'][this.data.statusTab]
     if (st) params.status = st
-    return api.productList(params).then(res => {
+    // 用商家端专属端点：顾客端的 /api/product/list 写死 status=0，
+    // 拿它做商家列表会一条草稿都看不到，而且没有 total 做角标。
+    // merchantId 由后端从 token 取，前端不用传（传了也会被忽略）。
+    return api.merchantProductList(params).then(res => {
       const list = (res && res.rows) || []
       this.setData({ products: list, loading: false })
       this._loadCounts(params, (res && res.total) || 0)
@@ -62,7 +64,7 @@ Page({
    * 这里改成用 pageSize=1 各查一次，只取 total。
    */
   _loadCounts(baseParams, currentTotal) {
-    const q = (status) => api.productList(
+    const q = (status) => api.merchantProductList(
       Object.assign({}, baseParams, { pageNum: 1, pageSize: 1, status })
     ).then(r => (r && r.total) || 0).catch(() => 0)
     Promise.all([q('0'), q('1')]).then(([onShelf, offShelf]) => {

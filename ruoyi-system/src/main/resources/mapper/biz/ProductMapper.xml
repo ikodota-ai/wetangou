@@ -148,6 +148,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="categoryId != null "> and p.category_id = #{categoryId}</if>
             <if test="productName != null  and productName != ''"> and p.product_name like concat('%', #{productName}, '%')</if>
             <if test="productType != null  and productType != ''"> and p.product_type = #{productType}</if>
+            <!-- typeCode 是 v2 的 11 种商品类型（GROUPON/VOUCHER/...），
+                 与 productType（0普通/1到店自取 的老字段）不是一回事。
+                 原先这里漏了 typeCode 条件，导致小程序商家端列表的「团购/品牌」
+                 tab 和后台按类型筛选都传了参数却不生效，返回的还是全部商品。 -->
+            <if test="typeCode != null  and typeCode != ''"> and p.type_code = #{typeCode}</if>
             <if test="status != null  and status != ''"> and p.status = #{status}</if>
             <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(p.store_id, #{params.storeIds})</if>
         </where>
