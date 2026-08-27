@@ -26,6 +26,11 @@ chkf() { local n="$1" f="$2" pat="$3"
   if grep -q -- "$pat" "$f" 2>/dev/null; then echo "  ✅ $n"; PASS=$((PASS+1));
   else echo "  ❌ $n (未在 $f 找到: $pat)"; FAIL=$((FAIL+1)); fi
 }
+# 反向断言：某个模式「不该」出现在文件里（用于确认已被删除的错误实现没被改回来）
+chkfn() { local n="$1" f="$2" pat="$3"
+  if grep -q -- "$pat" "$f" 2>/dev/null; then echo "  ❌ $n (仍在 $f 命中: $pat)"; FAIL=$((FAIL+1));
+  else echo "  ✅ $n"; PASS=$((PASS+1)); fi
+}
 
 echo "商品查看态（只读详情页） smoke:"
 
@@ -111,8 +116,10 @@ chkf "B10) 编辑跳 /product/create（不带 /biz 前缀）" "$D" "path: '/prod
 chkf "B11) 返回回列表而非 history.back" "$D" "path: '/goods/product'"
 chkf "B12) 收单方式用 HEAD/STORE 而非 MERCHANT/PLATFORM" "$D" "HEAD: '总部统一收款'"
 
-# 存量数据打脸出来的两处兼容（实测 collect_method: PLATFORM 229 / HEAD 2）
-chkf "B17) collectMethod 兼容 PLATFORM 等存量取值" "$D" "PLATFORM: '平台统一收款'"
+# collect_method 语义已由 sql/biz_collect_method_semantic_v6.sql 归一（实测 357 行全 HEAD），
+# 原先的 PLATFORM/MERCHANT/自有 三套取值来自 comment 写错，兼容映射已删。
+# 这里反过来断言：不该再出现「平台统一收款」这种把收款方式和 pay_mode 混淆的文案。
+chkfn "B17) collectMethod 不再保留 PLATFORM 等错义映射" "$D" "PLATFORM: '平台统一收款'"
 # 售后政策存量有直接存中文长句的，必须占整行 + 允许换行
 chkf "B18) 售后政策整行展示（存量有中文长句）" "$D" "label=\"售后政策\" :span=\"2\""
 # 查看态不做类型裁剪：STORED_CARD(13)/BOOKING(1) 也要看到门店和消费规则

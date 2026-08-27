@@ -138,7 +138,15 @@ public class Product extends BaseEntity
     /** 预约是否仅工作日 0否 1是 */
     private Integer bookingWorkdayOnly;
 
-    /** 券码类型 PLATFORM/THIRD_PARTY/MERCHANT_OWN */
+    /**
+     * 收款方式 HEAD总部统一收款 / STORE门店独立收款。
+     *
+     * 注意：这里原来的注释写的是「券码类型 PLATFORM/THIRD_PARTY/MERCHANT_OWN」，
+     * 那是建列时把 PRD 里两个不同字段搞混留下的（列名取「收款方式」、
+     * comment 取「券码类型」），详见
+     * doc/collect_method-语义冲突排查-2026-08-27.md。
+     * 券码类型现由 ProductExt.codeType 承载，不要再往这一列写券码相关取值。
+     */
     private String collectMethod;
 
     /** 是否与店内优惠互斥 0否 1是 */

@@ -69,7 +69,7 @@ alter table biz_product
   add column refund_policy     varchar(500)    default ''               comment '售后政策' after max_persons,
   add column booking_required  tinyint(1)      default 0                comment '是否需要预约 0否 1是' after refund_policy,
   add column booking_workday_only tinyint(1)   default 0                comment '预约是否仅工作日 0否 1是' after booking_required,
-  add column collect_method    varchar(20)     default 'PLATFORM'      comment '券码类型 PLATFORM/THIRD_PARTY/MERCHANT_OWN' after booking_workday_only,
+  add column collect_method    varchar(20)     default 'HEAD'          comment '收款方式 HEAD总部统一收款/STORE门店独立收款（券码类型另见 biz_product_ext.code_type）' after booking_workday_only,
   add column mutex_with_store_promotion tinyint(1) default 1             comment '是否与店内优惠互斥 0否 1是' after collect_method,
   add column extra_fee_desc    varchar(500)    default ''               comment '额外费用说明' after mutex_with_store_promotion,
   add column other_notice      varchar(2000)   default ''               comment '其他说明（500字内，禁止美团点评字样）' after extra_fee_desc,

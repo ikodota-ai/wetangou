@@ -117,11 +117,13 @@
               <el-form-item label="所属商家">
                 <el-input :value="merchantLabel" readonly placeholder="未指定" />
               </el-form-item>
-              <el-form-item label="收单方式">
-                <el-radio-group v-model="form.collectMethod">
-                  <el-radio label="HEAD">总部统一收款</el-radio>
-                  <el-radio label="STORE">门店独立收款</el-radio>
-                </el-radio-group>
+              <!-- 收款方式由所属商家的支付配置（biz_merchant.pay_mode）决定，不是建品时手选：
+                   同一商户的两个商品收款方式不同，在结算上没有意义。
+                   PRD 和小程序商家端都标「不可编辑」，原先这里却是可点的 radio，
+                   运营能随便改 —— 库里那 2 条与商户配置不一致的值就是这么来的。 -->
+              <el-form-item label="收款方式">
+                <el-input :value="collectMethodLabel" readonly placeholder="未指定商家" />
+                <div class="dyl-tip">跟随所属商家的支付配置，如需调整请到「商户管理」修改该商户的支付方式</div>
               </el-form-item>
               <el-form-item label="适用门店" prop="storeIdList">
                 <biz-select
@@ -641,6 +643,11 @@ export default {
       const hit = (this.merchantOptions || []).find(m => m.merchantId === id)
       return hit ? hit.merchantName : ('商户 #' + id)
     },
+    /** 当前商家对应的收款方式（只读展示用） */
+    collectMethodLabel() {
+      if (!this.form.merchantId) return ''
+      return this.form.collectMethod === 'STORE' ? '门店独立收款' : '总部统一收款'
+    },
     enabledTypeList() { return (this.typeList || []).filter(t => t.status === '0' || t.status === 0) },
     typeName() {
       const t = (this.typeList || []).find(x => x.typeCode === this.form.typeCode)
@@ -762,7 +769,14 @@ export default {
     'form.productId'(val) {
       if (!val) return
       this.$nextTick(() => this.rebindScroller())
-    }
+    },
+    /**
+     * 收款方式跟随所属商家的支付配置（biz_merchant.pay_mode：0 商户自有商户号 /
+     * 1 平台统一收款），不再由运营手选。
+     * 也监听 merchantOptions：商户列表是异步拉的，切商家时可能还没到手。
+     */
+    'form.merchantId'() { this.syncCollectMethod() },
+    merchantOptions() { this.syncCollectMethod() }
   },
   beforeDestroy() {
     // 不移除会在离开页面后继续跑，并因 $refs 已销毁而报错
@@ -815,6 +829,18 @@ export default {
     isShowMerchantSelect() {
       const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
       return userType !== '2'
+    },
+    /**
+     * 按所属商家的 pay_mode 推导收款方式。
+     * 目前两种 pay_mode 都落 HEAD —— 只有门店各自持商户号才算 STORE，
+     * 当前数据模型（商户级支付配置）还没有这种形态，等有了再扩展这里。
+     */
+    syncCollectMethod() {
+      const id = this.form.merchantId
+      if (!id) return
+      const hit = (this.merchantOptions || []).find(m => Number(m.merchantId) === Number(id))
+      if (!hit) return
+      this.$set(this.form, 'collectMethod', 'HEAD')
     },
     /** 拉商户列表，仅用于第 2 步只读回显商家名（下拉本身由 BizSelect 自己拉） */
     loadMerchantOptions() {

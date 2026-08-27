@@ -58,6 +58,7 @@ biz_menu_business_pages
 biz_product_dict_charset_fix
 biz_product_industry_sync_safe
 biz_product_seed
+biz_collect_method_semantic_v6
 """.split()
 
 DEMO = """

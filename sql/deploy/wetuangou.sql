@@ -1020,7 +1020,7 @@ alter table biz_product
   add column refund_policy     varchar(500)    default ''               comment '售后政策' after max_persons,
   add column booking_required  tinyint(1)      default 0                comment '是否需要预约 0否 1是' after refund_policy,
   add column booking_workday_only tinyint(1)   default 0                comment '预约是否仅工作日 0否 1是' after booking_required,
-  add column collect_method    varchar(20)     default 'PLATFORM'      comment '券码类型 PLATFORM/THIRD_PARTY/MERCHANT_OWN' after booking_workday_only,
+  add column collect_method    varchar(20)     default 'HEAD'          comment '收款方式 HEAD总部统一收款/STORE门店独立收款（券码类型另见 biz_product_ext.code_type）' after booking_workday_only,
   add column mutex_with_store_promotion tinyint(1) default 1             comment '是否与店内优惠互斥 0否 1是' after collect_method,
   add column extra_fee_desc    varchar(500)    default ''               comment '额外费用说明' after mutex_with_store_promotion,
   add column other_notice      varchar(2000)   default ''               comment '其他说明（500字内，禁止美团点评字样）' after extra_fee_desc,
@@ -1222,7 +1222,7 @@ CALL add_column_if_missing('biz_product', 'max_persons', "int(11) DEFAULT 0 COMM
 CALL add_column_if_missing('biz_product', 'refund_policy', "varchar(500) DEFAULT '' COMMENT '售后政策' AFTER max_persons");
 CALL add_column_if_missing('biz_product', 'booking_required', "tinyint(1) DEFAULT 0 COMMENT '需要预约' AFTER refund_policy");
 CALL add_column_if_missing('biz_product', 'booking_workday_only', "tinyint(1) DEFAULT 0 COMMENT '预约仅工作日' AFTER booking_required");
-CALL add_column_if_missing('biz_product', 'collect_method', "varchar(20) DEFAULT 'PLATFORM' COMMENT '券码类型' AFTER booking_workday_only");
+CALL add_column_if_missing('biz_product', 'collect_method', "varchar(20) DEFAULT 'HEAD' COMMENT '收款方式 HEAD总部统一收款/STORE门店独立收款' AFTER booking_workday_only");
 CALL add_column_if_missing('biz_product', 'mutex_with_store_promotion', "tinyint(1) DEFAULT 1 COMMENT '与店内优惠互斥' AFTER collect_method");
 CALL add_column_if_missing('biz_product', 'extra_fee_desc', "varchar(500) DEFAULT '' COMMENT '额外费用说明' AFTER mutex_with_store_promotion");
 CALL add_column_if_missing('biz_product', 'other_notice', "varchar(2000) DEFAULT '' COMMENT '其他说明' AFTER extra_fee_desc");
@@ -4524,6 +4524,70 @@ insert ignore into biz_product_category (merchant_id, parent_id, category_name, 
   (0,11, '儿童摄影',  '亲子·儿童摄影',  2, 'PARENT_CHILD', 200000, 'GROUPON,VOUCHER,COMBO',                                  1, '0', 'system', now()),
   (0,11, '儿童乐园',  '亲子·儿童乐园',  2, 'PARENT_CHILD', 200000, 'GROUPON,VOUCHER,COMBO',                                  2, '0', 'system', now()),
   (0,11, '亲子游泳',  '亲子·亲子游泳',  2, 'PARENT_CHILD', 200000, 'GROUPON,VOUCHER,PERIOD_CARD,COMBO',                      3, '0', 'system', now());
+
+
+-- ############################################################
+-- 源文件：sql/biz_collect_method_semantic_v6.sql
+-- ############################################################
+
+-- ============================================================================
+-- 统一 biz_product.collect_method 语义为「收款方式」（v6，方案 A）
+--
+-- 背景见 doc/collect_method-语义冲突排查-2026-08-27.md：
+--   PRD 里收款方式（HEADQUARTERS/STORE）和券码类型（PLATFORM/THIRD_PARTY/
+--   MERCHANT_OWN）本是两个字段，4e071924 建列时把后者的取值和 comment 挂到了
+--   名为 collect_method（收款方式）的列上 —— 名字取前者、语义写后者，
+--   后续开发各自按名字和 comment 理解，分叉成三套值。
+--
+--   券码类型已由 biz_product_ext.code_type 独立承接（415 行全有值），
+--   所以这列上的「券码类型」comment 现在是重复定义，必须清掉。
+--
+-- 取值统一用 HEAD / STORE 而不是 PRD 的 HEADQUARTERS：
+--   仓内已有 2 条 HEAD，且 create.vue / detail.vue 都用 HEAD，
+--   改成 HEADQUARTERS 要动 3 个文件却没有任何收益。
+--
+-- 存量归一（229 条 PLATFORM 全是 DDL DEFAULT 兜底，无一条是用户选的）：
+--   按所属商户的 biz_merchant.pay_mode 推导 —— 这才是真正决定收款归属的字段
+--   （0 商户自有商户号 / 1 平台统一收款）。当前两个商户都是 0，
+--   在「一个商户一套支付配置」的形态下等价于总部统一收款，故一律落 HEAD。
+--   等真出现连锁分店独立收款（门店各自的商户号）再引入 STORE。
+--
+-- 安全性：全仓 grep 确认无任何业务代码读这一列（ProductValidator 无校验、
+--   顾客端 wxml 从不渲染），改取值不会破坏现有逻辑。
+--
+-- 导入：mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/biz_collect_method_semantic_v6.sql
+-- 幂等：可重复执行
+-- ============================================================================
+
+-- 1) 改 comment + DEFAULT。
+--    MODIFY COLUMN 本身幂等（重复执行结果一致），不需要先探测。
+ALTER TABLE biz_product
+  MODIFY COLUMN collect_method varchar(20) DEFAULT 'HEAD'
+  COMMENT '收款方式 HEAD总部统一收款/STORE门店独立收款（取值以此为准；旧值 PLATFORM 是历史 comment 写错留下的券码类型语义，券码类型见 biz_product_ext.code_type）';
+
+-- 2) 存量归一：把券码类型语义的旧值按商户 pay_mode 推导成收款方式语义。
+--    只动这 3 个旧值，不碰已经正确的 HEAD/STORE（幂等的关键）。
+UPDATE biz_product p
+  LEFT JOIN biz_merchant m ON m.merchant_id = p.merchant_id
+   SET p.collect_method = CASE
+         -- pay_mode=1 平台统一收款 → 总部收款
+         WHEN m.pay_mode = '1' THEN 'HEAD'
+         -- pay_mode=0 商户自有商户号 → 当前形态下也是总部统一收款
+         -- （门店各自持商户号才算 STORE，现在没有这种数据）
+         ELSE 'HEAD'
+       END
+ WHERE p.collect_method IN ('PLATFORM', 'THIRD_PARTY', 'MERCHANT_OWN');
+
+-- 3) 空值兜底：DEFAULT 只在 insert 不带该列时生效，历史上可能有显式写 null 的
+UPDATE biz_product SET collect_method = 'HEAD'
+ WHERE collect_method IS NULL OR collect_method = '';
+
+-- 4) 校验
+SELECT collect_method, COUNT(*) AS cnt
+  FROM biz_product GROUP BY collect_method ORDER BY cnt DESC;
+
+SELECT CONCAT('残留旧语义取值（应为 0）：', COUNT(*)) AS result
+  FROM biz_product WHERE collect_method IN ('PLATFORM', 'THIRD_PARTY', 'MERCHANT_OWN');
 
 
 -- ============================================================

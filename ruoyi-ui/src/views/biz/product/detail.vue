@@ -58,7 +58,7 @@
         <div class="dyl-sec-title">{{ merchantTabLabel }}</div>
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="所属商家">{{ dash(merchantLabel) }}</el-descriptions-item>
-          <el-descriptions-item label="收单方式">{{ collectMethodText }}</el-descriptions-item>
+          <el-descriptions-item label="收款方式">{{ collectMethodText }}</el-descriptions-item>
           <el-descriptions-item label="适用门店" :span="2">
             <template v-if="storeNameList.length">
               <el-tag v-for="s in storeNameList" :key="s" size="mini" class="dyl-tag">{{ s }}</el-tag>
@@ -211,21 +211,13 @@ const VOUCHER_TYPE = { GENERAL: '通兑券', CATEGORY: '单品类券' }
 const SCOPE = { ALL: '全场通用', CATEGORY: '按品类', STORE: '按门店' }
 const V_RULE = { ALL_CATEGORY: '全部品类适用', ALL_BRAND: '全部品牌适用' }
 /**
- * collect_method 的取值目前是两套语义混在一列（实测存量：PLATFORM 229 / HEAD 2）：
- *   - 建表 comment 和 Product.java 注释写的是「券码类型 PLATFORM/THIRD_PARTY/MERCHANT_OWN」，
- *     小程序商家端建品也一直写 PLATFORM；
- *   - 而后台 create.vue 把它当「收单方式 HEAD/STORE」在用（那 2 条 HEAD 就是后台建的）。
- * 全仓 grep 确认没有任何业务代码读这一列（只有 mapper 读写 + 两端表单），
- * 所以暂不改语义（属独立的数据治理），但详情页必须两套都认 ——
- * 否则 229 个存量商品这一栏会显示裸 code。
+ * collect_method 语义已由 sql/biz_collect_method_semantic_v6.sql 统一为「收款方式」，
+ * 357 条存量全部归一到 HEAD/STORE，旧的券码类型取值（PLATFORM/THIRD_PARTY/
+ * MERCHANT_OWN）已清零，故不再保留兼容映射。
+ * 券码类型现由 ext.code_type 承载，见下方 CODE_TYPE。
+ * 背景：doc/collect_method-语义冲突排查-2026-08-27.md
  */
-const COLLECT = {
-  HEAD: '总部统一收款',
-  STORE: '门店独立收款',
-  PLATFORM: '平台统一收款',
-  THIRD_PARTY: '第三方收款',
-  MERCHANT_OWN: '商户自行收款'
-}
+const COLLECT = { HEAD: '总部统一收款', STORE: '门店独立收款' }
 
 export default {
   name: 'ProductDetail',

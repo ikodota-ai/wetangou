@@ -53,7 +53,7 @@ CALL add_column_if_missing('biz_product', 'max_persons', "int(11) DEFAULT 0 COMM
 CALL add_column_if_missing('biz_product', 'refund_policy', "varchar(500) DEFAULT '' COMMENT '售后政策' AFTER max_persons");
 CALL add_column_if_missing('biz_product', 'booking_required', "tinyint(1) DEFAULT 0 COMMENT '需要预约' AFTER refund_policy");
 CALL add_column_if_missing('biz_product', 'booking_workday_only', "tinyint(1) DEFAULT 0 COMMENT '预约仅工作日' AFTER booking_required");
-CALL add_column_if_missing('biz_product', 'collect_method', "varchar(20) DEFAULT 'PLATFORM' COMMENT '券码类型' AFTER booking_workday_only");
+CALL add_column_if_missing('biz_product', 'collect_method', "varchar(20) DEFAULT 'HEAD' COMMENT '收款方式 HEAD总部统一收款/STORE门店独立收款' AFTER booking_workday_only");
 CALL add_column_if_missing('biz_product', 'mutex_with_store_promotion', "tinyint(1) DEFAULT 1 COMMENT '与店内优惠互斥' AFTER collect_method");
 CALL add_column_if_missing('biz_product', 'extra_fee_desc', "varchar(500) DEFAULT '' COMMENT '额外费用说明' AFTER mutex_with_store_promotion");
 CALL add_column_if_missing('biz_product', 'other_notice', "varchar(2000) DEFAULT '' COMMENT '其他说明' AFTER extra_fee_desc");
