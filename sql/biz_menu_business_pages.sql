@@ -19,15 +19,15 @@
 
 -- 1) 18 个业务菜单页（C 型）
 
-SET @pid = (SELECT menu_id FROM sys_menu WHERE menu_name='商品管理' AND menu_type='M' ORDER BY menu_id LIMIT 1);
-INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT '商品创建', @pid, 1, 'create', 'biz/product/create', NULL, '', 1, 0, 'C', '0', '0', 'biz:product:add', '#', 'admin', SYSDATE(), '商品创建路由（抖音来客风格）'
-FROM (SELECT 1) t WHERE @pid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:product:add' AND menu_type='C') x);
-
-SET @pid = (SELECT menu_id FROM sys_menu WHERE menu_name='商品管理' AND menu_type='M' ORDER BY menu_id LIMIT 1);
-INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
-SELECT '商品详情', @pid, 2, 'detail/:productId(d+)', 'biz/product/detail', NULL, '', 1, 0, 'C', '1', '0', 'biz:product:query', '#', 'admin', SYSDATE(), '商品详情路由'
-FROM (SELECT 1) t WHERE @pid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:product:query' AND menu_type='C') x);
+-- 「商品创建」「商品详情」两条 C 型菜单已移除，不要再加回来。
+-- 原因（实测 /getRouters 确认）：它们挂在「商品管理」下，而商品管理自己是 C 型，
+-- SysMenuServiceImpl.buildMenus 只对 M（目录）递归 children，
+-- C 型菜单的子菜单会被整体丢弃 —— 这两条路由从来没被下发过。
+-- 且「商品详情」的 path 'detail/:productId(d+)' 正则反斜杠在 SQL 里丢了（本意 (\\d+)）。
+-- 两个页面现由 ruoyi-ui/src/router/index.js 静态注册：
+--   /product/create 和 /product/detail/:productId
+-- 权限点由 2063「商品查询」/ 2064「商品新增」（F 型）承载，无需额外菜单。
+-- 清理存量记录见 sql/biz_product_detail_menu_fix_v5.sql
 
 SET @pid = (SELECT menu_id FROM sys_menu WHERE menu_name='门店商品' AND menu_type='M' ORDER BY menu_id LIMIT 1);
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)

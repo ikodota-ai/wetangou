@@ -97,7 +97,26 @@ export const constantRoutes = [
         path: '',
         component: () => import('@/views/biz/product/create'),
         name: 'ProductCreate',
-        meta: { title: '商品高级编辑', activeMenu: '/product' }
+        // activeMenu 必须是真实的列表路由 /goods/product（商品管理挂在「门店商品」目录下）。
+        // 原来写 '/product' 匹配不到任何菜单，进编辑页时左侧菜单不高亮。
+        meta: { title: '商品高级编辑', activeMenu: '/goods/product' }
+      }
+    ]
+  },
+  {
+    // 商品查看态（只读）。走静态注册而不是 sys_menu：
+    // sys_menu 里的 2293「商品详情」挂在 2062「商品管理」下，而 2062 是 C 类菜单，
+    // SysMenuServiceImpl.buildMenus 只对 M（目录）递归 children，
+    // 所以那条菜单从来没被下发过 —— 和 /product/create 同样的原因。
+    path: '/product/detail/:productId',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/biz/product/detail'),
+        name: 'ProductDetail',
+        meta: { title: '商品详情', activeMenu: '/goods/product' }
       }
     ]
   },

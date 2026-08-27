@@ -99,7 +99,13 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="商品名称" align="left" prop="productName" min-width="180" show-overflow-tooltip />
+      <el-table-column label="商品名称" align="left" prop="productName" min-width="180" show-overflow-tooltip>
+        <template slot-scope="scope">
+          <!-- 点商品名进查看态：列表信息有限（无渠道/消费规则/搭配），
+               运营核对一个商品的完整配置原先只能进编辑页，有误改风险 -->
+          <el-link type="primary" :underline="false" @click="handleView(scope.row)">{{ scope.row.productName }}</el-link>
+        </template>
+      </el-table-column>
       <el-table-column label="封面图" align="center" prop="cover" width="100">
         <template slot-scope="scope">
           <el-image v-if="scope.row.cover" :src="scope.row.cover" style="width: 60px; height: 60px; border-radius: 4px" fit="cover" :preview-src-list="[scope.row.cover]" />
@@ -119,8 +125,15 @@
       </el-table-column>
       <el-table-column label="排序" align="center" prop="sort" width="80" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="160" />
-      <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
         <template slot-scope="scope">
+          <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-view"
+            @click="handleView(scope.row)"
+            v-hasPermi="['biz:product:query']"
+          >查看</el-button>
           <el-button
             size="mini"
             type="text"
@@ -291,6 +304,21 @@ export default {
      * 而分段式创建页字段是齐的，却只能从已有商品的「高级编辑」进去 ——
      * 没有商品时无路可走，一个都建不出来。这里统一入口，避免维护两套表单。
      */
+    /**
+     * 查看：进只读详情页。
+     *
+     * 原先列表只有「编辑」一个入口，想核对某个商品的完整配置（投放渠道、
+     * 消费规则、商品搭配这些列表里没有的字段）就必须打开编辑表单，
+     * 一不小心改了字段再保存就是误操作。所以补一个查看态。
+     */
+    handleView(row) {
+      const productId = (row && row.productId) || (this.ids && this.ids[0]);
+      if (productId == null) {
+        this.$modal.msgWarning('请先选择要查看的商品');
+        return;
+      }
+      this.$router.push({ path: '/product/detail/' + productId }).catch(() => {})
+    },
     handleAdd() {
       this.$router.push({ path: '/product/create' }).catch(() => {})
     },
