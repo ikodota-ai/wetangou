@@ -20,13 +20,18 @@
 -- 无需清 Redis：菜单不走缓存，刷新后台页面即可看到新名字。
 -- ============================================================================
 
-UPDATE sys_menu SET menu_name = '行业品类'     WHERE menu_id = 2032 AND menu_name = '商品分类';
-UPDATE sys_menu SET menu_name = '行业品类查询' WHERE menu_id = 2033 AND menu_name = '商品分类查询';
-UPDATE sys_menu SET menu_name = '行业品类新增' WHERE menu_id = 2034 AND menu_name = '商品分类新增';
-UPDATE sys_menu SET menu_name = '行业品类修改' WHERE menu_id = 2035 AND menu_name = '商品分类修改';
-UPDATE sys_menu SET menu_name = '行业品类删除' WHERE menu_id = 2036 AND menu_name = '商品分类删除';
-UPDATE sys_menu SET menu_name = '行业品类导出' WHERE menu_id = 2037 AND menu_name = '商品分类导出';
+-- 按 perms 定位而不是写死 menu_id：
+-- 实测本地库这组菜单是 2032-2037，而 init-all.sh 建出来的全新库是 2012 / 2048-2052
+-- （menu_id 由各菜单脚本各自的插入顺序决定，不同库不一致）。
+-- 写死 id 的话，在 id 不同的库上不仅改不到目标，还可能命中同 id 的别的菜单
+-- —— 全新库的 2032 恰好是「协议查询」。perms 才是稳定标识。
+UPDATE sys_menu SET menu_name = '行业品类'     WHERE perms = 'biz:category:list'   AND menu_name = '商品分类';
+UPDATE sys_menu SET menu_name = '行业品类查询' WHERE perms = 'biz:category:query'  AND menu_name = '商品分类查询';
+UPDATE sys_menu SET menu_name = '行业品类新增' WHERE perms = 'biz:category:add'    AND menu_name = '商品分类新增';
+UPDATE sys_menu SET menu_name = '行业品类修改' WHERE perms = 'biz:category:edit'   AND menu_name = '商品分类修改';
+UPDATE sys_menu SET menu_name = '行业品类删除' WHERE perms = 'biz:category:remove' AND menu_name = '商品分类删除';
+UPDATE sys_menu SET menu_name = '行业品类导出' WHERE perms = 'biz:category:export'  AND menu_name = '商品分类导出';
 
--- 校验：应看到 6 行「行业品类*」，且 perms 仍为 biz:category:*
+-- 校验：应看到 6 行「行业品类*」
 SELECT menu_id, parent_id, menu_name, path, component, perms
-FROM sys_menu WHERE menu_id BETWEEN 2032 AND 2037 ORDER BY menu_id;
+FROM sys_menu WHERE perms LIKE 'biz:category:%' ORDER BY menu_id;

@@ -27,7 +27,7 @@
 -- 两个页面现由 ruoyi-ui/src/router/index.js 静态注册：
 --   /product/create 和 /product/detail/:productId
 -- 权限点由 2063「商品查询」/ 2064「商品新增」（F 型）承载，无需额外菜单。
--- 清理存量记录见 sql/biz_product_detail_menu_fix_v5.sql
+-- 清理存量记录见 sql/upgrade/biz_product_detail_menu_fix_v5.sql
 
 SET @pid = (SELECT menu_id FROM sys_menu WHERE menu_name='门店商品' AND menu_type='M' ORDER BY menu_id LIMIT 1);
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)

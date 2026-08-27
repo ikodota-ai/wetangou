@@ -31,8 +31,13 @@ fi
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# 脚本按用途分了子目录：
+#   sql/          全新库初始化用的建表 / 加列 / 菜单 / 种子
+#   sql/upgrade/  存量库的增量迁移（历史上遗漏过接线，见下方 5.5 段）
+#   sql/archive/  一次性调试产物，不参与任何部署
 run() {
   local f="sql/$1.sql"
+  [ -f "$f" ] || f="sql/upgrade/$1.sql"
   [ -f "$f" ] || { echo "SKIP $1 (文件不存在)"; return 0; }
   local out
   out=$("$MYSQL_BIN" --default-character-set=utf8mb4 \
@@ -106,6 +111,18 @@ run migration-2026-08-14-f2-mpauth-menu
 # 再跑一遍菜单补齐：部分按钮的父菜单（预约明细 / 提现申请）由上面的脚本创建，
 # 第一遍时 @pid 为空挂不上，这里补挂。脚本幂等，重复执行安全。
 run biz_menu_business_pages
+
+# 这 6 个是历史增量迁移，长期只在存量库手工跑过、从没接进初始化链 ——
+# 于是全新库缺渠道字典表、菜单名还是旧的、2292/2293 死菜单还在。
+# 它们都幂等，放在菜单段之后统一补上。
+echo "--- 5.5/6 增量迁移（sql/upgrade，存量库同样要跑）---"
+run biz_product_field_gap_v4        # biz_sale_channel 表 + ext 9 列 + 渠道字典菜单
+run biz_mpauth_menu_fix             # 小程序授权菜单补齐 + 越权按钮回收
+run biz_category_menu_rename        # 菜单「商品分类」→「行业品类」
+run biz_product_detail_menu_fix_v5  # 删 2292/2293 两条从不下发的死菜单
+run biz_product_category_join_fix   # 商品/佣金规则的分类 join 指向 biz_product_category
+run biz_staff_usertype_hotfix       # 修扫码入职店员拿到平台权限（P0 越权）
+run biz_collect_method_semantic_v6  # collect_method 语义归一为收款方式
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

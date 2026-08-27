@@ -58,6 +58,12 @@ biz_menu_business_pages
 biz_product_dict_charset_fix
 biz_product_industry_sync_safe
 biz_product_seed
+biz_product_field_gap_v4
+biz_mpauth_menu_fix
+biz_category_menu_rename
+biz_product_detail_menu_fix_v5
+biz_product_category_join_fix
+biz_staff_usertype_hotfix
 biz_collect_method_semantic_v6
 """.split()
 
@@ -87,8 +93,16 @@ def strip_delimiter_blocks(text):
         re.IGNORECASE | re.DOTALL | re.MULTILINE)
     return pattern.sub('', text)
 
+def resolve(name):
+    """脚本按用途分了子目录：sql/（全新库初始化）、sql/upgrade/（存量库增量迁移）。
+    这里按名字找文件，调用方不用关心它在哪个目录。"""
+    for cand in (f'sql/{name}.sql', f'sql/upgrade/{name}.sql'):
+        if os.path.exists(cand):
+            return cand
+    raise FileNotFoundError(f'找不到 {name}.sql（已查 sql/ 和 sql/upgrade/）')
+
 def clean(name):
-    path = f'sql/{name}.sql'
+    path = resolve(name)
     s = open(path, encoding='utf-8').read()
 
     # 特例：industry_sync 的游标过程等价改写成一条 UPDATE

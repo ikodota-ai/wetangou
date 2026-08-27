@@ -55,6 +55,14 @@ jobs:
       - name: Lint mybatis mapper XML
         run: bash .github/scripts/lint-mybatis.sh
 
+      # 挡住写死 menu_id 的增量迁移，以及漏接部署链的新脚本 ——
+      # 这两类错误在库上不报错，只会静默改错权限 / 让全新库缺东西
+      - name: Lint sql upgrade scripts
+        run: bash .github/scripts/lint-sql-upgrade.sh
+
+      - name: Lint sql seed idempotency
+        run: bash .github/scripts/lint-sql-seed.sh
+
       - name: Backend - mvn package
         run: mvn -B -e -ntp clean package
         env:

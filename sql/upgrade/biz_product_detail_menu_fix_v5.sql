@@ -30,20 +30,24 @@
 -- ============================================================================
 
 -- 删掉这两条误导性的 C 类菜单（它们的 component 指向的页面现由静态路由承载）。
--- 用 component 一起限定，避免误删被后人改过用途的同 id 记录。
+--
+-- 只按 component + menu_type 定位，不再写死 menu_id 2292/2293：
+-- menu_id 由各菜单脚本的插入顺序决定，不同库不一样 —— 实测 init-all.sh 建出来的
+-- 全新库里 2292/2293 是「提现记录查询」和「在线预约查询」两个正常的 F 权限点。
+-- 原先条件里的 menu_id IN (2292,2293) 在那种库上会让本脚本什么都删不到
+-- （幸好 component 限定挡住了误删）。component 才是这两条菜单的稳定标识。
 DELETE FROM sys_role_menu WHERE menu_id IN (
     SELECT menu_id FROM (
         SELECT menu_id FROM sys_menu
-         WHERE menu_id IN (2292, 2293)
-           AND menu_type = 'C'
+         WHERE menu_type = 'C'
            AND component IN ('biz/product/create', 'biz/product/detail')
     ) t
 );
 
 DELETE FROM sys_menu
- WHERE menu_id IN (2292, 2293)
-   AND menu_type = 'C'
+ WHERE menu_type = 'C'
    AND component IN ('biz/product/create', 'biz/product/detail');
 
-SELECT CONCAT('剩余 2292/2293 记录数（应为 0）：', COUNT(*)) AS result
-  FROM sys_menu WHERE menu_id IN (2292, 2293);
+SELECT CONCAT('剩余死菜单数（应为 0）：', COUNT(*)) AS result
+  FROM sys_menu
+ WHERE menu_type = 'C' AND component IN ('biz/product/create', 'biz/product/detail');

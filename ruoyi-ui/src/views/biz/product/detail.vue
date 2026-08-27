@@ -211,7 +211,7 @@ const VOUCHER_TYPE = { GENERAL: '通兑券', CATEGORY: '单品类券' }
 const SCOPE = { ALL: '全场通用', CATEGORY: '按品类', STORE: '按门店' }
 const V_RULE = { ALL_CATEGORY: '全部品类适用', ALL_BRAND: '全部品牌适用' }
 /**
- * collect_method 语义已由 sql/biz_collect_method_semantic_v6.sql 统一为「收款方式」，
+ * collect_method 语义已由 sql/upgrade/biz_collect_method_semantic_v6.sql 统一为「收款方式」，
  * 357 条存量全部归一到 HEAD/STORE，旧的券码类型取值（PLATFORM/THIRD_PARTY/
  * MERCHANT_OWN）已清零，故不再保留兼容映射。
  * 券码类型现由 ext.code_type 承载，见下方 CODE_TYPE。

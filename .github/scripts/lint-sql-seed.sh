@@ -19,7 +19,9 @@ for f in biz_product_model_v2.sql biz_merchant_v2.sql biz_product_dict_charset_f
 done
 
 # 2) INSERT ... 必须有 ON DUPLICATE KEY 或 INSERT IGNORE（idempotent）
-for s in $DIR/*.sql; do
+#    sql/upgrade/ 是存量库的增量迁移，同样会被重复执行（甚至更可能），必须一起扫。
+#    sql/archive/ 是不参与部署的一次性产物，跳过。
+for s in $DIR/*.sql $DIR/upgrade/*.sql; do
   [ -f "$s" ] || continue
   # 找包含 INSERT INTO/REPLACE INTO 的行
   if grep -qE "INSERT INTO|REPLACE INTO" "$s"; then

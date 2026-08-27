@@ -44,7 +44,7 @@ doc/PRD-抖音来客商品模型.md:121
 
 ### 「券码类型」现在有专属列了
 
-上一轮字段落库（`7e1e8056` / `sql/biz_product_field_gap_v4.sql:77`）已经建了
+上一轮字段落库（`7e1e8056` / `sql/upgrade/biz_product_field_gap_v4.sql:77`）已经建了
 `biz_product_ext.code_type`，取值 `MERCHANT` / `PLATFORM`，实测 415 行全有值：
 
 ```

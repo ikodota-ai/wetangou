@@ -2225,7 +2225,7 @@ ORDER BY p.order_num, c.order_num;
 -- 两个页面现由 ruoyi-ui/src/router/index.js 静态注册：
 --   /product/create 和 /product/detail/:productId
 -- 权限点由 2063「商品查询」/ 2064「商品新增」（F 型）承载，无需额外菜单。
--- 清理存量记录见 sql/biz_product_detail_menu_fix_v5.sql
+-- 清理存量记录见 sql/upgrade/biz_product_detail_menu_fix_v5.sql
 
 SET @pid = (SELECT menu_id FROM sys_menu WHERE menu_name='门店商品' AND menu_type='M' ORDER BY menu_id LIMIT 1);
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -3720,7 +3720,7 @@ INSERT IGNORE INTO sys_role_menu (role_id, menu_id) VALUES (4, 2290), (4, 2291);
 -- 两个页面现由 ruoyi-ui/src/router/index.js 静态注册：
 --   /product/create 和 /product/detail/:productId
 -- 权限点由 2063「商品查询」/ 2064「商品新增」（F 型）承载，无需额外菜单。
--- 清理存量记录见 sql/biz_product_detail_menu_fix_v5.sql
+-- 清理存量记录见 sql/upgrade/biz_product_detail_menu_fix_v5.sql
 
 SET @pid = (SELECT menu_id FROM sys_menu WHERE menu_name='门店商品' AND menu_type='M' ORDER BY menu_id LIMIT 1);
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, route_name, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
@@ -4524,6 +4524,433 @@ insert ignore into biz_product_category (merchant_id, parent_id, category_name, 
   (0,11, '儿童摄影',  '亲子·儿童摄影',  2, 'PARENT_CHILD', 200000, 'GROUPON,VOUCHER,COMBO',                                  1, '0', 'system', now()),
   (0,11, '儿童乐园',  '亲子·儿童乐园',  2, 'PARENT_CHILD', 200000, 'GROUPON,VOUCHER,COMBO',                                  2, '0', 'system', now()),
   (0,11, '亲子游泳',  '亲子·亲子游泳',  2, 'PARENT_CHILD', 200000, 'GROUPON,VOUCHER,PERIOD_CARD,COMBO',                      3, '0', 'system', now());
+
+
+-- ############################################################
+-- 源文件：sql/biz_product_field_gap_v4.sql
+-- ############################################################
+
+-- ============================================================================
+-- 商品字段缺口补落库（v4）
+--
+-- 背景：后台商品编辑页有 12 个输入框填了存不下 —— 前端 form 上有字段，
+--      提交后 Jackson 因 Product/ProductExt 域无对应属性直接丢弃。
+--      运营以为配好了，实际库里什么都没有（357 个商品中只有 2 个有 extra_fee_desc，
+--      35 个有 sale_start_date，正是「这两个框从没生效」的证据）。
+--
+-- 本脚本做两件事：
+--   1) 新建 biz_sale_channel 投放渠道字典（+ 5 行种子）
+--   2) biz_product_ext 幂等加 7 列，承接原先丢弃的字段
+--
+-- 为什么放 ext 不放 biz_product：主表 DEFAULT 会架空 null 校验
+--   （price/stock/validity_days 已因 DEFAULT 逼 ProductValidator 用 requirePositive 特判），
+--   新字段全是可选配置项，放 ext 不引入新的 DEFAULT 陷阱。
+--
+-- 导入：mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/biz_product_field_gap_v4.sql
+-- 幂等：可重复执行
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1. 投放渠道字典 biz_sale_channel
+--
+-- 为什么要建表而不是硬编码：抖音来客的「投放渠道」是独立子页，
+-- 每个渠道有自己的投放规则说明、分组、可用性 —— 是有业务语义的实体，不是装饰字段。
+-- 硬编码在 create.vue 里的 DOUPIN/TOUTIAO/OTHER 是照抄抖音来客的渠道名，
+-- 与本项目（微信小程序生态）根本不匹配，所以这里按我们自己的分发场景重定义。
+-- ----------------------------------------------------------------------------
+create table if not exists biz_sale_channel (
+  channel_code   varchar(30)  not null                comment '渠道代码',
+  channel_name   varchar(50)  not null                comment '渠道名称',
+  channel_group  varchar(30)  default ''              comment '渠道分组（用于前端分组展示）',
+  channel_desc   varchar(500) default ''              comment '投放规则说明（前端字段级灰字）',
+  icon           varchar(255) default ''              comment '渠道图标',
+  sort           int(4)       default 0               comment '显示顺序',
+  is_default     tinyint(1)   default 0               comment '新建商品是否默认勾选 0否 1是',
+  status         char(1)      default '0'             comment '状态（0启用 1停用）',
+  create_time    datetime     default current_timestamp,
+  update_time    datetime     default current_timestamp on update current_timestamp,
+  primary key (channel_code)
+) engine=innodb default charset=utf8mb4 comment='投放渠道字典';
+
+-- 种子：按本项目真实分发场景定义（小程序自有生态），不照抄抖音来客
+replace into biz_sale_channel
+  (channel_code, channel_name, channel_group, channel_desc, sort, is_default, status)
+values
+  ('MINI_HOME',   '小程序首页',   'SELF',    '商品出现在小程序首页推荐流，是默认的主要曝光位',                    10, 1, '0'),
+  ('MINI_STORE',  '门店详情页',   'SELF',    '顾客进入适用门店主页时可见；不勾选则只能通过直接链接购买',            20, 1, '0'),
+  ('DISTRIBUTOR', '推客分享',     'SOCIAL',  '允许推客生成带参二维码/海报分享，成交后计佣金；不勾选则推客看不到该商品', 30, 1, '0'),
+  ('GROUP_SHARE', '社群/朋友圈',  'SOCIAL',  '允许顾客分享商品卡片到微信会话与朋友圈',                          40, 1, '0'),
+  ('OFFLINE_QR',  '门店物料码',   'OFFLINE', '用于印制门店台卡/海报的静态码，扫码直达该商品详情',                 50, 0, '0');
+
+-- ----------------------------------------------------------------------------
+-- 2. biz_product_ext 幂等加列（7 列，承接原先被丢弃的字段）
+-- ----------------------------------------------------------------------------
+drop procedure if exists biz_ext_add_col;
+
+
+-- 售卖信息
+call biz_ext_add_col('sale_channels',
+  'sale_channels varchar(500) default '''' comment ''投放渠道代码集合（逗号分隔，见 biz_sale_channel）''');
+call biz_ext_add_col('staff_promote',
+  'staff_promote tinyint(1) default 0 comment ''职人带货 0否 1是''');
+
+-- 交易规则
+call biz_ext_add_col('code_type',
+  'code_type varchar(20) default ''MERCHANT'' comment ''券码类型 MERCHANT商家券/PLATFORM平台券''');
+call biz_ext_add_col('consume_start_date',
+  'consume_start_date datetime default null comment ''顾客可消费开始时间''');
+call biz_ext_add_col('consume_end_date',
+  'consume_end_date datetime default null comment ''顾客可消费结束时间''');
+call biz_ext_add_col('exclude_dates',
+  'exclude_dates varchar(1000) default '''' comment ''顾客不可消费日期段 JSON 数组，如 [["2026-01-01","2026-01-03"]]''');
+call biz_ext_add_col('daily_time_start',
+  'daily_time_start varchar(8) default '''' comment ''每日可消费时段开始 HH:mm:ss''');
+call biz_ext_add_col('daily_time_end',
+  'daily_time_end varchar(8) default '''' comment ''每日可消费时段结束 HH:mm:ss''');
+
+-- 商品资质（代金券）
+call biz_ext_add_col('voucher_rules',
+  'voucher_rules varchar(500) default '''' comment ''代金券适用规则集合（逗号分隔 ALL_CATEGORY/ALL_BRAND/...）''');
+
+drop procedure if exists biz_ext_add_col;
+
+-- ----------------------------------------------------------------------------
+-- 3. 存量商品：给 ext 补默认投放渠道
+--    没有这一步，存量 357 个商品的 sale_channels 为空，
+--    等顾客端真按渠道过滤时会全部消失。
+-- ----------------------------------------------------------------------------
+update biz_product_ext
+   set sale_channels = 'MINI_HOME,MINI_STORE,DISTRIBUTOR,GROUP_SHARE'
+ where sale_channels is null or sale_channels = '';
+
+-- 没有 ext 行的商品补一行（否则编辑页读不到默认渠道）
+insert into biz_product_ext (product_id, sale_channels)
+select p.product_id, 'MINI_HOME,MINI_STORE,DISTRIBUTOR,GROUP_SHARE'
+  from biz_product p
+  left join biz_product_ext e on e.product_id = p.product_id
+ where e.product_id is null;
+
+-- ----------------------------------------------------------------------------
+-- 4. 渠道字典菜单 + 权限（沿用 biz_product_type 的 perms 风格）
+-- ----------------------------------------------------------------------------
+set @parent := (select menu_id from sys_menu where menu_name = '商品管理' and menu_type = 'M' limit 1);
+
+delete from sys_role_menu where menu_id in (select menu_id from sys_menu where perms like 'biz:saleChannel:%');
+delete from sys_menu where perms like 'biz:saleChannel:%';
+
+insert into sys_menu
+ (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values
+ ('投放渠道', ifnull(@parent, 0), 90, 'saleChannel', 'biz/saleChannel/index', 1, '0', 'C', '0', '0', 'biz:saleChannel:list', 'guide', 'admin', sysdate(), '投放渠道字典');
+
+set @m := last_insert_id();
+insert into sys_menu
+ (menu_name, parent_id, order_num, path, component, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+values
+ ('渠道查询', @m, 1, '', '', 1, '0', 'F', '0', '0', 'biz:saleChannel:query',  '#', 'admin', sysdate(), ''),
+ ('渠道新增', @m, 2, '', '', 1, '0', 'F', '0', '0', 'biz:saleChannel:add',    '#', 'admin', sysdate(), ''),
+ ('渠道修改', @m, 3, '', '', 1, '0', 'F', '0', '0', 'biz:saleChannel:edit',   '#', 'admin', sysdate(), ''),
+ ('渠道删除', @m, 4, '', '', 1, '0', 'F', '0', '0', 'biz:saleChannel:remove', '#', 'admin', sysdate(), '');
+
+-- 平台管理员角色授权（渠道是平台级保底设置，商户不改）
+insert into sys_role_menu (role_id, menu_id)
+select 1, menu_id from sys_menu where perms like 'biz:saleChannel:%'
+   and not exists (select 1 from sys_role_menu rm where rm.role_id = 1 and rm.menu_id = sys_menu.menu_id);
+
+select 'biz_product_field_gap_v4 done' as msg,
+       (select count(*) from biz_sale_channel) as channels,
+       (select count(*) from information_schema.columns
+         where table_schema = database() and table_name = 'biz_product_ext') as ext_cols;
+
+
+-- ############################################################
+-- 源文件：sql/biz_mpauth_menu_fix.sql
+-- ############################################################
+
+-- =============================================
+-- 小程序授权菜单修复（幂等，可重复执行）
+-- 执行：mysql --default-character-set=utf8mb4 -uroot -p 库名 < sql/biz_mpauth_menu_fix.sql
+--       ↑ 必须带 --default-character-set=utf8mb4，否则中文菜单名会二次编码变乱码
+--         （menu_id=2291 原本就是漏加该参数导致存成 "å°ç¨‹åºæŽˆæƒæŸ¥è¯¢"）
+--
+-- 修 3 件事：
+--   1) mpauth 查询菜单名乱码复原
+--   2) 补齐 mpauth 的增删改导出按钮权限（原先只有 list + query）
+--   3) 角色绑定：admin(1)/platform(3) 此前完全没绑 mpauth 菜单，后台看不到
+-- 前置：ruoyi-ui/src/views/biz/mpauth/index.vue 已实装（否则点进去空白）
+-- 缓存：菜单本身不走缓存，无需 flushdb（详见 doc/部署上线指南.md §7.2）
+--
+-- ⚠️ 本脚本原先写死 menu_id 2290/2291/2294/2295/2296，实测这会改错菜单：
+--    menu_id 由各菜单脚本的插入顺序决定，不同库不一致。init-all.sh 建出来的
+--    全新库里 2294/2295/2296 是「在线预约」的增删改按钮（biz:booking:add/edit/remove），
+--    旧版脚本把它们当成 mpauth 按钮绑给了 admin/platform，
+--    还用 DELETE 把它们从代理商/商户角色手里删掉 —— 是一次真实的权限错授。
+--    现全部改为按 perms 定位，新按钮的 menu_id 交给 auto_increment。
+-- =============================================
+
+-- 1) 修乱码菜单名（按 perms 定位，menu_id 在各库不一致）
+UPDATE sys_menu SET menu_name='小程序授权查询' WHERE perms='biz:mpauth:query';
+
+-- 2) 补齐按钮权限。
+--    menu_id 不再手工指定，交给 auto_increment —— 手工分配就是上面那次错授的根因。
+--    父菜单按 perms='biz:mpauth:list' 现查，缺父菜单时整段不插（NOT EXISTS 兜住）。
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT '小程序授权修改', p.menu_id, 2, '#', '', '', 1, 0, 'F', '0', '0', 'biz:mpauth:edit', '#', 'admin', SYSDATE(), '维护授权状态'
+  FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:mpauth:list' LIMIT 1) p
+ WHERE NOT EXISTS (SELECT 1 FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:mpauth:edit') t);
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT '小程序授权删除', p.menu_id, 3, '#', '', '', 1, 0, 'F', '0', '0', 'biz:mpauth:remove', '#', 'admin', SYSDATE(), '清理本地授权记录'
+  FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:mpauth:list' LIMIT 1) p
+ WHERE NOT EXISTS (SELECT 1 FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:mpauth:remove') t);
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, query, is_frame, is_cache, menu_type, visible, status, perms, icon, create_by, create_time, remark)
+SELECT '小程序授权导出', p.menu_id, 4, '#', '', '', 1, 0, 'F', '0', '0', 'biz:mpauth:export', '#', 'admin', SYSDATE(), '导出授权清单'
+  FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:mpauth:list' LIMIT 1) p
+ WHERE NOT EXISTS (SELECT 1 FROM (SELECT menu_id FROM sys_menu WHERE perms='biz:mpauth:export') t);
+
+-- 3) 角色绑定（同样按 perms 现查 menu_id）
+--    admin(1) / platform(3)：全部权限（授权是平台级能力）
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id)
+SELECT r.role_id, m.menu_id FROM sys_menu m
+  JOIN (SELECT 1 AS role_id UNION ALL SELECT 3) r
+ WHERE m.perms IN ('biz:mpauth:list','biz:mpauth:query','biz:mpauth:edit','biz:mpauth:remove','biz:mpauth:export');
+
+--    agent(4) / merchant(5)：只读（代理商看名下商户，商户看自己，
+--    TenantFilterHelper 会强制过滤），不给增删改导出
+INSERT IGNORE INTO sys_role_menu(role_id, menu_id)
+SELECT r.role_id, m.menu_id FROM sys_menu m
+  JOIN (SELECT 4 AS role_id UNION ALL SELECT 5) r
+ WHERE m.perms IN ('biz:mpauth:list','biz:mpauth:query');
+
+--    清掉可能的历史误绑：代理商/商户不该有 mpauth 的删改导出
+DELETE rm FROM sys_role_menu rm
+  JOIN sys_menu m ON m.menu_id = rm.menu_id
+ WHERE rm.role_id IN (4,5)
+   AND m.perms IN ('biz:mpauth:edit','biz:mpauth:remove','biz:mpauth:export');
+
+-- 4) 清理悬空绑定
+DELETE rm FROM sys_role_menu rm LEFT JOIN sys_menu m ON rm.menu_id=m.menu_id WHERE m.menu_id IS NULL;
+
+-- 5) 校验
+SELECT menu_id, parent_id, menu_name, menu_type, perms FROM sys_menu
+ WHERE perms LIKE 'biz:mpauth:%' ORDER BY order_num;
+SELECT rm.role_id, GROUP_CONCAT(m.perms ORDER BY m.perms) AS perms
+  FROM sys_role_menu rm JOIN sys_menu m ON m.menu_id = rm.menu_id
+ WHERE m.perms LIKE 'biz:mpauth:%' GROUP BY rm.role_id;
+
+
+-- ############################################################
+-- 源文件：sql/biz_category_menu_rename.sql
+-- ############################################################
+
+-- ============================================================================
+-- 菜单改名：「商品分类」→「行业品类」（menu_id=2032 及其 5 个按钮）
+--
+-- 为什么改：
+--   menu_id=2032 指向 biz/category/index，而该页实际管理的是
+--   biz_product_category —— 平台级「行业品类」多级树
+--   （带 industry_code / allowed_types / deposit_amount / license_required），
+--   是商品高级编辑页第 1 步「商品品类」级联选择器的数据源。
+--
+--   但它挂在「门店商品」(parent_id=2108) 下且叫「商品分类」，
+--   极易被误认为是商家给自己菜单分组用的那种分类
+--   （那个是另一张遗留表 biz_category）。改名消除歧义。
+--
+-- 只改 menu_name（显示名），不动 perms / path / component：
+--   perms 是 biz:category:* ，前端 v-hasPermi 和后端 @PreAuthorize 都在用，
+--   改了会直接导致该页按钮全部失效、甚至整页 403。
+--
+-- 幂等：带 WHERE menu_name 条件，重复执行不会产生额外变更。
+--
+-- 无需清 Redis：菜单不走缓存，刷新后台页面即可看到新名字。
+-- ============================================================================
+
+-- 按 perms 定位而不是写死 menu_id：
+-- 实测本地库这组菜单是 2032-2037，而 init-all.sh 建出来的全新库是 2012 / 2048-2052
+-- （menu_id 由各菜单脚本各自的插入顺序决定，不同库不一致）。
+-- 写死 id 的话，在 id 不同的库上不仅改不到目标，还可能命中同 id 的别的菜单
+-- —— 全新库的 2032 恰好是「协议查询」。perms 才是稳定标识。
+UPDATE sys_menu SET menu_name = '行业品类'     WHERE perms = 'biz:category:list'   AND menu_name = '商品分类';
+UPDATE sys_menu SET menu_name = '行业品类查询' WHERE perms = 'biz:category:query'  AND menu_name = '商品分类查询';
+UPDATE sys_menu SET menu_name = '行业品类新增' WHERE perms = 'biz:category:add'    AND menu_name = '商品分类新增';
+UPDATE sys_menu SET menu_name = '行业品类修改' WHERE perms = 'biz:category:edit'   AND menu_name = '商品分类修改';
+UPDATE sys_menu SET menu_name = '行业品类删除' WHERE perms = 'biz:category:remove' AND menu_name = '商品分类删除';
+UPDATE sys_menu SET menu_name = '行业品类导出' WHERE perms = 'biz:category:export'  AND menu_name = '商品分类导出';
+
+-- 校验：应看到 6 行「行业品类*」
+SELECT menu_id, parent_id, menu_name, path, component, perms
+FROM sys_menu WHERE perms LIKE 'biz:category:%' ORDER BY menu_id;
+
+
+-- ############################################################
+-- 源文件：sql/biz_product_detail_menu_fix_v5.sql
+-- ############################################################
+
+-- ============================================================================
+-- 修 sys_menu 里「商品创建 / 商品详情」两条死菜单（v5）
+--
+-- 背景：v3_p2_menus_routes.sql 早就插了 2292「商品创建」和 2293「商品详情」，
+--      component 分别指向 biz/product/create 和 biz/product/detail。
+--      但这两条从来没生效过，原因有两个：
+--
+--   1) 二者都挂在 2062「商品管理」下，而 2062 的 menu_type = 'C'。
+--      SysMenuServiceImpl.buildMenus 只在 UserConstants.TYPE_DIR（即 'M'）时
+--      才递归 children，所以 C 类菜单的子菜单被整体丢弃 ——
+--      /getRouters 实测确认返回里根本没有这两条路由。
+--
+--   2) 2293 的 path 写成 'detail/:productId(d+)'，正则反斜杠在写 SQL 时丢了，
+--      本意是 :productId(\d+)。就算路由能下发，这个 path 也匹配不到数字 ID。
+--
+--   3) 2292/2293 在 sys_role_menu 里 0 条授权记录（select count(*) 实测 = 0），
+--      非 admin 角色即便路由能下发也拿不到。
+--
+-- 结论：商品创建 / 商品详情两个页面都改由 ruoyi-ui/src/router/index.js 静态注册
+--      （/product/create 和 /product/detail/:productId），不依赖 sys_menu。
+--      这两条 C 类菜单记录留着只会误导后来人 —— 看到 sys_menu 里有记录，
+--      以为改 path 就能生效，实际改了也不下发。所以降级为按钮级（F）权限点，
+--      与 2063「商品查询」/2064「商品新增」保持同一形态。
+--
+-- 权限侧不需要额外补：查看态用的 biz:product:query 已由 2063 承载，
+-- 且已授权给 role_id 4（代理商）和 5（商户管理员），admin 走 *:*:* 全通。
+--
+-- 导入：mysql --default-character-set=utf8mb4 -uroot -p ry-vue < sql/biz_product_detail_menu_fix_v5.sql
+-- 幂等：可重复执行
+-- ============================================================================
+
+-- 删掉这两条误导性的 C 类菜单（它们的 component 指向的页面现由静态路由承载）。
+--
+-- 只按 component + menu_type 定位，不再写死 menu_id 2292/2293：
+-- menu_id 由各菜单脚本的插入顺序决定，不同库不一样 —— 实测 init-all.sh 建出来的
+-- 全新库里 2292/2293 是「提现记录查询」和「在线预约查询」两个正常的 F 权限点。
+-- 原先条件里的 menu_id IN (2292,2293) 在那种库上会让本脚本什么都删不到
+-- （幸好 component 限定挡住了误删）。component 才是这两条菜单的稳定标识。
+DELETE FROM sys_role_menu WHERE menu_id IN (
+    SELECT menu_id FROM (
+        SELECT menu_id FROM sys_menu
+         WHERE menu_type = 'C'
+           AND component IN ('biz/product/create', 'biz/product/detail')
+    ) t
+);
+
+DELETE FROM sys_menu
+ WHERE menu_type = 'C'
+   AND component IN ('biz/product/create', 'biz/product/detail');
+
+SELECT CONCAT('剩余死菜单数（应为 0）：', COUNT(*)) AS result
+  FROM sys_menu
+ WHERE menu_type = 'C' AND component IN ('biz/product/create', 'biz/product/detail');
+
+
+-- ############################################################
+-- 源文件：sql/biz_product_category_join_fix.sql
+-- ############################################################
+
+-- ============================================================================
+-- 商品分类归一：把商品/佣金规则的 category_id 从 biz_category 迁到 biz_product_category
+--
+-- 背景（为什么要这个脚本）：
+--   系统里有两张分类表，职责本该不同：
+--     * biz_product_category —— 平台级「行业品类」多级树，带 industry_code /
+--       allowed_types / deposit_amount / license_required。
+--       商品高级编辑页第 1 步的「商品品类」级联选择器、后台「商品分类」菜单
+--       （menu_id=2032，component=biz/category/index）用的都是这张表。
+--     * biz_category —— 早期的商户/门店级自定义分组（只有 name/icon/sort +
+--       merchant_id/store_id），用于小程序点单页左侧导航那种分组。
+--
+--   但 ProductMapper.xml / CommissionRuleMapper.xml 一直 join 的是 biz_category，
+--   而 category_id 实际来自 biz_product_category —— 两张表 ID 空间独立，
+--   于是新建商品在列表页「商品分类」列显示为空；
+--   更危险的是 ID 会撞车：biz_category 里 100='套餐'，
+--   将来 biz_product_category 自增到 100 时是另一个东西，会显示成不相干的分类。
+--
+--   现已把两处 join 改为 biz_product_category。本脚本负责把存量数据对齐，
+--   否则那些老商品改完 join 后分类名会变空。
+--
+--   biz_category 目前没有任何写入入口（mapper 里只有 join，无 insert/update/delete），
+--   小程序端也不读它，属于遗留表，故只迁引用、不动它本身。
+--
+-- 幂等：只更新「在 biz_category 命中、且在 biz_product_category 不命中」的行，
+--       重复执行不会产生额外变更。
+-- ============================================================================
+
+-- 1) 商品：老 category_id → biz_product_category 中的同名二级品类
+--    映射依据是两表同名分类（100 套餐→10100 套餐，200 野生菌套餐→10200 …）
+UPDATE biz_product p
+  JOIN biz_category      old_c ON old_c.category_id = p.category_id
+  JOIN biz_product_category new_c
+       ON new_c.category_name = old_c.category_name
+      AND new_c.level = 2
+  LEFT JOIN biz_product_category chk ON chk.category_id = p.category_id
+SET p.category_id = new_c.category_id
+WHERE chk.category_id IS NULL;
+
+-- 2) 佣金规则：同样的迁移（当前数据 category_id 全为 NULL，此处为将来兜底）
+UPDATE biz_commission_rule r
+  JOIN biz_category      old_c ON old_c.category_id = r.category_id
+  JOIN biz_product_category new_c
+       ON new_c.category_name = old_c.category_name
+      AND new_c.level = 2
+  LEFT JOIN biz_product_category chk ON chk.category_id = r.category_id
+SET r.category_id = new_c.category_id
+WHERE chk.category_id IS NULL;
+
+-- 3) 校验：期望 0 行。非 0 说明还有 category_id 落在 biz_product_category 之外，
+--    需要人工确认该分类应归到哪个行业品类。
+SELECT p.product_id, p.product_name, p.category_id
+FROM biz_product p
+LEFT JOIN biz_product_category c ON c.category_id = p.category_id
+WHERE p.category_id IS NOT NULL
+  AND p.category_id <> 0
+  AND c.category_id IS NULL;
+
+
+-- ############################################################
+-- 源文件：sql/biz_staff_usertype_hotfix.sql
+-- ############################################################
+
+-- ============================================================================
+-- 修复：扫码入职员工账号被误建成 user_type='00'（平台身份）导致的越权
+--
+-- 背景：ApiMerchantStaffController.createStaffByOpenid 历史版本写死 u.setUserType("00")。
+--      而 buildLoginMember 见到 user_type='00' 就授予 BizRole.PLATFORM，
+--      结果扫邀请码入职的普通店员登录小程序后可读全平台商户/订单/员工名单。
+--
+-- 代码侧已修：新建账号统一 user_type='02'，且「有员工关联的账号」不再升级为平台身份。
+-- 本脚本负责清理存量脏数据。
+--
+-- 幂等：可重复执行。
+-- ============================================================================
+
+-- 1) 有商家员工关联、却被标成平台账号（00）的，一律纠正为商户员工（02）
+UPDATE sys_user u
+JOIN (
+    SELECT DISTINCT user_id FROM biz_merchant_staff
+) s ON s.user_id = u.user_id
+SET u.user_type = '02',
+    u.update_time = NOW()
+WHERE u.user_type = '00'
+  AND u.user_name <> 'admin';
+
+-- 2) 顺带回填 merchant_id（早期版本 insertUser 漏列，导致租户归属为空/0）
+UPDATE sys_user u
+JOIN (
+    SELECT user_id, MIN(merchant_id) AS mid
+    FROM biz_merchant_staff
+    GROUP BY user_id
+) s ON s.user_id = u.user_id
+SET u.merchant_id = s.mid,
+    u.update_time = NOW()
+WHERE u.user_type = '02'
+  AND (u.merchant_id IS NULL OR u.merchant_id = 0)
+  AND s.mid IS NOT NULL
+  AND s.mid <> 0;
+
+-- 3) 校验：以下两条查询都应返回 0 行
+-- SELECT user_id, user_name, user_type FROM sys_user
+--  WHERE user_type = '00' AND user_id IN (SELECT user_id FROM biz_merchant_staff);
+-- SELECT u.user_id FROM sys_user u JOIN biz_merchant_staff s ON s.user_id = u.user_id
+--  WHERE u.user_type = '02' AND (u.merchant_id IS NULL OR u.merchant_id = 0) AND s.merchant_id <> 0;
 
 
 -- ############################################################
