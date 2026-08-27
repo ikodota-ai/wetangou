@@ -365,6 +365,22 @@ export default {
       title: "",
       // 第三方平台状态（loadStatus 写入）
       status: null,
+      // 代上传向导弹窗。
+      //
+      // 这三个原先只在 openWizard() 里赋值，从没在 data() 声明过（74f97704 引入
+      // 向导时就漏了）—— Vue 的响应式只认 data 里声明过的键，未声明的属性初始
+      // 渲染时是 undefined，模板里 wizardForm.merchantId 直接抛
+      // 「Cannot read properties of undefined」，整页渲染中断变白板。
+      // 弹窗的 v-if 挡不住这个：el-form 的 :model="wizardForm" 在外层就会先求值。
+      wizardVisible: false,
+      wizardStep: 0,
+      wizardForm: {
+        merchantId: null,
+        userVersion: '',
+        userDesc: '',
+        templateId: '',
+        extJson: ''
+      },
       // 代码包下载弹窗
       codePackVisible: false,
       codePackForm: {

@@ -48,6 +48,38 @@ while IFS= read -r f; do
   PASS=$((PASS+1))
 done < <(find ruoyi-ui/src -name '*.vue' | sort)
 
+# 3) 模板里 :model="X" 绑定的对象，X 必须在 data() 里声明。
+#    Vue 的响应式只认 data 里声明过的键 —— 只在 methods 里 this.X = {...} 赋值的话，
+#    初始渲染时 X 是 undefined，模板读 X.someField 直接抛
+#    「Cannot read properties of undefined」，整页渲染中断变白板。
+#    弹窗的 v-if 挡不住：el-form 的 :model 在外层就会先求值。
+#    （实测 views/biz/mprelease/index.vue 的 wizardForm 就是这样，从 74f97704 起一直是白板）
+echo ""
+echo "检查 :model 绑定的对象是否在 data() 声明:"
+MODEL_FAIL=0
+while IFS= read -r f; do
+  grep -q '<script' "$f" || continue
+  # 取 data() { return { ... 段（到 created/methods/computed 之前）。
+  # 注意不能用 \s —— BSD sed（macOS）不认，会静默取出 0 行让整个检查失效。
+  blk=$(sed -n '/data[ ]*([ ]*)[ ]*{/,/^[[:space:]]*\(created\|methods\|computed\|mounted\|watch\)[[:space:]]*[(:]/p' "$f")
+  [ -n "$blk" ] || continue
+  # props 和 computed 里声明的也算（RuoYi 的 gen/*Form.vue 就把 info 作为 prop 传入）
+  extra=$(sed -n '/^[[:space:]]*props[[:space:]]*:/,/^[[:space:]]*}/p' "$f"; \
+          sed -n '/^[[:space:]]*computed[[:space:]]*:/,/^[[:space:]]*}[[:space:]]*[,;]*[[:space:]]*$/p' "$f")
+  for v in $(grep -o ':model="[a-zA-Z_$][a-zA-Z0-9_$]*"' "$f" | sed 's/.*:model="//;s/"//' | sort -u); do
+    if ! echo "$blk$extra" | grep -qE "^[[:space:]]+$v[[:space:]]*[:(]"; then
+      echo "  ❌ $f :model=\"$v\" 但 data() 里没声明 $v"
+      MODEL_FAIL=$((MODEL_FAIL+1))
+    fi
+  done
+done < <(find ruoyi-ui/src -name '*.vue' | sort)
+if [ "$MODEL_FAIL" -eq 0 ]; then
+  echo "  ✅ 全部 :model 绑定的对象都已在 data() 声明"
+  PASS=$((PASS+1))
+else
+  FAIL=$((FAIL+MODEL_FAIL))
+fi
+
 echo ""
 echo "vue sfc lint: PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
