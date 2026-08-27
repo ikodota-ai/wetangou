@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
-import com.ruoyi.common.annotation.Sensitive;
-import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
@@ -56,13 +54,19 @@ public class Store extends BaseEntity
     @Excel(name = "纬度")
     private BigDecimal latitude;
 
-    /** 门店电话 */
-    @Sensitive(desensitizedType = DesensitizedType.PHONE)
+    /**
+     * 门店电话。
+     *
+     * 不加 @Sensitive：这是门店主动对外公布的联系方式（顾客要靠它打电话到店），
+     * 属公开信息，不是个人隐私。而 SensitiveJsonSerializer.desensitization()
+     * 在拿不到 LoginUser 时返 true，也就是「匿名请求一律脱敏」——
+     * 小程序 /api/store/* 全是匿名接口，加了注解后顾客拿到的是 134****3069，
+     * wx.makePhoneCall 传含 * 的号码必然失败，表现为「点拨打电话没反应」。
+     */
     @Excel(name = "门店电话")
     private String phone;
 
-    /** 客服电话 */
-    @Sensitive(desensitizedType = DesensitizedType.PHONE)
+    /** 客服电话（同上，公开信息，不脱敏，否则小程序拨不出去） */
     @Excel(name = "客服电话")
     private String servicePhone;
 

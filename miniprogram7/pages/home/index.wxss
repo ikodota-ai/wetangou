@@ -20,12 +20,16 @@
 .s-hours { font-size: 24rpx; color: var(--color-text-2); }
 .tags { display: flex; align-items: center; gap: 16rpx; }
 .tag { font-size: 22rpx; color: var(--color-primary); background: var(--color-tag-green-bg); padding: 4rpx 16rpx; border-radius: 8rpx; }
+/* 门店没配服务标签时的占位，用灰色区分于真实标签 */
+.tag-empty { color: var(--color-text-4); background: #F5F5F5; }
 .detail { margin-left: auto; font-size: 24rpx; color: var(--color-text-4); }
 
 .s-addr { background: #F7F7F7; border-radius: 16rpx; padding: 20rpx 24rpx; display: flex; align-items: center; justify-content: space-between; margin-top: 8rpx; }
 .addr-txt { flex: 1; display: flex; flex-direction: column; gap: 6rpx; }
 .a1 { font-size: 26rpx; font-weight: 600; color: #1A1A1A; }
 .a2 { font-size: 22rpx; color: var(--color-text-4); }
+/* 「查看距离」是可点的，用主色区分于纯展示的距离文案 */
+.a2-act { color: var(--color-primary); }
 .addr-ops { display: flex; gap: 24rpx; }
 .op { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
 .op-ic { width: 64rpx; height: 64rpx; border-radius: 50%; background: #ECECEC; display: flex; align-items: center; justify-content: center; }
@@ -76,6 +80,13 @@
 .bp-ttl { font-size: 30rpx; font-weight: 600; color: #1A1A1A; }
 .bp-sub { font-size: 24rpx; color: #999; }
 .bp-arr { width: 24rpx; height: 24rpx; border-right: 4rpx solid #CCC; border-top: 4rpx solid #CCC; transform: rotate(45deg); margin-right: 16rpx; }
+.bp-card + .bp-card { border-top: 1rpx solid #F0F0F0; }
+.bp-price { display: flex; align-items: baseline; gap: 12rpx; margin-top: 4rpx; }
+.bp-price .now { font-size: 32rpx; font-weight: 700; color: #FF4D3A; }
+.bp-price .old { font-size: 22rpx; color: #BBB; text-decoration: line-through; }
+.bp-empty { display: flex; flex-direction: column; align-items: center; gap: 12rpx; padding: 48rpx 0; }
+.bp-empty-t { font-size: 26rpx; color: #999; }
+.bp-empty-a { font-size: 26rpx; color: var(--color-primary); }
 
 /* 设施抽屉 */
 .drawer-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: flex-end; }
@@ -86,9 +97,14 @@
 .d-close::before, .d-close::after { content: ''; position: absolute; left: 50%; top: 50%; width: 32rpx; height: 4rpx; background: #999; border-radius: 2rpx; }
 .d-close::before { transform: translate(-50%, -50%) rotate(45deg); }
 .d-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
-.drawer-body { padding: 0 32rpx 122rpx;height:120rpx; display: flex; flex-direction: column; gap: 24rpx; }
-.fac-line { font-size: 28rpx; color: #1A1A1A; line-height: 1.8; }
-.dot { display: inline-block; width: 16rpx;}
+/* 原来写死 height:120rpx，设施项一多就被裁掉 —— 改成上限内自适应 + 可滚动。 */
+.drawer-body { padding: 8rpx 32rpx 40rpx; max-height: 60vh; }
+/* 每项独立一行，两列排布，避免长标签（如「提供独立空间」）挤在一起看不清 */
+.fac-grid { display: flex; flex-wrap: wrap; }
+.fac-item { display: flex; align-items: center; width: 50%; padding: 14rpx 0; box-sizing: border-box; }
+.fac-ic { font-size: 24rpx; color: var(--color-primary); margin-right: 10rpx; }
+.fac-txt { font-size: 28rpx; color: #1A1A1A; }
+.fac-empty { font-size: 28rpx; color: var(--color-text-4); padding: 40rpx 0; text-align: center; }
 
 /* 咨询弹窗 */
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 60rpx; }

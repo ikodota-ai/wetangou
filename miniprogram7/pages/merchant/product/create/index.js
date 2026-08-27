@@ -223,6 +223,8 @@ Page({
     // 编辑态：productId 有值就是改已有商品，走 PUT；否则 POST 新建
     productId: null,
     isEdit: false,
+    // 收款方式只读展示文案（跟随 form.collectMethod，HEAD/STORE 两种）
+    collectMethodLabel: '总部统一收款',
     // step: 1 = 选类型页, 2 = tab 表单页
     step: 1,
     activeTab: 0,           // 0/1/2/3/4
@@ -237,7 +239,11 @@ Page({
     // 弹窗
     categorySheet: false,   // 商品品类弹窗
     typeSheet: false,       // 商品类型弹窗
-    categoryList: ['购物·服饰鞋帽·服装', '购物·服饰鞋帽·鞋靴', '购物·服饰鞋帽·箱包', '购物·母婴用品·儿童服饰', '购物·服饰鞋帽·内衣袜子'],
+    // 品类来自 biz_product_category（/api/product/category/list），不写死中文串：
+    // 原先这里硬编码 5 条「购物·服饰鞋帽·服装」之类，和库里真实品类（美食/丽人/
+    // 住宿…）完全对不上，商家只能在 5 个不相干的服饰品类里挑一个。
+    categoryList: [],
+    categoryLoaded: false,
     pickedCategory: '',
 
     // 表单
@@ -253,8 +259,6 @@ Page({
     channelGroups: [],
     channelSheet: false,
     channelSummary: '',
-    categoryOptions: [{ id: 0, label: '不选' }],
-    categoryIdx: 0,
     periodOptions: PERIOD_OPTIONS,
     periodIdx: 0,
 
@@ -272,7 +276,10 @@ Page({
       staffPromote: 0,
       codeType: 'MERCHANT',
       refundPolicy: 'ANYTIME',
-      collectMethod: 'PLATFORM',
+      // 收款方式跟随商家支付配置，HEAD=总部统一收款（与 wxml 展示的文案一致）。
+      // 原先写 'PLATFORM' 是把「券码类型」语义误用到这一列，导致
+      // wxml 显示「总部统一收款」而库里存 PLATFORM —— 显示与落库不一致。
+      collectMethod: 'HEAD',
       mutexWithStorePromotion: 1,
       extraFeeDesc: ''
     },
@@ -337,7 +344,7 @@ Page({
         requireXiaoxin: p.requireXiaoxin ? 1 : 0,
         notice: p.notice || '',
         refundPolicy: p.refundPolicy || 'ANYTIME',
-        collectMethod: p.collectMethod || 'PLATFORM',
+        collectMethod: p.collectMethod || 'HEAD',
         mutexWithStorePromotion: p.mutexWithStorePromotion === 0 ? 0 : 1,
         extraFeeDesc: p.extraFeeDesc || '',
         saleChannels: ext.saleChannels ? String(ext.saleChannels).split(',').filter(v => v) : [],
@@ -352,6 +359,7 @@ Page({
         pickedTypeName: (item && item.typeName) || tc,
         pickedTypeDesc: TYPE_DESC[tc] || '',
         pickedCategory: p.categoryName || '（沿用原品类）',
+        collectMethodLabel: form.collectMethod === 'STORE' ? '门店独立收款' : '总部统一收款',
         form,
         step: 2,
         activeTab: 0
@@ -471,13 +479,32 @@ Page({
     })
   },
 
+  /**
+   * 拉真实品类给第 1 步的品类弹窗用。
+   *
+   * 这里不能再「静默 catch」：品类是必填项，拉失败时弹窗会是空的，商家点不动
+   * 「下一步」却看不到任何原因。
+   * label 优先 full_path（「美食·套餐」比单独一个「套餐」可读），叶子优先排前面
+   * （level 大的更具体）。
+   */
   async _loadCategories() {
     try {
       const data = await api.categoryList()
-      const cats = [{ id: 0, label: '不选' }]
-      if (data && Array.isArray(data)) data.forEach(c => cats.push({ id: c.categoryId, label: c.categoryName }))
-      this.setData({ categoryOptions: cats })
-    } catch (e) { /* 静默 */ }
+      const rows = Array.isArray(data) ? data : []
+      const cats = rows
+        .map(c => ({
+          id: c.categoryId,
+          label: c.fullPath || c.categoryName,
+          level: c.level || 1
+        }))
+        .filter(c => c.id && c.label)
+        .sort((a, b) => (b.level - a.level) || (a.id - b.id))
+      this.setData({ categoryList: cats, categoryLoaded: true })
+    } catch (e) {
+      console.warn('[create] _loadCategories FAIL', e)
+      this.setData({ categoryList: [], categoryLoaded: true })
+      wx.showToast({ title: '品类加载失败：' + ((e && (e.msg || e.errMsg)) || '网络异常'), icon: 'none', duration: 3000 })
+    }
   },
 
   _rebuildFields() {
@@ -507,9 +534,21 @@ Page({
   onCloseCategorySheet() { this.setData({ categorySheet: false }) },
   onCloseTypeSheet() { this.setData({ typeSheet: false }) },
 
+  /**
+   * 选品类。
+   *
+   * 原先只写 pickedCategory（展示用的中文串），form.categoryId 一直是初始值 0，
+   * 提交时 `categoryId: f.categoryId === 0 ? null : f.categoryId` 把它变成 null
+   * —— 商家端建出来的商品品类全是空的。真正该写的是 categoryId。
+   */
   onPickCategoryItem(e) {
-    const name = e.currentTarget.dataset.name
-    this.setData({ pickedCategory: name, categorySheet: false })
+    const ds = e.currentTarget.dataset
+    const id = Number(ds.id)
+    this.setData({
+      pickedCategory: ds.name,
+      'form.categoryId': id > 0 ? id : 0,
+      categorySheet: false
+    })
   },
 
   onPickTypeItem(e) {
@@ -579,12 +618,6 @@ Page({
   /** 是否可与店内其他优惠同享（库里存的是「互斥」，取值要反过来） */
   onToggleMutex(e) {
     this.setData({ 'form.mutexWithStorePromotion': e.detail.value ? 0 : 1 })
-  },
-
-  onPickCategory(e) {
-    const idx = Number(e.detail.value)
-    const opt = this.data.categoryOptions[idx]
-    this.setData({ categoryIdx: idx, 'form.categoryId': opt.id })
   },
 
   onPickPeriod(e) {
@@ -657,7 +690,7 @@ Page({
       notice: (f.notice || '').trim(),
       // 与后台对齐的字段（原先商家端不传，主表 DEFAULT 顶上，运营在后台看到的是默认值）
       refundPolicy: f.refundPolicy || 'ANYTIME',
-      collectMethod: f.collectMethod || 'PLATFORM',
+      collectMethod: f.collectMethod || 'HEAD',
       mutexWithStorePromotion: f.mutexWithStorePromotion === 0 ? 0 : 1,
       extraFeeDesc: (f.extraFeeDesc || '').trim(),
       productType: this._mapProductType(this.data.pickedType),

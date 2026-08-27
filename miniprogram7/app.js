@@ -332,6 +332,27 @@ App({
     fetchList('list_placeholder')
     tryLazyLoc()
   },
+  /**
+   * 商品列表卡片上那行小字。
+   *
+   * 原先 home/index.wxml 写死「购买后365天内可用｜免预约」—— 有效期是每个商品
+   * 自己的 validity_days（后台可填 30/90/365...），免不免预约取决于 type_code
+   * 是不是 BOOKING，两个都写死等于对所有商品撒谎。
+   * 优先用运营自己填的 subtitle；没填才按真实字段拼。
+   */
+  buildGoodsDesc(p) {
+    if (p && p.subtitle) return p.subtitle
+    const parts = []
+    const days = p && p.validityDays
+    if (days) parts.push('购买后' + days + '天内可用')
+    const tc = (p && p.typeCode) || ''
+    if (tc === 'BOOKING') {
+      parts.push('需预约')
+    } else if (tc) {
+      parts.push('免预约')
+    }
+    return parts.join('｜')
+  },
   // 加载商品
   loadGoods(storeId) {
     return new Promise((resolve, reject) => {
@@ -346,6 +367,9 @@ App({
             price: p.price != null ? String(p.price) : '0.00',
             marketPrice: p.marketPrice != null ? String(p.marketPrice) : '',
             subtitle: p.subtitle || '',
+            typeCode: p.typeCode || '',
+            validityDays: p.validityDays || null,
+            desc: this.buildGoodsDesc(p),
             sold: p.sales || p.sold || 0,
             cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png'
           }));
@@ -383,6 +407,9 @@ App({
           price: p.price != null ? String(p.price) : '0.00',
           marketPrice: p.marketPrice != null ? String(p.marketPrice) : '',
           subtitle: p.subtitle || '',
+          typeCode: p.typeCode || '',
+          validityDays: p.validityDays || null,
+          desc: this.buildGoodsDesc(p),
           sold: p.sales || p.sold || 0,
           cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png'
         })) : []

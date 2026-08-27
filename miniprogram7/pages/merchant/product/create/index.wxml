@@ -71,7 +71,9 @@
         </view>
         <view class="readonly-row">
           <text class="row-label">收款方式 <text class="readonly-tag">不可编辑</text></text>
-          <text class="readonly-value">总部统一收款</text>
+          <!-- 原先这里硬编码「总部统一收款」，而 js 往库里写的是 PLATFORM ——
+               显示与落库不一致。现在绑定真实值。 -->
+          <text class="readonly-value">{{collectMethodLabel}}</text>
         </view>
         <!-- 适用门店：多选。原先是单选（storeIds 只塞一个 storeId），
              连锁商户的同一个套餐在第 2 家门店就没法卖。 -->
@@ -270,14 +272,16 @@
         <text class="sheet-close" bindtap="onCloseCategorySheet">×</text>
       </view>
       <view class="sheet-body">
-        <view class="sheet-tip">智能推荐以下品类</view>
-        <view wx:for="{{categoryList}}" wx:key="*this"
-              class="sheet-item"
-              data-name="{{item}}"
+        <view class="sheet-tip" wx:if="{{categoryList.length}}">请选择商品所属品类</view>
+        <view wx:for="{{categoryList}}" wx:key="id"
+              class="sheet-item {{form.categoryId === item.id ? 'on' : ''}}"
+              data-id="{{item.id}}"
+              data-name="{{item.label}}"
               bindtap="onPickCategoryItem">
-          <text>{{item}}</text>
+          <text>{{item.label}}</text>
         </view>
-        <view class="sheet-tip">以上没有合适的品类，查看<text class="link"> 全部分类</text></view>
+        <view class="sheet-tip" wx:if="{{categoryLoaded && !categoryList.length}}">暂无可用品类，请联系平台在后台【门店商品 → 商品分类】配置</view>
+        <view class="sheet-tip" wx:if="{{!categoryLoaded}}">加载中…</view>
       </view>
       <view class="sheet-foot">
         <view class="sheet-btn" bindtap="onCloseCategorySheet">确认</view>

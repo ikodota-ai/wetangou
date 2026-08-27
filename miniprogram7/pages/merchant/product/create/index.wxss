@@ -78,6 +78,7 @@
 
 /* ===== 多选弹窗条目（门店 / 渠道） ===== */
 .sheet-item.pick { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.sheet-item.on { color: #FF4D3A; font-weight: 600; }
 .pick-mark { width: 40rpx; text-align: center; font-size: 32rpx; color: transparent; }
 .pick-mark.on { color: #1677FF; }
 .ch-group { margin-bottom: 12rpx; }

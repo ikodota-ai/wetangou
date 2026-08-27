@@ -62,12 +62,18 @@ public class ApiProductController
      *   - merchantId 不传：按 storeId 查单店商品
      *   - merchantId 传了 + storeId 缺：返回该商户下所有自取/跨店商品
      *   - 两个都传：商户范围 + 门店范围
+     *
+     * <p>typeCode 是 v2 抖音来客商品类型（GROUPON/VOUCHER/BOOKING/...）。
+     * 原先这个端点只收老字段 productType（'0'/'1'），顾客端没法按 v2 类型筛，
+     * 于是首页「预约服务」tab 只能写死一张图 —— 这里补上。
+     * productType 保留是为了兼容既有调用方。</p>
      */
     @GetMapping("/list")
     public AjaxResult list(@RequestParam(required = false) Long storeId,
                            @RequestParam(required = false) Long merchantId,
                            @RequestParam(required = false) Long categoryId,
-                           @RequestParam(required = false) String productType)
+                           @RequestParam(required = false) String productType,
+                           @RequestParam(required = false) String typeCode)
     {
         Product query = new Product();
         query.setStatus("0");
@@ -75,6 +81,7 @@ public class ApiProductController
         query.setMerchantId(merchantId);
         query.setCategoryId(categoryId);
         query.setProductType(productType);
+        query.setTypeCode(typeCode);
         List<Product> list = productService.selectProductList(query);
         return AjaxResult.success(fillImageUrls(list));
     }

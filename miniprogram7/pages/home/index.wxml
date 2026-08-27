@@ -23,24 +23,26 @@
         <text class="s-name">{{store.name}}</text>
         <view class="pay-btn" bindtap="goPay">买单</view>
       </view>
+      <!-- 评分功能尚未实装（没有评价表/接口），原先画 5 颗灰星 + 「暂无评分」
+           会让用户以为是真评分为 0。等有评价数据源再恢复星级。 -->
       <view class="s-rating">
-        <view class="star s-off"></view>
-        <view class="star s-off"></view>
-        <view class="star s-off"></view>
-        <view class="star s-off"></view>
-        <view class="star s-off"></view>
-        <text class="s-score">暂无评分</text>
+        <text class="s-score">评分功能即将上线</text>
       </view>
       <view class="s-hours">营业时间：{{store.hours}}</view>
+      <!-- 标签取后端 /api/store/{id}/services（门店 services 字段经字典翻译），
+           原先硬编码「可堂食/可预约」，门店实际没配这两项时是在骗用户 -->
       <view class="tags">
-        <text class="tag">可堂食</text>
-        <text class="tag">可预约</text>
-        <text class="detail" bindtap="openFacility">详情 ></text>
+        <text class="tag" wx:for="{{facilityTags}}" wx:key="*this">{{item}}</text>
+        <text class="tag tag-empty" wx:if="{{!facilityTags.length}}">暂无服务标签</text>
+        <text class="detail" wx:if="{{facilities.length}}" bindtap="openFacility">详情 ></text>
       </view>
       <view class="s-addr">
         <view class="addr-txt">
           <text class="a1">{{store.address}}</text>
-          <text class="a2">距您{{store.distanceText || '距离未知'}}</text>
+          <!-- 有距离就显示，没有就给个可点的「查看距离」（点了才取位，
+               避免一进首页就弹授权框；原先恒显示「计算中…」且永远不会变） -->
+          <text class="a2" wx:if="{{store.hasDistance}}">距您{{store.distanceText}}</text>
+          <text class="a2 a2-act" wx:else catchtap="requestDistance">查看距离 ></text>
         </view>
         <view class="addr-ops">
           <view class="op" bindtap="goLocation">
@@ -60,7 +62,7 @@
       <view class="entry" bindtap="goBooking">
         <view class="e-txt">
           <text class="e-ttl">预约到店</text>
-          <text class="e-sub">提前预约到店</text>
+          <text class="e-sub">在线选时段</text>
         </view>
         <view class="e-ic ic-clock"></view>
       </view>
@@ -91,7 +93,7 @@
         <image class="g-img" src="{{item.cover}}"></image>
         <view class="g-info">
           <text class="g-name">{{item.name}}</text>
-          <text class="g-desc">购买后365天内可用｜免预约</text>
+          <text class="g-desc" wx:if="{{item.desc}}">{{item.desc}}</text>
           <text class="g-sold">已售 {{item.sold}}</text>
           <view class="g-bottom">
             <view class="g-price">
@@ -113,13 +115,24 @@
     </view>
 
     <view class="book-panel" wx:else>
-      <view class="bp-card" bindtap="goBooking">
-        <image class="bp-img" src="/assets/img/BookTypeImg.jpg"></image>
+      <view class="bp-card" wx:for="{{bookingGoods}}" wx:key="productId" data-id="{{item.productId}}" bindtap="goDetail">
+        <image class="bp-img" src="{{item.cover}}"></image>
         <view class="bp-txt">
-          <text class="bp-ttl">堂食预约</text>
-          <text class="bp-sub">在线选择时段，到店免排队</text>
+          <text class="bp-ttl">{{item.name}}</text>
+          <text class="bp-sub">{{item.desc}}</text>
+          <view class="bp-price">
+            <text class="now">¥{{item.price}}</text>
+            <text class="old" wx:if="{{item.marketPrice && item.marketPrice != item.price}}">¥{{item.marketPrice}}</text>
+          </view>
         </view>
         <view class="bp-arr"></view>
+      </view>
+      <view class="bp-empty" wx:if="{{bookingLoaded && !bookingGoods.length}}">
+        <text class="bp-empty-t">该门店暂未上架预约服务</text>
+        <text class="bp-empty-a" bindtap="goBooking">直接发起预约 ></text>
+      </view>
+      <view class="bp-empty" wx:if="{{!bookingLoaded}}">
+        <text class="bp-empty-t">加载中…</text>
       </view>
     </view>
   </view>
@@ -131,12 +144,18 @@
         <text class="d-title">设施及服务</text>
         <view class="d-close" bindtap="closeFacility"></view>
       </view>
-      <view class="drawer-body">
-        <view class="fac-line" wx:if="{{facilities.length}}">
-          <block wx:for="{{facilities}}" wx:key="*this"><text class="dot">·</text>{{item}}</block>
+      <!-- 原先是把所有项拼在一行纯文本里，且 .drawer-body 写死 height:120rpx，
+           项目一多就被截断看不全 —— 这就是「详情读不到正确的值和排版」。
+           改成每项一行的列表，高度自适应 + 超长可滚动。 -->
+      <scroll-view class="drawer-body" scroll-y>
+        <view class="fac-grid" wx:if="{{facilities.length}}">
+          <view class="fac-item" wx:for="{{facilities}}" wx:key="*this">
+            <text class="fac-ic">✓</text>
+            <text class="fac-txt">{{item}}</text>
+          </view>
         </view>
-        <view class="fac-line" wx:else>该门店暂未配置设施及服务</view>
-      </view>
+        <view class="fac-empty" wx:else>该门店暂未配置设施及服务</view>
+      </scroll-view>
     </view>
   </view>
 
