@@ -119,7 +119,17 @@ export default {
   watch: {
     $route: {
       handler: function(route) {
-        this.redirect = route.query && route.query.redirect
+        const query = route.query || {}
+        this.redirect = query.redirect
+        // 支持从外部直接带身份进来，例如给商户的物料写 /admin/login?entry=merchant。
+        // 只切 tab 文案，不参与鉴权 —— 真实身份仍由后端 getInfo 返回的 userType 决定，
+        // 所以这里不做校验：拿商户链接登平台账号，照样按平台身份进后台。
+        // 必须用 hasOwnProperty 判断：直接写 entryTips[query.entry] 会连原型链一起认，
+        // ?entry=__proto__ / ?entry=constructor 都能取到值从而绕过白名单，
+        // 导致 tab 落到一个不存在的 name 上、三个 tab 全不选中（实测复现过）。
+        if (query.entry && Object.prototype.hasOwnProperty.call(this.entryTips, query.entry)) {
+          this.activeEntry = query.entry
+        }
       },
       immediate: true
     }
