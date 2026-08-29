@@ -56,6 +56,13 @@ HJS=$MP/pages/home/index.js
 chkfn "C1) loadBanners 不再硬传 merchantId: 0" "$HJS" "merchantId: 0"
 chkf  "C2) merchantId 拿到才传" "$HJS" "if (mid) params.merchantId = mid"
 chkf  "C3) 丢弃 http 图（小程序 image 只支持 https）" "$HJS" "http:\\\\/\\\\/"
+# banner 是平台/商户级资源，必须在 onLoad 直接拉。
+# 它曾经挂在 loadData 的 pickNearestStore 回调里，而那个回调只在门店「变化」时
+# 触发（app.js useStore: if (changed) callback(s)）；app.js onLaunch 的
+# bootDefaultStore() 已先把 globalData.store 填好 → changed=false → 回调不执行
+# → loadBanners 一次都没被调用，后台配了 banner 也恒空白。
+chkf  "C4) onLoad 直接调 loadBanners（不依赖门店回调）" "$HJS" "this.loadBanners();"
+chkfn_code "C5) loadBanners 不再挂在门店回调里按 storeId 调" "$HJS" "this.loadBanners(store.storeId)"
 
 # ---------- D. 前端：距离不再恒「计算中」 ----------
 chkfn_code "D1) 距离不再兜底成「计算中…」" "$HJS" "|| '计算中…'"

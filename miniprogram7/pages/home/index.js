@@ -24,7 +24,6 @@ Page({
   onShow() {
     // 身份切换入口统一放在「我的」页，首页不再显示
   },
-  _lastBannerStoreId: null,
   _bannerToastShown: false,
   _firstLoadDone: false,
   _slowTimer: null,
@@ -55,6 +54,15 @@ Page({
       const sys = wx.getSystemInfoSync();
       this.setData({ statusBarHeight: sys.statusBarHeight || 20 });
     } catch (e) {}
+    // banner 是平台/商户级资源，与门店无关，直接在 onLoad 拉。
+    //
+    // 原先它挂在 loadData 的 pickNearestStore 回调里，而那个 callback 只在
+    // 门店「变化」时才触发（app.js useStore: if (changed) callback(s)）。
+    // app.js onLaunch 的 bootDefaultStore() 已经先把 globalData.store 填好了，
+    // 于是首页 onLoad 再调 pickNearestStore 时走 globalData_placeholder 分支，
+    // prev.storeId === s.storeId → changed=false → 回调一次都不执行
+    // → loadBanners 根本没被调用，banner 位恒空白（后台配了也不显示）。
+    this.loadBanners();
     // 始终调 pickNearestStore：
     //   - 有缓存 → 立刻 callback 渲染（占位）
     //   - 同时异步取位 + 查最近门店，nearest 拿到后 callback 升级 store
@@ -152,11 +160,11 @@ Page({
           this.setData({ goods: list })
         }
       })
-      // 只在 storeId 变化时重拉 banners / facilities（占位 → 真实最近切换时才刷）
+      // 只在 storeId 变化时重拉 facilities（占位 → 真实最近切换时才刷）。
+      // banner 不在这里 —— 它与门店无关，已在 onLoad 拉过；放这里会因为
+      // callback 只在门店变化时触发而永远不执行。
       if (store.storeId !== lastStoreId) {
         lastStoreId = store.storeId
-        this._lastBannerStoreId = null
-        this.loadBanners(store.storeId)
         this.loadFacilities(store.storeId)
       }
       this.loadBookingGoods(store.storeId)
@@ -170,12 +178,10 @@ Page({
   // 传 0 会让 merchantId 出现在请求里，一旦后端没有「>0 才过滤」的 guard
   // 就变成 merchant_id=0 精确匹配 → 恒 0 条。省掉这个参数让后端返平台+商户全量，
   // 比传一个假的 0 安全。
-  loadBanners(storeId) {
+  loadBanners() {
     const mid = app.globalData && app.globalData.merchant && app.globalData.merchant.merchantId
     const params = { position: 'home' }
     if (mid) params.merchantId = mid
-    if (this._lastBannerStoreId === storeId) return
-    this._lastBannerStoreId = storeId
     api.bannerList(params).then((res) => {
       const rows = (res && (res.data || res.rows || res)) || [];
       if (!Array.isArray(rows) || rows.length === 0) {

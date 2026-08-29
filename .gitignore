@@ -85,7 +85,10 @@ logs/
 # 7. 工具/依赖产物（不入库）
 miniprogram7/node_modules/
 miniprogram7/package-lock.json
-miniprogram7/tests/
+# 注：miniprogram7/tests/ 曾整目录忽略，但它装的是 5 个真 vitest 单测
+# （npm test 67 项，CI 也跑），把测试排除在版本控制外会让「反向验证过的护栏」
+# 只存在于本地。inviteScene / role 两个是当初 git add -f 进来的，
+# 于是同一目录半数入库半数不入库。改为只忽略依赖产物。
 .agents/
 .playwright-cli/
 skills-lock.json
