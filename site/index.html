@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>到店管理系统 —— 多商户到店团购与核销平台</title>
+  <meta name="description" content="到店管理系统：面向多商户的到店团购、买单、预约与核销一体化平台，支持平台/代理商/商户三级管理。">
+  <!-- 复用后台 dist 里的 favicon：www/ 根下没有这个文件，写 /favicon.ico 会 404 -->
+  <link rel="icon" href="/admin/favicon.ico">
+  <!--
+    站点根路径的介绍页（纯静态单文件，不参与前端构建）。
+
+    为什么不做成 Vue 工程：这一页只有文案 + 两个入口，为它引一套构建链
+    （依赖、打包、发版）不划算；单文件内联样式，改文案直接编辑上传即可。
+
+    后台管理端部署在 /admin/（见 ruoyi-ui/vue.config.js 的 publicPath），
+    与本页互不覆盖 —— 重传 dist 不会删掉这个文件。
+  -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #1f2329;
+      background: #f7f8fa;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .hero {
+      background: linear-gradient(135deg, #1890ff 0%, #0052d9 100%);
+      color: #fff;
+      padding: 80px 20px 96px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 38px; font-weight: 600; letter-spacing: 1px; }
+    .hero .sub { margin-top: 16px; font-size: 17px; opacity: .92; }
+    .actions { margin-top: 36px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block; padding: 12px 32px; border-radius: 6px;
+      font-size: 16px; text-decoration: none; transition: all .2s;
+    }
+    .btn-primary { background: #fff; color: #0052d9; font-weight: 500; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.18); }
+    .btn-ghost { border: 1px solid rgba(255,255,255,.7); color: #fff; }
+    .btn-ghost:hover { background: rgba(255,255,255,.14); }
+
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    .section { padding: 64px 0; }
+    .section h2 { font-size: 26px; font-weight: 600; text-align: center; }
+    .section .desc { text-align: center; color: #646a73; margin-top: 10px; font-size: 15px; }
+
+    .grid { margin-top: 40px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .card { background: #fff; border-radius: 10px; padding: 26px 24px; border: 1px solid #e5e6eb; }
+    .card h3 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+    .card p { color: #646a73; font-size: 14px; }
+
+    .mp { background: #fff; border-top: 1px solid #e5e6eb; }
+    .mp-inner { display: flex; align-items: center; gap: 48px; flex-wrap: wrap; justify-content: center; }
+    .qr-box { text-align: center; }
+    .qr-box img {
+      width: 200px; height: 200px; display: block;
+      border: 1px solid #e5e6eb; border-radius: 8px; background: #fafafa;
+    }
+    .qr-box .qr-tip { margin-top: 12px; font-size: 14px; color: #646a73; }
+    .mp-text { max-width: 420px; }
+    .mp-text h2 { text-align: left; }
+    .mp-text ul { margin-top: 18px; padding-left: 20px; color: #646a73; font-size: 14px; }
+    .mp-text li { margin-bottom: 8px; }
+
+    footer { text-align: center; padding: 32px 20px; color: #8f959e; font-size: 13px; background: #f7f8fa; }
+    footer a { color: #8f959e; }
+
+    @media (max-width: 640px) {
+      .hero { padding: 56px 20px 64px; }
+      .hero h1 { font-size: 27px; }
+      .section { padding: 44px 0; }
+      .mp-text h2 { text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <div class="wrap">
+      <h1>到店管理系统</h1>
+      <p class="sub">多商户到店团购 · 买单 · 预约 · 核销一体化平台</p>
+      <div class="actions">
+        <!-- 后台入口：与 vue.config.js 的 publicPath 一致，务必保留结尾斜杠，
+             否则 nginx 的 location /admin/ 匹配不上会掉回本页 -->
+        <a class="btn btn-primary" href="/admin/">进入管理后台</a>
+        <a class="btn btn-ghost" href="#miniprogram">使用小程序</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="wrap">
+      <h2>平台能力</h2>
+      <p class="desc">支持平台方、代理商、商户三级分权运营，数据按租户隔离</p>
+      <div class="grid">
+        <div class="card">
+          <h3>到店团购</h3>
+          <p>团购券、代金券、次卡、储值卡、周期卡等多种商品形态，支持子品搭配与「N 选 M」组合。</p>
+        </div>
+        <div class="card">
+          <h3>到店买单</h3>
+          <p>顾客当面输入消费金额直接支付，支持代金券抵扣与不参与优惠金额，无需店员二次确认。</p>
+        </div>
+        <div class="card">
+          <h3>在线预约</h3>
+          <p>按服务项目与场次预约到店，支持人数上限、状态流转与到店核销。</p>
+        </div>
+        <div class="card">
+          <h3>员工核销</h3>
+          <p>店员扫码核销订单，多门店权限隔离，核销流水与今日业绩实时可查。</p>
+        </div>
+        <div class="card">
+          <h3>分销推广</h3>
+          <p>推客海报与专属太阳码，佣金按冷静期结算，冻结与可提现余额自动联动。</p>
+        </div>
+        <div class="card">
+          <h3>多商户运营</h3>
+          <p>一个商户对应一个小程序，代理商只管名下商户，商户只管旗下门店与员工。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section mp" id="miniprogram">
+    <div class="wrap mp-inner">
+      <div class="qr-box">
+        <!-- TODO: 把小程序码图片放到站点根目录并改这里的 src。
+             建议命名 miniprogram-qr.png，放在与本文件同级（即 nginx root 下）。
+             图片没准备好时这里会显示浏览器默认的碎图占位。 -->
+        <img src="/miniprogram-qr.png" alt="到店管理系统小程序码">
+        <p class="qr-tip">微信扫一扫，立即使用</p>
+      </div>
+      <div class="mp-text">
+        <h2>小程序端</h2>
+        <ul>
+          <li>顾客端：浏览门店与团购商品、下单支付、到店出示券码核销</li>
+          <li>商家端：同一个小程序内切换身份，店长与店员登录后核销、开单、看流水</li>
+          <li>无需下载安装，微信内直接打开；扫码后可添加到「我的小程序」</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>到店管理系统 &nbsp;·&nbsp; <a href="/admin/">管理后台</a></p>
+  </footer>
+
+</body>
+</html>

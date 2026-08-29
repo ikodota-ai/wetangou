@@ -20,7 +20,11 @@ module.exports = {
   // 部署生产环境和开发环境下的URL。
   // 默认情况下，Vue CLI 会假设你的应用是被部署在一个域名的根路径上
   // 例如 https://www.ruoyi.vip/。如果应用被部署在一个子路径上，你就需要用这个选项指定这个子路径。例如，如果你的应用被部署在 https://www.ruoyi.vip/admin/，则设置 baseUrl 为 /admin/。
-  publicPath: process.env.NODE_ENV === "production" ? "/" : "/",
+  // 生产部署在 /admin/ 子路径：站点根路径 / 留给系统介绍页（含后台入口 + 小程序下载）。
+  // 这个值决定打包产物里静态资源的引用前缀（static/js/*.js → /admin/static/js/*.js），
+  // 必须与 nginx 的 location /admin/ 和 router 的 base 三者一致，改一个就得改三个。
+  // 开发态仍是 /，npm run dev 直接 localhost 访问不用带前缀。
+  publicPath: process.env.NODE_ENV === "production" ? "/admin/" : "/",
   // 在npm run build 或 yarn build 时 ，生成文件的目录名称（要和baseUrl的生产环境路径一致）（默认dist）
   outputDir: 'dist',
   // 用于放置生成的静态资源 (js、css、img、fonts) 的；（项目打包之后，静态资源会放在这个文件夹下）

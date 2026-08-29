@@ -134,7 +134,9 @@ export default {
         type: 'warning'
       }).then(() => {
         this.$store.dispatch('LogOut').then(() => {
-          location.href = '/index'
+          // 不能写死 '/index'：后台部署在 /admin/ 子路径下，写死会跳到站点根的介绍页。
+          // BASE_URL 由 Vue CLI 从 publicPath 注入（生产 '/admin/'、开发 '/'），末尾带 /。
+          location.href = process.env.BASE_URL + 'index'
         })
       }).catch(() => {})
     }

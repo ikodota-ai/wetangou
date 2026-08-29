@@ -244,6 +244,10 @@ Router.prototype.replace = function push(location) {
 
 export default new Router({
   mode: 'history', // 去掉url中的#
+  // 与 vue.config.js 的 publicPath 保持一致（生产 /admin/、开发 /）。
+  // history 模式下 base 决定路由如何解析 URL：少了它，/admin/system/user
+  // 会被当成路由路径本身去匹配，匹配不到就走 404 页。
+  base: process.env.BASE_URL,
   scrollBehavior: () => ({ y: 0 }),
   routes: constantRoutes
 })
