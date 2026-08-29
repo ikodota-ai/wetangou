@@ -241,6 +241,18 @@
               </el-checkbox-group>
             </el-form-item>
           </el-col>
+          <el-col :span="24">
+            <el-form-item label="买单自动确认" prop="billAutoConfirm">
+              <el-radio-group v-model="form.billAutoConfirm">
+                <el-radio label="1">自动确认（推荐）</el-radio>
+                <el-radio label="0">需店员确认金额</el-radio>
+              </el-radio-group>
+              <div class="form-tip">
+                买单的常规场景是顾客在店员面前输入消费金额后直接付款，保持「自动确认」即可。
+                选「需店员确认」后顾客要等门店在系统里确认金额才能支付，而当前商家端暂无确认入口，会导致付不了款。
+              </div>
+            </el-form-item>
+          </el-col>
           <el-col :span="12">
             <el-form-item label="门店状态" prop="status">
               <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%">
@@ -374,6 +386,7 @@ export default {
         servicePhone: null,
         businessHours: null,
         serviceHours: null,
+        billAutoConfirm: '1',
         status: '0',
         sort: 0
       };
@@ -414,6 +427,11 @@ export default {
       const storeId = row.storeId || this.ids;
       getStore(storeId).then(response => {
         this.form = response.data || response;
+        // 存量门店该列可能是 null（加列前建的），radio 会变成一个都没选中，
+        // 保存时又把 null 原样提交回去 —— 兜底成默认的「自动确认」。
+        if (!this.form.billAutoConfirm) {
+          this.form.billAutoConfirm = '1';
+        }
         this.serviceList = this.form.services ? this.form.services.split(',') : [];
         this.mapPoint = { lng: this.form.longitude, lat: this.form.latitude };
         this.title = "修改门店";

@@ -123,6 +123,7 @@ run biz_product_detail_menu_fix_v5  # 删 2292/2293 两条从不下发的死菜�
 run biz_product_category_join_fix   # 商品/佣金规则的分类 join 指向 biz_product_category
 run biz_staff_usertype_hotfix       # 修扫码入职店员拿到平台权限（P0 越权）
 run biz_collect_method_semantic_v6  # collect_method 语义归一为收款方式
+run biz_bill_auto_confirm_v7        # 门店级买单自动确认开关（默认开，买单免店员确认）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

@@ -22,12 +22,24 @@ import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.PayBill;
 import com.ruoyi.biz.domain.MemberVoucher;
+import com.ruoyi.biz.domain.Store;
 import com.ruoyi.biz.service.IPayBillService;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IMemberVoucherService;
+import com.ruoyi.biz.service.IStoreService;
 
 /**
- * 小程序-到店买单（会员发起 → 店员确认 → 会员支付）
+ * 小程序-到店买单
+ *
+ * <p>默认链路是「会员在店员面前输入金额 → 直接支付」：买单的真实场景是
+ * 顾客当面结账，店员看着屏幕上的金额，不需要再回后台点一次确认。
+ * 所以门店的 {@code bill_auto_confirm} 默认为 '1'，create() 直接落
+ * status='1'（待支付）。</p>
+ *
+ * <p>个别需要人工核对金额的门店可以把该开关置 '0'，退回
+ * 「会员发起 → 店员 confirm → 会员支付」的三段式。注意：目前商家端
+ * 并没有可用的确认入口（confirm 端点要求 userType=='store'，而商家端
+ * 签发的是 merchant/owner/manager/staff），关掉开关等于让顾客付不了钱。</p>
  *
  * @author dytuangou
  */
@@ -47,6 +59,9 @@ public class ApiBillController
 
     @Autowired
     private WxPayService wxPayService;
+
+    @Autowired
+    private IStoreService storeService;
 
     /**
      * 会员发起买单：填写消费金额，可选代金券
@@ -91,21 +106,47 @@ public class ApiBillController
         bill.setMemberVoucherId(memberVoucherId);
         bill.setDiscountAmount(discount);
         bill.setPayAmount(amount.subtract(discount));
-        bill.setStatus("0");
         bill.setCreateTime(new Date());
-        // 支付 mock 模式：跳过店员确认环节，create 后直接置为已确认，
-        // 前端轮询一次 status=1 即触发 prepay/pay，适合自助买单场景。
-        // 生产环境 wx.pay.mockEnabled=false 时仍走老流程（status=0 待确认）。
-        if (wxPayService.isMock())
+        // 「要不要店员确认」由门店的 bill_auto_confirm 决定，不再挂在支付 mock 开关上。
+        //
+        // 原先是 if (wxPayService.isMock()) status='1'，而 WxPayConfig.isMockEnabled()
+        // 在 prod profile 下硬编码返回 false —— 于是本地（mockEnabled=true）建单即可付、
+        // 生产必须等确认，同一份代码两种行为，看着像「功能被改回去了」。
+        // 支付是否 mock 与业务上要不要人工核对金额本来就是两件无关的事。
+        if (isAutoConfirm(storeId))
         {
             bill.setStatus("1");
+            bill.setConfirmUser("auto");
+            bill.setConfirmTime(new Date());
+        }
+        else
+        {
+            bill.setStatus("0");
         }
         payBillService.insertPayBill(bill);
         return AjaxResult.success(bill);
     }
 
     /**
-     * 查询买单状态（会员轮询店员是否已确认）
+     * 门店是否开启买单自动确认。
+     *
+     * <p>缺省语义是「开启」：门店查不到、或 bill_auto_confirm 为 null/空
+     * （加列前的存量数据）都按自动确认处理。理由是关掉它会让顾客卡在
+     * 「等门店确认」而没有任何一端能完成确认，宁可少一道人工核对，
+     * 也不能让付款链路断掉。</p>
+     */
+    private boolean isAutoConfirm(Long storeId)
+    {
+        Store store = storeService.selectStoreByStoreId(storeId);
+        if (store == null)
+        {
+            return true;
+        }
+        return !"0".equals(store.getBillAutoConfirm());
+    }
+
+    /**
+     * 查询买单状态（自动确认门店建单即 status=1；需确认门店由会员轮询店员是否已确认）
      */
     @LoginRequired
     @GetMapping("/{billId}")

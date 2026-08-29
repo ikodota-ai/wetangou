@@ -2,7 +2,9 @@ const app = getApp();
 const { api } = require('../../utils/request.js');
 const { formatMoney } = require('../../utils/util.js');
 
-// 店员确认的轮询间隔与上限：买单需门店确认金额后才能付款
+// 轮询间隔与上限。
+// 只在门店关掉了「买单自动确认」时才会用到 —— 默认门店建单即 status=1，
+// 顾客在店员面前输入金额后直接进支付，不弹确认提示、不轮询。
 const POLL_INTERVAL = 2000;
 const POLL_MAX = 60;
 
@@ -192,7 +194,9 @@ Page({
       wx.showToast({ title: (err && (err.msg || err.message)) || '发起买单失败', icon: 'none' });
     });
   },
-  // 买单需店员确认金额，确认后才可付款
+  // status=1 直接进支付（门店开启自动确认时的常态路径）。
+  // 只有门店显式关掉自动确认（bill_auto_confirm='0'）后端才会落 status=0，
+  // 这时才需要提示顾客出示给店员并开始轮询。
   afterCreated() {
     if (this.data.status === '1') {
       this.pay();

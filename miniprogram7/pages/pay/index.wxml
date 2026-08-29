@@ -8,7 +8,7 @@
     <text class="block-title">消费总金额</text>
     <view class="amount-box">
       <text class="yen">¥</text>
-      <input class="amount-in" type="digit" value="{{total}}" bindinput="onTotal" placeholder="请与门店确认" disabled="{{!!billId}}" />
+      <input class="amount-in" type="digit" value="{{total}}" bindinput="onTotal" placeholder="请输入消费金额" disabled="{{!!billId}}" />
     </view>
   </view>
 
@@ -16,7 +16,7 @@
     <text class="no-disc">不参与优惠金额</text>
     <view class="amount-box">
       <text class="yen">¥</text>
-      <input class="amount-in" type="digit" value="{{noDiscount}}" bindinput="onNoDiscount" placeholder="请与门店确认" disabled="{{!!billId}}" />
+      <input class="amount-in" type="digit" value="{{noDiscount}}" bindinput="onNoDiscount" placeholder="没有则不填" disabled="{{!!billId}}" />
     </view>
   </view>
 
@@ -36,11 +36,13 @@
   <view class="card tip-row" wx:if="{{billId}}">
     <text class="t-no">买单号 {{billNo}}</text>
     <text class="t-st" wx:if="{{status === '0'}}">等待门店确认金额...</text>
-    <text class="t-st" wx:elif="{{status === '1'}}">门店已确认，请完成支付</text>
+    <text class="t-st" wx:elif="{{status === '1'}}">请完成支付</text>
     <text class="t-st" wx:elif="{{status === '2'}}">已支付</text>
   </view>
 
   <view class="bottom-bar">
+    <!-- waiting 只在门店关掉了「买单自动确认」时才为 true；
+         默认门店建单即待支付，按钮不会出现「等待门店确认」这个态。 -->
     <view class="pay-btn {{waiting ? 'off' : ''}}" bindtap="onPay">
       {{waiting ? '等待门店确认...' : (billId ? '继续支付' : '立即支付')}}
     </view>

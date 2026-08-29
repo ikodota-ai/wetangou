@@ -90,6 +90,16 @@ public class Store extends BaseEntity
     @Excel(name = "服务设置")
     private String services;
 
+    /**
+     * 买单自动确认（1自动确认 0需店员确认金额）
+     *
+     * <p>买单的真实场景是顾客在店员面前输入金额后直接付款，所以默认 '1'。
+     * 置 '0' 时 create() 落 status='0'，需要门店端员工调 confirm 才能付 ——
+     * 目前商家端并没有可用的确认入口，关掉等于让顾客付不了钱，慎用。</p>
+     */
+    @Excel(name = "买单自动确认", readConverterExp = "1=自动确认,0=需店员确认")
+    private String billAutoConfirm;
+
     /** 显示顺序 */
     @Excel(name = "显示顺序")
     private Integer sort;
@@ -261,6 +271,16 @@ public class Store extends BaseEntity
         return services;
     }
 
+    public void setBillAutoConfirm(String billAutoConfirm) 
+    {
+        this.billAutoConfirm = billAutoConfirm;
+    }
+
+    public String getBillAutoConfirm() 
+    {
+        return billAutoConfirm;
+    }
+
     public void setSort(Integer sort) 
     {
         this.sort = sort;
@@ -320,6 +340,7 @@ public class Store extends BaseEntity
             .append("serviceHours", getServiceHours())
             .append("intro", getIntro())
             .append("services", getServices())
+            .append("billAutoConfirm", getBillAutoConfirm())
             .append("sort", getSort())
             .append("status", getStatus())
             .append("delFlag", getDelFlag())

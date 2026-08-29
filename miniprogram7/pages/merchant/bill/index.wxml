@@ -14,11 +14,14 @@
       </view>
       <view class="row2">
         <text class="meta">金额 ¥{{item.amount}}  优惠 ¥{{item.discountAmount}}</text>
-        <text class="status s-{{item.status}}">{{statusText(item.status)}}</text>
+        <text class="status s-{{item.status}}">{{item.statusText}}</text>
       </view>
+      <!-- 这里原有一个「确认买单」按钮（bindtap="onConfirm"），但 index.js 里
+           从来没有 onConfirm 这个方法，点了没反应；而它调用的 confirm 端点
+           要求 userType=='store'，商家端签发的是 merchant/owner/manager/staff
+           也进不去。现在门店默认自动确认，买单建单即待支付，本就不需要这个动作。 -->
       <view class="row3">
         <text class="time">{{item.createTimeStr}}</text>
-        <view class="btn" wx:if="{{item.status === '0'}}" data-id="{{item.billId}}" bindtap="onConfirm">确认买单</view>
       </view>
     </view>
   </view>
