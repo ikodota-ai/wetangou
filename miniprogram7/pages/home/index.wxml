@@ -174,6 +174,8 @@
         <image wx:if="{{qrcode}}" class="c-qr-img" src="{{qrcode}}" mode="aspectFit"></image>
         <text wx:else class="c-qr-txt">暂未配置客服二维码</text>
       </view>
+      <!-- serviceHours 已经是「门店 -> 商家客服时间 -> 商家营业时间」降级后的结果，
+           三处都没配才会落到「请咨询门店」这句兜底文案 -->
       <text class="c-hours">{{serviceHours ? '客服服务时间 ' + serviceHours : '客服服务时间请咨询门店'}}</text>
     </view>
     <view class="consult-close" catchtap="closeConsult">

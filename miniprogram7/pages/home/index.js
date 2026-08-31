@@ -1,6 +1,7 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
 const { haversineKm, formatDistance } = require('../../utils/util.js');
+const { resolveContact } = require('../../utils/contact.js');
 
 Page({
   data: {
@@ -15,6 +16,10 @@ Page({
     tab: 'pickup',
     showConsult: false,
     showFacility: false,
+    // 拨打电话和客服电话是两条独立的降级链，不能共用一个字段：
+    // callPhone    门店电话 -> 商家电话（打过去是店里）
+    // servicePhone 门店客服 -> 商家客服（可能是总部 400）
+    callPhone: '',
     phone: '',
     qrcode: '',
     serviceHours: '',
@@ -150,6 +155,10 @@ Page({
       lastStoreId = booted.storeId
       this.loadFacilities(booted.storeId)
       this.loadBookingGoods(booted.storeId)
+      // 客服信息也要在这里先算一次，理由同上：pickNearestStore 的回调
+      // 只在门店变化时触发，onLaunch 已经填好 store 的情况下压根不会跑，
+      // 于是「拨打电话」永远读到空的 data.phone → 提示「暂无客服电话」。
+      this.setData(this._contactPatch(booted))
     }
     app.pickNearestStore((store) => {
       if (!store) {
@@ -159,22 +168,10 @@ Page({
       console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300))
       // 距离计算走 _compatStoreView（包含「计算中…」占位 + 缺位置时后台异步补位）
       const viewStore = this._compatStoreView(store)
-      // 客服信息：门店优先，商家兜底。
-      const m = (app.globalData && app.globalData.merchant) || {}
-      const _storePhone = store.servicePhone || store.phone
-      const _storeQr = store.serviceQrcode
-      const _storeSvcHours = store.serviceHours
-      const sp = _storePhone || m.servicePhone || ''
-      const sq = _storeQr || m.serviceQrcode || ''
-      const sh = _storeSvcHours || m.serviceHours || m.businessHours || ''
-      this.setData({
+      this.setData(Object.assign({
         store: viewStore,
-        goods: app.globalData.goods || [],
-        phone: sp,
-        qrcode: sq ? toFullUrl(sq) : '',
-        serviceHours: sh,
-        isStoreService: !!_storePhone || !!_storeSvcHours || !!_storeQr
-      })
+        goods: app.globalData.goods || []
+      }, this._contactPatch(store)))
       // 「到店自取」tab 用的是跨店商品，globalData.goods 是按 storeId 拉的，可能为空
       // 这里主动按 merchantId 再拉一次补齐（不论 pickNearestStore 有没有先填过）
       app.loadAllPickupGoods().then((list) => {
@@ -322,14 +319,38 @@ Page({
     wx.showActionSheet({
       itemList: ['拨打电话', '在线咨询'],
       success: (res) => {
-        if (res.tapIndex === 0) this.callService();
+        if (res.tapIndex === 0) this.callStore();
         else this.openConsult();
       }
     });
   },
+  // 把「门店优先、商家兜底」的结果整理成 setData 用的补丁。
+  // 抽出来是因为要在两个地方调（首拉 + pickNearestStore 回调），
+  // 降级规则本身在 utils/contact.js 里，纯函数好测。
+  _contactPatch(store) {
+    const merchant = (app.globalData && app.globalData.merchant) || {}
+    const c = resolveContact(store, merchant)
+    return {
+      callPhone: c.callPhone,
+      phone: c.servicePhone,
+      // 二维码可能是 /profile/... 相对路径，必须补成绝对地址，
+      // 否则 <image> 加载不出来（且 http 的会被小程序静默拒绝）
+      qrcode: c.qrcode ? toFullUrl(c.qrcode) : '',
+      serviceHours: c.serviceHours,
+      isStoreService: c.isStoreService
+    }
+  },
+  // 门店座机：给「联系商家 → 拨打电话」用
+  callStore() {
+    const tel = this.data.callPhone || this.data.phone;
+    if (!tel) return wx.showToast({ title: '暂无联系电话', icon: 'none' });
+    wx.makePhoneCall({ phoneNumber: tel });
+  },
+  // 客服热线：给「在线咨询」弹窗里的号码用
   callService() {
-    if (!this.data.phone) return wx.showToast({ title: '暂无客服电话', icon: 'none' });
-    wx.makePhoneCall({ phoneNumber: this.data.phone });
+    const tel = this.data.phone || this.data.callPhone;
+    if (!tel) return wx.showToast({ title: '暂无客服电话', icon: 'none' });
+    wx.makePhoneCall({ phoneNumber: tel });
   },
   previewQrcode() {
     if (!this.data.qrcode) return;

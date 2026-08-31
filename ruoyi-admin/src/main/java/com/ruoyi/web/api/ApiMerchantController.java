@@ -78,7 +78,13 @@ public class ApiMerchantController
         data.put("merchantName", merchant.getMerchantName());
         data.put("logo", safeAbsolute(merchant.getLogo()));
         data.put("intro", merchant.getIntro());
-        // 商家级客服兜底信息
+        // 商家级客服兜底信息。
+        // phone 和 servicePhone 是两码事，都要返：
+        //   phone        商家对外电话 —— 门店没填门店电话时，「拨打电话」降级用它
+        //   servicePhone 商家客服热线 —— 门店没填客服电话时，「在线咨询」降级用它
+        // 之前只返了 servicePhone，导致门店电话为空时前端无从降级，
+        // 表现为「明明后台填了商家电话，小程序仍提示没有设置」。
+        data.put("phone", merchant.getPhone());
         data.put("servicePhone", merchant.getServicePhone());
         data.put("serviceQrcode", safeAbsolute(merchant.getServiceQrcode()));
         data.put("businessHours", merchant.getBusinessHours());
