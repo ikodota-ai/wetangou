@@ -1,5 +1,6 @@
 const { api, toFullUrl } = require('../../../utils/request.js');
 const { formatMoney } = require('../../../utils/util.js');
+const { payOrder } = require('../../../utils/pay.js');
 
 const STATUS_TEXT = {
   '0': '待支付',
@@ -61,6 +62,14 @@ Page({
     const no = this.data.order && this.data.order.orderNo;
     if (!no) return;
     wx.setClipboardData({ data: no, success: () => wx.showToast({ title: '订单号已复制', icon: 'success' }) });
+  },
+  // 详情页原来没有任何支付入口，所以列表页才不得不拦截待支付订单的点击、
+  // 直接拉支付 —— 结果这类订单永远进不来。微信支付商户平台配的
+  // 「订单页面路径」指向的就是本页，进不来等于那个配置形同虚设。
+  onPay() {
+    const o = this.data.order;
+    if (!o || o.status !== '0') return;
+    payOrder(o.orderId, () => this.load());
   },
   loadQrCode() {
     this.setData({ qrLoading: true });

@@ -45,6 +45,17 @@
     <view class="row"><text class="lab">下单时间</text><text class="val">{{order.createTime}}</text></view>
     <view class="row" wx:if="{{order.payTime}}"><text class="lab">支付时间</text><text class="val">{{order.payTime}}</text></view>
   </view>
+
+  <!-- 待支付订单的底部操作栏。做成 fixed 常驻，避免订单信息长时按钮被顶到屏外。
+       上面用等高占位撑开，否则最后一行信息会被盖住 -->
+  <view class="pay-holder" wx:if="{{order.status === '0'}}"></view>
+  <view class="pay-bar" wx:if="{{order.status === '0'}}">
+    <view class="pb-sum">
+      <text class="pb-lab">实付</text>
+      <text class="pb-num">¥{{order.payAmount}}</text>
+    </view>
+    <view class="pb-btn" bindtap="onPay">去支付</view>
+  </view>
 </view>
 <view class="empty" wx:elif="{{!loading}}">
   <text class="empty-text">订单不存在</text>

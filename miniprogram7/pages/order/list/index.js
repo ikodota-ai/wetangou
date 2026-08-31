@@ -1,6 +1,7 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../../utils/request.js');
 const { formatMoney, formatDate } = require('../../../utils/util.js');
+const { payOrder } = require('../../../utils/pay.js');
 
 // tab 与后端订单状态的映射：后端 0待支付 1待使用 2已核销 3已取消 4已退款
 const TAB_STATUS = {
@@ -70,46 +71,23 @@ Page({
       wx.showToast({ title: '订单加载失败', icon: 'none' });
     });
   },
+  // 点卡片一律进详情，包括待支付的。
+  // 原先待支付会被拦下来直接拉支付，于是这类订单根本进不去详情页 ——
+  // 微信支付商户平台要配「订单页面路径」，那个路径得真能打开订单详情，
+  // 被拦掉就等于配了也没用。续付改由卡片上的「去支付」按钮负责。
   goDetail(e) {
     const id = e.currentTarget.dataset.id;
     if (!id) return;
-    const order = this.data.list.find((o) => String(o.orderId) === String(id));
-    // 待支付订单点进去直接续付，其余展示核销码等详情
-    if (order && order.status === '0') {
-      this.continuePay(id);
-      return;
-    }
     wx.navigateTo({ url: '/pages/order/detail/index?id=' + id });
   },
+  // catchtap 绑定：不能用 bindtap，否则点按钮会冒泡到卡片的 goDetail，
+  // 变成「既跳详情又拉支付」
+  onPay(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    this.continuePay(id);
+  },
   continuePay(orderId) {
-    wx.showLoading({ title: '发起支付', mask: true });
-    api.prepayOrder(orderId).then((res) => {
-      wx.hideLoading();
-      if (res && res.mock) {
-        wx.showToast({ title: '支付成功', icon: 'success' });
-        this.loadList();
-        return;
-      }
-      const p = (res && (res.data || res)) || {};
-      if (!p.paySign) {
-        wx.showToast({ title: '暂不可支付，请稍后重试', icon: 'none' });
-        return;
-      }
-      wx.requestPayment({
-        timeStamp: String(p.timeStamp),
-        nonceStr: p.nonceStr,
-        package: p.package,
-        signType: p.signType || 'RSA',
-        paySign: p.paySign,
-        success: () => {
-          wx.showToast({ title: '支付成功', icon: 'success' });
-          this.loadList();
-        },
-        fail: () => wx.showToast({ title: '已取消支付', icon: 'none' })
-      });
-    }).catch((err) => {
-      wx.hideLoading();
-      wx.showToast({ title: (err && err.msg) || '支付失败', icon: 'none' });
-    });
+    payOrder(orderId, () => this.loadList());
   }
 });

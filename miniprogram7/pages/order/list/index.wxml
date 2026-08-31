@@ -42,6 +42,11 @@
         </view>
       </view>
       <view class="row2"><text class="total">共{{item.qty}}件商品，实付</text><text class="total-num">¥{{item.total}}</text></view>
+      <!-- 待支付才出操作栏。catchtap 而非 bindtap：要拦住冒泡，
+           否则点「去支付」会连带触发外层卡片的 goDetail -->
+      <view class="ops" wx:if="{{item.status === '0'}}">
+        <view class="op-btn primary" data-id="{{item.orderId}}" catchtap="onPay">去支付</view>
+      </view>
     </view>
   </view>
 </view>

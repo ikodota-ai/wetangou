@@ -26,3 +26,20 @@
 .qr-img { width: 360rpx; height: 360rpx; background: #fff; }
 .qr-tip { font-size: 22rpx; color: #909399; margin-top: 16rpx; }
 .qr-loading { font-size: 22rpx; color: #909399; margin-top: 16rpx; }
+
+/* 待支付底部操作栏。fixed 常驻底部，占位块防止盖住最后一行信息。
+   安全区留白给全面屏机型的手势条 */
+.pay-holder { height: 140rpx; }
+.pay-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #FFF; box-shadow: 0 -2rpx 12rpx rgba(0,0,0,0.06);
+}
+.pb-sum { display: flex; align-items: baseline; gap: 8rpx; }
+.pb-lab { font-size: 26rpx; color: #999; }
+.pb-num { font-size: 36rpx; font-weight: 700; color: var(--color-primary); }
+.pb-btn {
+  padding: 18rpx 64rpx; border-radius: 999rpx; font-size: 30rpx; font-weight: 600;
+  background: var(--color-primary); color: #FFF;
+}
