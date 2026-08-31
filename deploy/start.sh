@@ -19,19 +19,51 @@
 set -u   # 用未定义变量直接报错
 # 不加 set -e：停服务那步进程不存在时会返非 0，属正常情况，需要自己控制
 
-APP_DIR=/data/wwwroot/daodian
-JAR="$APP_DIR/ruoyi-admin.jar"
-JAVA=/opt/jdk17/bin/java
+# 本脚本就放在 /data/wwwroot/daodian/ 下，和 jar、dist.zip、logs 同级。
+# 所以 APP_DIR 不写死，按脚本自身所在目录推导 —— 换目录、改名都不用动代码，
+# 也避免"脚本在 A 目录、APP_DIR 却指向 B"这种改一半留下的坑。
+# cd + pwd 会把软链接和相对路径都解成绝对路径（后面 pgrep 按全路径匹配，必须绝对）。
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+JAR="${JAR:-$APP_DIR/ruoyi-admin.jar}"
+JAVA="${JAVA:-/opt/jdk17/bin/java}"
 LOG_DIR="$APP_DIR/logs"
+# stdout.log 只接 nohup 重定向的控制台输出（启动横幅、启动失败的堆栈）。
+# 业务日志（sys-info / sys-error / sys-user）由 logback 单独写，靠上面的
+# -Dlog.path 指过来 —— 详见 start_app 里的说明。
 LOG="$LOG_DIR/stdout.log"
-WWW="$APP_DIR/www"
-ZIP="$APP_DIR/dist.zip"
-PORT=8083
+# 前端站点根。nginx 的 root 必须指到 $WWW（后台在 $WWW/admin/）——
+# 两边对不上就是后台白屏或 404，改任一边记得同步另一边。
+WWW="${WWW:-$APP_DIR/www}"
+ZIP="${ZIP:-$APP_DIR/dist.zip}"
+PORT="${PORT:-8083}"
 
 # ---- 敏感配置：优先读环境变量，没有再用默认值 ----
+# 想彻底不留明文：写进 /etc/dytuangou/dytuangou.env，
+# 调用前 set -a; . /etc/dytuangou/dytuangou.env; set +a
 DB_URL="${DB_URL:-jdbc:mysql://rm-wz9n4ot89173fp840.mysql.rds.aliyuncs.com:3306/bx_wetuangou?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8}"
 DB_USER="${DB_USER:-rds_root}"
-DB_PASS="${DB_PASS:-T3Z1Zpt6HPJjRSjhqoiBbKtyu5Ku6UDU}"
+DB_PASS="${DB_PASS:-uoLpa5Rewj83UDo4}"
+
+# Redis 独占 db3（见部署指南 §7.3）。服务器上 Redis 还有别的业务，
+# 用 db0 会和别人撞 key，清缓存时也不敢 flushdb。
+REDIS_DB="${REDIS_DB:-3}"
+
+# JWT 密钥。必须固定写死，不能每次启动 openssl rand 现生成 ——
+# 那样重启后所有人的 token 立即失效，全被踢下线。
+TOKEN_SECRET="${TOKEN_SECRET:-NbYJcKnPYRfiVevISeCj3iW84x0qPOnTpOxqMJYNABBHogOJX1dfhlxz4H1H3qm}"
+
+# OSS。access-key/secret-key 在 application-prod.yml 里刻意没给默认值
+# （${OSS_ACCESS_KEY} 无冒号兜底），漏传会直接
+# Could not resolve placeholder 启动失败 —— 属于设计如此，早暴露好过传图时才炸。
+OSS_ENDPOINT="${OSS_ENDPOINT:-https://oss-cn-shenzhen.aliyuncs.com}"
+OSS_REGION="${OSS_REGION:-cn-shenzhen}"
+OSS_BUCKET="${OSS_BUCKET:-wetuango}"
+OSS_AK="${OSS_AK:-LTAI5t8EPaBkF1BzGV4WRgVv}"
+OSS_SK="${OSS_SK:-ahgDNAXVXlWb5WIpbhwh8iVJyMw5dI}"
+# 外网访问域名。不配的话 S3StorageAdapter 会拼成 endpoint/bucket/key 的
+# path 风格，阿里云 OSS 不认这种形式，图片链接打不开。
+OSS_PUBLIC_DOMAIN="${OSS_PUBLIC_DOMAIN:-https://wetuango.oss-cn-shenzhen.aliyuncs.com}"
 
 # ----------------------------------------------------------------------------
 # 找出本应用的 java 进程
@@ -82,10 +114,25 @@ start_app() {
   [ -f "$JAR" ] || { echo "[start] 找不到 $JAR" >&2; return 1; }
   mkdir -p "$LOG_DIR"
 
+  # stdout.log 用 >> 追加（不是 >），这样上次崩溃的堆栈不会被本次启动覆盖掉,
+  # 正是要排查问题的时候最需要它。代价是会一直涨，所以超过 50M 就先归档一份。
+  # 业务日志有 logback 自己轮转，这里只兜 stdout/stderr。
+  if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 52428800 ]; then
+    mv "$LOG" "$LOG.$(date +%Y%m%d%H%M%S)"
+    echo "[start] stdout.log 超 50M，已归档"
+  fi
+
   echo "[start] 启动中..."
+  # -Dlog.path 不能省，也不能拿 --logging.file.name 代替：
+  # 项目用的是自带的 logback.xml，里面写死 ${log.path:-/Users/mac/ruoyi/logs}
+  # —— 那是开发机的绝对路径。服务器上不传这个参数，logback 就去建
+  # /Users/mac/ruoyi/logs，建不了就把业务日志整个丢掉（sys-error.log 也没了，
+  # 出问题时无从查起），而且它是 JVM 系统属性，必须放在 -jar 前面。
+  # 本地实测：只传 --logging.file.name 不会生成任何文件，纯属无效参数。
   nohup "$JAVA" \
     -Xms512m -Xmx1024m \
     -Dfile.encoding=UTF-8 \
+    -Dlog.path="$LOG_DIR" \
     -jar "$JAR" \
     --spring.profiles.active=prod \
     --server.port=$PORT \
@@ -93,7 +140,14 @@ start_app() {
     --spring.datasource.druid.master.url="$DB_URL" \
     --spring.datasource.druid.master.username="$DB_USER" \
     --spring.datasource.druid.master.password="$DB_PASS" \
-    --ruoyi.storage.s3.public-domain=https://wetuango.oss-cn-shenzhen.aliyuncs.com \
+    --spring.data.redis.database=$REDIS_DB \
+    --token.secret="$TOKEN_SECRET" \
+    --ruoyi.storage.s3.endpoint="$OSS_ENDPOINT" \
+    --ruoyi.storage.s3.region="$OSS_REGION" \
+    --ruoyi.storage.s3.bucket="$OSS_BUCKET" \
+    --ruoyi.storage.s3.access-key="$OSS_AK" \
+    --ruoyi.storage.s3.secret-key="$OSS_SK" \
+    --ruoyi.storage.s3.public-domain="$OSS_PUBLIC_DOMAIN" \
     --ruoyi.profile="$APP_DIR/uploadPath" \
     >> "$LOG" 2>&1 &
 
