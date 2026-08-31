@@ -23,10 +23,12 @@
         <text class="s-name">{{store.name}}</text>
         <view class="pay-btn" bindtap="goPay">买单</view>
       </view>
-      <!-- 评分功能尚未实装（没有评价表/接口），原先画 5 颗灰星 + 「暂无评分」
-           会让用户以为是真评分为 0。等有评价数据源再恢复星级。 -->
-      <view class="s-rating">
-        <text class="s-score">评分功能即将上线</text>
+      <!-- 评分取门店 rating 字段（后台「门店管理」手工维护，0.0-5.0）。
+           没填时整行不渲染 —— 显示「暂无评分」或 5 颗灰星都会被当成差评。 -->
+      <view class="s-rating" wx:if="{{store.hasRating}}">
+        <view class="star {{index < store.ratingStars ? 'star-on' : ''}}"
+              wx:for="{{[0,1,2,3,4]}}" wx:key="*this"></view>
+        <text class="s-score">{{store.ratingText}}</text>
       </view>
       <view class="s-hours">营业时间：{{store.hours}}</view>
       <!-- 标签取后端 /api/store/{id}/services（门店 services 字段经字典翻译），

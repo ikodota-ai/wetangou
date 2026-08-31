@@ -1,5 +1,5 @@
 const app = getApp()
-const { api, APPID } = require('../../../utils/request.js')
+const { api, APPID, toFullUrl } = require('../../../utils/request.js')
 const identity = require('../../../utils/identity.js')
 
 Page({
@@ -39,12 +39,22 @@ Page({
     }
   },
 
+  // 头像必须过 toFullUrl：后端存的是 /profile/avatar/... 相对路径，
+  // 历史脏数据还可能是 http://127.0.0.1:8080/... 这种内网绝对地址，
+  // 直接丢给 <image> 都渲染不出来（昵称是纯文本所以看起来"只有头像坏了"）。
+  _viewUser(u) {
+    const user = u || {}
+    return Object.assign({}, user, {
+      avatarUrl: user.avatarUrl ? toFullUrl(user.avatarUrl) : ''
+    })
+  },
+
   syncUser() {
     // 客服电话与二维码跟随当前门店，避免各页写死同一个号码
     const store = app.globalData.store || {}
     this.setData({
       logged: !!app.globalData.user.logged,
-      user: app.globalData.user,
+      user: this._viewUser(app.globalData.user),
       servicePhone: store.servicePhone || store.phone || '',
       serviceQrcode: store.serviceQrcode || '',
       businessHours: store.businessHours || store.hours || ''
@@ -57,7 +67,7 @@ Page({
   },
 
   onUserUpdate(user) {
-    this.setData({ logged: !!user.logged, user })
+    this.setData({ logged: !!user.logged, user: this._viewUser(user) })
   },
 
   goStaffLogin() {

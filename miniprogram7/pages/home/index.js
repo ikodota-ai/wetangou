@@ -94,13 +94,23 @@ Page({
     // 于是永久停在「计算中…」—— 而它根本不会再算，因为不主动取位。
     // 区分两种状态：算出来了就显示，没位置就明说需要授权。
     const _dist = formatDistance(_distKm)
+    // 评分：后台手工维护的 0.0-5.0。用 == null 判断而不是 !s.rating ——
+    // 后者会把合法的 0 分也当成未评分（虽然 0 分罕见，但语义上是两回事）。
+    const _rawRating = s.rating
+    const _ratingNum = _rawRating == null || _rawRating === '' ? null : Number(_rawRating)
+    const _hasRating = _ratingNum != null && Number.isFinite(_ratingNum)
     return Object.assign({}, s, {
       name: s.storeName || s.name || '',
       hours: s.businessHours || s.hours || '',
       logo: s.logo ? toFullUrl(s.logo) : '',
       distanceText: _dist,
       // wxml 用它决定是显示「距您 x km」还是「查看距离」按钮
-      hasDistance: !!_dist
+      hasDistance: !!_dist,
+      hasRating: _hasRating,
+      // 4.8 → 显示 "4.8"，5 → 显示 "5.0"（统一一位小数，避免 4.8 和 5 混排）
+      ratingText: _hasRating ? _ratingNum.toFixed(1) : '',
+      // 点亮几颗星：4.8 分点亮 5 颗（四舍五入），3.2 点亮 3 颗
+      ratingStars: _hasRating ? Math.round(_ratingNum) : 0
     })
   },
 
@@ -128,7 +138,19 @@ Page({
   },
 
   loadData() {
+    // 门店相关的数据（设施标签、可预约商品）不能只等 pickNearestStore 的回调 ——
+    // 那个 callback 只在门店「变化」时才触发（app.js useStore: if (changed) cb(s)），
+    // 而 app.onLaunch 的 bootDefaultStore 通常已经把 globalData.store 填好了，
+    // 于是首页 onLoad 再调时 prev.storeId === s.storeId → changed=false → 回调一次都不执行，
+    // 表现就是「设施标签恒显示暂无服务标签」（和之前 banner 恒空白是同一个根因）。
+    // 所以这里先用已有的 store 主动拉一次。
+    const booted = (app.globalData && app.globalData.store) || null
     let lastStoreId = null
+    if (booted && booted.storeId) {
+      lastStoreId = booted.storeId
+      this.loadFacilities(booted.storeId)
+      this.loadBookingGoods(booted.storeId)
+    }
     app.pickNearestStore((store) => {
       if (!store) {
         console.warn('[home] pickNearestStore returned null')
@@ -163,11 +185,12 @@ Page({
       // 只在 storeId 变化时重拉 facilities（占位 → 真实最近切换时才刷）。
       // banner 不在这里 —— 它与门店无关，已在 onLoad 拉过；放这里会因为
       // callback 只在门店变化时触发而永远不执行。
+      // 门店真的换了才重拉（避免和上面的首拉重复请求）
       if (store.storeId !== lastStoreId) {
         lastStoreId = store.storeId
         this.loadFacilities(store.storeId)
+        this.loadBookingGoods(store.storeId)
       }
-      this.loadBookingGoods(store.storeId)
     });
   },
 

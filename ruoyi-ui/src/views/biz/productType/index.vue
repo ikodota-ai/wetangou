@@ -67,7 +67,7 @@
     <el-dialog :title="title" :visible.sync="open" width="560px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="类型代码" prop="typeCode">
-          <el-input v-model="form.typeCode" placeholder="如 GROUPON（新建时必填，修改时不可改）" :disabled="form.typeCodeId != null" />
+          <el-input v-model="form.typeCode" placeholder="如 GROUPON（新建时必填，修改时不可改）" :disabled="!!form.isEdit" />
         </el-form-item>
         <el-form-item label="类型名称" prop="typeName">
           <el-input v-model="form.typeName" placeholder="请输入类型名称" />
@@ -165,7 +165,7 @@ export default {
       this.reset()
       const code = row.typeCode || this.ids[0]
       getProductType(code).then(res => {
-        this.form = res.data
+        this.form = Object.assign({}, res.data, { isEdit: true })
         this.open = true
         this.title = "修改商品类型"
       })
@@ -185,14 +185,21 @@ export default {
     submitForm() {
       this.$refs.form.validate(valid => {
         if (!valid) return
-        if (this.form.typeCodeId != null) {
-          updateProductType(this.form).then(() => {
+        // 判断新增/修改要用真实主键 typeCode —— 实体里没有 typeCodeId 这个字段，
+        // 写它则恒为 undefined，修改也会走 addProductType，
+        // 报 Duplicate entry 'STORED_CARD' for key 'PRIMARY'。
+        // isEdit 由 handleUpdate 打标，比看 typeCode 有没有值更可靠（新增时用户也会填 typeCode）。
+        // isEdit 只是前端标记，不发给后端
+        const payload = Object.assign({}, this.form)
+        delete payload.isEdit
+        if (this.form.isEdit) {
+          updateProductType(payload).then(() => {
             this.$modal.msgSuccess("修改成功")
             this.open = false
             this.getList()
           })
         } else {
-          addProductType(this.form).then(() => {
+          addProductType(payload).then(() => {
             this.$modal.msgSuccess("新增成功")
             this.open = false
             this.getList()
@@ -202,7 +209,7 @@ export default {
     },
     cancel() { this.open = false; this.reset() },
     reset() {
-      this.form = { typeCode: null, typeName: null, typeDesc: '', appCanCreate: 1, needLicense: 0, sort: 0, status: '0' }
+      this.form = { typeCode: null, typeName: null, typeDesc: '', appCanCreate: 1, needLicense: 0, sort: 0, status: '0', isEdit: false }
       this.$nextTick(() => { if (this.$refs.form) this.$refs.form.clearValidate() })
     }
   }

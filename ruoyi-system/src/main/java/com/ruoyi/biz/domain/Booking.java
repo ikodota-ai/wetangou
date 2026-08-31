@@ -45,8 +45,15 @@ public class Booking extends BaseEntity
     @Excel(name = "服务名称")
     private String serviceName;
 
+    /** 预约类型（字典 biz_booking_type 的 value，如 dine_in / in_store / other） */
+    @Excel(name = "预约类型")
+    private String bookingType;
+
     /** 预约日期 */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    // 库里 booking_date 是 DATE 类型（无时分秒），前端日期选择器发的也是 "2026-08-31"。
+    // 原来按 "yyyy-MM-dd HH:mm:ss" 反序列化，新增预约直接 400：
+    // Cannot deserialize value of type java.util.Date from String "2026-08-31"。
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "预约日期", width = 30, dateFormat = "yyyy-MM-dd")
     private Date bookingDate;
 
@@ -117,6 +124,16 @@ public class Booking extends BaseEntity
     public Long getProductId()
     {
         return productId;
+    }
+
+    public void setBookingType(String bookingType)
+    {
+        this.bookingType = bookingType;
+    }
+
+    public String getBookingType()
+    {
+        return bookingType;
     }
 
     public void setServiceName(String serviceName)
@@ -207,6 +224,7 @@ public class Booking extends BaseEntity
             .append("storeId", getStoreId())
             .append("productId", getProductId())
             .append("serviceName", getServiceName())
+            .append("bookingType", getBookingType())
             .append("bookingDate", getBookingDate())
             .append("timeSlot", getTimeSlot())
             .append("status", getStatus())

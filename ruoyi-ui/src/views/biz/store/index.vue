@@ -254,6 +254,24 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="门店评分" prop="rating">
+              <el-input-number
+                v-model="form.rating"
+                :min="0"
+                :max="5"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+                placeholder="0.0 - 5.0"
+                style="width: 100%"
+              />
+              <div class="form-tip">
+                小程序首页店铺卡片展示的评分，留空则不显示星级。
+                注意 0.0 分会被当成真实差评展示，不想显示就清空而不是填 0。
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="门店状态" prop="status">
               <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%">
                 <el-option label="营业中" value="0" />
@@ -387,6 +405,7 @@ export default {
         businessHours: null,
         serviceHours: null,
         billAutoConfirm: '1',
+        rating: null,
         status: '0',
         sort: 0
       };

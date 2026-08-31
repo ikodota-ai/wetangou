@@ -66,6 +66,8 @@ biz_product_category_join_fix
 biz_staff_usertype_hotfix
 biz_collect_method_semantic_v6
 biz_bill_auto_confirm_v7
+biz_store_rating_booking_type_v8
+biz_member_avatar_relative_v9
 """.split()
 
 DEMO = """

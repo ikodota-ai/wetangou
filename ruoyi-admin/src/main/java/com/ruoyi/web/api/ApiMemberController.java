@@ -112,7 +112,9 @@ public class ApiMemberController
         {
             return AjaxResult.error("缺少手机号授权code");
         }
-        String phone = wxMaService.getPhoneNumberByCode(code);
+        // 带上当前会员的 merchantId：多商户版每个商户有自己的 appId/secret，
+        // 不传就只读全局参数，后台配过也会报「未配置小程序appId/secret」。
+        String phone = wxMaService.getPhoneNumberByCode(code, MemberContextHolder.getMerchantId());
 
         Member update = new Member();
         update.setMemberId(MemberContextHolder.getMemberId());
@@ -133,14 +135,25 @@ public class ApiMemberController
         {
             return AjaxResult.error("上传头像不能为空");
         }
+        // upload() 返回的已经是 /profile/avatar/2026/08/31/xxx.jpg 这种相对路径。
+        //
+        // 入库必须存相对路径，不能存 serverConfig.getUrl() 拼出来的绝对地址：
+        // getUrl() 取的是当前请求的 host，本地跑就写进 http://127.0.0.1:8080/...、
+        // 内网调试写进 http://172.31.26.216:8080/...（库里存量数据就是这样），
+        // 换个环境或换台手机全部打不开；而且 <image> 不支持 http，
+        // 生产 https 域名下这些 http 绝对地址会被微信直接拦掉。
+        // 昵称是纯文本所以没事 —— 这就是「昵称能读出来、头像读不出来」的原因。
+        //
+        // 前端 toFullUrl() 会用当前接口 baseUrl 补全相对路径，跨环境都对。
         String avatar = FileUploadUtils.upload(RuoYiConfig.getAvatarPath(), avatarfile);
-        String url = serverConfig.getUrl() + avatar;
 
         Member update = new Member();
         update.setMemberId(MemberContextHolder.getMemberId());
-        update.setAvatar(url);
+        update.setAvatar(avatar);
         memberService.updateMember(update);
 
+        // 响应仍给绝对地址：前端拿到就能直接预览，不用等下次 profile 刷新
+        String url = serverConfig.getUrl() + avatar;
         return AjaxResult.success().put("imgUrl", url).put("url", url);
     }
 

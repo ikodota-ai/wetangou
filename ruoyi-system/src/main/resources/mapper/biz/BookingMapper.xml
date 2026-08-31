@@ -12,6 +12,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="storeName"    column="store_name"    />
         <result property="productId"    column="product_id"    />
         <result property="serviceName"    column="service_name"    />
+        <result property="bookingType"    column="booking_type"    />
         <result property="bookingDate"    column="booking_date"    />
         <result property="timeSlot"    column="time_slot"    />
         <result property="status"    column="status"    />
@@ -25,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectBookingVo">
-        select b.booking_id, b.booking_no, b.store_id, s.store_name, b.product_id, b.service_name,
+        select b.booking_id, b.booking_no, b.store_id, s.store_name, b.product_id, b.service_name, b.booking_type,
                b.booking_date, b.time_slot, b.status, b.remark,
                b.create_by, b.create_time, b.update_by, b.update_time,
                (select count(1) from biz_booking_member bm where bm.booking_id = b.booking_id and bm.status = '0') as signup_count,
@@ -42,6 +43,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="storeId != null "> and b.store_id = #{storeId}</if>
             <if test="productId != null "> and b.product_id = #{productId}</if>
             <if test="serviceName != null  and serviceName != ''"> and b.service_name like concat('%', #{serviceName}, '%')</if>
+            <if test="bookingType != null  and bookingType != ''"> and b.booking_type = #{bookingType}</if>
             <if test="bookingDate != null "> and b.booking_date = #{bookingDate}</if>
             <if test="timeSlot != null  and timeSlot != ''"> and b.time_slot = #{timeSlot}</if>
             <if test="status != null  and status != ''"> and b.status = #{status}</if>
@@ -74,6 +76,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="storeId != null">store_id,</if>
             <if test="productId != null">product_id,</if>
             <if test="serviceName != null">service_name,</if>
+            <if test="bookingType != null">booking_type,</if>
             <if test="bookingDate != null">booking_date,</if>
             <if test="timeSlot != null">time_slot,</if>
             <if test="status != null">status,</if>
@@ -89,6 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="storeId != null">#{storeId},</if>
             <if test="productId != null">#{productId},</if>
             <if test="serviceName != null">#{serviceName},</if>
+            <if test="bookingType != null">#{bookingType},</if>
             <if test="bookingDate != null">#{bookingDate},</if>
             <if test="timeSlot != null">#{timeSlot},</if>
             <if test="status != null">#{status},</if>
@@ -107,6 +111,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="storeId != null">store_id = #{storeId},</if>
             <if test="productId != null">product_id = #{productId},</if>
             <if test="serviceName != null">service_name = #{serviceName},</if>
+            <if test="bookingType != null">booking_type = #{bookingType},</if>
             <if test="bookingDate != null">booking_date = #{bookingDate},</if>
             <if test="timeSlot != null">time_slot = #{timeSlot},</if>
             <if test="status != null">status = #{status},</if>

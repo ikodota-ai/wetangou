@@ -54,7 +54,30 @@ Page({
     wx.navigateTo({ url: `/pages/agreement/${type}/index` })
   },
 
-  onSkip() { wx.switchTab({ url: '/pages/home/index' }) },
+  /**
+   * 登录成功 / 跳过后回到用户来的那一页。
+   *
+   * 之前无论从哪进来都写死 switchTab('/pages/home/index')：用户在
+   * 订单列表 / 优惠券 / 买单 / 预约 页点登录，登完被甩回首页，
+   * 之前在干的事全丢了，得自己再点回去。
+   *
+   * 这些页面都是用 navigateTo 打开登录页的（见 order/list、voucher、pay、
+   * booking/create 等），所以页面栈里有上一页，navigateBack 能原样回去。
+   * 只有栈深 <= 1（比如用户直接从分享链接进登录页）才回首页兜底。
+   */
+  backOrHome() {
+    const pages = getCurrentPages() || []
+    if (pages.length > 1) {
+      const prev = pages[pages.length - 2]
+      // tabBar 页不能用 navigateBack 之后再刷新数据，这里统一让上一页自己在
+      // onShow 里重读 globalData.user（各页已有 onShow → syncUser 的写法）
+      wx.navigateBack({ delta: 1 })
+      return
+    }
+    wx.switchTab({ url: '/pages/home/index' })
+  },
+
+  onSkip() { this.backOrHome() },
 
   /**
    * 一键微信登录：openid 优先身份识别
@@ -173,7 +196,7 @@ Page({
       try { wx.setStorageSync('hasStaffAccount', !!hasStaffAccount) } catch (e) {}
       this.setData({ hasStaffAccount: hasStaffAccount })
       wx.showToast({ title: '登录成功', icon: 'success' })
-      setTimeout(() => wx.switchTab({ url: '/pages/home/index' }), 600)
+      setTimeout(() => this.backOrHome(), 600)
     }
     appInst.notifyUserUpdate && appInst.notifyUserUpdate()
   },

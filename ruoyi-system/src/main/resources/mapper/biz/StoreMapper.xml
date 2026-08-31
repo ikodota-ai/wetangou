@@ -23,6 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="intro"    column="intro"    />
         <result property="services"    column="services"    />
         <result property="billAutoConfirm"    column="bill_auto_confirm"    />
+        <result property="rating"             column="rating"               />
         <result property="sort"    column="sort"    />
         <result property="status"    column="status"    />
         <result property="delFlag"    column="del_flag"    />
@@ -35,7 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectStoreVo">
-        select store_id, store_name, logo, province, city, district, address, longitude, latitude, phone, service_phone, service_qrcode, business_hours, service_hours, intro, services, bill_auto_confirm, sort, status, del_flag, create_by, create_time, update_by, update_time, remark, merchant_id from biz_store
+        select store_id, store_name, logo, province, city, district, address, longitude, latitude, phone, service_phone, service_qrcode, business_hours, service_hours, intro, services, bill_auto_confirm, rating, sort, status, del_flag, create_by, create_time, update_by, update_time, remark, merchant_id from biz_store
     </sql>
 
     <select id="selectStoreList" parameterType="Store" resultMap="StoreResult">
@@ -100,6 +101,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="intro != null">intro,</if>
             <if test="services != null">services,</if>
             <if test="billAutoConfirm != null">bill_auto_confirm,</if>
+            <if test="rating != null">rating,</if>
             <if test="sort != null">sort,</if>
             <if test="status != null">status,</if>
             <if test="delFlag != null">del_flag,</if>
@@ -127,6 +129,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="intro != null">#{intro},</if>
             <if test="services != null">#{services},</if>
             <if test="billAutoConfirm != null">#{billAutoConfirm},</if>
+            <if test="rating != null">#{rating},</if>
             <if test="sort != null">#{sort},</if>
             <if test="status != null">#{status},</if>
             <if test="delFlag != null">#{delFlag},</if>
@@ -157,6 +160,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="intro != null">intro = #{intro},</if>
             <if test="services != null">services = #{services},</if>
             <if test="billAutoConfirm != null">bill_auto_confirm = #{billAutoConfirm},</if>
+            <if test="rating != null">rating = #{rating},</if>
             <if test="sort != null">sort = #{sort},</if>
             <if test="status != null">status = #{status},</if>
             <if test="delFlag != null">del_flag = #{delFlag},</if>
@@ -188,7 +192,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         SELECT
             s.store_id, s.store_name, s.logo, s.province, s.city, s.district, s.address,
             s.longitude, s.latitude, s.phone, s.service_phone, s.service_qrcode,
-            s.business_hours, s.service_hours, s.intro, s.services, s.bill_auto_confirm, s.sort, s.status, s.del_flag,
+            s.business_hours, s.service_hours, s.intro, s.services, s.bill_auto_confirm, s.rating, s.sort, s.status, s.del_flag,
             s.create_by, s.create_time, s.update_by, s.update_time, s.remark, s.merchant_id,
             (
                 6371000 * ACOS(

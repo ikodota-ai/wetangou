@@ -72,6 +72,11 @@
       <el-table-column label="预约编号" align="center" prop="bookingNo" width="180" />
       <el-table-column label="门店" align="center" prop="storeName" min-width="140" show-overflow-tooltip />
       <el-table-column label="服务名称" align="center" prop="serviceName" min-width="120" show-overflow-tooltip />
+      <el-table-column label="类型" align="center" prop="bookingType" width="100">
+        <template slot-scope="scope">
+          <dict-tag :options="dict.type.biz_booking_type" :value="scope.row.bookingType" />
+        </template>
+      </el-table-column>
       <el-table-column label="预约日期" align="center" prop="bookingDate" width="110" />
       <el-table-column label="时段" align="center" prop="timeSlot" width="100" />
       <el-table-column label="报名人次" align="center" prop="signupCount" width="90" />
@@ -109,6 +114,16 @@
         </el-form-item>
         <el-form-item label="服务名称" prop="serviceName">
           <el-input v-model="form.serviceName" placeholder="请输入服务名称" />
+        </el-form-item>
+        <el-form-item label="预约类型" prop="bookingType">
+          <el-select v-model="form.bookingType" placeholder="请选择预约类型" clearable style="width: 100%">
+            <el-option
+              v-for="d in dict.type.biz_booking_type"
+              :key="d.value"
+              :label="d.label"
+              :value="d.value"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="预约日期" prop="bookingDate">
           <el-date-picker clearable
@@ -168,6 +183,10 @@ import { listBooking, getBooking, delBooking, addBooking, updateBooking, listBoo
 
 export default {
   name: "Booking",
+  // 预约类型走字典（sql/upgrade/biz_store_rating_booking_type_v8.sql 建的
+  // biz_booking_type），商家可在「系统管理 → 字典管理」自行增删类型，
+  // 不用改代码。
+  dicts: ['biz_booking_type'],
   data() {
     return {
       loading: true,
@@ -190,6 +209,7 @@ export default {
         storeId: null,
         productId: null,
         serviceName: null,
+        bookingType: null,
         bookingDate: null,
         status: null
       },
@@ -239,6 +259,7 @@ export default {
         storeId: null,
         productId: null,
         serviceName: null,
+        bookingType: null,
         bookingDate: null,
         timeSlot: null,
         status: '0',

@@ -139,17 +139,33 @@ public class WxMaService
 
     public String getPhoneNumberByCode(String phoneCode)
     {
+        return getPhoneNumberByCode(phoneCode, null);
+    }
+
+    /**
+     * 换取微信授权手机号
+     *
+     * @param phoneCode  前端 getPhoneNumber 回调里的 code
+     * @param merchantId 当前会员所属商户；决定用哪套 appId/secret 去换 access_token
+     */
+    public String getPhoneNumberByCode(String phoneCode, Long merchantId)
+    {
         if (StringUtils.isEmpty(phoneCode))
         {
             throw new ServiceException("手机号授权code不能为空");
         }
         // 本地联调模式：无真实appId时返回mock手机号，便于全链路测试
-        if (wxMaConfig.isMockEnabled() && StringUtils.isEmpty(wxMaConfig.getAppId()))
+        if (wxMaConfig.isMockEnabled() && StringUtils.isEmpty(wxMaConfig.getAppId(merchantId)))
         {
             log.info("[WxMaService] mock获取手机号，phoneCode={}", phoneCode);
             return "13800000000";
         }
-        String accessToken = getAccessToken(null);
+        // 必须把 merchantId 传下去。原来写死 getAccessToken(null)，
+        // 而 getAppId(null)/getSecret(null) 只读全局 sys_config 参数 ——
+        // 多商户版的 appId/secret 是配在 biz_merchant 表里的，
+        // 全局参数为空时就抛「未配置小程序appId/secret」，
+        // 于是后台明明在「微信配置」里填好了，取手机号照样失败。
+        String accessToken = getAccessToken(merchantId);
         JSONObject body = new JSONObject();
         body.put("code", phoneCode);
         String url = PHONE_URL + "?access_token=" + accessToken;

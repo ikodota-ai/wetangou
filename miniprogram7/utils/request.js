@@ -22,7 +22,15 @@ try {
 function toFullUrl(url) {
   if (!url) return '';
   let u = String(url).trim();
-  if (/^https?:\/\//i.test(u)) return u;
+  if (/^https?:\/\//i.test(u)) {
+    // 历史脏数据修复：早期上传头像时后端把 serverConfig.getUrl() 拼进库了，
+    // 于是存量记录是 http://127.0.0.1:8080/profile/... 或 http://172.31.26.216:8080/...
+    // 这类地址换台设备/换个环境必然打不开，而且 <image> 不支持 http。
+    // 只要认得出 /profile/ 这个后端资源前缀，就丢掉原 host 用当前 baseUrl 重拼。
+    const m = u.match(/^https?:\/\/[^/]+(\/profile\/.*)$/i);
+    if (m) return _base() + m[1];
+    return u;
+  }
   u = u.replace(/^\/dev-api/, '');
   if (u.charAt(0) !== '/') u = '/' + u;
   return _base() + u;

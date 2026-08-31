@@ -13,9 +13,34 @@ describe('toFullUrl', () => {
     expect(toFullUrl('')).toBe('')
   })
 
-  it('http(s):// 绝对地址 → 原样返回（不拼 baseUrl）', () => {
+  it('http(s):// 外部绝对地址 → 原样返回（不拼 baseUrl）', () => {
     expect(toFullUrl('https://example.com/a.jpg')).toBe('https://example.com/a.jpg')
     expect(toFullUrl('http://cdn.example.com/b.png')).toBe('http://cdn.example.com/b.png')
+  })
+
+  it('外部图床 / 微信 CDN 不能被改写', () => {
+    // 这两类地址去掉 host 就彻底废了，必须原样保留
+    expect(toFullUrl('https://thirdwx.qlogo.cn/mmopen/xxx/132')).toBe('https://thirdwx.qlogo.cn/mmopen/xxx/132')
+    expect(toFullUrl('https://wetuango.oss-cn-shenzhen.aliyuncs.com/2026/x.png'))
+      .toBe('https://wetuango.oss-cn-shenzhen.aliyuncs.com/2026/x.png')
+  })
+
+  it('历史脏数据：带内网 host 的 /profile/ 地址 → 换成当前 baseUrl', () => {
+    // 早期 ApiMemberController.uploadAvatar 把 serverConfig.getUrl() 拼进库了，
+    // 存量记录形如 http://172.31.26.216:8080/profile/avatar/...
+    // 换台设备必然打不开，而且 <image> 不支持 http。
+    // 认出 /profile/ 前缀就丢掉原 host 重拼 —— 这是「昵称能读出来、头像读不出来」的修复。
+    const r1 = toFullUrl('http://172.31.26.216:8080/profile/avatar/2026/08/08/b.jpg')
+    expect(r1).not.toContain('172.31.26.216')
+    expect(r1).toMatch(/\/profile\/avatar\/2026\/08\/08\/b\.jpg$/)
+
+    const r2 = toFullUrl('http://127.0.0.1:8080/profile/avatar/c.jpeg')
+    expect(r2).not.toContain('127.0.0.1')
+    expect(r2).toMatch(/\/profile\/avatar\/c\.jpeg$/)
+  })
+
+  it('绝对地址里没有 /profile/ 的不动（无法判断归属）', () => {
+    expect(toFullUrl('http://x/a.png')).toBe('http://x/a.png')
   })
 
   it('/path 相对地址 → 拼 baseUrl', () => {

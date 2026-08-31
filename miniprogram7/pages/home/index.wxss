@@ -16,6 +16,7 @@
 .pay-btn { width: 128rpx; height: 72rpx; line-height: 72rpx; text-align: center; background: var(--color-primary); color: #FFFFFF; border-radius: 12rpx; font-size: 28rpx; font-weight: 600; }
 .s-rating { display: flex; align-items: center; gap: 6rpx; }
 .star { width: 28rpx; height: 28rpx; background: #E8E8E8; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.star-on { background: #FFB400; }
 .s-score { font-size: 24rpx; color: var(--color-text-4); margin-left: 8rpx; }
 .s-hours { font-size: 24rpx; color: var(--color-text-2); }
 .tags { display: flex; align-items: center; gap: 16rpx; }

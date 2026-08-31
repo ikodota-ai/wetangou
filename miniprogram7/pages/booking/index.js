@@ -1,4 +1,5 @@
 const app = getApp();
+const { haversineKm, formatDistance } = require('../../utils/util.js');
 
 Page({
   data: { statusBarHeight: 20, store: {} },
@@ -31,12 +32,25 @@ Page({
   },
 
   // 兼容后端字段：storeName → name，businessHours → hours
+  //
+  // 距离必须走 formatDistance，和首页保持一致：后端 distance 单位是米，
+  // 原来 wxml 直接渲染 {{store.distance}}，屏幕上就是「距您1234.5678」这种裸数字。
   _compatStore(s) {
     if (!s) return {};
+    const loc = (app.globalData && app.globalData.location) || null
+    let _distKm = null
+    if (s.distance != null && s.distance !== '') {
+      _distKm = Number(s.distance) / 1000
+    } else if (loc && loc.lat != null && loc.lng != null && s.latitude != null && s.longitude != null) {
+      _distKm = haversineKm(loc.lat, loc.lng, s.latitude, s.longitude)
+    }
+    const _dist = formatDistance(_distKm)
     return Object.assign({}, s, {
       name: s.storeName || s.name || '',
       hours: s.businessHours || s.hours || '',
-      address: s.address || ''
+      address: s.address || '',
+      distanceText: _dist,
+      hasDistance: !!_dist
     });
   },
   onShow() {

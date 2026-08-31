@@ -21,7 +21,7 @@
       <view class="s-addr">
         <view class="addr-txt">
           <text class="a1">{{store.address || '-'}}</text>
-          <text class="a2" wx:if="{{store.distance}}">距您{{store.distance}}</text>
+          <text class="a2" wx:if="{{store.hasDistance}}">距您{{store.distanceText}}</text>
         </view>
         <view class="ops">
           <view class="op" bindtap="goLocation">

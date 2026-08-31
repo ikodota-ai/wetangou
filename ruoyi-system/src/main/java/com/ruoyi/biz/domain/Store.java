@@ -100,6 +100,16 @@ public class Store extends BaseEntity
     @Excel(name = "买单自动确认", readConverterExp = "1=自动确认,0=需店员确认")
     private String billAutoConfirm;
 
+    /**
+     * 门店评分（0.0-5.0，后台手工维护）
+     *
+     * <p>用 BigDecimal 而非 Double：评分要按 4.8 这种一位小数精确展示，
+     * double 的二进制浮点会出现 4.799999999 这类值。
+     * null 表示尚未评分 —— 和 0.0 分（差评）不是一回事，前端据此决定显示与否。</p>
+     */
+    @Excel(name = "门店评分")
+    private java.math.BigDecimal rating;
+
     /** 显示顺序 */
     @Excel(name = "显示顺序")
     private Integer sort;
@@ -271,6 +281,16 @@ public class Store extends BaseEntity
         return services;
     }
 
+    public void setRating(java.math.BigDecimal rating)
+    {
+        this.rating = rating;
+    }
+
+    public java.math.BigDecimal getRating()
+    {
+        return rating;
+    }
+
     public void setBillAutoConfirm(String billAutoConfirm) 
     {
         this.billAutoConfirm = billAutoConfirm;
@@ -341,6 +361,7 @@ public class Store extends BaseEntity
             .append("intro", getIntro())
             .append("services", getServices())
             .append("billAutoConfirm", getBillAutoConfirm())
+            .append("rating", getRating())
             .append("sort", getSort())
             .append("status", getStatus())
             .append("delFlag", getDelFlag())
