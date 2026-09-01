@@ -129,6 +129,7 @@ run biz_member_avatar_relative_v9    # 会员头像洗成相对路径（去掉�
 run biz_store_booking_rule_v10       # 门店级预约可约范围（提前天数/时段粒度/歇业日）
 run biz_merchant_appid_null_v11      # 空 appid 洗成 NULL（uk_appid 不容多个空串，否则第二个不填 appid 的商户建不出来）
 run biz_merchant_staff_perms_v12     # 商户管理员/代理商补店员邀请权限（老板原本招不了店员，全 403）
+run biz_staff_tenant_backfill_v13    # 回填扫码入职员工的租户归属（缺记录会兜底成平台身份、看到别家商户数据）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

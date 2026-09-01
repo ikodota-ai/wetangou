@@ -6,6 +6,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,6 +49,9 @@ import com.ruoyi.biz.service.IPayBillService;
 import com.ruoyi.biz.service.IBookingService;
 import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.system.service.ISysUserService;
+import com.ruoyi.system.mapper.SysRoleMapper;
+import com.ruoyi.common.core.domain.entity.SysRole;
+import com.ruoyi.common.constant.TenantConstants;
 import com.ruoyi.biz.api.role.BizRole;
 
 /**
@@ -68,7 +73,13 @@ public class ApiMerchantStaffController
     private static final String STAFF_STATUS_ACTIVE = "0";
     private static final String STAFF_STATUS_PENDING = "3";
 
+    private static final Logger log = LoggerFactory.getLogger(ApiMerchantStaffController.class);
+
     @Autowired private ISysUserService userService;
+    @Autowired private SysRoleMapper roleMapper;
+
+    /** PC 后台「商户管理员」角色的 role_key（老板/店长复用） */
+    private static final String MERCHANT_PC_ROLE_KEY = "merchant";
     @Autowired private IMerchantStaffService staffService;
     @Autowired
     private IAgentService agentService;
@@ -760,8 +771,48 @@ public class ApiMerchantStaffController
         // 导致扫码入职的店员直接拿到平台越权：可读全平台商户/订单/员工名单）
         u.setUserType("02");
         u.setMerchantId(invite.getMerchantId()); // 多商户隔离
+        // 必须同步 biz_merchant_user：PC 端的租户身份只认这张表（TenantServiceImpl.buildContextByUserId），
+        // 查不到记录会兜底成「平台账号」。实测扫码入职的账号一旦拿到 PC 权限，
+        // /biz/store/list 会返回 merchant_id=2/200 等别家门店 —— 跨商户数据泄漏。
+        u.setTenantUserType(TenantConstants.USER_TYPE_MERCHANT);
+        u.setTenantMerchantId(invite.getMerchantId());
+        // 老板/店长要在 PC 后台审核下一个店员、发邀请码、重置密码，必须绑「商户管理员」角色；
+        // 不绑角色则 permissions 为空集，实测 /biz/staffInvite/** 四个端点全 403，
+        // 「店长审核店员」这一环直接断裂（招进来的第一个店长再也招不了人）。
+        // 店员(STAFF)只在小程序端核销，不给 PC 角色。
+        Long pcRoleId = resolvePcRoleId(invite.getRole());
+        if (pcRoleId != null)
+        {
+            u.setRoleIds(new Long[] { pcRoleId });
+        }
         userService.insertUser(u);
         return u;
+    }
+
+    /**
+     * 按商家版角色映射 PC 后台角色；返回 null 表示不给后台权限。
+     *
+     * <p>role_key='merchant'（商户管理员）由 sys_role 查得，不写死 role_id ——
+     * role_id 由建库时的插入顺序决定，各环境不一致。</p>
+     *
+     * <p>必须走 mapper 而不是 ISysRoleService.selectRoleList：后者带 @DataScope，
+     * 会从 SecurityContext 取当前后台登录用户来拼数据范围。扫码入职是匿名请求
+     * （@Anonymous，没有 PC 端 token），实测直接抛「获取用户信息异常」401，
+     * 把整条入职链路打断。checkRoleKeyUnique 是精确匹配且不带数据范围切面。</p>
+     */
+    private Long resolvePcRoleId(String staffRole)
+    {
+        if (!"OWNER".equals(staffRole) && !"MANAGER".equals(staffRole))
+        {
+            return null;
+        }
+        SysRole role = roleMapper.checkRoleKeyUnique(MERCHANT_PC_ROLE_KEY);
+        if (role != null && role.getRoleId() != null)
+        {
+            return role.getRoleId();
+        }
+        log.warn("[Staff] 未找到 role_key={} 的 PC 角色，{} 将没有后台权限", MERCHANT_PC_ROLE_KEY, staffRole);
+        return null;
     }
 
 

@@ -103,17 +103,21 @@ SIGNUP_I=""
 K_STAFF_UID=""
 ORDER_K=""
 M_UID=""
+O_MGR_UID=""
+O_STF_UID=""
 cleanup() {
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
   if [ -n "$STAFF_UID" ]; then
     sql "delete from biz_merchant_staff where user_id=$STAFF_UID;"
     sql "delete from sys_user_role where user_id=$STAFF_UID;"
+    sql "delete from biz_merchant_user where user_id=$STAFF_UID;"
     sql "delete from sys_user where user_id=$STAFF_UID;"
   fi
   if [ -n "$OWNER_UID" ]; then
     sql "delete from biz_merchant_staff where user_id=$OWNER_UID;"
     sql "delete from sys_user_role where user_id=$OWNER_UID;"
+    sql "delete from biz_merchant_user where user_id=$OWNER_UID;"
     sql "delete from sys_user where user_id=$OWNER_UID;"
   fi
   sql "delete from biz_member where openid='mock_smokemsv_member';"
@@ -130,6 +134,7 @@ cleanup() {
   if [ -n "$K_STAFF_UID" ]; then
     sql "delete from biz_merchant_staff where user_id=$K_STAFF_UID;"
     sql "delete from sys_user_role where user_id=$K_STAFF_UID;"
+    sql "delete from biz_merchant_user where user_id=$K_STAFF_UID;"
     sql "delete from sys_user where user_id=$K_STAFF_UID;"
   fi
   sql "delete from biz_merchant_staff_invite where remark like 'smokemsv%';"
@@ -137,9 +142,19 @@ cleanup() {
   if [ -n "$M_UID" ]; then
     sql "delete from biz_merchant_staff where user_id=$M_UID;"
     sql "delete from sys_user_role where user_id=$M_UID;"
+    sql "delete from biz_merchant_user where user_id=$M_UID;"
     sql "delete from sys_user where user_id=$M_UID;"
   fi
   sql "delete from biz_member where openid='mock_smokemsv_dual';"
+  # O 组：扫码入职的店长 / 店员（含 PC 角色与租户归属两张附表）
+  for U in "$O_MGR_UID" "$O_STF_UID"; do
+    if [ -n "$U" ]; then
+      sql "delete from biz_merchant_staff where user_id=$U;"
+      sql "delete from sys_user_role where user_id=$U;"
+      sql "delete from biz_merchant_user where user_id=$U;"
+      sql "delete from sys_user where user_id=$U;"
+    fi
+  done
   # L 组：商家端建出来的商品（含 biz_product_store 关联）
   sql "delete from biz_product_store where product_id in (select product_id from biz_product where product_name like 'smokemsv_prod%');"
   sql "delete from biz_product where product_name like 'smokemsv_prod%';"
@@ -542,6 +557,87 @@ if [ -n "$AGENT_TK" ]; then
   ck "代理商访问商家端被拒" \
      "$(curl -s "$BASE_URL/api/merchant/staff/home" -H "X-App-Id: $APPID" \
         -H "Authorization: Bearer $AGENT_TK" | jtop code)" "403"
+fi
+
+# ---- O) 扫码入职的店长要能在 PC 后台接着招下一个店员 ----
+# 为什么锁这组：createStaffByOpenid 建账号时只写 sys_user.merchant_id，
+# 既没绑 PC 角色、也没往 biz_merchant_user 落租户归属。造成两个实测缺陷：
+#   1) 店长登 PC 后台 permissions 为空集，/biz/staffInvite/** 四个端点全 403，
+#      「老板招店长 → 店长再招店员」这条链在第二环直接断掉；
+#   2) PC 端租户身份只认 biz_merchant_user（TenantServiceImpl.buildContextByUserId），
+#      查不到记录会兜底成「平台账号」—— 实测 /getInfo 返 userType=0，
+#      /biz/store/list 返回 merchant_id=2/200 的别家门店，属跨商户泄漏。
+# STAFF 只在小程序核销，不该拿到 PC 权限，但租户归属仍必须落库（否则同样兜底成平台）。
+if [ -n "$ATK" ]; then
+  echo "[O] 扫码入职店长的后台权限与租户归属"
+
+  # O1 发一张 MANAGER 码，走真实扫码入职
+  curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $ATK" \
+    -H 'Content-Type: application/json' \
+    -d "{\"merchantId\":$MID,\"storeId\":$STORE_A,\"role\":\"MANAGER\",\"remark\":\"smokemsv_omgr\"}" >/dev/null
+  O_CODE=$(sqlv "select invite_code from biz_merchant_staff_invite where remark='smokemsv_omgr' order by invite_id desc limit 1;")
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/acceptInvite" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"code\":\"smokemsv_omgr_wx\",\"scene\":\"invite:$MID:$STORE_A:$O_CODE\",\"nickName\":\"smokemsv_omgr\"}")
+  ckc "店长扫码入职成功" "$RESP" "等待店长审核"
+  O_MGR_UID=$(sqlv "select user_id from sys_user where openid='mock_smokemsv_omgr_wx' and del_flag='0' order by user_id desc limit 1;")
+  ck "店长账号已建" "$([ -n "$O_MGR_UID" ] && echo yes || echo no)" "yes"
+
+  if [ -n "$O_MGR_UID" ]; then
+    # O2 两张附表必须落：PC 角色（merchant）+ 租户归属（userType=2/本商户）
+    ck "店长绑到 PC 商户管理员角色" \
+       "$(sqlv "select count(*) from sys_user_role ur join sys_role r on r.role_id=ur.role_id where ur.user_id=$O_MGR_UID and r.role_key='merchant';")" "1"
+    ck "店长租户归属已落库" \
+       "$(sqlv "select concat(user_type,'/',merchant_id) from biz_merchant_user where user_id=$O_MGR_UID;")" "2/$MID"
+
+    # O3 审核在职 + 重置密码后登 PC 后台
+    O_SID=$(sqlv "select id from biz_merchant_staff where user_id=$O_MGR_UID limit 1;")
+    curl -s -X POST "$BASE_URL/biz/staffInvite/staff/audit" -H "Authorization: Bearer $ATK" \
+      -H 'Content-Type: application/json' -d "{\"id\":$O_SID,\"approve\":true}" >/dev/null
+    O_PWD=$(curl -s -X PUT "$BASE_URL/biz/staffInvite/staff/resetPwd/$O_MGR_UID" -H "Authorization: Bearer $ATK" \
+      -H 'Content-Type: application/json' -d '{}' | jtop newPassword)
+    O_USER=$(sqlv "select user_name from sys_user where user_id=$O_MGR_UID;")
+    O_TK=$(curl -s -X POST "$BASE_URL/login" -H 'Content-Type: application/json' \
+      -d "{\"username\":\"$O_USER\",\"password\":\"$O_PWD\"}" | jtop token)
+    ck "店长能登 PC 后台" "$([ -n "$O_TK" ] && echo yes || echo no)" "yes"
+
+    if [ -n "$O_TK" ]; then
+      # O4 身份不能兜底成平台（兜底会看到别家商户数据）
+      INFO=$(curl -s "$BASE_URL/getInfo" -H "Authorization: Bearer $O_TK")
+      ck "店长身份是商户而非平台" "$(echo "$INFO" | jtop userType)"   "2"
+      ck "店长身份带本商户ID"    "$(echo "$INFO" | jtop merchantId)" "$MID"
+
+      # O5 招下一个店员的四个端点必须通（原来全 403）
+      ck "店长看待审列表"  "$(curl -s "$BASE_URL/biz/staffInvite/staff/audit" -H "Authorization: Bearer $O_TK" | jtop code)" "200"
+      ck "店长看员工名单"  "$(curl -s "$BASE_URL/biz/staffInvite/staff/list"  -H "Authorization: Bearer $O_TK" | jtop code)" "200"
+      RESP=$(curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $O_TK" \
+        -H 'Content-Type: application/json' \
+        -d "{\"merchantId\":$MID,\"storeId\":$STORE_A,\"role\":\"STAFF\",\"remark\":\"smokemsv_obymgr\"}")
+      ckc "店长能自己发店员邀请码" "$RESP" "已生成邀请码"
+
+      # O6 门店列表只能是本商户（兜底成平台时实测会多出 merchant_id=2/200）
+      OTHER=$(curl -s "$BASE_URL/biz/store/list?pageSize=100" -H "Authorization: Bearer $O_TK" \
+        | python3 -c "
+import sys,json
+rows=(json.load(sys.stdin).get('rows') or [])
+print(sum(1 for r in rows if r.get('merchantId') not in (None, $MID)))")
+      ck "店长看不到别家门店" "$OTHER" "0"
+    fi
+  fi
+
+  # O7 店员只在小程序核销，不该拿 PC 角色；但租户归属仍必须落
+  curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $ATK" \
+    -H 'Content-Type: application/json' \
+    -d "{\"merchantId\":$MID,\"storeId\":$STORE_A,\"role\":\"STAFF\",\"remark\":\"smokemsv_ostf\"}" >/dev/null
+  O_SCODE=$(sqlv "select invite_code from biz_merchant_staff_invite where remark='smokemsv_ostf' order by invite_id desc limit 1;")
+  curl -s -X POST "$BASE_URL/api/merchant/staff/acceptInvite" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"code\":\"smokemsv_ostf_wx\",\"scene\":\"invite:$MID:$STORE_A:$O_SCODE\",\"nickName\":\"smokemsv_ostf\"}" >/dev/null
+  O_STF_UID=$(sqlv "select user_id from sys_user where openid='mock_smokemsv_ostf_wx' and del_flag='0' order by user_id desc limit 1;")
+  if [ -n "$O_STF_UID" ]; then
+    ck "店员没拿到任何 PC 角色" "$(sqlv "select count(*) from sys_user_role where user_id=$O_STF_UID;")" "0"
+    ck "店员租户归属仍已落库"   "$(sqlv "select concat(user_type,'/',merchant_id) from biz_merchant_user where user_id=$O_STF_UID;")" "2/$MID"
+  fi
 fi
 
 echo
