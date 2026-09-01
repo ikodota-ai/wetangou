@@ -70,6 +70,18 @@ function _clearAuth(authScope) {
   }
 }
 
+// 从会员登录响应里取 hasStaffAccount。
+// 抽成纯函数是因为有两条会员登录入口都要写这个标记：显式登录页
+// (pages/login/login.js) 和下面的静默重登。它是「我的」页显示「切换到商家版」
+// 入口的唯一依据，任一条漏写，已入职的店员在会员端就找不到进商家版的路。
+// 兼容后端把字段放顶层或包在 data 里两种形态。
+function pickHasStaffAccount(data) {
+  if (!data) return false
+  if (data.hasStaffAccount === true) return true
+  if (data.data && data.data.hasStaffAccount === true) return true
+  return false
+}
+
 // === 静默重登 + 重试（仅会员态）===
 // 会员 token 真过期时，自动 wx.login() 换 code 重新登录，
 // 成功后用新 token 重试原请求一次。微信授权静默，用户无感。
@@ -91,6 +103,11 @@ function _reloginAndRetry(url, options, authScope) {
       if (!token) throw new Error('relogin no token')
       try { wx.setStorageSync('token', token) } catch (e) {}
       try { wx.setStorageSync('memberToken', token) } catch (e) {}
+      // 和 pages/login/login.js 一样要刷 hasStaffAccount：这是「我的」页显示
+      // 「切换到商家版」入口的唯一依据。只在显式登录页写的话，店员换设备或清了
+      // 缓存后走这条静默重登，storage 里没这个标记 → 入口不出现，明明已入职的
+      // 店员在会员端找不到任何进商家版的路。
+      try { wx.setStorageSync('hasStaffAccount', pickHasStaffAccount(data)) } catch (e) {}
       // 用新 token 重试原请求
       return request(url, options)
     } catch (e) {
@@ -313,5 +330,6 @@ module.exports = {
   APPID,
   toFullUrl,
   fixRichText,
+  pickHasStaffAccount,
   mockEnabled: MOCK_ENABLED
 };

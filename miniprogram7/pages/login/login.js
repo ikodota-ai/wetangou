@@ -1,5 +1,5 @@
 const app = getApp()
-const { api, APPID } = require('../../utils/request.js')
+const { api, APPID, pickHasStaffAccount } = require('../../utils/request.js')
 const identity = require('../../utils/identity.js')
 
 /**
@@ -141,7 +141,7 @@ Page({
     }
     const loginType = data.loginType || (data.data && data.data.loginType) || 'member'
     const isStaff = data.isStaff === true || (data.data && data.data.isStaff === true)
-    const hasStaffAccount = data.hasStaffAccount === true || (data.data && data.data.hasStaffAccount === true)
+    const hasStaffAccount = pickHasStaffAccount(data)
     const appInst = getApp() || {}
     appInst.globalData = appInst.globalData || {}
     // 写 token 到 storage

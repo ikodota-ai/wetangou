@@ -45,6 +45,9 @@
 #      老板审核通过后店员静默 wxLogin 免密进商家版并能核销
 #   L) 商家端建商品：老板能建(落草稿)+上架+在商家端列表可见，租户字段被强制覆盖为
 #      自己商户；店员(STAFF)、代理商、平台账号都不能建
+#   M) 会员端识别店员身份：入职前 /api/auth/login 返 hasStaffAccount=false（会员端不显示
+#      「切换到商家版」），扫码入职后转 true；待审时静默 wxLogin 返 601（前端弹「等待
+#      店长审核」而不是「切换失败」），没绑过的返 600，审核通过后返 200 + token
 #
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-merchant-staff-verify.sh
@@ -62,6 +65,9 @@ ck() { # ck <描述> <实际> <期望>
   if [ "$2" = "$3" ]; then echo "  OK: $1 ($2)"; else echo "  FAIL: $1 期望 $3 实际 $2"; FAIL=1; fi
 }
 ckc() { # ckc <描述> <实际> <应包含>
+  # 空实际值必须直接判失败：case 的 *"$3"* 对空串会命中任意模式，
+  # 断言写法一旦取不到值（例如把跨行命令替换嵌进参数里）就会静默变成假绿。
+  if [ -z "$2" ]; then echo "  FAIL: $1 实际值为空（断言取值失败）"; FAIL=1; return; fi
   case "$2" in *"$3"*) echo "  OK: $1";; *) echo "  FAIL: $1 期望含「$3」实际「$2」"; FAIL=1;; esac
 }
 
@@ -93,6 +99,7 @@ NOSTORE_MID=""
 SIGNUP_I=""
 K_STAFF_UID=""
 ORDER_K=""
+M_UID=""
 cleanup() {
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
@@ -123,6 +130,13 @@ cleanup() {
     sql "delete from sys_user where user_id=$K_STAFF_UID;"
   fi
   sql "delete from biz_merchant_staff_invite where remark like 'smokemsv%';"
+  # M 组：会员端身份识别用的扫码入职账号
+  if [ -n "$M_UID" ]; then
+    sql "delete from biz_merchant_staff where user_id=$M_UID;"
+    sql "delete from sys_user_role where user_id=$M_UID;"
+    sql "delete from sys_user where user_id=$M_UID;"
+  fi
+  sql "delete from biz_member where openid='mock_smokemsv_dual';"
   # L 组：商家端建出来的商品（含 biz_product_store 关联）
   sql "delete from biz_product_store where product_id in (select product_id from biz_product where product_name like 'smokemsv_prod%');"
   sql "delete from biz_product where product_name like 'smokemsv_prod%';"
@@ -423,6 +437,65 @@ print('yes' if any(str(r.get('productId'))=='$L_PID' for r in rows) else 'no')
   ck "店员的商品没落库" "$(sqlv "select count(*) from biz_product where product_name='smokemsv_prod_staff';")" "0"
 else
   echo "  SKIP: 老板小程序端登录失败，跳过 L"
+fi
+
+# ---- M) 会员端识别店员身份 → 免密进商家版 ----
+# 已定设计：店员不走小程序登录页扫码，入职只用微信「扫一扫」；已绑 openid 的店员
+# 从会员端「我的」→「切换到商家版」静默 wx.login 免密进。
+# 「我的」页那个入口的唯一依据就是 hasStaffAccount，所以这个字段必须在
+# 「入职前 false / 入职后 true」两个时刻都准确。
+if [ -n "$ATK" ]; then
+  # M1 同一个微信入职前：会员端不应显示商家版入口
+  # 断言不要把跨行的命令替换直接嵌进参数里：那样取到的是空串，
+  # 而 ckc 是子串匹配（空串命中任意模式）→ 静默假绿。先存变量再断言。
+  MRESP1=$(curl -s -X POST "$BASE_URL/api/auth/login" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"code\":\"smokemsv_dual\",\"appid\":\"$APPID\"}")
+  ck "入职前 hasStaffAccount=false" "$(echo "$MRESP1" | jtop hasStaffAccount)" "False"
+
+  # M2 没绑过员工的微信静默切商家版 → 600 NOT_BOUND（前端据此提示「去登录绑定」）
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/wxLogin" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' -d '{"code":"smokemsv_dual"}')
+  ck "未绑员工返 600" "$(echo "$RESP" | jtop code)" "600"
+
+  # M3 用同一个微信扫码入职
+  RESP=$(curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $ATK" \
+    -H 'Content-Type: application/json' \
+    -d "{\"merchantId\":$MID,\"storeId\":$STORE_A,\"role\":\"STAFF\",\"remark\":\"smokemsv_dual\"}")
+  M_CODE=$(sqlv "select invite_code from biz_merchant_staff_invite where remark='smokemsv_dual' order by invite_id desc limit 1;")
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/acceptInvite" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"code\":\"smokemsv_dual\",\"scene\":\"invite:$MID:$STORE_A:$M_CODE\"}")
+  echo "[M] 会员端身份识别"
+  ckc "入职提交成功" "$RESP" "等待店长审核"
+  M_UID=$(sqlv "select user_id from sys_user where openid='mock_smokemsv_dual' and del_flag='0' order by user_id desc limit 1;")
+
+  # M4 入职后会员端就该出现商家版入口
+  MRESP2=$(curl -s -X POST "$BASE_URL/api/auth/login" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"code\":\"smokemsv_dual\",\"appid\":\"$APPID\"}")
+  ck "入职后 hasStaffAccount=true" "$(echo "$MRESP2" | jtop hasStaffAccount)" "True"
+
+  # M5 待审期间点进去必须是「等待店长审核」（601），不能是含糊的切换失败
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/wxLogin" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' -d '{"code":"smokemsv_dual"}')
+  ck "待审静默登录返 601" "$(echo "$RESP" | jtop code)" "601"
+  ck "待审不发 token"    "$(echo "$RESP" | jtop token)"  ""
+
+  # M6 审核通过后免密进商家版
+  M_LINK=$(sqlv "select id from biz_merchant_staff where user_id=$M_UID and merchant_id=$MID order by id desc limit 1;")
+  if [ -n "$M_LINK" ]; then
+    curl -s -X POST "$BASE_URL/biz/staffInvite/staff/audit" -H "Authorization: Bearer $ATK" \
+      -H 'Content-Type: application/json' -d "{\"id\":$M_LINK,\"approve\":true}" > /dev/null
+    RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/wxLogin" -H "X-App-Id: $APPID" \
+      -H 'Content-Type: application/json' -d '{"code":"smokemsv_dual"}')
+    ck "审核后免密登录成功" "$(echo "$RESP" | jtop code)"      "200"
+    ck "拿到 staff token"   "$([ -n "$(echo "$RESP" | jtop token)" ] && echo yes || echo no)" "yes"
+    ck "角色是 STAFF"       "$(echo "$RESP" | jtop staffRole)"  "STAFF"
+    ck "userType=staff"     "$(echo "$RESP" | jtop userType)"   "staff"
+  fi
+else
+  echo "  SKIP: admin 登录失败，跳过 M"
 fi
 
 echo
