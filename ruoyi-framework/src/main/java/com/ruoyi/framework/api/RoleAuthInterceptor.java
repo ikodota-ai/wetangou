@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
  *   <li>从 MemberContextHolder 取当前 LoginMember</li>
  *   <li>若 LoginMember.roles 与 value 任一匹配 → 通过</li>
  *   <li>includeHigher=true 时：OWNER 包含 MANAGER 权限（OWNER > MANAGER > STAFF）</li>
+ *   <li>PLATFORM / AGENT 只匹配显式声明了自己的端点，不穿透商家端职务序列</li>
  *   <li>不匹配 → 403</li>
  *   <li>未登录 → 放行（由 MemberAuthInterceptor 先挡 401）</li>
  * </ul>
@@ -27,17 +28,15 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class RoleAuthInterceptor implements HandlerInterceptor
 {
-    /** 角色等级：OWNER=3 > MANAGER=2 > STAFF=1，AGENT/PLATFORM 单独算 */
+    /**
+     * 角色等级统一取 {@link BizRole#rank()}。
+     *
+     * <p>这里原本另抄了一份 switch，和 BizRole.rank() 是两份要各自维护的真值表 ——
+     * 将来往枚举里加职务（例如财务、收银）只改一处，另一处就会静默算错等级。</p>
+     */
     private static int roleRank(BizRole r)
     {
-        if (r == null) return 0;
-        switch (r)
-        {
-            case OWNER:   return 3;
-            case MANAGER: return 2;
-            case STAFF:   return 1;
-            default:      return 0;
-        }
+        return r == null ? 0 : r.rank();
     }
 
     @Override
@@ -64,8 +63,19 @@ public class RoleAuthInterceptor implements HandlerInterceptor
         for (BizRole need : allowed)
         {
             if (need == null) continue;
-            // PLATFORM 永远放行
-            if (myRoles != null && myRoles.contains(BizRole.PLATFORM)) { ok = true; break; }
+            // PLATFORM 只匹配显式声明了 PLATFORM 的端点。
+            //
+            // 原来这里是「含 PLATFORM 就无条件放行」，等于平台账号可以穿透全部商家端
+            // @RequireRole。已定的产品决策是「平台账号和代理商不允许登录商家版」，
+            // 平台要跨店看数据走 ApiPlatformController 的 @RequireRole(PLATFORM) 专属端点。
+            // 之前挡住平台账号的只是各端点内部「merchantId 为空」的巧合 —— 不是防护：
+            // /api/merchant/staff/me 不依赖 merchantId，平台账号实测能拿到 200 和账号资料。
+            // 一旦某个平台账号被顺手填上 merchant_id，整片商家端就全部敞开。
+            if (need == BizRole.PLATFORM)
+            {
+                if (myRoles != null && myRoles.contains(BizRole.PLATFORM)) { ok = true; break; }
+                continue;
+            }
             // AGENT 仅匹配 AGENT
             if (need == BizRole.AGENT)
             {

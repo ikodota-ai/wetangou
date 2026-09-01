@@ -48,6 +48,9 @@
 #   M) 会员端识别店员身份：入职前 /api/auth/login 返 hasStaffAccount=false（会员端不显示
 #      「切换到商家版」），扫码入职后转 true；待审时静默 wxLogin 返 601（前端弹「等待
 #      店长审核」而不是「切换失败」），没绑过的返 600，审核通过后返 200 + token
+#   N) 平台/代理商不得穿透商家端：RoleAuthInterceptor 原本「含 PLATFORM 就无条件放行」，
+#      平台账号可穿透全部商家端 @RequireRole（/me 实测能拿 200 + 账号资料）。收口后
+#      平台账号访问商家端一律 403，但平台/代理商各自的专属端点必须仍然可用。
 #
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-merchant-staff-verify.sh
@@ -496,6 +499,49 @@ if [ -n "$ATK" ]; then
   fi
 else
   echo "  SKIP: admin 登录失败，跳过 M"
+fi
+
+# ---- N) 平台/代理商不得穿透商家端 @RequireRole ----
+# 已定决策：平台账号和代理商不允许登录商家版。原来 RoleAuthInterceptor 里
+# 「myRoles 含 PLATFORM 就 ok=true」会放平台账号进任何商家端端点；当时挡住它的
+# 只是各端点内部「merchantId 为空」的巧合，而 /me 不依赖 merchantId，实测返 200
+# 并吐出账号资料。哪天有平台账号被顺手填上 merchant_id，整片商家端就全敞开。
+PLAT_TK=$(mlogin platform_c43 | jtop token)
+AGENT_TK=$(mlogin agent_c43   | jtop token)
+if [ -n "$PLAT_TK" ]; then
+  echo "[N] 平台账号穿透防护"
+  # N1 商家端端点一律 403（覆盖 STAFF 级、OWNER/MANAGER 级两种声明）
+  for E in me home today/orders today/bills today/bookings finance/summary; do
+    ck "平台账号访问 $E 被拒" \
+       "$(curl -s "$BASE_URL/api/merchant/staff/$E" -H "X-App-Id: $APPID" \
+          -H "Authorization: Bearer $PLAT_TK" | jtop code)" "403"
+  done
+  # N2 商品写操作同样不能穿透
+  PRESP=$(curl -s -X POST "$BASE_URL/api/product/add" -H "X-App-Id: $APPID" \
+    -H "Authorization: Bearer $PLAT_TK" -H 'Content-Type: application/json' \
+    -d "{\"productName\":\"smokemsv_prod_plat\",\"typeCode\":\"GROUPON\",\"storeIds\":\"$STORE_A\",\"price\":1,\"maxPerOrder\":1}")
+  ck "平台账号建商品被拒" "$(echo "$PRESP" | jtop code)" "403"
+  ck "平台账号的商品没落库" "$(sqlv "select count(*) from biz_product where product_name='smokemsv_prod_plat';")" "0"
+  # N3 平台自己的专属端点必须还能用（收口不能把正常功能一起砍掉）
+  ck "平台专属端点仍可用" \
+     "$(curl -s "$BASE_URL/api/merchant/staff/platform/finance/summary" -H "X-App-Id: $APPID" \
+        -H "Authorization: Bearer $PLAT_TK" | jtop code)" "200"
+  # N4 平台账号也不能借放行去访问代理商端点
+  ck "平台账号访问代理商端点被拒" \
+     "$(curl -s "$BASE_URL/api/agent/info" -H "X-App-Id: $APPID" \
+        -H "Authorization: Bearer $PLAT_TK" | jtop code)" "403"
+fi
+if [ -n "$AGENT_TK" ]; then
+  # N5 代理商专属端点不能被这次收口打断
+  for E in info stats; do
+    ck "代理商专属 $E 仍可用" \
+       "$(curl -s "$BASE_URL/api/agent/$E" -H "X-App-Id: $APPID" \
+          -H "Authorization: Bearer $AGENT_TK" | jtop code)" "200"
+  done
+  # N6 代理商同样不得进商家端
+  ck "代理商访问商家端被拒" \
+     "$(curl -s "$BASE_URL/api/merchant/staff/home" -H "X-App-Id: $APPID" \
+        -H "Authorization: Bearer $AGENT_TK" | jtop code)" "403"
 fi
 
 echo
