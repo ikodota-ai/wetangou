@@ -1,5 +1,6 @@
 // app.js 洞天团购小程序（miniprogram7）入口
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
+const { decide: decideStorePick } = require('./utils/storePick.js');
 
 App({
   onLaunch() {
@@ -208,18 +209,24 @@ App({
   },
   pickNearestStore(callback, opts) {
     const useStore = (s, source) => {
-      if (!s || !s.storeId) {
-        if (source === 'sync') callback && callback(null);
-        return;
+      // 判定逻辑在 utils/storePick.js（纯函数，被单测直接引用）。
+      // 之前这段判断内联在这里，单测只能复制一份来测，复制品和真实代码
+      // 各自演化 —— 同一个 bug 复发三次而单测一直全绿。
+      const d = decideStorePick(this.globalData.store, s, source)
+      if (!d.shouldStore) {
+        if (d.shouldCallback) callback && callback(null)
+        return
       }
-      const prev = this.globalData.store
-      const changed = !prev || prev.storeId !== s.storeId || prev.latitude !== s.latitude
+      const changed = d.changed
       this.globalData.store = s
       this.globalData.stores = [s]
       try { wx.setStorageSync('lastStoreId', s.storeId) } catch (e) {}
       this.loadGoods(s.storeId).catch(() => {})
       console.log('[pickNearestStore] source=' + source + ' storeId=' + s.storeId + ' name=' + (s.storeName || s.name || ''))
-      if (changed) callback && callback(s)
+      // changed 不再决定「给不给回调」（那是三次复发的根因，见 storePick.js），
+      // 而是作为第二个参数交给调用方：需要区分「首次填充」和「门店真的换了」
+      // 的页面可以自己看这个标记。
+      if (d.shouldCallback) callback && callback(s, { changed: changed, source: source })
     }
     const fetchList = (src) => api.storeList({ page: 1, pageSize: 1 }).then((res) => {
       const rows = (res && (res.rows || res.data || res)) || []

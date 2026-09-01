@@ -261,6 +261,8 @@ const api = {
   merchantStaffBookingReject:  (signupId, body) => request('/api/merchant/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),
   // 预约
   bookingSlots: (params) => request('/api/booking/slots', { data: params }),
+  // 可选预约类型：后台「字典管理 → 预约类型」维护，前端不再写死「堂食预约」
+  bookingTypes: () => request('/api/booking/types'),
   createBooking: (data) => request('/api/booking', { method: 'POST', data }),
   bookingList: (params) => request('/api/booking/list', { data: params }),
   bookingDetail: (id) => request(`/api/booking/${id}`),

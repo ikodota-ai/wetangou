@@ -36,10 +36,20 @@
       </view>
     </view>
 
-    <view class="book-card" bindtap="goCreate">
+    <!-- 预约类型来自后台「字典管理 → 预约类型」，配几条就显示几张卡。
+         原先这里写死一张「堂食预约」，后台加了「到店消费」也不显示。 -->
+    <view class="book-card" wx:for="{{bookingTypes}}" wx:key="code"
+          data-code="{{item.code}}" data-name="{{item.name}}" bindtap="goCreateType">
       <image class="bc-img" src="{{store.logo || '/assets/img/RestaurantImg.png'}}" mode="aspectFill"></image>
       <view class="bc-mask"></view>
-      <text class="bc-ttl">堂食预约</text>
+      <text class="bc-ttl">{{item.name}}</text>
+    </view>
+    <!-- 后台一条都没配时给个入口，别让顾客约不了；typesLoaded 之前不显示，
+         避免首屏闪一下这段文案 -->
+    <view class="book-card" wx:if="{{typesLoaded && !bookingTypes.length}}" bindtap="goCreate">
+      <image class="bc-img" src="{{store.logo || '/assets/img/RestaurantImg.png'}}" mode="aspectFill"></image>
+      <view class="bc-mask"></view>
+      <text class="bc-ttl">在线预约</text>
     </view>
 
     <view class="my-booking" bindtap="goList">

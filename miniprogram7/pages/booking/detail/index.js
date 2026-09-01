@@ -30,7 +30,9 @@ Page({
           storePhone: r.storePhone || '',
           latitude: Number(r.storeLatitude) || 0,
           longitude: Number(r.storeLongitude) || 0,
-          serviceName: r.serviceName || '堂食预约',
+          // 兜底文案用中性的「在线预约」：serviceName 现在跟着后台配的
+          // 预约类型走，写死「堂食预约」会把「到店消费」的历史单显示错
+          serviceName: r.serviceName || '在线预约',
           bookingTime: (r.bookingDate ? String(r.bookingDate).slice(0, 10) : '') + (r.timeSlot ? ' ' + r.timeSlot : ''),
           createTime: r.createTime || '-',
           contact: r.contact || '-',

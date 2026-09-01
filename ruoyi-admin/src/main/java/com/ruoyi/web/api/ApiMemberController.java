@@ -14,7 +14,6 @@ import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.utils.file.FileUploadUtils;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.common.core.domain.AjaxResult;
-import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.service.WxMaService;
@@ -57,6 +56,15 @@ public class ApiMemberController
      * <p>会员查看自己的资料需要看到明文手机号。直接返回 Member 实体
      * 会被 @Sensitive 把 phone 变 138****0000，所以这里手工拷贝字段，
      * 不用 Jackson 反序列化 @Sensitive 注解。</p>
+     *
+     * <p>注意 phone 必须是明文：手工拷贝的目的就是绕开 @Sensitive，
+     * 结果这里又手动调了一次 desensitizer()，等于白绕。
+     * 而这个接口是「当前会员看自己的手机号」，不是给别人看的，脱敏没有意义。
+     *
+     * 更要紧的是它会污染下游：app.js 的 bootUser 和下单页的
+     * _refreshUserContact 都拿这个返回值 Object.assign 进 globalData.user，
+     * 把登录接口给的明文覆盖成 138****1234；下单/买单/预约提交时带过去的
+     * 就是含星号的号码，既存不进订单也拨不出去。</p>
      */
     @LoginRequired
     @GetMapping("/profile")
@@ -73,7 +81,7 @@ public class ApiMemberController
         vo.put("nickName", m.getNickname());
         vo.put("avatar", m.getAvatar());
         vo.put("avatarUrl", m.getAvatar());
-        vo.put("phone", DesensitizedType.PHONE.desensitizer().apply(m.getPhone()));
+        vo.put("phone", m.getPhone());
         vo.put("gender", m.getGender());
         vo.put("birthday", m.getBirthday());
         vo.put("status", m.getStatus());

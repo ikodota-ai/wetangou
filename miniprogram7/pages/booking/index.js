@@ -1,10 +1,14 @@
 const app = getApp();
+const { api } = require('../../utils/request.js');
 const { haversineKm, formatDistance } = require('../../utils/util.js');
 
 Page({
-  data: { statusBarHeight: 20, store: {} },
+  // bookingTypes 来自后台「字典管理 → 预约类型」，不再写死一张「堂食预约」卡。
+  // typesLoaded 用来区分「还没拉到」和「后台真的没配」——前者不该显示空态。
+  data: { statusBarHeight: 20, store: {}, bookingTypes: [], typesLoaded: false },
   onLoad() {
     try { this.setData({ statusBarHeight: wx.getSystemInfoSync().statusBarHeight || 20 }); } catch (e) {}
+    this.loadTypes();
     // 立即用缓存的 store 渲染一次（避免空窗期）
     const cached = (getApp().globalData && getApp().globalData.store) || null
     if (cached && cached.storeId) {
@@ -12,7 +16,7 @@ Page({
     } else {
       this.setData({ _storeLoadTimedOut: false });
     }
-    // 后台异步尝试选最近门店（pickNearestStore 内部有 globalData 短路，未变就不重渲染）
+    // 门店从占位升级成最近门店时刷新（回调现在每次都会触发，见 app.js useStore 注释）
     app.pickNearestStore((s) => {
       if (s && s.storeId) this.setData({ store: this._compatStore(s), _storeLoadTimedOut: false });
     });
@@ -24,6 +28,21 @@ Page({
     }, 5000);
   },
   onUnload() { if (this._storeTimer) { clearTimeout(this._storeTimer); this._storeTimer = null; } },
+
+  // 预约类型：后台字典配几条就显示几张卡，顺序按字典的 dict_sort
+  loadTypes() {
+    api.bookingTypes().then((res) => {
+      const rows = (res && (res.data || res.rows || res)) || [];
+      this.setData({
+        bookingTypes: Array.isArray(rows) ? rows : [],
+        typesLoaded: true
+      });
+    }).catch((err) => {
+      console.warn('[booking] loadTypes FAIL', err);
+      this.setData({ bookingTypes: [], typesLoaded: true });
+    });
+  },
+
   retryStore() {
     this.setData({ _storeLoadTimedOut: false });
     app.pickNearestStore((s) => {
@@ -58,7 +77,20 @@ Page({
   },
   goCreate() {
     const id = this.data.store.storeId;
-    wx.navigateTo({ url: '/pages/booking/create/index' + (id ? '?storeId=' + id : '') });
+    this._toCreate(id, '', '');
+  },
+  // 点某一类预约：把类型带过去，create 页据此落 booking_type 并显示标题
+  goCreateType(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    this._toCreate(this.data.store.storeId, ds.code || '', ds.name || '');
+  },
+  _toCreate(storeId, code, name) {
+    const q = [];
+    if (storeId) q.push('storeId=' + storeId);
+    if (code) q.push('bookingType=' + encodeURIComponent(code));
+    // 标题一起带过去，省掉 create 页再拉一次字典
+    if (name) q.push('typeName=' + encodeURIComponent(name));
+    wx.navigateTo({ url: '/pages/booking/create/index' + (q.length ? '?' + q.join('&') : '') });
   },
   goList() { wx.navigateTo({ url: '/pages/booking/list/index' }); },
   goHome() { wx.switchTab({ url: '/pages/home/index' }); },

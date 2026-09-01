@@ -24,16 +24,23 @@ Page({
     phone: '',
     people: 1,
     remark: '',
+    // 预约类型：由上一页（预约首页）按后台字典传进来。
+    // 后台一条都没配时走「在线预约」兜底，bookingType 留空 —— 后端对空值不校验。
+    bookingType: '',
+    typeName: '在线预约',
     loadingSlots: false,
     submitting: false,
     showSuccess: false
   },
   onLoad(opts) {
     const days = getNextDays(7).map((d) => ({ label: formatDate(d, 'MM-DD'), date: formatDate(d, 'YYYY-MM-DD') }));
+    const o = opts || {};
     this.setData({
       days,
       contact: app.globalData.user.nickname || '',
-      phone: app.globalData.user.phone || ''
+      phone: app.globalData.user.phone || '',
+      bookingType: o.bookingType ? decodeURIComponent(o.bookingType) : '',
+      typeName: o.typeName ? decodeURIComponent(o.typeName) : '在线预约'
     });
 
     if (opts && opts.storeId) {
@@ -229,7 +236,10 @@ Page({
     wx.showLoading({ title: '提交中', mask: true });
     api.createBooking({
       storeId: this.data.store.storeId,
-      serviceName: '堂食预约',
+      // serviceName 和 bookingType 都跟着后台配的类型走，
+      // 原先写死「堂食预约」，后台配了「到店消费」也会被存成堂食
+      serviceName: this.data.typeName,
+      bookingType: this.data.bookingType || undefined,
       bookingDate: date,
       timeSlot: this.data.slot,
       contact: this.data.contact,

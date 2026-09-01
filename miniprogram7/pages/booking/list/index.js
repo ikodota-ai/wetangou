@@ -43,7 +43,8 @@ Page({
     return {
       id: r.id,
       bookingId: r.bookingId,
-      title: r.serviceName || '堂食预约',
+      // 同 detail 页：兜底文案不能写死某一种类型
+      title: r.serviceName || '在线预约',
       time: (r.bookingDate ? String(r.bookingDate).slice(0, 10) : '') + (r.timeSlot ? ' ' + r.timeSlot : ''),
       address: r.storeAddress || r.storeName || '',
       storeName: r.storeName || '',
