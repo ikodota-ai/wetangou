@@ -227,7 +227,7 @@ print(len(rows), d.get('aheadDays') or 0, len([x for x in rows if x.get('closed'
     ok "可约范围可配：/api/booking/days 返 $1 天（可提前 $2 天，其中歇业 $3 天）"
     echo "       后台【门店管理】可调「可提前预约 / 时段粒度 / 每周歇业日」"
   else
-    fail "/api/booking/days 不可用 → 新 jar 未部署（v10 才有这个端点）"
+    bad "/api/booking/days 不可用 → 新 jar 未部署（v10 才有这个端点）"
     echo "       → 先执行 sql/upgrade/biz_store_booking_rule_v10.sql，再传新 jar"
   fi
 fi

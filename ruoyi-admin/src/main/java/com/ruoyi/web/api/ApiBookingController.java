@@ -140,6 +140,12 @@ public class ApiBookingController
                 throw new ServiceException("预约类型不存在或已停用");
             }
 
+            // 可约范围必须在后端再判一次：日期条置灰、时段标 closed 都只是界面效果，
+            // 实测直接 POST 过来时歇业日 / 超出可提前天数 / 已过去的时段 / 非营业时间
+            // 一律返 200 落库，商家会收到根本没法接待的单子。
+            bookingService.assertSlotBookable(storeId,
+                    com.ruoyi.common.utils.DateUtils.parseDateToStr("yyyy-MM-dd", bookingDate), timeSlot);
+
             // 同门店同日同时段已有场次时直接复用，避免每人报名都新建一个场次
             Booking query = new Booking();
             query.setStoreId(storeId);

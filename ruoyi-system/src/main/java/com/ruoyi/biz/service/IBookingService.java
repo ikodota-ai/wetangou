@@ -84,4 +84,17 @@ public interface IBookingService
      * @return aheadDays / closedDays / openCount / days[{date,label,weekday,weekdayText,closed,closedReason}]
      */
     public Map<String, Object> selectBookableDays(Long storeId);
+
+    /**
+     * 校验某门店某日某时段是否真的可以被预约，不可约直接抛 ServiceException
+     *
+     * <p>为什么单独提出来：可约范围原先只在小程序端拦（日期条置灰、时段标 closed），
+     * 直接 POST /api/booking 时后端一律放行，歇业日、超出可提前天数的日期、
+     * 已过去的日期、营业时间外的时刻、甚至非法时段串都能落库。</p>
+     *
+     * @param storeId  门店 ID
+     * @param date     预约日期 yyyy-MM-dd
+     * @param timeSlot 时段，"10:00" 或 "10:00-11:00"
+     */
+    public void assertSlotBookable(Long storeId, String date, String timeSlot);
 }

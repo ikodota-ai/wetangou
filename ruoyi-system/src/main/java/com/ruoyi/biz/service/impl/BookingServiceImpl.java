@@ -295,6 +295,110 @@ public class BookingServiceImpl implements IBookingService
     }
 
     /**
+     * 提交预约前的服务端校验：日期在可约范围内、不是歇业日、时段真在营业时间里。
+     *
+     * <p>为什么必须有：可约范围原先只在小程序端拦（日期条置灰、时段标 closed）。
+     * 实测直接 POST /api/booking 绕过界面，歇业日、超出可提前天数的日期、
+     * 已经过去的日期、营业时间之外的 03:00、甚至「随便填」这种非时段字符串，
+     * 后端一律返 200 落库。而 selectBookableDays 的注释里写着
+     * 「顾客照样能选到周一，提交后才被拒」—— 实际上从来没被拒过。</p>
+     *
+     * <p>校验依据与 selectAvailableSlots / selectBookableDays 完全同源
+     * （同样的 resolveAheadDays / isClosedDay / isWithinAheadRange /
+     * parseBusinessHours / resolveSlotMinutes），避免出现「界面允许但提交被拒」
+     * 或反过来的不一致。</p>
+     *
+     * @param storeId  门店
+     * @param date     预约日期 yyyy-MM-dd
+     * @param timeSlot 时段，形如 "10:00" 或 "10:00-11:00"（取起始时刻）
+     */
+    @Override
+    public void assertSlotBookable(Long storeId, String date, String timeSlot)
+    {
+        Store store = storeMapper.selectStoreByStoreId(storeId);
+        if (store == null)
+        {
+            throw new com.ruoyi.common.exception.ServiceException("门店不存在");
+        }
+        if (StringUtils.isEmpty(date))
+        {
+            throw new com.ruoyi.common.exception.ServiceException("预约日期不能为空");
+        }
+        // 日期格式先卡住：yyyy-MM-dd 之外的写法后面按范围算会得到错误结论
+        Date bookingDate;
+        try
+        {
+            java.text.SimpleDateFormat ymd = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            ymd.setLenient(false);
+            bookingDate = ymd.parse(date);
+        }
+        catch (Exception e)
+        {
+            throw new com.ruoyi.common.exception.ServiceException("预约日期格式不正确");
+        }
+
+        if (!isWithinAheadRange(store, date))
+        {
+            throw new com.ruoyi.common.exception.ServiceException(
+                    "该日期不可预约，本店最多可提前 " + resolveAheadDays(store) + " 天预约");
+        }
+        if (isClosedDay(store, bookingDate))
+        {
+            throw new com.ruoyi.common.exception.ServiceException("本店当日歇业，请选择其他日期");
+        }
+
+        // 时段：必须能解析出 HH:mm，且落在营业时间内、对齐到配置的粒度
+        String start = startOf(timeSlot);
+        if (StringUtils.isEmpty(start) || !start.matches("\\d{1,2}:\\d{2}"))
+        {
+            throw new com.ruoyi.common.exception.ServiceException("预约时段格式不正确");
+        }
+        String[] hm = start.split(":");
+        int minutes;
+        try
+        {
+            minutes = Integer.parseInt(hm[0]) * 60 + Integer.parseInt(hm[1]);
+        }
+        catch (NumberFormatException e)
+        {
+            throw new com.ruoyi.common.exception.ServiceException("预约时段格式不正确");
+        }
+        int[] range = parseBusinessHours(store.getBusinessHours());
+        int openMinutes = range[0] * 60;
+        int closeMinutes = range[1] * 60;
+        if (minutes < openMinutes || minutes >= closeMinutes)
+        {
+            throw new com.ruoyi.common.exception.ServiceException(
+                    "该时段不在营业时间内（" + pad(range[0]) + ":00-" + pad(range[1]) + ":00）");
+        }
+        int step = resolveSlotMinutes(store);
+        if ((minutes - openMinutes) % step != 0)
+        {
+            throw new com.ruoyi.common.exception.ServiceException(
+                    "该时段不可选，本店按 " + step + " 分钟为一档开放预约");
+        }
+
+        // 当天不能约已经过去的时段（前端标 expired，后端同样要兜底）
+        if (date.equals(DateUtils.getDate()))
+        {
+            Calendar now = Calendar.getInstance();
+            int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+            if (minutes <= nowMinutes)
+            {
+                throw new com.ruoyi.common.exception.ServiceException("该时段已过，请选择更晚的时段");
+            }
+        }
+
+        // 容量：与 selectAvailableSlots 的 remain 同一套算法
+        Map<String, Integer> booked = countBookedPeople(storeId, bookingDate);
+        int used = booked.containsKey(start) ? booked.get(start).intValue() : 0;
+        if (used >= resolveSlotLimit())
+        {
+            throw new com.ruoyi.common.exception.ServiceException("该时段已约满，请选择其他时段");
+        }
+    }
+
+    /**
      * 门店可提前预约天数，非法值回退 7（与小程序原先写死的 7 天一致，保证升级后行为不变）
      */
     private int resolveAheadDays(Store store)

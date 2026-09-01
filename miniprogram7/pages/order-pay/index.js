@@ -2,6 +2,8 @@
 // 支付中间页（订单/买单共用）
 const app = getApp()
 const { api } = require('../../utils/request.js')
+const { formatMoney } = require('../../utils/util.js')
+const voucherUtil = require('../../utils/voucher.js')
 
 Page({
   data: {
@@ -15,19 +17,141 @@ Page({
     expireTimeText: '',
     paying: false,
     // prepay 内部缓存
-    _prepayRes: null
+    _prepayRes: null,
+    // 代金券。下单页是 redirectTo 跳到本页的，用户退不回去，
+    // 本页原先又没有券入口 —— 到店自取先下单、到店才付，
+    // 在店里想起有券时整条路都是断的。买单(type=bill)的券在买单页选，这里不重复给入口。
+    canUseVoucher: false,
+    total: 0,
+    discount: '0.00',
+    vouchers: [],
+    voucherList: [],
+    voucherCount: 0,
+    showVoucher: false,
+    changing: false
   },
 
   onLoad(opts) {
     // 来源：order/list "去支付" 或 买单页 "提交"
     const t = opts && opts.type ? opts.type : 'order'
     const id = opts && opts.id ? Number(opts.id) : 0
-    this.setData({ type: t, orderId: id })
+    this.setData({ type: t, orderId: id, canUseVoucher: t === 'order' })
     if (!id) {
       wx.showToast({ title: '缺少订单号', icon: 'none' })
       return
     }
     this.loadPayInfo()
+    this.loadOrderAmount()
+    this.loadVouchers()
+  },
+
+  // 从领券中心返回时要重新拉一次，否则刚领的券在本页看不到
+  onShow() {
+    if (this.data.canUseVoucher) {
+      this.loadVouchers()
+    }
+  },
+
+  /**
+   * 券可用性要按订单「商品总价」判，和下单页、后端 VoucherUsageService 同一个基准；
+   * prepay 只返实付金额，用它判门槛会把「满 100 减 20 的券用在 200 减到 180 的单上」
+   * 越判越不可用。所以另拉一次订单详情取 totalAmount / storeId / discountAmount。
+   */
+  loadOrderAmount() {
+    if (!this.data.canUseVoucher) return
+    api.orderDetail(this.data.orderId).then((res) => {
+      const o = (res && (res.data || res)) || {}
+      if (!o.orderId) return
+      this.setData({
+        total: parseFloat(o.totalAmount || 0) || 0,
+        discount: formatMoney(o.discountAmount),
+        _storeIdVal: o.storeId || null,
+        // 订单已经不是待支付了就收掉入口（例如从历史页面返回时状态已变）
+        canUseVoucher: o.status === '0'
+      })
+      this.refreshUsable()
+    }).catch(() => {})
+  },
+
+  loadVouchers() {
+    if (!this.data.canUseVoucher) return
+    const u = (app && app.globalData && app.globalData.user) || {}
+    if (!u.logged) return
+    api.myVoucher({ status: '0' }).then((res) => {
+      const rows = (res && (res.data || res.rows || res)) || []
+      const vouchers = (Array.isArray(rows) ? rows : []).map((v) => ({
+        id: v.id,
+        status: v.status,
+        faceValue: formatMoney(v.faceValue),
+        threshold: formatMoney(v.threshold),
+        expireTime: v.expireTime || '',
+        expireText: v.expireTime ? String(v.expireTime).slice(0, 10) : '',
+        storeId: v.storeId,
+        storeName: v.storeName || ''
+      }))
+      this.setData({ vouchers })
+      this.refreshUsable()
+    }).catch(() => {})
+  },
+
+  refreshUsable() {
+    const usable = voucherUtil.usableList(this.data.vouchers, this.data.total, undefined, this.data._storeIdVal)
+    this.setData({ voucherCount: usable.length })
+  },
+
+  openVoucher() {
+    if (!this.data.canUseVoucher) return
+    const u = (app && app.globalData && app.globalData.user) || {}
+    if (!u.logged) {
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
+    const sid = this.data._storeIdVal
+    // 不可用的也列出来置灰写明原因，否则用户不知道是差门槛还是限门店
+    const list = this.data.vouchers.map((v) => ({
+      ...v,
+      usable: voucherUtil.isUsable(v, this.data.total, undefined, sid),
+      limitText: voucherUtil.storeMatch(v, sid) ? '' : ('仅限' + (v.storeName || '指定门店'))
+    }))
+    this.setData({ showVoucher: true, voucherList: list })
+  },
+  closeVoucher() { this.setData({ showVoucher: false }) },
+  pickVoucher(e) {
+    const id = e.currentTarget.dataset.id
+    const v = this.data.vouchers.find((x) => String(x.id) === String(id))
+    if (!v) return
+    if (!voucherUtil.isUsable(v, this.data.total, undefined, this.data._storeIdVal)) {
+      const why = voucherUtil.storeMatch(v, this.data._storeIdVal)
+        ? '该券暂不可用'
+        : ('该券仅限' + (v.storeName || '指定门店') + '使用')
+      wx.showToast({ title: why, icon: 'none' })
+      return
+    }
+    this.applyVoucher(v.id)
+  },
+  clearVoucher() { this.applyVoucher(null) },
+
+  /**
+   * 换券后必须重新 prepay。order_no 就是微信的 out_trade_no，
+   * 后端换券时会重发单号作废旧预支付单；本页若继续拿旧的 paySign 去
+   * requestPayment，微信按首次下单金额扣款 —— 页面显示 180 实际扣 200。
+   */
+  applyVoucher(memberVoucherId) {
+    if (this.data.changing) return
+    this.setData({ changing: true, showVoucher: false })
+    wx.showLoading({ title: '处理中', mask: true })
+    api.orderChangeVoucher(this.data.orderId, memberVoucherId).then(() => {
+      wx.hideLoading()
+      this.setData({ changing: false, _prepayRes: null })
+      wx.showToast({ title: memberVoucherId ? '已使用代金券' : '已取消代金券', icon: 'success' })
+      this.loadPayInfo()
+      this.loadOrderAmount()
+      this.loadVouchers()
+    }).catch((err) => {
+      wx.hideLoading()
+      this.setData({ changing: false })
+      wx.showToast({ title: (err && (err.msg || err.message)) || '操作失败', icon: 'none' })
+    })
   },
 
   /**
@@ -121,7 +245,8 @@ Page({
     }
     const p = (r && (r.data || r)) || {}
     if (!p.paySign) {
-      wx.showToast({ title: '暂未配置支付参数', icon: 'none' })
+      // _prepayRes 被换券清空后还没刷回来时也会走到这里，提示要区分开
+      wx.showToast({ title: this.data.changing ? '金额更新中，请稍候' : '暂未配置支付参数', icon: 'none' })
       return
     }
     this.setData({ paying: true })
