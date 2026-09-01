@@ -91,6 +91,23 @@ public class ApiBookingController
     }
 
     /**
+     * 门店可预约日期列表
+     *
+     * <p>小程序预约页原先写死「未来 7 天」，运营既收不窄也放不宽，
+     * 也没法把歇业日排掉（门店周一休息，顾客照样能选周一，提交才被拒）。
+     * 现在天数取门店 booking_ahead_days，歇业日按 booking_closed_days 标出。</p>
+     *
+     * <p>匿名可访问，理由同 /slots：未登录也要能先看能约哪天。</p>
+     *
+     * @param storeId 门店ID
+     */
+    @GetMapping("/days")
+    public AjaxResult days(@RequestParam Long storeId)
+    {
+        return AjaxResult.success(bookingService.selectBookableDays(storeId));
+    }
+
+    /**
      * 会员报名预约
      */
     @LoginRequired

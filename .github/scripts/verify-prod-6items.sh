@@ -213,6 +213,23 @@ print(len(d.get('day') or [])+len(d.get('night') or []))" 2>/dev/null || echo 0)
   else
     todo "该日期算不出时段 → 检查门店「营业时间」是否填了（未填按 10-22 默认）"
   fi
+
+  # v10 起「可约范围」本身也能配了（原先只有起止小时跟营业时间走，
+  # 天数写死 7 / 粒度写死整点 / 歇业日没有）。这里验新端点是否已上线。
+  DAYS=$(curl -s "${H[@]}" "$BASE/api/booking/days?storeId=$SID")
+  DN=$(echo "$DAYS" | python3 -c "
+import sys,json
+d=json.load(sys.stdin).get('data') or {}
+rows=d.get('days') or []
+print(len(rows), d.get('aheadDays') or 0, len([x for x in rows if x.get('closed')]))" 2>/dev/null || echo "0 0 0")
+  set -- $DN
+  if [ "${1:-0}" -gt 0 ]; then
+    ok "可约范围可配：/api/booking/days 返 $1 天（可提前 $2 天，其中歇业 $3 天）"
+    echo "       后台【门店管理】可调「可提前预约 / 时段粒度 / 每周歇业日」"
+  else
+    fail "/api/booking/days 不可用 → 新 jar 未部署（v10 才有这个端点）"
+    echo "       → 先执行 sql/upgrade/biz_store_booking_rule_v10.sql，再传新 jar"
+  fi
 fi
 echo
 

@@ -110,6 +110,33 @@ public class Store extends BaseEntity
     @Excel(name = "门店评分")
     private java.math.BigDecimal rating;
 
+    /**
+     * 可提前预约天数（含今天，1-60）
+     *
+     * <p>小程序预约页原先写死 getNextDays(7)，运营想「只放开今天和明天」
+     * 或者「提前半个月接单」都做不到。放门店级而不是复用 biz_booking 的
+     * 预约日期字段 —— 那张表每一行是一个已发生的场次，不是规则。</p>
+     */
+    @Excel(name = "可提前预约天数")
+    private Integer bookingAheadDays;
+
+    /**
+     * 预约时段粒度（分钟，15/30/60/120）
+     *
+     * <p>原先后端固定按整点展开，餐饮想做 11:00 / 11:30 两档做不到。</p>
+     */
+    @Excel(name = "预约时段粒度")
+    private Integer bookingSlotMinutes;
+
+    /**
+     * 歇业日：每周几不可约，1-7 逗号分隔（1=周一，7=周日），空=每天可约
+     *
+     * <p>用 ISO-8601 的 1-7 而不是 Calendar 的 1=周日，避免前后端各理解一套。
+     * 门店周一休息时，顾客不该还能选到周一。</p>
+     */
+    @Excel(name = "歇业日")
+    private String bookingClosedDays;
+
     /** 显示顺序 */
     @Excel(name = "显示顺序")
     private Integer sort;
@@ -291,6 +318,36 @@ public class Store extends BaseEntity
         return rating;
     }
 
+    public void setBookingAheadDays(Integer bookingAheadDays)
+    {
+        this.bookingAheadDays = bookingAheadDays;
+    }
+
+    public Integer getBookingAheadDays()
+    {
+        return bookingAheadDays;
+    }
+
+    public void setBookingSlotMinutes(Integer bookingSlotMinutes)
+    {
+        this.bookingSlotMinutes = bookingSlotMinutes;
+    }
+
+    public Integer getBookingSlotMinutes()
+    {
+        return bookingSlotMinutes;
+    }
+
+    public void setBookingClosedDays(String bookingClosedDays)
+    {
+        this.bookingClosedDays = bookingClosedDays;
+    }
+
+    public String getBookingClosedDays()
+    {
+        return bookingClosedDays;
+    }
+
     public void setBillAutoConfirm(String billAutoConfirm) 
     {
         this.billAutoConfirm = billAutoConfirm;
@@ -362,6 +419,9 @@ public class Store extends BaseEntity
             .append("services", getServices())
             .append("billAutoConfirm", getBillAutoConfirm())
             .append("rating", getRating())
+            .append("bookingAheadDays", getBookingAheadDays())
+            .append("bookingSlotMinutes", getBookingSlotMinutes())
+            .append("bookingClosedDays", getBookingClosedDays())
             .append("sort", getSort())
             .append("status", getStatus())
             .append("delFlag", getDelFlag())

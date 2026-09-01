@@ -126,6 +126,7 @@ run biz_collect_method_semantic_v6  # collect_method 语义归一为收款方式
 run biz_bill_auto_confirm_v7        # 门店级买单自动确认开关（默认开，买单免店员确认）
 run biz_store_rating_booking_type_v8 # 门店评分列 + 预约类型字典 + biz_booking.booking_type
 run biz_member_avatar_relative_v9    # 会员头像洗成相对路径（去掉内网 host 前缀）
+run biz_store_booking_rule_v10       # 门店级预约可约范围（提前天数/时段粒度/歇业日）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

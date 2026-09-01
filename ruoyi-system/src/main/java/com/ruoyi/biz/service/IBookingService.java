@@ -73,4 +73,15 @@ public interface IBookingService
      * @return 时段信息（含白天/晚上分组与剩余可约数）
      */
     public Map<String, Object> selectAvailableSlots(Long storeId, String date);
+
+    /**
+     * 查询门店可预约日期列表
+     *
+     * <p>天数取门店 booking_ahead_days（原先小程序写死 7 天），
+     * 并按 booking_closed_days 标出歇业日。</p>
+     *
+     * @param storeId 门店 ID
+     * @return aheadDays / closedDays / openCount / days[{date,label,weekday,weekdayText,closed,closedReason}]
+     */
+    public Map<String, Object> selectBookableDays(Long storeId);
 }

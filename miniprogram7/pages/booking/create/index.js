@@ -11,6 +11,10 @@ Page({
     calendarMonth: '',
     calendarMonthIndex: 0,
     days: [],
+    aheadDays: 7,
+    closedDay: false,
+    outOfRange: false,
+    closedReason: '',
     dateIdx: 0,
     period: 'day',
     dayRange: '',
@@ -33,7 +37,10 @@ Page({
     showSuccess: false
   },
   onLoad(opts) {
-    const days = getNextDays(7).map((d) => ({ label: formatDate(d, 'MM-DD'), date: formatDate(d, 'YYYY-MM-DD') }));
+    // 日期条改由后端 /api/booking/days 决定（天数取门店「可提前预约天数」，
+    // 并排除歇业日）。这里先用本地 7 天占位，避免接口回来前日期条是空的；
+    // loadDays() 回来后整体覆盖。原先是写死 getNextDays(7)，运营调不了。
+    const days = getNextDays(7).map((d) => ({ label: formatDate(d, 'MM-DD'), date: formatDate(d, 'YYYY-MM-DD'), closed: false }));
     const o = opts || {};
     this.setData({
       days,
@@ -78,7 +85,39 @@ Page({
       },
       distance: s.distanceText || ''
     });
-    this.loadSlots();
+    // 先拉可约日期（天数/歇业日都在门店上），再按选中日期拉时段。
+    // loadDays 内部会调 loadSlots，避免两次请求打乱 dateIdx。
+    this.loadDays();
+  },
+
+  /**
+   * 可预约日期：天数取门店 booking_ahead_days，歇业日标 closed。
+   * 失败时保留 onLoad 里的本地 7 天占位，不让预约页直接不可用。
+   */
+  loadDays() {
+    const store = this.data.store;
+    if (!store.storeId) return;
+    api.bookingDays({ storeId: store.storeId }).then((res) => {
+      const d = (res && (res.data || res)) || {};
+      const rows = Array.isArray(d.days) ? d.days : [];
+      if (!rows.length) { this.loadSlots(); return; }
+      const days = rows.map((it) => ({
+        label: it.label || '',
+        date: it.date || '',
+        // weekdayText 后端已处理「今天/明天/周三」，前端不再自己算
+        weekdayText: it.weekdayText || '',
+        closed: !!it.closed,
+        closedReason: it.closedReason || ''
+      }));
+      // 默认落在第一个非歇业日；全歇业时才退回 0，
+      // 否则用户进来就停在一个不可约的日子上，点时段全是灰的又不说为什么
+      let idx = days.findIndex((x) => !x.closed);
+      if (idx < 0) idx = 0;
+      this.setData({ days, dateIdx: idx, aheadDays: d.aheadDays || days.length, slot: '' });
+      this.loadSlots();
+    }).catch(() => {
+      this.loadSlots();
+    });
   },
   // 时段由后端按门店营业时间与已约人数计算，不再用本地模板
   loadSlots() {
@@ -100,6 +139,11 @@ Page({
         dayRange: d.dayRange || '',
         nightRange: d.nightRange || '',
         slotLimit: d.slotLimit || 0,
+        // 整天不可约（歇业 / 超出可约范围）时把原因显示出来，
+        // 不然全是灰按钮用户不知道为什么
+        closedDay: !!d.closedDay,
+        outOfRange: !!d.outOfRange,
+        closedReason: d.closedReason || '',
         slot: this.firstAvailable(currentSlots),
         loadingSlots: false
       });
@@ -116,6 +160,12 @@ Page({
   pickDate(e) {
     const idx = Number(e.currentTarget.dataset.idx);
     if (idx === this.data.dateIdx) return;
+    // 歇业日直接拦住并说明原因：让它可点再靠后端拒，用户体验是「点了没反应」
+    const target = this.data.days[idx];
+    if (target && target.closed) {
+      wx.showToast({ title: target.closedReason || '该日期不可预约', icon: 'none' });
+      return;
+    }
     this.setData({ dateIdx: idx, slot: '' });
     this.loadSlots();
   },

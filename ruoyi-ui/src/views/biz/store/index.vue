@@ -271,6 +271,59 @@
               </div>
             </el-form-item>
           </el-col>
+          <el-col :span="24">
+            <el-divider content-position="left">预约可约范围</el-divider>
+            <div class="form-tip" style="margin-bottom:12px">
+              这三项决定小程序上顾客<b>能选哪天、能选哪个点</b>。
+              「预约管理」列表里的每一行是已经产生的场次（谁哪天几点约了），是结果不是规则，改那里不会影响顾客可选范围。
+              可选时段的<b>起止</b>仍跟着门店「营业时间」走。
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="可提前预约" prop="bookingAheadDays">
+              <el-input-number
+                v-model="form.bookingAheadDays"
+                :min="1"
+                :max="60"
+                :step="1"
+                controls-position="right"
+                style="width: 100%"
+              />
+              <div class="form-tip">含今天，单位天。填 1 表示只能约当天，默认 7。</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="时段粒度" prop="bookingSlotMinutes">
+              <el-select v-model="form.bookingSlotMinutes" placeholder="请选择" style="width: 100%">
+                <el-option label="15 分钟一档" :value="15" />
+                <el-option label="30 分钟一档" :value="30" />
+                <el-option label="1 小时一档（默认）" :value="60" />
+                <el-option label="2 小时一档" :value="120" />
+              </el-select>
+              <div class="form-tip">如营业 09:00-12:00，选 30 分钟则顾客看到 09:00 / 09:30 / 10:00…</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="每周歇业日" prop="bookingClosedDaysArr">
+              <el-select
+                v-model="form.bookingClosedDaysArr"
+                multiple
+                collapse-tags
+                clearable
+                placeholder="不选=每天可约"
+                style="width: 100%"
+              >
+                <el-option label="周一" value="1" />
+                <el-option label="周二" value="2" />
+                <el-option label="周三" value="3" />
+                <el-option label="周四" value="4" />
+                <el-option label="周五" value="5" />
+                <el-option label="周六" value="6" />
+                <el-option label="周日" value="7" />
+              </el-select>
+              <div class="form-tip">选中的星期在小程序日期条上会标「歇业」且不可点。</div>
+            </el-form-item>
+          </el-col>
           <el-col :span="12">
             <el-form-item label="门店状态" prop="status">
               <el-select v-model="form.status" placeholder="请选择状态" style="width: 100%">
@@ -406,6 +459,13 @@ export default {
         serviceHours: null,
         billAutoConfirm: '1',
         rating: null,
+        // 预约可约范围：默认与改造前行为一致（7 天 / 整点 / 不歇业），
+        // 这样新建门店不填也不会变行为
+        bookingAheadDays: 7,
+        bookingSlotMinutes: 60,
+        bookingClosedDays: null,
+        // 表单用数组绑 el-select multiple，提交前拼成 '1,3' 存库
+        bookingClosedDaysArr: [],
         status: '0',
         sort: 0
       };
@@ -452,6 +512,18 @@ export default {
           this.form.billAutoConfirm = '1';
         }
         this.serviceList = this.form.services ? this.form.services.split(',') : [];
+        // 加列前建的门店这三项是 null，直接绑到 el-input-number 会显示空、
+        // 保存又把 null 提交回去，等于每次编辑门店都把规则清掉一次
+        if (!this.form.bookingAheadDays || this.form.bookingAheadDays < 1) {
+          this.form.bookingAheadDays = 7;
+        }
+        if (!this.form.bookingSlotMinutes) {
+          this.form.bookingSlotMinutes = 60;
+        }
+        // '1,3' → ['1','3']；filter 掉空串，否则 '' 会 split 出 [''] 让下拉显示一个空标签
+        this.form.bookingClosedDaysArr = this.form.bookingClosedDays
+          ? String(this.form.bookingClosedDays).split(',').filter(x => x !== '')
+          : [];
         this.mapPoint = { lng: this.form.longitude, lat: this.form.latitude };
         this.title = "修改门店";
         this.open = true;
@@ -461,6 +533,12 @@ export default {
       this.$refs.form.validate(valid => {
         if (valid) {
           this.form.services = this.serviceList.join(',');
+          // 歇业日按星期升序存，便于人工核对；清空时存空串而不是 null,
+          // 后端 mapper 判的是 != null，空串才能覆盖掉旧值
+          this.form.bookingClosedDays = (this.form.bookingClosedDaysArr || [])
+            .slice()
+            .sort((a, b) => Number(a) - Number(b))
+            .join(',');
           if (this.form.storeId != null) {
             updateStore(this.form).then(response => {
               this.$modal.msgSuccess("修改成功");

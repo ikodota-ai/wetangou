@@ -31,8 +31,11 @@
   <view class="card">
     <text class="block-title">预约时间</text>
     <scroll-view scroll-x class="date-row" enhanced show-scrollbar="{{false}}">
-      <view class="date-item {{idx === dateIdx ? 'on' : ''}}" wx:for="{{days}}" wx:key="date" data-idx="{{idx}}" bindtap="pickDate">
+      <view class="date-item {{idx === dateIdx ? 'on' : ''}} {{item.closed ? 'closed' : ''}}" wx:for="{{days}}" wx:key="date" data-idx="{{idx}}" bindtap="pickDate">
         <text class="dt">{{item.label}}</text>
+        <!-- 歇业日标出来，别让用户点了才知道不能约 -->
+        <text class="dw" wx:if="{{item.closed}}">歇业</text>
+        <text class="dw" wx:elif="{{item.weekdayText}}">{{item.weekdayText}}</text>
         <view class="dt-bar"></view>
       </view>
       <view class="date-item more" bindtap="openCalendar">
@@ -82,6 +85,10 @@
       </view>
     </view>
     <text class="slot-empty" wx:else>{{loadingSlots ? '时段加载中…' : '该时间段暂无可预约时段'}}</text>
+    <!-- 歇业 / 超出可约范围：时段仍然列出但全灰，这里说明为什么 -->
+    <view class="slot-closed" wx:if="{{closedReason}}">
+      <text>{{closedReason}}，请另选日期</text>
+    </view>
   </view>
 
   <view class="card">
@@ -110,7 +117,9 @@
 
   <view class="card">
     <text class="block-title">预约说明</text>
-    <text class="explain">本店全周午晚市开放预约<block wx:if="{{slotLimit}}">，单时段限 {{slotLimit}} 人</block>，座位保留 15 分钟，超时自动作废；用餐前 2 小时可免费取消；可备注包间、用餐需求，到店出示预约码核验入座。</text>
+    <!-- 原先写死「本店全周午晚市开放预约」，门店配了歇业日就自相矛盾。
+         改为按后端返回的可约天数 / 歇业情况描述。 -->
+    <text class="explain">本店可提前 {{aheadDays}} 天预约<block wx:if="{{slotLimit}}">，单时段限 {{slotLimit}} 人</block>，座位保留 15 分钟，超时自动作废；用餐前 2 小时可免费取消；可备注包间、用餐需求，到店出示预约码核验入座。</text>
   </view>
 
   <view class="bottom-bar">

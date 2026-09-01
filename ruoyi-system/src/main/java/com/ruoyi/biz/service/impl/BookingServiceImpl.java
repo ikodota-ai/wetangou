@@ -60,6 +60,15 @@ public class BookingServiceImpl implements IBookingService
     /** 白天与晚上的分界小时 */
     private static final int NIGHT_START_HOUR = 18;
 
+    /** 可提前预约天数默认值（与小程序原先写死的 getNextDays(7) 一致） */
+    private static final int DEFAULT_AHEAD_DAYS = 7;
+
+    /** 可提前预约天数上限 */
+    private static final int MAX_AHEAD_DAYS = 60;
+
+    /** 时段粒度默认值（分钟）：60 即改造前的整点展开 */
+    private static final int DEFAULT_SLOT_MINUTES = 60;
+
     @Override
     public Booking selectBookingByBookingId(Long bookingId)
     {
@@ -158,6 +167,7 @@ public class BookingServiceImpl implements IBookingService
         int openHour = range[0];
         int closeHour = range[1];
         int slotLimit = resolveSlotLimit();
+        int stepMinutes = resolveSlotMinutes(store);
 
         // 已有场次的报名人数按时段汇总，用于计算剩余容量
         Map<String, Integer> bookedPeople = countBookedPeople(storeId, bookingDate);
@@ -165,24 +175,35 @@ public class BookingServiceImpl implements IBookingService
         // 当天只能约当前时刻之后的时段；非当天不受限
         boolean isToday = queryDate.equals(DateUtils.getDate());
         Calendar now = Calendar.getInstance();
-        int nowHour = now.get(Calendar.HOUR_OF_DAY);
+        int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+
+        // 歇业日 / 超出可提前预约范围时，整天不开放。
+        // 仍然把时段列出来（标 closed），而不是返回空数组 ——
+        // 前端空数组只能显示「暂无时段」，用户不知道是歇业还是没配营业时间。
+        boolean closedDay = isClosedDay(store, bookingDate);
+        boolean outOfRange = !isWithinAheadRange(store, queryDate);
 
         List<Map<String, Object>> day = new ArrayList<Map<String, Object>>();
         List<Map<String, Object>> night = new ArrayList<Map<String, Object>>();
-        for (int hour = openHour; hour < closeHour; hour++)
+        for (int minutes = openHour * 60; minutes < closeHour * 60; minutes += stepMinutes)
         {
-            String time = pad(hour) + ":00";
+            int hour = minutes / 60;
+            String time = pad(hour) + ":" + pad2(minutes % 60);
             int used = bookedPeople.containsKey(time) ? bookedPeople.get(time).intValue() : 0;
             int remain = Math.max(slotLimit - used, 0);
-            boolean expired = isToday && hour <= nowHour;
+            // 过时判断改用「分钟」比较：粒度 30 分钟时，用小时比会把
+            // 同一小时内还没到的 11:30 也当成已过时
+            boolean expired = isToday && minutes <= nowMinutes;
 
             Map<String, Object> slot = new LinkedHashMap<String, Object>();
             slot.put("time", time);
             slot.put("remain", Integer.valueOf(remain));
-            // full 与 expired 分开返回，前端可分别提示「已约满」「已过时」
+            // full / expired / closed 分开返回，前端可分别提示
+            // 「已约满」「已过时」「今日歇业」
             slot.put("full", Boolean.valueOf(remain <= 0));
             slot.put("expired", Boolean.valueOf(expired));
-            slot.put("available", Boolean.valueOf(remain > 0 && !expired));
+            slot.put("closed", Boolean.valueOf(closedDay || outOfRange));
+            slot.put("available", Boolean.valueOf(remain > 0 && !expired && !closedDay && !outOfRange));
             if (hour < NIGHT_START_HOUR)
             {
                 day.add(slot);
@@ -199,11 +220,181 @@ public class BookingServiceImpl implements IBookingService
         result.put("date", queryDate);
         result.put("businessHours", store.getBusinessHours());
         result.put("slotLimit", Integer.valueOf(slotLimit));
+        result.put("slotMinutes", Integer.valueOf(stepMinutes));
+        result.put("closedDay", Boolean.valueOf(closedDay));
+        result.put("outOfRange", Boolean.valueOf(outOfRange));
+        // 整天不可约时给出原因，前端直接展示，不用自己拼文案
+        result.put("closedReason", closedDay ? "本店当日歇业" : (outOfRange ? "超出可预约日期范围" : ""));
         result.put("dayRange", buildRange(day));
         result.put("nightRange", buildRange(night));
         result.put("day", day);
         result.put("night", night);
         return result;
+    }
+
+    /**
+     * 可预约日期列表（供小程序渲染日期选择条）
+     *
+     * <p>原先小程序写死 getNextDays(7)，运营既不能收窄成「只接今天和明天」，
+     * 也不能放宽成「提前半个月」，更没法把歇业日排除掉 —— 门店周一休息，
+     * 顾客照样能选到周一，提交后才被拒。现在天数取门店
+     * booking_ahead_days，并给每天标出 closed 与原因。</p>
+     */
+    @Override
+    public Map<String, Object> selectBookableDays(Long storeId)
+    {
+        Store store = storeMapper.selectStoreByStoreId(storeId);
+        if (store == null)
+        {
+            throw new com.ruoyi.common.exception.ServiceException("门店不存在");
+        }
+        int aheadDays = resolveAheadDays(store);
+
+        java.text.SimpleDateFormat ymd = new java.text.SimpleDateFormat("yyyy-MM-dd");
+        java.text.SimpleDateFormat md = new java.text.SimpleDateFormat("MM-dd");
+        String[] weekLabels = new String[] { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
+
+        Calendar cursor = Calendar.getInstance();
+        cursor.set(Calendar.HOUR_OF_DAY, 0);
+        cursor.set(Calendar.MINUTE, 0);
+        cursor.set(Calendar.SECOND, 0);
+        cursor.set(Calendar.MILLISECOND, 0);
+
+        List<Map<String, Object>> days = new ArrayList<Map<String, Object>>();
+        int openCount = 0;
+        for (int i = 0; i < aheadDays; i++)
+        {
+            Date d = cursor.getTime();
+            boolean closed = isClosedDay(store, d);
+            int iso = toIsoWeekday(d);
+
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("date", ymd.format(d));
+            item.put("label", md.format(d));
+            item.put("weekday", Integer.valueOf(iso));
+            item.put("weekdayText", i == 0 ? "今天" : (i == 1 ? "明天" : weekLabels[iso - 1]));
+            item.put("closed", Boolean.valueOf(closed));
+            item.put("closedReason", closed ? "歇业" : "");
+            days.add(item);
+            if (!closed)
+            {
+                openCount++;
+            }
+            cursor.add(Calendar.DAY_OF_MONTH, 1);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        result.put("storeId", storeId);
+        result.put("storeName", store.getStoreName());
+        result.put("aheadDays", Integer.valueOf(aheadDays));
+        result.put("slotMinutes", Integer.valueOf(resolveSlotMinutes(store)));
+        result.put("closedDays", store.getBookingClosedDays() == null ? "" : store.getBookingClosedDays());
+        result.put("openCount", Integer.valueOf(openCount));
+        result.put("days", days);
+        return result;
+    }
+
+    /**
+     * 门店可提前预约天数，非法值回退 7（与小程序原先写死的 7 天一致，保证升级后行为不变）
+     */
+    private int resolveAheadDays(Store store)
+    {
+        Integer v = store.getBookingAheadDays();
+        if (v == null || v.intValue() < 1)
+        {
+            return DEFAULT_AHEAD_DAYS;
+        }
+        // 上限 60：再长的排期没有业务意义，且会让前端日期条渲染上百个元素
+        return Math.min(v.intValue(), MAX_AHEAD_DAYS);
+    }
+
+    /**
+     * 时段粒度，非法值回退 60（整点，与改造前行为一致）
+     *
+     * <p>必须做兜底：粒度参与 {@code minutes += stepMinutes} 的循环步长，
+     * 取到 0 或负数会直接死循环把线程占满。</p>
+     */
+    private int resolveSlotMinutes(Store store)
+    {
+        Integer v = store.getBookingSlotMinutes();
+        if (v == null)
+        {
+            return DEFAULT_SLOT_MINUTES;
+        }
+        int m = v.intValue();
+        // 只认这几档：任意分钟数会切出 07:13 这类没人会填的时间
+        if (m == 15 || m == 30 || m == 60 || m == 120)
+        {
+            return m;
+        }
+        return DEFAULT_SLOT_MINUTES;
+    }
+
+    /**
+     * 该日期是否落在门店歇业日上
+     */
+    private boolean isClosedDay(Store store, Date date)
+    {
+        String conf = store.getBookingClosedDays();
+        if (StringUtils.isEmpty(conf) || date == null)
+        {
+            return false;
+        }
+        int iso = toIsoWeekday(date);
+        for (String part : conf.split(","))
+        {
+            String t = part.trim();
+            if (t.isEmpty())
+            {
+                continue;
+            }
+            try
+            {
+                if (Integer.parseInt(t) == iso)
+                {
+                    return true;
+                }
+            }
+            catch (NumberFormatException e)
+            {
+                // 脏数据（例如存了「周一」）忽略，不能因此让整个预约页报错
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 目标日期是否在「今天 ~ 今天+可提前天数-1」范围内
+     *
+     * <p>过去的日期同样算越界 —— 否则顾客改一下请求参数就能约到昨天。</p>
+     */
+    private boolean isWithinAheadRange(Store store, String queryDate)
+    {
+        try
+        {
+            java.text.SimpleDateFormat ymd = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            ymd.setLenient(false);
+            Date target = ymd.parse(queryDate);
+            Date today = ymd.parse(DateUtils.getDate());
+            long diffDays = (target.getTime() - today.getTime()) / (24L * 60L * 60L * 1000L);
+            return diffDays >= 0 && diffDays < resolveAheadDays(store);
+        }
+        catch (Exception e)
+        {
+            // 日期格式异常时不拦，交由既有 parseDate 的行为处理
+            return true;
+        }
+    }
+
+    /**
+     * java.util.Calendar 的 DAY_OF_WEEK 是 1=周日，业务侧统一用 ISO 的 1=周一
+     */
+    private int toIsoWeekday(Date date)
+    {
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        int dow = c.get(Calendar.DAY_OF_WEEK);
+        return dow == Calendar.SUNDAY ? 7 : dow - 1;
     }
 
     /**
@@ -319,6 +510,14 @@ public class BookingServiceImpl implements IBookingService
     private String pad(int hour)
     {
         return hour < 10 ? "0" + hour : String.valueOf(hour);
+    }
+
+    /**
+     * 分钟补零。粒度为 30 时要输出 "11:30"，为 60 时输出 "11:00"
+     */
+    private String pad2(int minute)
+    {
+        return minute < 10 ? "0" + minute : String.valueOf(minute);
     }
 
     private Date parseDate(String date)

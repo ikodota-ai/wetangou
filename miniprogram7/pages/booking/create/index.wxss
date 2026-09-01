@@ -26,6 +26,14 @@
 .dt-bar { position: absolute; left: 50%; bottom: -4rpx; transform: translateX(-50%); width: 56rpx; height: 4rpx; border-radius: 2rpx; background: transparent; }
 .date-item.on .dt-bar { background: var(--color-primary); }
 .date-item.more .dt { color: #1A1A1A; font-weight: 600; }
+/* 日期条第二行：周几 / 歇业标记。date-item 原本只有一行文字，
+   加了这行要让它纵向排列，否则「歇业」会挤到右边去 */
+.date-item { text-align: center; }
+.dw { display: block; margin-top: 4rpx; font-size: 22rpx; color: #BBB; }
+.date-item.on .dw { color: var(--color-primary); }
+/* 歇业日整体压暗并划掉，明确表达不可选 */
+.date-item.closed .dt { color: #CCC; text-decoration: line-through; }
+.date-item.closed .dw { color: #E64340; }
 
 .period-row { display: flex; align-items: center; margin-top: 32rpx; }
 .period { flex: 1; text-align: center; padding: 16rpx 0; }
@@ -63,6 +71,9 @@
 .slot-tip { font-size: 20rpx; color: #999; }
 .slot.on .slot-tip { color: rgba(255,255,255,0.8); }
 .slot-empty { display: block; margin-top: 24rpx; font-size: 26rpx; color: #999; text-align: center; }
+/* 整天不可约的原因条：时段还在但全灰，必须说明为什么 */
+.slot-closed { margin-top: 20rpx; padding: 16rpx; border-radius: 12rpx; background: #FFF7F7; }
+.slot-closed text { font-size: 26rpx; color: #E64340; }
 .stepper { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 24rpx; }
 .st-btn { width: 56rpx; height: 56rpx; line-height: 52rpx; text-align: center; border-radius: 8rpx; background: #F2F2F7; font-size: 32rpx; color: #1A1A1A; }
 .st-val { min-width: 48rpx; text-align: center; font-size: 30rpx; color: #1A1A1A; }
