@@ -425,11 +425,11 @@ public class ApiBookingController
             throw new ServiceException("已完成的预约不能取消");
         }
         LoginMember loginMember = MemberContextHolder.get();
-        if ("store".equals(loginMember.getUserType()))
+        if (loginMember.isStaffSession())
         {
-            // 门店端：必须是该场次所属门店的员工
+            // 员工端（门店端 store + 商家端 owner/manager/staff）：必须是该场次所属门店的员工
             Booking booking = bookingService.selectBookingByBookingId(signup.getBookingId());
-            if (booking == null || !loginMember.getStoreId().equals(booking.getStoreId()))
+            if (booking == null || !loginMember.hasStore(booking.getStoreId()))
             {
                 throw new ServiceException("仅场次所属门店可代取消");
             }

@@ -51,3 +51,11 @@ export function getPayNotifyUrl(merchantId) {
     params: { merchantId }
   })
 }
+
+// 重置（必要时补建）商户老板账号密码，返回明文密码仅此一次
+export function resetOwnerPwd(merchantId) {
+  return request({
+    url: '/biz/merchant/owner/resetPwd/' + merchantId,
+    method: 'put'
+  })
+}

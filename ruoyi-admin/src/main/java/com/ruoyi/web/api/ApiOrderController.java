@@ -271,9 +271,11 @@ public class ApiOrderController
             throw new ServiceException("门店ID不能为空");
         }
         LoginMember loginMember = MemberContextHolder.get();
-        // 门店员工只能在自己被授权的门店核销，请求里的 storeId 必须等于 token 中的 storeId
-        if (loginMember != null && "store".equals(loginMember.getUserType())
-                && !storeId.equals(loginMember.getStoreId()))
+        // 员工只能在自己被授权的门店核销。
+        // 原来比的是 token 里的单个 storeId，多店员工（含 store_id=0 展开的老板）
+        // 切到别的店就核销不了；改用 hasStore 比整个授权门店集合。
+        if (loginMember != null && loginMember.isStaffSession()
+                && !loginMember.hasStore(storeId))
         {
             throw new ServiceException("无权操作其他门店");
         }
@@ -287,8 +289,11 @@ public class ApiOrderController
             }
             verifyCode = byNo.getVerifyCode();
         }
-        Order order = apiOrderService.verify(verifyCode, storeId,
-                "store:" + (loginMember == null ? "" : loginMember.getMemberId()));
+        // 核销人标识：商家端链路没有 memberId（那是会员主键），要用 staffUserId，
+        // 否则核销记录里全是 "store:null"，事后查不到是谁核的。
+        Object operator = loginMember == null ? "" :
+                (loginMember.getStaffUserId() != null ? loginMember.getStaffUserId() : loginMember.getMemberId());
+        Order order = apiOrderService.verify(verifyCode, storeId, "store:" + operator);
         // 核销成功 → 异步发订阅消息给买家（不阻塞主流程，异常仅 log）
         notifyVerifySuccessAsync(order);
         return AjaxResult.success(order);

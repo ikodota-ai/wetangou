@@ -234,7 +234,7 @@ public class ApiProductController
         if (body.getSales() == null) body.setSales(0L);
         if (body.getStock() == null) body.setStock(0L);
         if (body.getSort() == null) body.setSort(0);
-        if (body.getCreateBy() == null) body.setCreateBy("merchant_" + me.getMemberId());
+        if (body.getCreateBy() == null) body.setCreateBy("merchant_" + me.getStaffUserId());
 
         // 草稿只校验基础字段；上架态才跑该类型的完整必填。
         //

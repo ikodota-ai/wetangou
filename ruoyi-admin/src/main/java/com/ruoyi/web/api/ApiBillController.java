@@ -172,13 +172,15 @@ public class ApiBillController
         }
         // 二次校验：确认人必须是买单所属门店的员工
         LoginMember loginMember = MemberContextHolder.get();
-        if (loginMember == null || !"store".equals(loginMember.getUserType())
-                || !loginMember.getStoreId().equals(bill.getStoreId()))
+        // 同 verify：认全部员工链路（owner/manager/staff/store），且按授权门店集合比对
+        if (loginMember == null || !loginMember.isStaffSession()
+                || !loginMember.hasStore(bill.getStoreId()))
         {
             throw new ServiceException("仅买单所属门店的员工可确认");
         }
         bill.setStatus("1");
-        bill.setConfirmUser("store:" + loginMember.getMemberId());
+        bill.setConfirmUser("store:" + (loginMember.getStaffUserId() != null
+                ? loginMember.getStaffUserId() : loginMember.getMemberId()));
         bill.setConfirmTime(new Date());
         payBillService.updatePayBill(bill);
         return AjaxResult.success(bill);

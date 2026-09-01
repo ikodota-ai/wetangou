@@ -122,7 +122,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="180" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="260" class-name="small-padding fixed-width">
         <template slot-scope="scope">
           <el-button
             size="mini"
@@ -138,6 +138,13 @@
             @click="handleWxConfig(scope.row)"
             v-hasPermi="['biz:merchant:wxconfig']"
           >微信配置</el-button>
+          <el-button
+            size="mini"
+            type="text"
+            icon="el-icon-key"
+            @click="handleResetOwnerPwd(scope.row)"
+            v-hasPermi="['biz:merchant:edit']"
+          >老板密码</el-button>
           <el-button
             size="mini"
             type="text"
@@ -357,7 +364,7 @@
 </template>
 
 <script>
-import { listMerchant, getMerchant, delMerchant, addMerchant, updateMerchant, getPayNotifyUrl } from "@/api/biz/merchant"
+import { listMerchant, getMerchant, delMerchant, addMerchant, updateMerchant, getPayNotifyUrl, resetOwnerPwd } from "@/api/biz/merchant"
 import { listAgent } from "@/api/biz/agent"
 import { getToken } from "@/utils/auth"
 
@@ -482,6 +489,31 @@ export default {
       this.title = "添加商户";
       this.open = true;
     },
+    /**
+     * 重置（必要时补建）老板账号密码。
+     *
+     * 用 $alert 而不是 msgSuccess：密码明文不落库不写日志，弹窗一关就再也拿不到。
+     */
+    handleResetOwnerPwd(row) {
+      const who = row.merchantName || ("商户" + row.merchantId);
+      this.$modal.confirm('确认重置「' + who + '」老板账号的登录密码？重置后旧密码立即失效，新密码只显示一次。若该商户还没有老板账号，将自动补建一个。').then(() => {
+        return resetOwnerPwd(row.merchantId);
+      }).then(res => {
+        this.alertOwnerAccount(res, "老板账号密码已重置");
+      }).catch(() => {});
+    },
+    // 老板账号/密码统一弹窗（新增商户与重置密码共用）
+    alertOwnerAccount(res, title) {
+      this.$alert(
+        '<div style="line-height:1.9">' +
+        '<div>登录账号：<b>' + (res.ownerUserName || '') + '</b></div>' +
+        '<div>登录密码：<b style="color:#E6A23C;font-size:16px">' + (res.ownerInitPassword || '') + '</b></div>' +
+        '<div style="color:#909399;font-size:12px;margin-top:6px">该密码不会保存，关闭后无法再次查看，请立即转交老板本人。老板可用它登录 PC 后台，也可登录小程序商家版（登录后自动绑定微信，之后免密进入）。</div>' +
+        '</div>',
+        title,
+        { dangerouslyUseHTMLString: true, confirmButtonText: '我已记录' }
+      );
+    },
     handleUpdate(row) {
       this.reset();
       const merchantId = row.merchantId || this.ids[0];
@@ -503,10 +535,14 @@ export default {
             this.getList();
           });
         } else {
-          addMerchant(this.form).then(() => {
-            this.$modal.msgSuccess("新增成功");
+          addMerchant(this.form).then(res => {
             this.open = false;
             this.getList();
+            if (res.ownerUserName) {
+              this.alertOwnerAccount(res, "商户已创建，老板账号已自动开通");
+            } else {
+              this.$modal.msgSuccess("新增成功");
+            }
           });
         }
       });

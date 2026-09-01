@@ -199,6 +199,59 @@ public class BizStaffInviteController extends BaseController
         return success("已解绑微信，该员工下次需用账号密码登录");
     }
 
+    /**
+     * 重置员工登录密码（admin / 店长 / 老板用）。
+     *
+     * <p>为什么不复用 RuoYi 的 {@code PUT /system/user/resetPwd}：
+     * 那个端点要 {@code system:user:resetPwd} 权限（商户账号没有），且要求调用方自己填新密码。
+     * 商家场景需要的是「点一下生成随机密码并当场显示」。</p>
+     *
+     * <p>背景缺陷：扫码入职时 {@code createStaffByOpenid} 生成的 6 位随机密码
+     * 既没返回给任何人、也没有任何重置入口，等于一个谁都不知道的废密码 ——
+     * 员工一旦换微信（openid 失效）就永久登不进商家版。</p>
+     *
+     * <p>新密码明文只在本次响应返回一次，不落库、不写日志。</p>
+     */
+    @Log(title = "商家员工", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('biz:staffInvite:edit')")
+    @PutMapping("/staff/resetPwd/{userId}")
+    public AjaxResult resetStaffPwd(@PathVariable("userId") Long userId)
+    {
+        com.ruoyi.common.core.domain.entity.SysUser user = userService.selectUserByUserId(userId);
+        if (user == null) return error("员工账号不存在");
+        // 防越权：只能重置本商户（代理商为名下商户）员工的密码
+        MerchantStaff link = staffService.selectByUserId(userId);
+        if (link == null) return error("该账号不是商家员工");
+        com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(link.getMerchantId());
+
+        String rawPwd = randomPassword();
+        com.ruoyi.common.core.domain.entity.SysUser upd = new com.ruoyi.common.core.domain.entity.SysUser();
+        upd.setUserId(userId);
+        upd.setPassword(com.ruoyi.common.utils.SecurityUtils.encryptPassword(rawPwd));
+        upd.setUpdateBy(getUsername());
+        if (userService.resetPwd(upd) <= 0)
+        {
+            return error("重置失败");
+        }
+        AjaxResult r = success("已重置密码");
+        r.put("userName", user.getUserName());
+        r.put("newPassword", rawPwd);
+        return r;
+    }
+
+    /** 初始/重置密码：8 位大小写+数字，避开易混字符（0/O/1/l/I） */
+    private String randomPassword()
+    {
+        String pool = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        java.security.SecureRandom rnd = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 8; i++)
+        {
+            sb.append(pool.charAt(rnd.nextInt(pool.length())));
+        }
+        return sb.toString();
+    }
+
     /** 给员工列表补 wxBound / openidMasked 展示字段（非表字段） */
     private void fillWxBindStatus(List<MerchantStaff> list)
     {

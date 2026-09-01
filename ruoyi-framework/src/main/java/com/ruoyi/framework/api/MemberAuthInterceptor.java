@@ -97,9 +97,9 @@ public class MemberAuthInterceptor implements HandlerInterceptor
                 writeError(response, 401, "员工登录态失效，请重新登录", "staff");
                 return false;
             }
-            if (!"store".equals(loginMember.getUserType()))
+            if (!isStaffSession(loginMember))
             {
-                writeError(response, 403, "此操作仅限门店端员工");
+                writeError(response, 403, "此操作仅限门店/商家端员工");
                 return false;
             }
         }
@@ -112,7 +112,7 @@ public class MemberAuthInterceptor implements HandlerInterceptor
         // 此时若端点又标了 @StoreStaffRequired 应返回 401
         if ((staffMethodAnno != null || staffClassAnno != null)
                 && loginMember != null
-                && "store".equals(loginMember.getUserType()))
+                && isStaffSession(loginMember))
         {
             java.util.List<Long> tokenStoreIds = loginMember.getStoreIds();
             Long currentStoreId = loginMember.getStoreId();
@@ -150,6 +150,24 @@ public class MemberAuthInterceptor implements HandlerInterceptor
             }
         }
         return true;
+    }
+
+    /**
+     * 是否属于「员工会话」（可访问 {@code @StoreStaffRequired} 端点）。
+     *
+     * <p>历史实现只认 {@code userType=store}（旧门店端登录链路 /api/store/staff/login）。
+     * 商家端登录链路（/api/merchant/staff/login|wxLogin、会员授权自动识别员工）发的是
+     * owner / manager / staff，于是核销 {@code POST /api/order/verify}、确认买单
+     * {@code /api/bill/confirm} 这些挂了 @StoreStaffRequired 的端点对商家端三种角色
+     * 全部返回 403「此操作仅限门店端员工」—— 也就是老板、店长、扫码入职的店员
+     * 进了商家版却一张券都核销不了，这是商家端最核心功能的阻塞点。</p>
+     *
+     * <p>注意：放行后下面的「门店集合校验」也必须对新链路生效（同样用本方法判定），
+     * 否则商家端员工带 storeId 参数就能操作别家门店。</p>
+     */
+    private boolean isStaffSession(LoginMember loginMember)
+    {
+        return loginMember != null && loginMember.isStaffSession();
     }
 
     private void writeError(HttpServletResponse response, int code, String msg) throws java.io.IOException

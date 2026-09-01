@@ -35,6 +35,11 @@ export function unbindStaffWx(userId) {
   return request({ url: '/biz/staffInvite/staff/unbindWx/' + userId, method: 'put' })
 }
 
+// 重置员工登录密码：后端自动生成 8 位随机密码，明文只在响应里返回一次
+export function resetStaffPwd(userId) {
+  return request({ url: '/biz/staffInvite/staff/resetPwd/' + userId, method: 'put' })
+}
+
 // 待审核员工清单（扫码入职后 status=3）
 export function listStaffAudit() {
   return request({ url: '/biz/staffInvite/staff/audit', method: 'get' })

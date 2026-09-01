@@ -64,4 +64,12 @@ public interface IMerchantService
      * @param merchantId 商户ID
      */
     public void checkMerchantDataScope(Long merchantId);
+
+    /**
+     * 重置（必要时补建）商户老板账号，返回账号名与新密码明文
+     *
+     * @param merchantId 商户ID
+     * @return 只带 ownerUserName / ownerInitPassword 的临时对象，密码明文不落库
+     */
+    public Merchant resetOwnerAccount(Long merchantId);
 }

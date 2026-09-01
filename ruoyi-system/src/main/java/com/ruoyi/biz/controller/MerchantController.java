@@ -77,7 +77,36 @@ public class MerchantController extends BaseController
     @PostMapping
     public AjaxResult add(@RequestBody Merchant merchant)
     {
-        return toAjax(merchantService.insertMerchant(merchant));
+        int rows = merchantService.insertMerchant(merchant);
+        if (rows <= 0)
+        {
+            return error("新增商户失败");
+        }
+        // 自动开通的老板账号/初始密码只在本次响应里回带（不落库），由平台交付给老板；
+        // 遗失后走后台「重置老板密码」。
+        AjaxResult r = AjaxResult.success("新增成功");
+        r.put("merchantId", merchant.getMerchantId());
+        r.put("ownerUserName", merchant.getOwnerUserName());
+        r.put("ownerInitPassword", merchant.getOwnerInitPassword());
+        return r;
+    }
+
+    /**
+     * 重置（必要时补建）商户老板账号密码。
+     *
+     * <p>老板初始密码只在新建商户时返回一次，遗失后无处可查；且本次之前建的商户
+     * 根本没有老板账号。这个端点两件事一起干：有账号就重置密码，没账号就补建。</p>
+     */
+    @PreAuthorize("@ss.hasPermi('biz:merchant:edit')")
+    @Log(title = "商户", businessType = BusinessType.UPDATE)
+    @PutMapping("/owner/resetPwd/{merchantId}")
+    public AjaxResult resetOwnerPwd(@PathVariable("merchantId") Long merchantId)
+    {
+        Merchant owner = merchantService.resetOwnerAccount(merchantId);
+        AjaxResult r = AjaxResult.success("已重置老板密码");
+        r.put("ownerUserName", owner.getOwnerUserName());
+        r.put("ownerInitPassword", owner.getOwnerInitPassword());
+        return r;
     }
 
     /**

@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.biz.domain.Agent;
 import com.ruoyi.biz.domain.Merchant;
+import com.ruoyi.biz.domain.MerchantStaff;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.biz.mapper.AgentMapper;
 import com.ruoyi.biz.mapper.MerchantMapper;
 import com.ruoyi.biz.service.IMerchantService;
@@ -24,6 +26,11 @@ import com.ruoyi.common.utils.TenantContextHolder;
 @Service
 public class MerchantServiceImpl implements IMerchantService
 {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MerchantServiceImpl.class);
+
+    /** PC 后台「商户管理员」角色（sys_role.role_key=merchant） */
+    private static final Long OWNER_PC_ROLE_ID = 5L;
+
     @Autowired
     private MerchantMapper merchantMapper;
 
@@ -32,6 +39,18 @@ public class MerchantServiceImpl implements IMerchantService
 
     @Autowired
     private ITenantService tenantService;
+
+    /**
+     * 用 @Lazy 注入：SysUserServiceImpl 本身依赖 IMerchantService（同步租户身份用），
+     * 直接注入会构成 merchantServiceImpl ↔ sysUserServiceImpl 循环依赖导致启动失败。
+     * 这里只在「新增商户自动开通老板账号」时用到，延迟到首次调用再解析即可。
+     */
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.ruoyi.system.service.ISysUserService userService;
+
+    @Autowired
+    private com.ruoyi.biz.service.IMerchantStaffService merchantStaffService;
 
     /**
      * 查询商户
@@ -97,7 +116,187 @@ public class MerchantServiceImpl implements IMerchantService
         {
             agentMapper.increaseUsedQuota(merchant.getAgentId());
         }
+        if (rows > 0)
+        {
+            createOwnerAccount(merchant);
+        }
         return rows;
+    }
+
+    /**
+     * 建商户时自动开通老板账号（商家版 OWNER 入口）。
+     *
+     * <p>为什么必须自动建：biz_merchant 上没有 owner_user_id，商户与老板账号之间
+     * 没有任何关联字段；而商家版登录（{@code /api/merchant/staff/login|wxLogin}）
+     * 强制要求 biz_merchant_staff 里存在在职关联，否则抛「该账号未关联商家」。
+     * 所以平台新建商户后，老板此前根本没有任何可登录的凭证 —— 只能靠人工往
+     * biz_merchant_staff 插一条 OWNER 才能进商家版。</p>
+     *
+     * <p>store_id=0 表示「全商户所有门店」，这样后续加门店不必再补员工关联。</p>
+     *
+     * <p>初始密码明文只在返回值里带回一次（{@link Merchant#getOwnerInitPassword()}），
+     * 不落库；遗失后由平台/店长在后台重置。</p>
+     *
+     * <p>失败不阻断建商户：账号建不出来可以事后补建或重置，但商户主记录不该因此回滚。</p>
+     */
+    private void createOwnerAccount(Merchant merchant)
+    {
+        try
+        {
+            String userName = buildOwnerUserName(merchant);
+            if (userName == null)
+            {
+                return;
+            }
+            String rawPwd = randomPassword();
+            SysUser u = new SysUser();
+            u.setUserName(userName);
+            u.setNickName(StringUtils.isEmpty(merchant.getMerchantName()) ? "商家老板" : merchant.getMerchantName());
+            u.setPassword(SecurityUtils.encryptPassword(rawPwd));
+            u.setPhonenumber(merchant.getPhone());
+            u.setStatus("0");
+            u.setDelFlag("0");
+            // 必须是 02（商户侧）：00 会在 StaffLoginMemberBuilder 里被判为 PLATFORM 角色
+            u.setUserType("02");
+            u.setMerchantId(merchant.getMerchantId());
+            // 同步 biz_merchant_user，否则 PC 端 TenantContext 会兜底成平台身份
+            u.setTenantUserType("2");
+            u.setTenantMerchantId(merchant.getMerchantId());
+            // PC 后台「商户管理员」角色，让老板也能登录后台
+            u.setRoleIds(new Long[] { OWNER_PC_ROLE_ID });
+            u.setCreateBy(SecurityUtils.getUsername());
+            u.setCreateTime(new Date());
+            userService.insertUser(u);
+
+            MerchantStaff ms = new MerchantStaff();
+            ms.setMerchantId(merchant.getMerchantId());
+            // 0 = 全商户所有门店（老板不绑定到具体门店）
+            ms.setStoreId(0L);
+            ms.setUserId(u.getUserId());
+            ms.setRole("OWNER");
+            ms.setRealName(u.getNickName());
+            ms.setPhone(merchant.getPhone());
+            // 平台开通的老板无需审核，直接在职
+            ms.setStatus("0");
+            ms.setCreateBy(SecurityUtils.getUsername());
+            ms.setCreateTime(new Date());
+            merchantStaffService.insert(ms);
+
+            merchant.setOwnerUserName(userName);
+            merchant.setOwnerInitPassword(rawPwd);
+        }
+        catch (Exception e)
+        {
+            log.error("[Merchant] 自动开通老板账号失败 merchantId={}", merchant.getMerchantId(), e);
+        }
+    }
+
+    /**
+     * 重置商户老板账号密码；若该商户还没有老板账号则先补建。
+     *
+     * <p>为什么要「必要时补建」：自动开通老板账号是本次才加的，之前建的商户
+     * biz_merchant_staff 里一条 OWNER 都没有，这些老板至今没有任何可登录商家版的凭证。
+     * 如果这个接口只做「重置」，历史商户就永远补不上账号，只能手工插库。</p>
+     *
+     * <p>新密码明文只在返回值里带回一次，不落库、不写日志。</p>
+     */
+    @Override
+    public Merchant resetOwnerAccount(Long merchantId)
+    {
+        checkMerchantDataScope(merchantId);
+        Merchant merchant = merchantMapper.selectMerchantByMerchantId(merchantId);
+        if (merchant == null)
+        {
+            throw new ServiceException("商户不存在");
+        }
+
+        MerchantStaff query = new MerchantStaff();
+        query.setMerchantId(merchantId);
+        query.setRole("OWNER");
+        List<MerchantStaff> owners = merchantStaffService.selectList(query);
+        Long ownerUserId = null;
+        for (MerchantStaff ms : owners)
+        {
+            if (ms.getUserId() != null && userService.selectUserByUserId(ms.getUserId()) != null)
+            {
+                ownerUserId = ms.getUserId();
+                break;
+            }
+        }
+
+        Merchant result = new Merchant();
+        if (ownerUserId == null)
+        {
+            // 历史商户没有老板账号：走一次自动开通，账号名/密码由 createOwnerAccount 回带
+            createOwnerAccount(merchant);
+            if (StringUtils.isEmpty(merchant.getOwnerUserName()))
+            {
+                throw new ServiceException("补建老板账号失败，请检查该商户号是否重复");
+            }
+            result.setOwnerUserName(merchant.getOwnerUserName());
+            result.setOwnerInitPassword(merchant.getOwnerInitPassword());
+            return result;
+        }
+
+        SysUser exist = userService.selectUserByUserId(ownerUserId);
+        String rawPwd = randomPassword();
+        SysUser upd = new SysUser();
+        upd.setUserId(ownerUserId);
+        upd.setPassword(SecurityUtils.encryptPassword(rawPwd));
+        upd.setUpdateBy(SecurityUtils.getUsername());
+        if (userService.resetPwd(upd) <= 0)
+        {
+            throw new ServiceException("重置老板密码失败");
+        }
+        result.setOwnerUserName(exist.getUserName());
+        result.setOwnerInitPassword(rawPwd);
+        return result;
+    }
+
+    /**
+     * 老板登录账号：优先 {@code 商户号_boss}，重名则追加随机后缀。
+     */
+    private String buildOwnerUserName(Merchant merchant)
+    {
+        String base = StringUtils.isEmpty(merchant.getMerchantNo())
+                ? ("m" + merchant.getMerchantId())
+                : merchant.getMerchantNo();
+        String candidate = base + "_boss";
+        for (int i = 0; i < 6; i++)
+        {
+            SysUser probe = new SysUser();
+            probe.setUserName(candidate);
+            if (userService.checkUserNameUnique(probe))
+            {
+                return candidate;
+            }
+            candidate = base + "_boss" + randomDigits(3);
+        }
+        return null;
+    }
+
+    /** 初始密码：8 位大小写+数字，避开易混字符（0/O/1/l/I） */
+    private String randomPassword()
+    {
+        String pool = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        StringBuilder sb = new StringBuilder();
+        java.security.SecureRandom rnd = new java.security.SecureRandom();
+        for (int i = 0; i < 8; i++)
+        {
+            sb.append(pool.charAt(rnd.nextInt(pool.length())));
+        }
+        return sb.toString();
+    }
+
+    private String randomDigits(int len)
+    {
+        java.security.SecureRandom rnd = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < len; i++)
+        {
+            sb.append(rnd.nextInt(10));
+        }
+        return sb.toString();
     }
 
     /**

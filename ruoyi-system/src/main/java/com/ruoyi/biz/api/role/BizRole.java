@@ -26,6 +26,29 @@ public enum BizRole
     STAFF;
 
     /**
+     * 商家端角色权限等级（越大权限越高）
+     *
+     * <p><b>绝不能用 {@link #ordinal()} 代替本方法</b>：枚举声明顺序是
+     * PLATFORM(0) / AGENT(1) / OWNER(2) / MANAGER(3) / STAFF(4)，
+     * 按 ordinal 比大小会得出「STAFF > OWNER」的反向结论。
+     * 历史上 ApiAuthController.buildStaffLoginMember 正是用 ordinal 挑「最高角色」，
+     * 导致老板兼任任一门店店员后，走会员授权链路登录会被降权成 STAFF，
+     * 商品与财务功能全部点不动。</p>
+     *
+     * <p>PLATFORM / AGENT 不属于商家端职务序列，返回 0 不参与比较。</p>
+     */
+    public int rank()
+    {
+        switch (this)
+        {
+            case OWNER:   return 3;
+            case MANAGER: return 2;
+            case STAFF:   return 1;
+            default:      return 0;
+        }
+    }
+
+    /**
      * 从 biz_merchant_staff.role 字符串解析
      */
     public static BizRole fromStaffRole(String role)

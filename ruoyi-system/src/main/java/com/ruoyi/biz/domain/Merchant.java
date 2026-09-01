@@ -134,6 +134,32 @@ public class Merchant extends BaseEntity
         this.merchantId = merchantId;
     }
 
+    /** 自动开通的老板登录账号（非表字段，仅新增商户时回带一次） */
+    private String ownerUserName;
+
+    /** 自动开通的老板初始密码明文（非表字段，不落库，仅新增时回带一次供平台交付给老板） */
+    private String ownerInitPassword;
+
+    public String getOwnerUserName()
+    {
+        return ownerUserName;
+    }
+
+    public void setOwnerUserName(String ownerUserName)
+    {
+        this.ownerUserName = ownerUserName;
+    }
+
+    public String getOwnerInitPassword()
+    {
+        return ownerInitPassword;
+    }
+
+    public void setOwnerInitPassword(String ownerInitPassword)
+    {
+        this.ownerInitPassword = ownerInitPassword;
+    }
+
     public String getMerchantNo()
     {
         return merchantNo;

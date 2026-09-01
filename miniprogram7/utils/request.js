@@ -248,6 +248,7 @@ const api = {
   merchantStaffMe: () => request('/api/merchant/staff/me'),
   merchantStaffProfile: (data) => request('/api/merchant/staff/profile', { method: 'POST', data }),
   merchantStaffLogout: () => request('/api/merchant/staff/logout', { method: 'POST' }),
+  merchantStaffSwitchStore: (storeId) => request('/api/merchant/staff/switch-store', { method: 'POST', data: { storeId } }),
   // 商家工作台（对标旧 /api/store/staff/{home,today/*,booking/*}）
   merchantStaffHome: () => request('/api/merchant/staff/home'),
   platformFinanceSummary: (params) => {

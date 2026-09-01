@@ -70,6 +70,25 @@ public class LoginMember implements Serializable
      */
     private Long storeId;
 
+    /**
+     * 商家员工身份的 sys_user.user_id。
+     *
+     * <p>必须与 {@link #memberId} 严格分开：sys_user 与 biz_member 是两条独立自增序列，
+     * 本地实测 sys_user 已到 999903、biz_member 已到 1001244，区间完全重叠。
+     * 历史上商家端登录把 user_id 直接塞进 memberId，导致店员 token 调 /api/auth/info
+     * 会按 memberId 命中同号的**别人的会员记录**（实测店员读到了会员 c24 的 openid）。
+     * 商家端一律读本字段，会员接口一律读 memberId。</p>
+     */
+    private Long staffUserId;
+
+    /**
+     * 是否拥有「全商户所有门店」范围（biz_merchant_staff.store_id=0，老板/商户级职务）。
+     *
+     * <p>storeIds 已在登录时展开为该商户的真实门店列表，本标记用于：
+     * 1) 商家端展示「全部门店」汇总选项；2) 新增门店后无需补员工关联即自动纳入范围。</p>
+     */
+    private boolean allStores;
+
     public LoginMember()
     {
     }
@@ -143,6 +162,22 @@ public class LoginMember implements Serializable
         return storeIds.contains(checkStoreId);
     }
 
+    /**
+     * 是否「员工会话」（门店端旧链路 + 商家端新链路统称）。
+     *
+     * <p>历史代码到处写 {@code "store".equals(getUserType())} 判断员工身份，
+     * 而商家端登录链路发的是 owner / manager / staff —— 于是核销、确认买单、
+     * 审核预约这些端点对商家端三种角色全部 403。这里统一收口，避免再各处漏改。</p>
+     */
+    public boolean isStaffSession()
+    {
+        if (userType == null) return false;
+        return "store".equals(userType)
+                || "owner".equals(userType)
+                || "manager".equals(userType)
+                || "staff".equals(userType);
+    }
+
     public String getToken()
     {
         return token;
@@ -151,6 +186,27 @@ public class LoginMember implements Serializable
     public void setToken(String token)
     {
         this.token = token;
+    }
+
+
+    public boolean isAllStores()
+    {
+        return allStores;
+    }
+
+    public void setAllStores(boolean allStores)
+    {
+        this.allStores = allStores;
+    }
+
+    public Long getStaffUserId()
+    {
+        return staffUserId;
+    }
+
+    public void setStaffUserId(Long staffUserId)
+    {
+        this.staffUserId = staffUserId;
     }
 
     public Long getMemberId()

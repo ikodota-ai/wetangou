@@ -62,35 +62,27 @@ Page({
 
   /**
    * 切到目标门店后再核销（适用于店员扫了非当前 store 的台卡）
+   *
+   * 原来打的是 /api/store/staff/switch-store，那个端点第一行就要求
+   * userType === 'store'，而商家端登录发的是 owner/manager/staff，
+   * 于是这条路径必然返回「此操作仅限门店端员工」—— 整段是死代码。
+   * 改打商家端专属的 /api/merchant/staff/switch-store。
    */
   _switchStoreThenVerify(targetSid, code) {
-    const token = wx.getStorageSync('token') || ''
-    const APPID = require('../../../utils/request.js').APPID
-    const BASE = require('../../../utils/request.js').BASE_URL
-    wx.request({
-      url: BASE + '/api/store/staff/switch-store',
-      method: 'POST',
-      header: { 'content-type': 'application/json', 'Authorization': 'Bearer ' + token, 'X-App-Id': APPID },
-      data: { storeId: targetSid },
-      success: (res) => {
-        if (res.statusCode === 200 && (res.data.code === 200 || res.data.success)) {
-          // 更新本地 staff
-          const staff = wx.getStorageSync('staffUser') || {}
-          staff.storeId = targetSid
-          wx.setStorageSync('staffUser', staff)
-          this.setData({ storeId: targetSid, storeName: '门店' + targetSid })
-          this.setData({ verifyCode: code })
-          setTimeout(() => {
-            this.onSubmit()
-            this._schemeCode = ''
-            this._schemeSid = null
-          }, 50)
-        } else {
-          wx.hideLoading()
-          wx.showToast({ title: res.data.msg || '切店失败', icon: 'none' })
-        }
-      },
-      fail: () => { wx.hideLoading(); wx.showToast({ title: '网络失败', icon: 'none' }) }
+    api.merchantStaffSwitchStore(targetSid).then((d) => {
+      const staff = wx.getStorageSync('staffUser') || {}
+      staff.storeId = targetSid
+      staff.storeName = (d && d.storeName) || ('门店' + targetSid)
+      wx.setStorageSync('staffUser', staff)
+      this.setData({ storeId: targetSid, storeName: staff.storeName, verifyCode: code })
+      setTimeout(() => {
+        this.onSubmit()
+        this._schemeCode = ''
+        this._schemeSid = null
+      }, 50)
+    }).catch((err) => {
+      wx.hideLoading()
+      wx.showToast({ title: (err && err.msg) || '切店失败', icon: 'none' })
     })
   },
   onCode(e) { this.setData({ verifyCode: e.detail.value }) },

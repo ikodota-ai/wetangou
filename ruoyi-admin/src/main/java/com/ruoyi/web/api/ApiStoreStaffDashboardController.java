@@ -402,7 +402,7 @@ public class ApiStoreStaffDashboardController extends BaseController
 
         // 防越权：token 里的 storeId 必须等于 body.storeId
         LoginMember login = MemberContextHolder.get();
-        if (login != null && "store".equals(login.getUserType()) && !storeId.equals(login.getStoreId())) {
+        if (login != null && login.isStaffSession() && !login.hasStore(storeId)) {
             return AjaxResult.error("无权操作其他门店");
         }
 

@@ -31,6 +31,7 @@ import com.ruoyi.biz.domain.Agent;
 import com.ruoyi.biz.api.service.WxMaService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.api.util.MemberTokenService;
+import com.ruoyi.biz.api.util.StaffLoginMemberBuilder;
 import com.ruoyi.biz.domain.MerchantStaff;
 import com.ruoyi.biz.domain.MerchantStaffInvite;
 import com.ruoyi.biz.domain.Store;
@@ -95,7 +96,12 @@ public class ApiMerchantStaffController
         if (!SecurityUtils.matchesPassword(password, user.getPassword())) throw new ServiceException("账号或密码错误");
 
         // 必须有商家员工关联（平台/代理商可无关联）
-        List<MerchantStaff> allLinks = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
+        // 必须绕开租户 SQL 过滤：MemberAuthInterceptor 对匿名 /api/** 会按 X-App-Id 设租户上下文，
+        // 未带/未匹配 appid 时兜底为默认商户 1，于是 TenantSqlInterceptor 会给这条查询追加
+        // "and ms.merchant_id = 1"。按 user_id 查自己的员工关联属于身份解析，商户归属由账号本身决定，
+        // 被 appid 上下文限制会导致「商户 201 的老板用密码登录报该账号未关联商家」。
+        List<MerchantStaff> allLinks = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }}));
         String ut = user.getUserType();
         // 平台/代理商可无员工关联；但一旦有关联就说明是商户侧账号，不再当特权处理
         boolean isPrivileged = ("00".equals(ut) || "01".equals(ut)) && (allLinks == null || allLinks.isEmpty());
@@ -188,7 +194,12 @@ public class ApiMerchantStaffController
         if (user == null) throw new ServiceException("NOT_BOUND", 600); // 600: 尚未绑定，前端引导走"扫码邀请"流程
         if (!"0".equals(user.getStatus())) throw new ServiceException("账号已被停用");
 
-        List<MerchantStaff> allLinks = staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }});
+        // 必须绕开租户 SQL 过滤：MemberAuthInterceptor 对匿名 /api/** 会按 X-App-Id 设租户上下文，
+        // 未带/未匹配 appid 时兜底为默认商户 1，于是 TenantSqlInterceptor 会给这条查询追加
+        // "and ms.merchant_id = 1"。按 user_id 查自己的员工关联属于身份解析，商户归属由账号本身决定，
+        // 被 appid 上下文限制会导致「商户 201 的老板用密码登录报该账号未关联商家」。
+        List<MerchantStaff> allLinks = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> staffService.selectList(new MerchantStaff() {{ setUserId(user.getUserId()); }}));
         String ut = user.getUserType();
         boolean isPrivileged = ("00".equals(ut) || "01".equals(ut)) && (allLinks == null || allLinks.isEmpty());
         // 一个 openid 可能在多个商户下都有员工关联；当前小程序 appid 决定用哪一份身份
@@ -271,7 +282,8 @@ public class ApiMerchantStaffController
 
         // 5) 校验员工关联（可能已存在 / 可能新绑）
         final SysUser boundUser = user;
-        List<MerchantStaff> links = staffService.selectList(new MerchantStaff() {{ setUserId(boundUser.getUserId()); }});
+        List<MerchantStaff> links = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> staffService.selectList(new MerchantStaff() {{ setUserId(boundUser.getUserId()); }}));
         MerchantStaff existLink = null;
         if (links != null) {
             for (MerchantStaff l : links) {
@@ -291,7 +303,8 @@ public class ApiMerchantStaffController
             ms.setCreateTime(new Date());
             staffService.insert(ms);
             // 重新查关联
-            links = staffService.selectList(new MerchantStaff() {{ setUserId(boundUser.getUserId()); }});
+            links = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                    () -> staffService.selectList(new MerchantStaff() {{ setUserId(boundUser.getUserId()); }}));
         }
 
         // 6) 标记邀请码已用
@@ -344,11 +357,11 @@ public class ApiMerchantStaffController
 
         // openid 已被其他账号绑定？
         SysUser exist = userService.selectUserByOpenId(openid);
-        if (exist != null && !exist.getUserId().equals(lm.getMemberId())) {
+        if (exist != null && !exist.getUserId().equals(lm.getStaffUserId())) {
             throw new ServiceException("该微信已绑定其他账号");
         }
 
-        SysUser user = userService.selectUserByUserId(lm.getMemberId());
+        SysUser user = userService.selectUserByUserId(lm.getStaffUserId());
         if (user == null) throw new ServiceException("员工账号不存在");
         // 走专用语句：updateUser 的动态 set 不含 openid 列
         userService.bindOpenid(user.getUserId(), openid);
@@ -366,8 +379,8 @@ public class ApiMerchantStaffController
     {
         LoginMember lm = MemberContextHolder.get();
         if (lm == null) throw new ServiceException("未登录");
-        SysUser u = userService.selectUserByUserId(lm.getMemberId());
-        MerchantStaff ms = staffService.selectByUserId(lm.getMemberId());
+        SysUser u = userService.selectUserByUserId(lm.getStaffUserId());
+        MerchantStaff ms = staffService.selectByUserId(lm.getStaffUserId());
 
         JSONObject r = new JSONObject();
         r.put("userId", u.getUserId());
@@ -437,10 +450,10 @@ public class ApiMerchantStaffController
         if (realName == null && phone == null) throw new ServiceException("无更新内容");
 
         MerchantStaff upd = new MerchantStaff();
-        upd.setUserId(lm.getMemberId());
+        upd.setUserId(lm.getStaffUserId());
         upd.setRealName(realName);
         upd.setPhone(phone);
-        upd.setUpdateBy(String.valueOf(lm.getMemberId()));
+        upd.setUpdateBy(String.valueOf(lm.getStaffUserId()));
         upd.setUpdateTime(new Date());
         staffService.updateByUserId(upd);
         return AjaxResult.success("已更新");
@@ -510,7 +523,45 @@ public class ApiMerchantStaffController
         }
     }
 
-/** 退出登录 */
+/**
+     * 商家端切换当前门店。
+     *
+     * <p>为什么要新加一个：已有的 {@code /api/store/staff/switch-store} 第一行就判
+     * {@code !"store".equals(lm.getUserType())} 直接抛「此操作仅限门店端员工」，
+     * 而商家端登录链路发的 userType 是 owner/manager/staff —— 也就是说商家端
+     * 任何角色调那个端点都必然失败（实测店员 staff001 绑了 3 个店，调用返
+     * {"msg":"此操作仅限门店端员工","code":500}）。核销页里那段切店代码是死代码。</p>
+     *
+     * <p>只允许切到本次登录已解析出的 storeIds 内（老板 store_id=0 已在登录时
+     * 展开成该商户全部门店），避免越权切到别家门店。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
+    @PostMapping("/switch-store")
+    public AjaxResult switchStore(@RequestBody JSONObject body)
+    {
+        LoginMember lm = MemberContextHolder.get();
+        if (lm == null) throw new ServiceException("未登录");
+        Long targetStoreId = body == null ? null : body.getLong("storeId");
+        if (targetStoreId == null) throw new ServiceException("请选择目标门店");
+        if (lm.getStoreIds() == null || !lm.getStoreIds().contains(targetStoreId))
+        {
+            throw new ServiceException("无权切换到该门店");
+        }
+        lm.setStoreId(targetStoreId);
+        // 刷新 token 缓存，后续请求才能看到新的 storeId
+        memberTokenService.refreshToken(lm);
+
+        Store st = storeService.selectStoreByStoreId(targetStoreId);
+        AjaxResult ajax = AjaxResult.success("已切换门店");
+        ajax.put("storeId", targetStoreId);
+        ajax.put("storeName", st == null ? "" : st.getStoreName());
+        ajax.put("storeIds", lm.getStoreIds());
+        ajax.put("stores", resolveStores(lm.getStoreIds()));
+        return ajax;
+    }
+
+    /** 退出登录 */
     @LoginRequired
     @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER, BizRole.STAFF}, includeHigher = true)
     @PostMapping("/logout")
@@ -604,73 +655,43 @@ public class ApiMerchantStaffController
         return hit;
     }
 
+    /**
+     * 构建商家端登录态。
+     *
+     * <p>实现收口到 {@link StaffLoginMemberBuilder}，与 {@code /api/auth/login}
+     * 的会员授权链路共用同一份逻辑 —— 此前两处各有一份复制品，其中一份用
+     * {@code BizRole.ordinal()} 挑最高角色（等级正好是反的），导致老板兼任店员后
+     * 走会员授权链路会被降权成 STAFF。</p>
+     */
     private LoginMember buildLoginMember(SysUser user, List<MerchantStaff> links, String userType)
     {
-        List<Long> storeIds = new ArrayList<>();
-        Long merchantId = null;
-        java.util.Set<BizRole> roles = new java.util.HashSet<>();
-        BizRole maxStaffRole = null;
-        for (MerchantStaff l : links) {
-            if (l.getStoreId() != null && !storeIds.contains(l.getStoreId())) storeIds.add(l.getStoreId());
-            if (merchantId == null && l.getMerchantId() != null) merchantId = l.getMerchantId();
-            BizRole r = BizRole.fromStaffRole(l.getRole());
-            roles.add(r);
-            if (maxStaffRole == null || staffRoleRank(r) > staffRoleRank(maxStaffRole)) {
-                maxStaffRole = r;
-            }
-        }
-        // 兼容 userType 参数（旧 staff 链路），确保非空
-        String resolvedUserType = userType;
-        if (maxStaffRole != null) {
-            switch (maxStaffRole) {
-                case OWNER:   resolvedUserType = "owner";   break;
-                case MANAGER: resolvedUserType = "manager"; break;
-                case STAFF:   resolvedUserType = "staff";   break;
-                default: break;
-            }
-        }
-        // 代理商/城市合伙人 叠加身份（user_type=01）
-        Long agentId = null;
-        if ("01".equals(user.getUserType())) {
-            roles.add(BizRole.AGENT);
-            resolvedUserType = "agent";
-            try {
-                Agent agent = agentService.selectAgentByUserId(user.getUserId());
-                if (agent != null) agentId = agent.getAgentId();
-            } catch (Exception ignore) { }
-        }
-        // 平台账号 也能登录小程序（user_type=00，外出查跨店数据）。
-        // 纵深防御：仅当该账号「没有任何商家员工关联」时才认平台身份。
-        // 历史上 acceptInvite 曾把扫码入职账号误建成 user_type=00，
-        // 若此处不加 links 判空，这些店员登录后会直接拿到 PLATFORM 角色（可读全平台数据）。
-        if ("00".equals(user.getUserType()) && (links == null || links.isEmpty())) {
-            roles.add(BizRole.PLATFORM);
-            resolvedUserType = "platform";
-        }
-        Long currentStoreId = storeIds.isEmpty() ? null : storeIds.get(0);
-        LoginMember lm = new LoginMember();
-        lm.setUserType(resolvedUserType);
-        lm.setRoles(roles);
-        lm.setStaffRole(maxStaffRole);
-        lm.setStoreId(currentStoreId);
-        lm.setStoreIds(storeIds);
-        lm.setMerchantId(merchantId);
-        lm.setAgentId(agentId);
-        lm.setMemberId(user.getUserId());
-        lm.setOpenid(user.getOpenid() == null ? "staff:" + user.getUserId() : user.getOpenid());
-        return lm;
+        return StaffLoginMemberBuilder.build(user, links, userType, uid -> {
+            Agent agent = agentService.selectAgentByUserId(uid);
+            return agent == null ? null : agent.getAgentId();
+        }, this::storeIdsOfMerchant);
     }
 
-    /** OWNER=3, MANAGER=2, STAFF=1, 其他=0 */
-    private static int staffRoleRank(BizRole r) {
-        if (r == null) return 0;
-        switch (r) {
-            case OWNER:   return 3;
-            case MANAGER: return 2;
-            case STAFF:   return 1;
-            default:      return 0;
+    /** 查商户下全部启用门店 ID（用于把 store_id=0 展开成真实门店范围） */
+    private java.util.List<Long> storeIdsOfMerchant(Long merchantId)
+    {
+        java.util.List<Long> out = new ArrayList<>();
+        if (merchantId == null) return out;
+        Store q = new Store();
+        q.setMerchantId(merchantId);
+        // 同上：展开 store_id=0 时按 merchantId 查门店，不能被 appid 兜底的租户上下文限制，
+        // 否则商户 201 的老板会查到商户 1 的门店（或查不到任何门店）。
+        java.util.List<Store> list = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> storeService.selectStoreList(q));
+        if (list != null)
+        {
+            for (Store st : list)
+            {
+                if (st.getStoreId() != null) out.add(st.getStoreId());
+            }
         }
+        return out;
     }
+
 
     private AjaxResult packLoginResult(LoginMember lm, SysUser user, List<MerchantStaff> links)
     {
@@ -683,6 +704,7 @@ public class ApiMerchantStaffController
         MerchantStaff me = links == null || links.isEmpty() ? null : links.get(0);
         AjaxResult ajax = AjaxResult.success();
         ajax.put("token", lm.getToken());
+        ajax.put("staffUserId", lm.getStaffUserId());
         ajax.put("userType", lm.getUserType());
         ajax.put("staffRole", lm.getStaffRole() == null ? null : lm.getStaffRole().name());
         ajax.put("roles", lm.getRoles() == null ? java.util.Collections.emptyList() :
@@ -760,7 +782,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
-    @RequireRole(value = BizRole.STAFF, includeHigher = false)
+    @RequireRole(value = BizRole.STAFF, includeHigher = true)
     @GetMapping("/home")
     public AjaxResult dashboardHome()
     {
@@ -819,7 +841,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
-    @RequireRole(value = BizRole.STAFF, includeHigher = false)
+    @RequireRole(value = BizRole.STAFF, includeHigher = true)
     @GetMapping("/today/orders")
     public AjaxResult todayOrders()
     {
@@ -843,7 +865,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
-    @RequireRole(value = BizRole.STAFF, includeHigher = false)
+    @RequireRole(value = BizRole.STAFF, includeHigher = true)
     @GetMapping("/today/bills")
     public AjaxResult todayBills()
     {
@@ -862,7 +884,7 @@ public class ApiMerchantStaffController
     }
 
     @LoginRequired
-    @RequireRole(value = BizRole.STAFF, includeHigher = false)
+    @RequireRole(value = BizRole.STAFF, includeHigher = true)
     @GetMapping("/today/bookings")
     public AjaxResult todayBookings()
     {
@@ -889,7 +911,7 @@ public class ApiMerchantStaffController
         if ("2".equals(bm.getStatus())) return AjaxResult.error("该报名已确认");
         if ("3".equals(bm.getStatus())) return AjaxResult.error("该报名已拒绝");
         bm.setStatus("2");
-        bm.setConfirmUser(m.getMemberId() == null ? "merchant-staff" : ("mstaff-" + m.getMemberId()));
+        bm.setConfirmUser(m.getStaffUserId() == null ? "merchant-staff" : ("mstaff-" + m.getStaffUserId()));
         bm.setConfirmTime(new Date());
         if (body != null && body.get("remark") != null) bm.setReviewRemark(String.valueOf(body.get("remark")));
         bookingService.updateBookingMember(bm);
@@ -911,7 +933,7 @@ public class ApiMerchantStaffController
         String reason = body == null ? null : String.valueOf(body.get("reason"));
         if (reason == null || reason.trim().isEmpty()) return AjaxResult.error("请填写拒绝原因");
         bm.setStatus("3");
-        bm.setConfirmUser(m.getMemberId() == null ? "merchant-staff" : ("mstaff-" + m.getMemberId()));
+        bm.setConfirmUser(m.getStaffUserId() == null ? "merchant-staff" : ("mstaff-" + m.getStaffUserId()));
         bm.setConfirmTime(new Date());
         bm.setReviewRemark(reason);
         bookingService.updateBookingMember(bm);

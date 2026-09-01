@@ -21,7 +21,8 @@ Page({
         this.setData({
           userId: data.userId,
           realName: data.realName || data.nickName || '',
-          storeName: (data.stores && data.stores[0] && data.stores[0].storeName) || ('门店' + data.storeId),
+          // 取当前 storeId 对应的门店名：多店员工切店后取 stores[0] 会一直显示第一个店
+          storeName: this.pickStoreName(data),
           role: data.role || '员工',
           openid: data.openid || '',
           openidBound: !!data.openidBound
@@ -34,6 +35,13 @@ Page({
           console.warn('[merchant me] err', err)
         }
       })
+  },
+
+  pickStoreName(data) {
+    const stores = (data && data.stores) || []
+    const cur = stores.filter(x => x.storeId === data.storeId)[0]
+    if (cur) return cur.storeName
+    return data && data.storeId ? ('门店' + data.storeId) : ''
   },
 
   goProfile() {

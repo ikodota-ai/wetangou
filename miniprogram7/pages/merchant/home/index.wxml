@@ -4,9 +4,10 @@
       <view class="identity-badge">商家工作台</view>
       <text class="identity-name">{{realName || '员工'}}</text>
     </view>
-    <view class="store-row">
+    <view class="store-row" bindtap="onSwitchStore">
       <text class="store-label">当前门店</text>
       <text class="store-name">{{storeName || '尚未登录'}}</text>
+      <text class="store-switch" wx:if="{{canSwitchStore}}">切换 ›</text>
     </view>
   </view>
 

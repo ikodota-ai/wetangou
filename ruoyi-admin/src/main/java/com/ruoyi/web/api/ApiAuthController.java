@@ -17,6 +17,7 @@ import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.biz.api.service.WxMaService;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.api.util.MemberTokenService;
+import com.ruoyi.biz.api.util.StaffLoginMemberBuilder;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Merchant;
 import com.ruoyi.biz.service.IMemberService;
@@ -60,6 +61,9 @@ public class ApiAuthController
     @Autowired
     private ISysUserService userService;
 
+    @Autowired
+    private com.ruoyi.biz.service.IStoreService storeService;
+
     /**
      * 微信登录：code换openid，注册或更新会员，返回会员token
      */
@@ -94,7 +98,12 @@ public class ApiAuthController
         try {
             SysUser u = userService.selectUserByOpenId(openid);
             if (u != null && "0".equals(u.getStatus())) {
-                List<MerchantStaff> allLinks = staffService.selectList(new MerchantStaff() {{ setUserId(u.getUserId()); }});
+                // 必须绕开租户 SQL 过滤：MemberAuthInterceptor 对匿名 /api/** 会按 X-App-Id 设租户上下文，
+                // 未带/未匹配 appid 时兜底为默认商户 1，于是 TenantSqlInterceptor 会给这条查询追加
+                // "and ms.merchant_id = 1"。按 user_id 查自己的员工关联属于身份解析，商户归属由账号本身决定，
+                // 被 appid 上下文限制会导致「商户 201 的老板用密码登录报该账号未关联商家」。
+                List<MerchantStaff> allLinks = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                        () -> staffService.selectList(new MerchantStaff() {{ setUserId(u.getUserId()); }}));
                 // 只认在职关联（status=0 或历史空值）；待审核(3)/离职(1) 按普通会员处理，
                 // 与上面「2) openid 命中但员工 status≠0 → 按普通会员处理」的设计一致。
                 List<MerchantStaff> links = new java.util.ArrayList<>();
@@ -113,6 +122,10 @@ public class ApiAuthController
                     ajax.put("userType", staffLm.getUserType());
                     ajax.put("loginType", "staff");
                     ajax.put("isStaff", true);
+                    // 前端 pages/login/login.js 读 data.staffUserId 建 staffUser 会话，
+                    // 此前后端从未返该字段，一路回退到 data.memberId（会员 ID 语义），
+                    // 商家端把它当 sys_user.user_id 用就会张冠李戴。
+                    ajax.put("staffUserId", staffLm.getStaffUserId());
                     ajax.put("isOwner", staffLm.isOwner());
                     ajax.put("isManagerOrAbove", staffLm.isManagerOrAbove());
                     ajax.put("isAgent", staffLm.isAgent());
@@ -338,54 +351,39 @@ public class ApiAuthController
     }
 
     /**
-     * 复制自 ApiMerchantStaffController.buildLoginMember 的核心逻辑
-     * 构造 staff 身份的 LoginMember（带 roles/userType/staffRole/storeId 等）
+     * 构建商家端登录态（与 ApiMerchantStaffController 共用同一实现）。
+     *
+     * <p>此前这里是一份从 ApiMerchantStaffController 复制来的副本，复制时把
+     * staffRoleRank() 换成了 BizRole.ordinal()。枚举声明顺序是
+     * PLATFORM(0)/AGENT(1)/OWNER(2)/MANAGER(3)/STAFF(4)，按 ordinal 取"最大"
+     * 等于认定 STAFF 权限最高 —— 老板只要兼任任一门店店员，走会员授权登录就会被
+     * 降权成 STAFF，商品/财务全部点不动，而账号密码链路却是正常的 OWNER。
+     * 同一个人两条链路两种身份，故收口为唯一实现。</p>
      */
     private LoginMember buildStaffLoginMember(SysUser user, List<MerchantStaff> links)
     {
-        java.util.List<Long> storeIds = new ArrayList<>();
-        Long merchantId2 = null;
-        java.util.Set<BizRole> roles = new java.util.HashSet<>();
-        BizRole maxStaffRole = null;
-        for (MerchantStaff l : links) {
-            if (l.getStoreId() != null && !storeIds.contains(l.getStoreId())) storeIds.add(l.getStoreId());
-            if (merchantId2 == null && l.getMerchantId() != null) merchantId2 = l.getMerchantId();
-            BizRole r = BizRole.fromStaffRole(l.getRole());
-            roles.add(r);
-            if (maxStaffRole == null || (r != null && r.ordinal() > (maxStaffRole == null ? -1 : maxStaffRole.ordinal()))) {
-                maxStaffRole = r;
+        return StaffLoginMemberBuilder.build(user, links, "merchant", null, this::storeIdsOfMerchant);
+    }
+
+    /** 查商户下全部门店 ID（把 biz_merchant_staff.store_id=0 展开成真实门店范围） */
+    private List<Long> storeIdsOfMerchant(Long merchantId)
+    {
+        List<Long> out = new java.util.ArrayList<>();
+        if (merchantId == null) return out;
+        com.ruoyi.biz.domain.Store q = new com.ruoyi.biz.domain.Store();
+        q.setMerchantId(merchantId);
+        // 同上：展开 store_id=0 时按 merchantId 查门店，不能被 appid 兜底的租户上下文限制，
+        // 否则商户 201 的老板会查到商户 1 的门店（或查不到任何门店）。
+        List<com.ruoyi.biz.domain.Store> list = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> storeService.selectStoreList(q));
+        if (list != null)
+        {
+            for (com.ruoyi.biz.domain.Store st : list)
+            {
+                if (st.getStoreId() != null) out.add(st.getStoreId());
             }
         }
-        String resolvedUserType = "merchant";
-        if (maxStaffRole != null) {
-            switch (maxStaffRole) {
-                case OWNER:   resolvedUserType = "owner";   break;
-                case MANAGER: resolvedUserType = "manager"; break;
-                case STAFF:   resolvedUserType = "staff";   break;
-                default: break;
-            }
-        }
-        if ("01".equals(user.getUserType())) {
-            roles.add(BizRole.AGENT);
-            resolvedUserType = "agent";
-        }
-        // 与 ApiMerchantStaffController.buildLoginMember 保持一致：
-        // 有商家员工关联的账号即便 user_type=00（历史脏数据）也不得升级为平台身份
-        if ("00".equals(user.getUserType()) && (links == null || links.isEmpty())) {
-            roles.add(BizRole.PLATFORM);
-            resolvedUserType = "platform";
-        }
-        Long currentStoreId = storeIds.isEmpty() ? null : storeIds.get(0);
-        LoginMember lm = new LoginMember();
-        lm.setUserType(resolvedUserType);
-        lm.setRoles(roles);
-        lm.setStaffRole(maxStaffRole);
-        lm.setStoreId(currentStoreId);
-        lm.setStoreIds(storeIds);
-        lm.setMerchantId(merchantId2);
-        lm.setMemberId(user.getUserId());
-        lm.setOpenid(user.getOpenid() == null ? "staff:" + user.getUserId() : user.getOpenid());
-        return lm;
+        return out;
     }
 
     /**

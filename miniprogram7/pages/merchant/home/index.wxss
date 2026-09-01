@@ -7,6 +7,7 @@
 .store-row { margin-top: 20rpx; display: flex; align-items: center; }
 .store-label { font-size: 24rpx; opacity: 0.8; margin-right: 12rpx; }
 .store-name { font-size: 30rpx; font-weight: 600; }
+.store-switch { font-size: 24rpx; margin-left: 12rpx; padding: 2rpx 12rpx; border-radius: 20rpx; background: rgba(255,255,255,0.25); }
 
 .notice { background: #FFF7E6; }
 .notice-t { font-size: 28rpx; color: #B26A00; font-weight: 600; }

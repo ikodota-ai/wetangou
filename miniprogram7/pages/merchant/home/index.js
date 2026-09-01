@@ -9,6 +9,8 @@ Page({
     storeName: '',
     realName: '',
     merchantId: null,
+    stores: [],
+    canSwitchStore: false,
     needBindWx: false,
     todayVerifyCount: 0,
     todayVerifyAmount: '0.00',
@@ -39,11 +41,14 @@ Page({
       wx.redirectTo({ url: '/pages/login/login?showMore=1' })
       return
     }
+    const stores = staff.stores || []
     this.setData({
       storeId: staff.storeId,
       storeName: staff.storeName || ('门店' + staff.storeId),
       realName: staff.realName || '',
       merchantId: staff.merchantId,
+      stores: stores,
+      canSwitchStore: stores.length > 1,
       needBindWx: !!staff.needBindWx,
       showGmv: role.isManagerOrAbove(),
       showCreateProduct: role.isManagerOrAbove(),
@@ -62,6 +67,11 @@ Page({
           staff.realName = me.realName || staff.realName
           staff.merchantId = me.merchantId || staff.merchantId
           staff.needBindWx = !me.openidBound
+          // stores 只有 /me 返，缓存起来给切店选择器用（老板 store_id=0 已在后端展开成真实门店）
+          if (me.stores && me.stores.length) staff.stores = me.stores
+          // 当前门店名以 storeId 为准取，不能取 stores[0]，否则切店后名字不跟着变
+          const cur = (staff.stores || []).filter(x => x.storeId === staff.storeId)[0]
+          if (cur) staff.storeName = cur.storeName
           wx.setStorageSync('staffUser', staff)
         }
         const d = home || {}
@@ -76,6 +86,8 @@ Page({
           pendingBillCount: d.pendingBillCount || 0,
           todayBookingCount: d.todayBookingCount || 0,
           recentOrders: d.recentOrders || [],
+          stores: (me && me.stores && me.stores.length) ? me.stores : this.data.stores,
+          canSwitchStore: ((me && me.stores) || this.data.stores || []).length > 1,
           showGmv: role.isManagerOrAbove(),
           showCreateProduct: role.isManagerOrAbove(),
           showBill: role.isManagerOrAbove(),
@@ -86,6 +98,39 @@ Page({
 
   orderStatusText(s) {
     return ({ '0': '待付款', '1': '待使用', '2': '已完成', '3': '已退款', '4': '已取消' })[s] || s
+  },
+
+  /**
+   * 切换当前门店。
+   *
+   * 商家端此前没有任何全局切店入口：老板/多店店员登录后只能操作 storeIds[0]，
+   * 其余门店的订单、买单、预约、核销全都看不到也管不了。
+   */
+  onSwitchStore() {
+    const stores = this.data.stores || []
+    if (stores.length < 2) return
+    wx.showActionSheet({
+      itemList: stores.map(s => (s.storeId === this.data.storeId ? '✓ ' : '') + s.storeName),
+      success: (res) => {
+        const target = stores[res.tapIndex]
+        if (!target || target.storeId === this.data.storeId) return
+        wx.showLoading({ title: '切换中', mask: true })
+        api.merchantStaffSwitchStore(target.storeId).then((d) => {
+          const staff = wx.getStorageSync('staffUser') || {}
+          staff.storeId = target.storeId
+          staff.storeName = (d && d.storeName) || target.storeName
+          wx.setStorageSync('staffUser', staff)
+          this.setData({ storeId: staff.storeId, storeName: staff.storeName })
+          return this.loadHome()
+        }).then(() => {
+          wx.hideLoading()
+          wx.showToast({ title: '已切换门店', icon: 'success' })
+        }).catch((err) => {
+          wx.hideLoading()
+          wx.showToast({ title: (err && err.msg) || '切换失败', icon: 'none' })
+        })
+      }
+    })
   },
 
   goVerify() { wx.navigateTo({ url: '/pages/merchant/verify/index' }) },

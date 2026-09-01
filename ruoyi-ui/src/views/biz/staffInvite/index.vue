@@ -157,6 +157,12 @@
               :disabled="scope.row.wxBound !== 1"
               @click="handleUnbindWx(scope.row)"
               v-hasPermi="['biz:staffInvite:edit']">解绑微信</el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-key"
+              @click="handleResetStaffPwd(scope.row)"
+              v-hasPermi="['biz:staffInvite:edit']">重置密码</el-button>
             <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDeleteStaff(scope.row)" v-hasPermi="['biz:staffInvite:remove']">删除</el-button>
           </template>
         </el-table-column>
@@ -249,7 +255,7 @@
 </template>
 
 <script>
-import { listStaffInvite, addStaffInvite, delStaffInvite, listStaff, updateStaff, profileStaff, delStaff, qrcodeStaffInvite, unbindStaffWx, listStaffAudit, auditStaff } from '@/api/biz/staffInvite'
+import { listStaffInvite, addStaffInvite, delStaffInvite, listStaff, updateStaff, profileStaff, delStaff, qrcodeStaffInvite, unbindStaffWx, resetStaffPwd, listStaffAudit, auditStaff } from '@/api/biz/staffInvite'
 
 export default {
   name: 'StaffInvite',
@@ -502,6 +508,28 @@ export default {
       }).then(() => {
         this.getStaffList()
         this.$modal.msgSuccess('已解绑微信')
+      }).catch(() => {})
+    },
+    /**
+     * 重置员工登录密码：后端生成 8 位随机密码，明文只回显一次。
+     *
+     * 用 $alert（而不是 msgSuccess 一闪而过）是因为这串密码不落库也不写日志，
+     * 关掉弹窗就再也拿不到，只能重新重置。
+     */
+    handleResetStaffPwd(row) {
+      const who = row.realName || row.userName || ('用户' + row.userId)
+      this.$modal.confirm('确认重置「' + who + '」的登录密码？重置后旧密码立即失效，新密码只显示一次，请及时转交本人。').then(() => {
+        return resetStaffPwd(row.userId)
+      }).then(res => {
+        this.$alert(
+          '<div style="line-height:1.9">' +
+          '<div>账号：<b>' + (res.userName || '') + '</b></div>' +
+          '<div>新密码：<b style="color:#E6A23C;font-size:16px">' + (res.newPassword || '') + '</b></div>' +
+          '<div style="color:#909399;font-size:12px;margin-top:6px">密码不会保存，关闭后无法再次查看。员工可用它登录小程序商家版，登录后会自动绑定微信，之后即可免密进入。</div>' +
+          '</div>',
+          '密码已重置',
+          { dangerouslyUseHTMLString: true, confirmButtonText: '我已记录' }
+        )
       }).catch(() => {})
     }
   }
