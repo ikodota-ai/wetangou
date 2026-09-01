@@ -51,7 +51,7 @@
   ],
   "window": {
     "navigationBarBackgroundColor": "#3A6B35",
-    "navigationBarTitleText": "川西坝子餐饮",
+    "navigationBarTitleText": "艾缇公主",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#F2F2F7"
   },
@@ -84,6 +84,10 @@
       "desc": "您的位置信息将用于为您推荐最近的店铺"
     }
   },
+  "requiredPrivateInfos": [
+    "getFuzzyLocation",
+    "getLocation"
+  ],
   "usingComponents": {},
   "sitemapLocation": "sitemap.json",
   "style": "v2"
