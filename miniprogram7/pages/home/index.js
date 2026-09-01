@@ -2,6 +2,7 @@ const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
 const { haversineKm, formatDistance } = require('../../utils/util.js');
 const { resolveContact } = require('../../utils/contact.js');
+const { toRatingView } = require('../../utils/rating.js');
 
 Page({
   data: {
@@ -99,23 +100,16 @@ Page({
     // 于是永久停在「计算中…」—— 而它根本不会再算，因为不主动取位。
     // 区分两种状态：算出来了就显示，没位置就明说需要授权。
     const _dist = formatDistance(_distKm)
-    // 评分：后台手工维护的 0.0-5.0。用 == null 判断而不是 !s.rating ——
-    // 后者会把合法的 0 分也当成未评分（虽然 0 分罕见，但语义上是两回事）。
-    const _rawRating = s.rating
-    const _ratingNum = _rawRating == null || _rawRating === '' ? null : Number(_rawRating)
-    const _hasRating = _ratingNum != null && Number.isFinite(_ratingNum)
-    return Object.assign({}, s, {
+    // 评分：后台手工维护的 0.0-5.0。判空/取整/越界规则收口在 utils/rating.js
+    // （纯函数，被单测直接引用；内联在页面里单测就只能复制一份来测）。
+    const _r = toRatingView(s.rating)
+    return Object.assign({}, s, _r, {
       name: s.storeName || s.name || '',
       hours: s.businessHours || s.hours || '',
       logo: s.logo ? toFullUrl(s.logo) : '',
       distanceText: _dist,
       // wxml 用它决定是显示「距您 x km」还是「查看距离」按钮
-      hasDistance: !!_dist,
-      hasRating: _hasRating,
-      // 4.8 → 显示 "4.8"，5 → 显示 "5.0"（统一一位小数，避免 4.8 和 5 混排）
-      ratingText: _hasRating ? _ratingNum.toFixed(1) : '',
-      // 点亮几颗星：4.8 分点亮 5 颗（四舍五入），3.2 点亮 3 颗
-      ratingStars: _hasRating ? Math.round(_ratingNum) : 0
+      hasDistance: !!_dist
     })
   },
 

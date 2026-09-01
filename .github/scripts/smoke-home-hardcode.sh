@@ -93,6 +93,45 @@ CAT_N=$(curl -s "$H/api/product/category/list" \
   | python3 -c 'import sys,json;print(len(json.load(sys.stdin).get("data") or []))')
 chk "H4) 品类接口返回非空" "$([ "${CAT_N:-0}" -gt 0 ] && echo yes || echo no)" "yes"
 
+# ---------- I. 门店评分：后端三条取值路径都要返 rating ----------
+# 首页店铺卡片的评分来自后台手填的 biz_store.rating。前端 store 可能来自
+# detail / list / nearest 三条路径中的任意一条（app.js pickNearestStore 会
+# 按缓存命中情况走不同分支），只要有一条漏了 select rating，
+# 走到那条路径时评分就不显示 —— 而后台明明填了。
+RAT_SQL=$(/usr/local/mysql/bin/mysql -h127.0.0.1 -uroot -p133301 --default-character-set=utf8mb4 -N -B   -e "use \`ry-vue\`; select ifnull(rating,'NULL') from biz_store where store_id=100;" 2>/dev/null || echo SKIP)
+if [ "$RAT_SQL" != "SKIP" ] && [ "$RAT_SQL" != "NULL" ]; then
+  R_DET=$(curl -s "$H/api/store/100" -H 'X-App-Id: wx9e147c4e2151b123'     | python3 -c 'import sys,json;print((json.load(sys.stdin).get("data") or {}).get("rating"))')
+  R_LST=$(curl -s "$H/api/store/list" -H 'X-App-Id: wx9e147c4e2151b123'     | python3 -c 'import sys,json
+rows=json.load(sys.stdin).get("data") or []
+print(next((r.get("rating") for r in rows if r.get("storeId")==100), None))')
+  R_NEA=$(curl -s "$H/api/store/nearest?latitude=22.53&longitude=113.95&limit=5" -H 'X-App-Id: wx9e147c4e2151b123'     | python3 -c 'import sys,json
+rows=json.load(sys.stdin).get("data") or []
+print(next((r.get("rating") for r in rows if r.get("storeId")==100), None))')
+  chk "I1) /api/store/{id} 返 rating"  "$(python3 -c "print(float('$R_DET'))" 2>/dev/null || echo none)" "$(python3 -c "print(float('$RAT_SQL'))")"
+  chk "I2) /api/store/list 返 rating"  "$(python3 -c "print(float('$R_LST'))" 2>/dev/null || echo none)" "$(python3 -c "print(float('$RAT_SQL'))")"
+  chk "I3) /api/store/nearest 返 rating" "$(python3 -c "print(float('$R_NEA'))" 2>/dev/null || echo none)" "$(python3 -c "print(float('$RAT_SQL'))")"
+else
+  echo "  ⏭  I1-I3 跳过：门店 100 的 rating 未填（后台「门店管理」填了评分才能验证这条链路）"
+fi
+# 前端：评分逻辑必须收口在 utils/rating.js，页面里不许再内联
+chkf  "I4) 首页用 utils/rating.js 的 toRatingView" "$HJS" "toRatingView(s.rating)"
+chkfn_code "I5) 页面里不再内联 toFixed(1) 算评分" "$HJS" "_ratingNum.toFixed(1)"
+chkf  "I6) wxml 用 hasRating 分支（原先写死「评分功能即将上线」）" "$MP/pages/home/index.wxml" "store.hasRating"
+chkfn "I7) 不再写死「评分功能即将上线」" "$MP/pages/home/index.wxml" "评分功能即将上线"
+
+# ---------- J. 客服兜底：商家信息异步到位后必须重算 ----------
+# 客服四项降级链是「门店 -> 商家」，而 bootMerchant 是异步的：
+# 首页 onLoad 首次算 _contactPatch 时 globalData.merchant 还是空对象，
+# 门店没配的那几项算成空且此后不再重算 → 「后台商家客服配了却显示暂未配置」。
+chkf  "J1) app.js 定义了 notifyUserUpdate（原先 8 处调用、从未定义）" "$MP/app.js" "notifyUserUpdate(user) {"
+chkf  "J2) app.js 定义了 notifyMerchantUpdate" "$MP/app.js" "notifyMerchantUpdate(merchant) {"
+chkf  "J3) bootMerchant 拿到数据后广播" "$MP/app.js" "this.notifyMerchantUpdate(this.globalData.merchant)"
+chkf  "J4) 首页实现 onMerchantUpdate 重算客服" "$HJS" "onMerchantUpdate()"
+chkf  "J5) 客服页实现 onMerchantUpdate" "$MP/pages/store/service/index.js" "onMerchantUpdate()"
+chkf  "J6) 预约首页客服电话走统一降级 resolveContact" "$MP/pages/booking/index.js" "resolveContact(this.data.store, merchant).servicePhone"
+chkfn_code "J7) 预约首页不再自己写 servicePhone || phone" "$MP/pages/booking/index.js" "this.data.store.servicePhone || this.data.store.phone"
+chkf  "J8) 广播逻辑收口在 utils/broadcast.js" "$MP/app.js" "require('./utils/broadcast.js')"
+
 echo ""
 echo "结果: PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
