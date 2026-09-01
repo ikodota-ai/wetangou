@@ -67,7 +67,8 @@
         </view>
         <view class="vi-right">
           <text class="vi-exp" wx:if="{{item.expireText}}">{{item.expireText}} 到期</text>
-          <text class="vi-tag" wx:if="{{!item.usable}}">不可用</text>
+          <!-- 不可用的原因要说清楚：只写"不可用"用户不知道是差门槛还是限门店 -->
+          <text class="vi-tag" wx:if="{{!item.usable}}">{{item.limitText || '不可用'}}</text>
         </view>
       </view>
       <view class="v-empty" wx:if="{{!voucherList.length}}">

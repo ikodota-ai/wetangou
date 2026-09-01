@@ -46,6 +46,9 @@ public class ApiOrderServiceImpl implements IApiOrderService
     private IMemberVoucherService memberVoucherService;
 
     @Autowired
+    private VoucherUsageService voucherUsageService;
+
+    @Autowired
     private ApiCommissionService commissionService;
 
     @Autowired
@@ -122,24 +125,10 @@ public class ApiOrderServiceImpl implements IApiOrderService
         BigDecimal totalAmount = price.multiply(BigDecimal.valueOf(quantity));
         BigDecimal discount = BigDecimal.ZERO;
 
-        // 代金券抵扣
-        if (memberVoucherId != null)
-        {
-            MemberVoucher mv = memberVoucherService.selectMemberVoucherById(memberVoucherId);
-            if (mv == null || !mv.getMemberId().equals(memberId) || !"0".equals(mv.getStatus()))
-            {
-                throw new ServiceException("代金券不可用");
-            }
-            if (mv.getThreshold() != null && totalAmount.compareTo(mv.getThreshold()) < 0)
-            {
-                throw new ServiceException("未达到代金券使用门槛");
-            }
-            discount = mv.getFaceValue() == null ? BigDecimal.ZERO : mv.getFaceValue();
-            if (discount.compareTo(totalAmount) > 0)
-            {
-                discount = totalAmount;
-            }
-        }
+        // 代金券抵扣：校验与试算收口到 VoucherUsageService，与买单页共用同一套规则
+        // （原先这里和 ApiBillController 各写一段，都漏了过期与门店限制两条判断）
+        discount = voucherUsageService.validateAndDiscount(
+                memberVoucherId, memberId, totalAmount, product.getStoreId());
         BigDecimal payAmount = totalAmount.subtract(discount);
 
         Order order = new Order();

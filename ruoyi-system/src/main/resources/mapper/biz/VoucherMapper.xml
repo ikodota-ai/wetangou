@@ -48,7 +48,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 </choose>
             </if>
  and v.merchant_id = #{merchantId}</if>
-            <if test="storeId != null "> and v.store_id = #{storeId}</if>
+            <!-- storeId 精确匹配是 admin 列表的语义（运营按门店筛）。
+                 小程序领券中心要的是"这家店能领哪些券"，除了本店专属券还必须带上
+                 全门店通用券（store_id 为 0 / NULL 的历史与新建数据都存在）；
+                 原先它复用了精确匹配，于是通用券在小程序里根本领不到。
+                 只有显式传 params.includeAnyStore=true 时才放宽，不影响后台。 -->
+            <if test="storeId != null ">
+                <choose>
+                    <when test="params != null and params.includeAnyStore == true">
+                        and (v.store_id = #{storeId} or v.store_id is null or v.store_id = 0)
+                    </when>
+                    <otherwise> and v.store_id = #{storeId}</otherwise>
+                </choose>
+            </if>
             <if test="voucherName != null  and voucherName != ''"> and v.voucher_name like concat('%', #{voucherName}, '%')</if>
             <if test="status != null  and status != ''"> and v.status = #{status}</if>
             <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(v.store_id, #{params.storeIds})</if>

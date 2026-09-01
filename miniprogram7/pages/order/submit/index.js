@@ -114,6 +114,10 @@ Page({
       if (s) this.setData({ store: { name: s.storeName || s.name || '' } });
     }).catch(() => {});
   },
+  // 本单归属门店：商品详情返回的 storeId 就是下单落库那个（后端按它校验券）
+  _storeId() {
+    return (this.data.product && this.data.product.storeId) || null;
+  },
   recalc() {
     const p = this.data.product;
     if (!p) return;
@@ -134,7 +138,11 @@ Page({
         faceValue: formatMoney(v.faceValue),
         threshold: formatMoney(v.threshold),
         expireTime: v.expireTime || '',
-        expireText: v.expireTime ? String(v.expireTime).slice(0, 10) : ''
+        expireText: v.expireTime ? String(v.expireTime).slice(0, 10) : '',
+        // 券模板的适用门店（0/空=全门店通用）。不带上它，跨店券会被算成可用，
+        // 用户选了提交才被后端「该代金券仅限 xx 使用」打回
+        storeId: v.storeId,
+        storeName: v.storeName || ''
       }));
       this.setData({ vouchers });
       this.refreshUsable();
@@ -145,11 +153,12 @@ Page({
   // 否则提交时会被后端「未达到代金券使用门槛」拒掉，用户不知道为什么
   refreshUsable(totalArg) {
     const total = parseFloat(totalArg != null ? totalArg : this.data.total) || 0;
-    const usable = voucherUtil.usableList(this.data.vouchers, total);
+    const sid = this._storeId();
+    const usable = voucherUtil.usableList(this.data.vouchers, total, undefined, sid);
     this.setData({ voucherCount: usable.length });
 
     const cur = this.data.voucher;
-    if (cur && !voucherUtil.isUsable(cur, total)) {
+    if (cur && !voucherUtil.isUsable(cur, total, undefined, sid)) {
       this.setData({ voucher: null, voucherText: '未使用' });
       wx.showToast({ title: '份数变化，已取消所选代金券', icon: 'none' });
     }
@@ -171,10 +180,13 @@ Page({
       return;
     }
     const total = parseFloat(this.data.total) || 0;
-    // 不可用的券也列出来并置灰，让用户知道差多少门槛，而不是列表空着让人以为没券
+    const sid = this._storeId();
+    // 不可用的券也列出来并置灰，让用户知道差多少门槛 / 限哪家店，
+    // 而不是列表空着让人以为没券
     const list = this.data.vouchers.map((v) => ({
       ...v,
-      usable: voucherUtil.isUsable(v, total)
+      usable: voucherUtil.isUsable(v, total, undefined, sid),
+      limitText: voucherUtil.storeMatch(v, sid) ? '' : ('仅限' + (v.storeName || '指定门店'))
     }));
     this.setData({ showVoucher: true, voucherList: list });
   },
@@ -184,8 +196,12 @@ Page({
     const v = this.data.vouchers.find((x) => String(x.id) === String(id));
     if (!v) return;
     const total = parseFloat(this.data.total) || 0;
-    if (!voucherUtil.isUsable(v, total)) {
-      wx.showToast({ title: '该券暂不可用', icon: 'none' });
+    const sid = this._storeId();
+    if (!voucherUtil.isUsable(v, total, undefined, sid)) {
+      const why = voucherUtil.storeMatch(v, sid)
+        ? '该券暂不可用'
+        : ('该券仅限' + (v.storeName || '指定门店') + '使用');
+      wx.showToast({ title: why, icon: 'none' });
       return;
     }
     this.setData({

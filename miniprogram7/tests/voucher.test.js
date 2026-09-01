@@ -6,7 +6,7 @@
 // 不是抵扣算错，是这张券从来没被带进下单请求。
 import { describe, it, expect } from 'vitest'
 
-const { isUsable, usableList, discountOf, payAmountOf, parseTime } = require('../utils/voucher.js')
+const { isUsable, usableList, discountOf, payAmountOf, parseTime, storeMatch } = require('../utils/voucher.js')
 
 // 固定"现在"，避免用例随真实时间漂移
 const NOW = new Date('2026/09/01 12:00:00').getTime()
@@ -76,6 +76,70 @@ describe('isUsable', () => {
 
   it('threshold 为 null 当 0 处理，不能因 NaN 比较把无门槛券判成不可用', () => {
     expect(isUsable(mk({ id: 1, faceValue: '5.00', threshold: null }), 3, NOW)).toBe(true)
+  })
+})
+
+describe('storeMatch —— 券的门店限制', () => {
+  // 背景：biz_voucher.store_id 限定券只能在哪家店用，但下单/买单一直没读过它。
+  // 实测领门店 201 的「满 150 减 30」去买门店 200 的 ¥200 商品，抵扣成功并落库
+  // —— A 店发的券把 B 店的营业额扣掉了。后端已在 VoucherUsageService 拦住，
+  // 前端这层负责提前置灰，不让用户选中后才被打回。
+  it('券限门店 200，本次消费也是 200 → 匹配', () => {
+    expect(storeMatch({ storeId: 200 }, 200)).toBe(true)
+  })
+
+  it('券限门店 201，本次消费是 200 → 不匹配', () => {
+    expect(storeMatch({ storeId: 201 }, 200)).toBe(false)
+  })
+
+  it('storeId=0 是全门店通用（历史数据里通用券存的就是 0）', () => {
+    expect(storeMatch({ storeId: 0 }, 200)).toBe(true)
+  })
+
+  it('storeId 为 null / undefined / 空串也当全门店通用（新建数据可能是 NULL）', () => {
+    expect(storeMatch({ storeId: null }, 200)).toBe(true)
+    expect(storeMatch({}, 200)).toBe(true)
+    expect(storeMatch({ storeId: '' }, 200)).toBe(true)
+  })
+
+  it('本次消费门店未知时不拦（商品详情还没加载完就渲染过一次）', () => {
+    expect(storeMatch({ storeId: 201 }, null)).toBe(true)
+    expect(storeMatch({ storeId: 201 }, undefined)).toBe(true)
+  })
+
+  it('字符串与数字的门店 id 要能比对上（接口返回类型不稳定）', () => {
+    expect(storeMatch({ storeId: '200' }, 200)).toBe(true)
+    expect(storeMatch({ storeId: 200 }, '200')).toBe(true)
+  })
+
+  it('券为 null 不能抛异常', () => {
+    expect(storeMatch(null, 200)).toBe(false)
+  })
+})
+
+describe('isUsable 带门店参数', () => {
+  it('金额够门槛但门店不符 → 不可用', () => {
+    const v = mk({ id: 1, faceValue: '30.00', threshold: '150.00' })
+    v.storeId = 201
+    expect(isUsable(v, 200, NOW)).toBe(true)          // 不传门店时按老行为
+    expect(isUsable(v, 200, NOW, 201)).toBe(true)     // 门店相符
+    expect(isUsable(v, 200, NOW, 200)).toBe(false)    // 门店不符
+  })
+
+  it('通用券在任意门店都可用', () => {
+    const v = mk({ id: 1, faceValue: '30.00', threshold: '150.00' })
+    v.storeId = 0
+    expect(isUsable(v, 200, NOW, 999)).toBe(true)
+  })
+})
+
+describe('usableList 带门店参数', () => {
+  it('只统计本店能用的券（跨店券不能计入「N 张可用」）', () => {
+    const a = mk({ id: 1, faceValue: '30.00', threshold: '0.00' }); a.storeId = 200
+    const b = mk({ id: 2, faceValue: '50.00', threshold: '0.00' }); b.storeId = 201
+    const c = mk({ id: 3, faceValue: '10.00', threshold: '0.00' }); c.storeId = 0
+    const out = usableList([a, b, c], 200, NOW, 200)
+    expect(out.map((x) => x.id)).toEqual([1, 3])
   })
 })
 

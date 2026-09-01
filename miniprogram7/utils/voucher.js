@@ -20,12 +20,16 @@ function toNum(v) {
 
 /**
  * 券是否可用于这笔订单
- * @param {Object} v      biz_member_voucher 一行
+ * @param {Object} v      biz_member_voucher 一行（storeId 来自 join 的券模板）
  * @param {Number} amount 订单商品总价
  * @param {Number} nowTs  当前时间戳（传入便于测试）
+ * @param {Number} storeId 本次消费门店；不传则不做门店校验
  */
-function isUsable(v, amount, nowTs) {
+function isUsable(v, amount, nowTs, storeId) {
   if (!v || v.status !== STATUS_UNUSED) return false
+  // 门店限制：券模板的 store_id 限定这张券只能在哪家店用（0 / 空 = 全门店通用）。
+  // 后端下单会拒，前端不判的话用户能选中、点提交才被打回「该代金券仅限 xx 使用」。
+  if (!storeMatch(v, storeId)) return false
   // 过期判断放前端也做一次：status 要靠定时任务刷，
   // 已过期但任务还没跑到的券 status 仍是 '0'，光看 status 会把它当可用，
   // 用户选了再被后端打回「代金券不可用」，体验很差。
@@ -51,13 +55,26 @@ function parseTime(s) {
 }
 
 /**
+ * 券的门店限制是否匹配本次消费门店
+ * storeId 为 0 / null / 空串都表示「全门店通用」——
+ * 历史数据里通用券存的是 0，新建的可能是 NULL，两种都要认。
+ */
+function storeMatch(v, storeId) {
+  if (!v) return false
+  var limit = v.storeId
+  if (limit === undefined || limit === null || limit === '' || Number(limit) === 0) return true
+  if (storeId === undefined || storeId === null || storeId === '') return true
+  return String(limit) === String(storeId)
+}
+
+/**
  * 从券列表里挑出可用的，按抵扣金额从大到小排
  */
-function usableList(list, amount, nowTs) {
+function usableList(list, amount, nowTs, storeId) {
   var arr = Array.isArray(list) ? list : []
   var out = []
   for (var i = 0; i < arr.length; i++) {
-    if (isUsable(arr[i], amount, nowTs)) out.push(arr[i])
+    if (isUsable(arr[i], amount, nowTs, storeId)) out.push(arr[i])
   }
   out.sort(function (a, b) {
     var d = toNum(b.faceValue) - toNum(a.faceValue)
@@ -90,6 +107,7 @@ function payAmountOf(amount, v) {
 
 module.exports = {
   isUsable: isUsable,
+  storeMatch: storeMatch,
   usableList: usableList,
   discountOf: discountOf,
   payAmountOf: payAmountOf,

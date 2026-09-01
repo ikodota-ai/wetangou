@@ -55,6 +55,9 @@ public class ApiBillController
     private IMemberVoucherService memberVoucherService;
 
     @Autowired
+    private com.ruoyi.biz.api.service.VoucherUsageService voucherUsageService;
+
+    @Autowired
     private IMemberService memberService;
 
     @Autowired
@@ -79,24 +82,11 @@ public class ApiBillController
             throw new ServiceException("门店与消费金额必填");
         }
         Long memberVoucherId = body.getLong("memberVoucherId");
-        BigDecimal discount = BigDecimal.ZERO;
-        if (memberVoucherId != null)
-        {
-            MemberVoucher mv = memberVoucherService.selectMemberVoucherById(memberVoucherId);
-            if (mv == null || !mv.getMemberId().equals(memberId) || !"0".equals(mv.getStatus()))
-            {
-                throw new ServiceException("代金券不可用");
-            }
-            if (mv.getThreshold() != null && amount.compareTo(mv.getThreshold()) < 0)
-            {
-                throw new ServiceException("未达到代金券使用门槛");
-            }
-            discount = mv.getFaceValue() == null ? BigDecimal.ZERO : mv.getFaceValue();
-            if (discount.compareTo(amount) > 0)
-            {
-                discount = amount;
-            }
-        }
+        // 校验与试算收口到 VoucherUsageService，与商品下单共用同一套规则。
+        // 买单能明确拿到 storeId，门店限制在这条路上尤其重要：
+        // 否则 A 店发的券可以用来付 B 店的账。
+        BigDecimal discount = voucherUsageService.validateAndDiscount(
+                memberVoucherId, memberId, amount, storeId);
 
         PayBill bill = new PayBill();
         bill.setBillNo("P" + System.currentTimeMillis() + (int) (Math.random() * 900 + 100));

@@ -48,6 +48,12 @@ public class ApiVoucherController
         Voucher query = new Voucher();
         query.setStatus("0");
         query.setStoreId(storeId);
+        // 领券中心问的是「这家店能领哪些券」，本店专属券之外还要带上全门店通用券。
+        // 原先直接复用了 admin 的精确匹配语义，于是 store_id=0 的通用券
+        // 在小程序里一张都领不到（首页「领券中心」入口是带 storeId 进来的）。
+        java.util.Map<String, Object> params = new java.util.HashMap<>();
+        params.put("includeAnyStore", true);
+        query.setParams(params);
         // 模糊搜索：与 admin /biz/voucher/list 行为对齐（VoucherMapper 已支持 LIKE）
         if (StringUtils.isNotEmpty(voucherName))
         {
@@ -74,6 +80,17 @@ public class ApiVoucherController
         {
             throw new ServiceException("代金券已被领完");
         }
+        // 模板有效期：valid_from / valid_to 原先建了字段但领取时从没读过，
+        // 于是活动结束的券还能继续领，领到手还是「30 天有效」的新券。
+        Date nowTime = new Date();
+        if (voucher.getValidFrom() != null && voucher.getValidFrom().after(nowTime))
+        {
+            throw new ServiceException("活动未开始");
+        }
+        if (voucher.getValidTo() != null && voucher.getValidTo().before(nowTime))
+        {
+            throw new ServiceException("活动已结束");
+        }
         // 同一会员不可重复领取同一张券（已使用/已过期的允许重领）
         MemberVoucher dupQuery = new MemberVoucher();
         dupQuery.setVoucherId(voucherId);
@@ -90,7 +107,7 @@ public class ApiVoucherController
         mv.setFaceValue(voucher.getFaceValue());
         mv.setThreshold(voucher.getThreshold());
         mv.setStatus("0");
-        mv.setGetTime(new Date());
+        mv.setGetTime(nowTime);
         if (voucher.getValidDays() != null && voucher.getValidDays() > 0)
         {
             Calendar cal = Calendar.getInstance();

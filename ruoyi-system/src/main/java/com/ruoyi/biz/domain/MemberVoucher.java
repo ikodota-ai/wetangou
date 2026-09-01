@@ -28,6 +28,17 @@ public class MemberVoucher extends BaseEntity
     @Excel(name = "代金券名称")
     private String voucherName;
 
+    /**
+     * 适用门店（join biz_voucher.store_id，非持久化字段；0 表示全门店通用）
+     *
+     * <p>小程序选券弹窗需要它来把「不能在本店用」的券置灰。原先 /api/voucher/my
+     * 压根没返这个字段，前端无从判断，只能让用户选中后被后端打回。</p>
+     */
+    private Long storeId;
+
+    /** 适用门店名称（join biz_store.store_name，非持久化字段） */
+    private String storeName;
+
     /** 代金券模板ID */
     @Excel(name = "代金券模板ID")
     private Long voucherId;
@@ -160,6 +171,26 @@ public class MemberVoucher extends BaseEntity
     public void setUseTime(Date useTime) 
     {
         this.useTime = useTime;
+    }
+
+    public void setStoreId(Long storeId)
+    {
+        this.storeId = storeId;
+    }
+
+    public Long getStoreId()
+    {
+        return storeId;
+    }
+
+    public void setStoreName(String storeName)
+    {
+        this.storeName = storeName;
+    }
+
+    public String getStoreName()
+    {
+        return storeName;
     }
 
     public void setVoucherName(String voucherName)

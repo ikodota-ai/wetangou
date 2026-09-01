@@ -17,13 +17,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="getTime"    column="get_time"    />
         <result property="useTime"    column="use_time"    />
         <result property="voucherName"    column="voucher_name"    />
+        <result property="storeId"    column="v_store_id"    />
+        <result property="storeName"    column="store_name"    />
     </resultMap>
 
     <sql id="selectMemberVoucherVo">
         select mv.id, mv.voucher_id, mv.member_id, mv.face_value, mv.threshold, mv.status, mv.use_order_id,
-               mv.expire_time, mv.get_time, mv.use_time, mv.merchant_id, v.voucher_name
+               mv.expire_time, mv.get_time, mv.use_time, mv.merchant_id, v.voucher_name,
+               v.store_id as v_store_id, s.store_name
         from biz_member_voucher mv
         left join biz_voucher v on mv.voucher_id = v.voucher_id
+        left join biz_store s on s.store_id = v.store_id
     </sql>
 
     <select id="selectMemberVoucherList" parameterType="MemberVoucher" resultMap="MemberVoucherResult">
