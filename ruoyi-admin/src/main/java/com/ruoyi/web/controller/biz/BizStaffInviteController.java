@@ -22,10 +22,13 @@ import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.biz.domain.MerchantStaff;
+import com.ruoyi.biz.domain.Store;
 import com.ruoyi.biz.domain.MerchantStaffInvite;
 import com.ruoyi.biz.api.service.WxMaService;
 import com.ruoyi.biz.service.IMerchantStaffInviteService;
 import com.ruoyi.biz.service.IMerchantStaffService;
+import com.ruoyi.biz.service.IStoreService;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 
 /**
  * 商家员工邀请码 / 员工名单管理（admin 后台）
@@ -53,6 +56,9 @@ public class BizStaffInviteController extends BaseController
 
     @Autowired
     private com.ruoyi.system.service.ISysUserService userService;
+
+    @Autowired
+    private IStoreService storeService;
 
     // ==================== 邀请码 ====================
 
@@ -104,6 +110,21 @@ public class BizStaffInviteController extends BaseController
     {
         if (invite.getMerchantId() == null) return error("请选择商户");
         if (invite.getStoreId() == null) return error("请选择门店");
+        // 商户账号带上别家 merchantId 请求时，TenantInsertInterceptor 会静默把落库值
+        // 改写成自己商户（不会真的跨租户写入），但 scene 用的还是请求体里那个 merchantId，
+        // 于是落库 merchant_id 与 scene 里的 mid 不一致。这里提前拒掉，让错误明确可见，
+        // 而不是让店长拿到一个看起来成功、实际扫不动的码。
+        TenantFilterHelper.assertDataScope(invite.getMerchantId());
+        // 真正的缺陷在这：门店归属从来没校验过。选了别家门店同样返回「已生成邀请码」，
+        // 但落库是「自己商户 + 别家门店」，acceptInvite 那步校验 mid/sid 必须与库中记录
+        // 一致，这个组合永远过不去（实测库里 G5BRHE 就是这么来的死码，扫码只报
+        // 「邀请码不存在」，店长完全不知道自己发了张废码）。
+        Store store = storeService.selectStoreByStoreId(invite.getStoreId());
+        if (store == null) return error("门店不存在");
+        if (store.getMerchantId() == null || !store.getMerchantId().equals(invite.getMerchantId()))
+        {
+            return error("门店「" + store.getStoreName() + "」不属于该商户，不能作为入职门店");
+        }
         if (invite.getExpireAt() == null)
         {
             // 默认 7 天后过期
@@ -145,6 +166,18 @@ public class BizStaffInviteController extends BaseController
     @PutMapping
     public AjaxResult edit(@RequestBody MerchantStaffInvite invite)
     {
+        if (invite.getInviteId() == null) return error("缺少 inviteId");
+        // 按库里那条记录的归属判，不信请求体里的 merchantId。
+        // 跨商户读本身已被 TenantSqlInterceptor 改写挡住（db 直接为 null），
+        // 这里保留显式判断是为了给出确定的错误，而不是依赖 SQL 改写的副作用。
+        MerchantStaffInvite db = inviteService.selectById(invite.getInviteId());
+        if (db == null) return error("邀请码不存在");
+        TenantFilterHelper.assertDataScope(db.getMerchantId());
+        // 不允许把别人的码改到自己名下、或把自己的码挪给别家商户
+        if (invite.getMerchantId() != null && !invite.getMerchantId().equals(db.getMerchantId()))
+        {
+            return error("不允许变更邀请码所属商户");
+        }
         invite.setUpdateBy(getUsername());
         return toAjax(inviteService.update(invite));
     }
@@ -154,6 +187,12 @@ public class BizStaffInviteController extends BaseController
     @DeleteMapping("/{inviteId}")
     public AjaxResult remove(@PathVariable("inviteId") Long inviteId)
     {
+        // 删除别家的码不会真的删掉（DELETE 语句被租户拦截器追加了 merchant_id 条件，
+        // 影响行数 0），但 toAjax(0) 只会返回含糊的「操作失败」，店长会以为是系统故障
+        // 反复重试。先按归属判一次，直接告诉他这条码不在他名下。
+        MerchantStaffInvite db = inviteService.selectById(inviteId);
+        if (db == null) return error("邀请码不存在");
+        TenantFilterHelper.assertDataScope(db.getMerchantId());
         return toAjax(inviteService.deleteById(inviteId));
     }
 

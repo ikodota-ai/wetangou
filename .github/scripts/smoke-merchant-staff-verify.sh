@@ -21,6 +21,12 @@
 #     noStore/needCreateStore 引导，写操作仍必须有门店（且文案按角色区分）。
 #  6. 预约确认/拒绝比的是 token 里当前激活门店，多店老板不切店就审不了别店的报名
 #     → 改用授权门店集合 hasStore()。
+#  7. 招店员这条链路店长根本走不通：sys_role「商户管理员」(role_id=5，新建商户自动开通的
+#     老板账号就用它) 绑了 125 条菜单却没有一条 biz:staffInvite:*，老板生成邀请码 /
+#     看员工名单 / 审入职 / 重置密码全部 403，只能让平台管理员代劳每一家店的招人。
+#     另外 add 从来没校验门店归属：选了别家门店同样返回「已生成邀请码」，落库却是
+#     「自己商户 + 别家门店」，acceptInvite 校验 mid/sid 必须与库中记录一致，这个
+#     组合永远过不去 —— 店长拿到一张扫了只报「邀请码不存在」的死码。
 #
 # 验证：
 #   A) 店员密码登录 → userType=staff / 带 staffUserId
@@ -34,6 +40,9 @@
 #   I) 老板不切店直接审别店预约报名 → 200（按授权集合判，不是只比激活门店）
 #   J) 0 门店商户老板进 /home → 200 + noStore/needCreateStore 引导，只读列表返空数组，
 #      写操作仍被拒；无门店店员拿到的是「联系店长」而不是「去建门店」
+#   K) 招店员闭环：老板(自动开通账号) 能自己发码 / 看员工名单 / 看待审列表；
+#      发码时带别家 merchantId 或别家门店都被拒；店员扫码入职落 status=3 待审，
+#      老板审核通过后店员静默 wxLogin 免密进商家版并能核销
 #
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-merchant-staff-verify.sh
@@ -80,6 +89,8 @@ ORDER_A=""
 BILL_A=""
 NOSTORE_MID=""
 SIGNUP_I=""
+K_STAFF_UID=""
+ORDER_K=""
 cleanup() {
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
@@ -102,6 +113,14 @@ cleanup() {
     sql "delete from biz_merchant where merchant_id=$NOSTORE_MID;"
   fi
   [ -n "$SIGNUP_I" ] && sql "update biz_booking_member set status='0', confirm_user=null, confirm_time=null, review_remark=null where id=$SIGNUP_I;"
+  # K 组：扫码入职的店员 + 老板发的邀请码 + 被核销的订单
+  [ -n "$ORDER_K" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_K;"
+  if [ -n "$K_STAFF_UID" ]; then
+    sql "delete from biz_merchant_staff where user_id=$K_STAFF_UID;"
+    sql "delete from sys_user_role where user_id=$K_STAFF_UID;"
+    sql "delete from sys_user where user_id=$K_STAFF_UID;"
+  fi
+  sql "delete from biz_merchant_staff_invite where remark like 'smokemsv%';"
 }
 trap cleanup EXIT
 
@@ -258,6 +277,96 @@ if [ -n "$ATK" ]; then
   fi
 else
   echo "  SKIP: admin 登录失败，跳过 J"
+fi
+
+# ---- K) 招店员闭环：老板发码 → 店员扫码入职 → 老板审核 → 店员静默登录核销 ----
+# 用 J 组建出来的商户（自动开通的老板账号，绑的是 role_id=5 商户管理员）验权限，
+# 用商户 1 的门店 100 走完整入职（acceptInvite 的 scene 查询受租户过滤，
+# 必须用与 APPID 对应的商户）。
+if [ -n "$NOSTORE_MID" ] && [ -n "$NS_USER" ]; then
+  # 老板在 PC 后台的 token（走 /login，不是小程序端）
+  OPTK=$(curl -s -X POST "$BASE_URL/login" -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$NS_USER\",\"password\":\"$NS_PWD\"}" | jtop token)
+  echo "[K] 老板 PC token len=${#OPTK}"
+  ck "老板能登 PC 后台" "$([ -n "$OPTK" ] && echo yes || echo no)" "yes"
+
+  # K1 老板自己就能看员工名单 / 待审列表 / 邀请码列表（原来这三个全 403）
+  ck "老板看员工名单"  "$(curl -s "$BASE_URL/biz/staffInvite/staff/list"  -H "Authorization: Bearer $OPTK" | jtop code)" "200"
+  ck "老板看待审列表"  "$(curl -s "$BASE_URL/biz/staffInvite/staff/audit" -H "Authorization: Bearer $OPTK" | jtop code)" "200"
+  ck "老板看邀请码列表" "$(curl -s "$BASE_URL/biz/staffInvite/list"       -H "Authorization: Bearer $OPTK" | jtop code)" "200"
+
+  # K2 越权：带别家 merchantId 发码必须拒（不能静默改写成自己商户后落一张 scene 错乱的码）
+  RESP=$(curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $OPTK" \
+    -H 'Content-Type: application/json' \
+    -d "{\"merchantId\":$MID,\"storeId\":$STORE_A,\"role\":\"STAFF\",\"remark\":\"smokemsv_bypass\"}")
+  ckc "带别家 merchantId 发码被拒" "$RESP" "没有权限"
+
+  # K3 越权：自己商户 + 别家门店必须拒（否则生成的是永远扫不动的死码）
+  RESP=$(curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $OPTK" \
+    -H 'Content-Type: application/json' \
+    -d "{\"merchantId\":$NOSTORE_MID,\"storeId\":$STORE_A,\"role\":\"STAFF\",\"remark\":\"smokemsv_wrongstore\"}")
+  ckc "自己商户配别家门店被拒" "$RESP" "不属于该商户"
+  ck "废码没落库" "$(sqlv "select count(*) from biz_merchant_staff_invite where remark='smokemsv_wrongstore';")" "0"
+fi
+
+# K4 完整入职闭环：用 admin 给商户 1 门店 100 发码（APPID 对应商户 1）
+if [ -n "$ATK" ]; then
+  RESP=$(curl -s -X POST "$BASE_URL/biz/staffInvite" -H "Authorization: Bearer $ATK" \
+    -H 'Content-Type: application/json' \
+    -d "{\"merchantId\":$MID,\"storeId\":$STORE_A,\"role\":\"STAFF\",\"remark\":\"smokemsv_loop\"}")
+  ckc "发码成功" "$RESP" "已生成邀请码"
+  K_CODE=$(sqlv "select invite_code from biz_merchant_staff_invite where remark='smokemsv_loop' order by invite_id desc limit 1;")
+  ck "邀请码 scene 与门店一致" \
+     "$(sqlv "select scene from biz_merchant_staff_invite where invite_code='$K_CODE';")" \
+     "invite:$MID:$STORE_A:AUTO"
+
+  # 店员微信扫一扫入职（scene 由小程序码带入）
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/acceptInvite" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"code\":\"smokemsv_newstaff\",\"scene\":\"invite:$MID:$STORE_A:$K_CODE\"}")
+  ckc "入职提交成功" "$RESP" "等待店长审核"
+  ck "待审不发 token"  "$(echo "$RESP" | jtop token)"        ""
+  ck "pendingAudit"    "$(echo "$RESP" | jtop pendingAudit)" "True"
+  # sys_user 是逻辑删除（del_flag=2），历史同 openid 账号会让这里取到多行
+  K_STAFF_UID=$(sqlv "select user_id from sys_user where openid='mock_smokemsv_newstaff' and del_flag='0' order by user_id desc limit 1;")
+  ck "扫码入职建出账号" "$([ -n "$K_STAFF_UID" ] && echo yes || echo no)" "yes"
+  K_LINK=$(sqlv "select id from biz_merchant_staff where user_id='$K_STAFF_UID' and merchant_id=$MID and store_id=$STORE_A order by id desc limit 1;")
+  ck "员工关联已建" "$([ -n "$K_LINK" ] && echo yes || echo no)" "yes"
+  ck "入职落待审 status=3" "$(sqlv "select status from biz_merchant_staff where id=$K_LINK;")" "3"
+
+  # 审核前不能静默登录（否则审核形同虚设，扫到码就能核销）
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/wxLogin" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' -d '{"code":"smokemsv_newstaff"}')
+  ck "审核前静默登录拿不到 token" "$(echo "$RESP" | jtop token)" ""
+
+  # 老板审核通过
+  RESP=$(curl -s -X POST "$BASE_URL/biz/staffInvite/staff/audit" -H "Authorization: Bearer $ATK" \
+    -H 'Content-Type: application/json' -d "{\"id\":$K_LINK,\"approve\":true}")
+  ck "审核通过" "$(echo "$RESP" | jtop code)" "200"
+  ck "审核后转在职" "$(sqlv "select status from biz_merchant_staff where id=$K_LINK;")" "0"
+
+  # 审核后店员静默 wxLogin 免密进商家版
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/wxLogin" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' -d '{"code":"smokemsv_newstaff"}')
+  KTK=$(echo "$RESP" | jtop token)
+  ck "审核后能静默登录"  "$([ -n "$KTK" ] && echo yes || echo no)" "yes"
+  ck "角色是 STAFF"      "$(echo "$RESP" | jtop staffRole)"        "STAFF"
+  ck "店员不是老板"      "$(echo "$RESP" | jtop isOwner)"          "False"
+
+  # 新店员真的能核销
+  ORDER_K=$(sqlv "select order_id from biz_order where store_id=$STORE_A and status='1' and verify_code is not null limit 1;")
+  if [ -n "$ORDER_K" ] && [ -n "$KTK" ]; then
+    KVC=$(sqlv "select verify_code from biz_order where order_id=$ORDER_K;")
+    RESP=$(curl -s -X POST "$BASE_URL/api/order/verify" -H "X-App-Id: $APPID" \
+      -H "Authorization: Bearer $KTK" -H 'Content-Type: application/json' \
+      -d "{\"storeId\":$STORE_A,\"verifyCode\":\"$KVC\"}")
+    ck "新店员核销成功" "$(echo "$RESP" | jtop code)" "200"
+    ck "核销人落真实 userId" "$(sqlv "select verify_user from biz_order where order_id=$ORDER_K;")" "store:$K_STAFF_UID"
+  else
+    echo "  SKIP: 找不到可核销订单，跳过 K 核销"
+  fi
+else
+  echo "  SKIP: admin 登录失败，跳过 K"
 fi
 
 echo

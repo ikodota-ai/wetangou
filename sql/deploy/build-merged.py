@@ -70,6 +70,7 @@ biz_store_rating_booking_type_v8
 biz_member_avatar_relative_v9
 biz_store_booking_rule_v10
 biz_merchant_appid_null_v11
+biz_merchant_staff_perms_v12
 """.split()
 
 DEMO = """
