@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
-import com.ruoyi.common.enums.DesensitizedType;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.biz.api.domain.LoginMember;
 import com.ruoyi.common.utils.StringUtils;
@@ -226,7 +225,11 @@ public class ApiBookingController
             vo.put("storeId", signup.getStoreId());
             vo.put("storeName", signup.getStoreName());
             vo.put("storeAddress", signup.getStoreAddress());
-            vo.put("storePhone", DesensitizedType.PHONE.desensitizer().apply(signup.getStorePhone()));
+            // 门店电话是公开信息（顾客要用它打给店里），脱敏后前端
+            // wx.makePhoneCall 拨的是 134****3069 —— 根本拨不出去。
+            // Store.java 里 phone/servicePhone 特意没加 @Sensitive 就是这个原因，
+            // 这里手动脱一次等于把那个决定推翻了。
+            vo.put("storePhone", signup.getStorePhone());
             vo.put("storeLatitude", signup.getStoreLatitude());
             vo.put("storeLongitude", signup.getStoreLongitude());
             vo.put("serviceName", signup.getServiceName());
@@ -257,7 +260,11 @@ public class ApiBookingController
         vo.put("bookingId", signup.getBookingId());
         vo.put("memberId", signup.getMemberId());
         vo.put("contact", signup.getContact());
-        vo.put("phone", DesensitizedType.PHONE.desensitizer().apply(signup.getPhone()));
+        // 注释写的是「自己看自己 → phone 明文」，做的却是脱敏 —— 和
+        // /api/member/profile 一模一样的问题。这是本人报名时自己填的联系电话
+        // （上面已按 memberId 校验过归属），脱敏没有意义，还会让顾客核对不了
+        // 自己填的号码对不对。
+        vo.put("phone", signup.getPhone());
         vo.put("people", signup.getPeople());
         vo.put("status", signup.getStatus());
         vo.put("confirmUser", signup.getConfirmUser());
@@ -269,7 +276,8 @@ public class ApiBookingController
         vo.put("storeId", signup.getStoreId());
         vo.put("storeName", signup.getStoreName());
         vo.put("storeAddress", signup.getStoreAddress());
-        vo.put("storePhone", DesensitizedType.PHONE.desensitizer().apply(signup.getStorePhone()));
+        // 同 list：门店电话要能拨出去，不能脱敏
+        vo.put("storePhone", signup.getStorePhone());
         vo.put("storeLatitude", signup.getStoreLatitude());
         vo.put("storeLongitude", signup.getStoreLongitude());
         vo.put("serviceName", signup.getServiceName());

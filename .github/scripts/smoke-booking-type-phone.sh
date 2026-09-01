@@ -17,6 +17,12 @@
 #   返回值 Object.assign 进 globalData.user，把登录接口给的明文覆盖成
 #   138****1234；下单/买单/预约提交带过去的就是含星号的号码。
 #
+# G~H) 预约列表/详情的 phone 与 storePhone 也必须是明文
+#   同一个错误在 ApiBookingController 里有三处：注释写「自己看自己 → phone
+#   明文」，做的却是 desensitizer()。storePhone 更严重 —— 门店电话脱敏后
+#   前端 wx.makePhoneCall 拨的是 134****3069，根本拨不出去
+#   （Store.java 里 phone/servicePhone 特意没加 @Sensitive 就是为了能拨）。
+#
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-booking-type-phone.sh
 set -e
@@ -103,6 +109,26 @@ PH=$(curl -s "$BASE_URL/api/member/profile" -H "Authorization: Bearer $MTK" -H "
 echo "[F] /api/member/profile phone = $PH"
 ck "phone 与库里一致"   "$PH" "13800009999"
 ck "phone 不含星号"     "$(echo "$PH" | grep -c '\*' || true)" "0"
+
+# G) 预约详情：本人报名的联系电话 + 门店电话都要明文
+SID=$(echo "$R2" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("signupId") or "")')
+DETAIL=$(curl -s "$BASE_URL/api/booking/signup/$SID" -H "Authorization: Bearer $MTK" -H "X-App-Id: $APPID")
+D_PH=$(echo "$DETAIL"  | python3 -c 'import sys,json;print((json.load(sys.stdin).get("data") or {}).get("phone") or "")')
+D_SPH=$(echo "$DETAIL" | python3 -c 'import sys,json;print((json.load(sys.stdin).get("data") or {}).get("storePhone") or "")')
+echo "[G] 预约详情 phone=$D_PH storePhone=$D_SPH"
+ck "详情 phone 明文"      "$(echo "$D_PH"  | grep -c '\*' || true)" "0"
+ck "详情 storePhone 明文" "$(echo "$D_SPH" | grep -c '\*' || true)" "0"
+ck "详情 storePhone 与门店表一致" "$D_SPH" "$(sql1 "select phone from biz_store where store_id=$STORE;")"
+
+# H) 预约列表：同上（列表和详情两处都脱过敏）
+LIST=$(curl -s "$BASE_URL/api/booking/list" -H "Authorization: Bearer $MTK" -H "X-App-Id: $APPID")
+L_SPH=$(echo "$LIST" | python3 -c '
+import sys,json
+rows=json.load(sys.stdin).get("data") or []
+print((rows[0] if rows else {}).get("storePhone") or "")
+')
+echo "[H] 预约列表 storePhone=$L_SPH"
+ck "列表 storePhone 明文" "$(echo "$L_SPH" | grep -c '\*' || true)" "0"
 
 echo
 if [ "$FAIL" = "0" ]; then
