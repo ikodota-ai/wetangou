@@ -10,6 +10,9 @@
 .store-switch { font-size: 24rpx; margin-left: 12rpx; padding: 2rpx 12rpx; border-radius: 20rpx; background: rgba(255,255,255,0.25); }
 
 .notice { background: #FFF7E6; }
+.notice.nostore { background: #FDF0F0; }
+.notice.nostore .notice-t { color: #C03639; }
+.notice.nostore .notice-d { color: #A33; }
 .notice-t { font-size: 28rpx; color: #B26A00; font-weight: 600; }
 .notice-d { font-size: 24rpx; color: #8C5800; margin-top: 6rpx; }
 

@@ -11,12 +11,17 @@
     </view>
   </view>
 
+  <view class="notice card nostore" wx:if="{{noStore}}">
+    <view class="notice-t">还没有门店</view>
+    <view class="notice-d">{{noStoreTip}}</view>
+  </view>
+
   <view class="notice card" wx:if="{{needBindWx}}">
     <view class="notice-t">未绑定微信</view>
     <view class="notice-d">登录后请在「我的」中扫码绑定微信，下次可直接微信登录。</view>
   </view>
 
-  <view class="stat-grid">
+  <view class="stat-grid" wx:if="{{!noStore}}">
     <view class="stat-card">
       <text class="stat-num">{{todayVerifyCount}}</text>
       <text class="stat-lab">今日核销</text>
@@ -44,7 +49,7 @@
     </view>
   </view>
 
-  <view class="modules card">
+  <view class="modules card" wx:if="{{!noStore}}">
     <view class="module-item" bindtap="goVerify">
       <view class="m-text"><text class="m-t">团购核销</text><text class="m-d">扫描或输入核销码</text></view>
       <view class="arr"></view>

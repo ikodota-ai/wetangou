@@ -134,6 +134,25 @@ public class Merchant extends BaseEntity
         this.merchantId = merchantId;
     }
 
+    /**
+     * 「本次请求显式把 appid 提交为空」标记（非表字段，不落库）。
+     *
+     * <p>用来区分两种 appid==null：一是编辑商户名时 JSON 根本没带 appid 字段（不能动 appid），
+     * 二是用户在微信配置里把 appid 清空要求解绑（必须置 NULL）。只凭 getAppid()==null 无法区分，
+     * 误判会导致改个商户名就把小程序 appid 抹掉。</p>
+     */
+    private boolean appidCleared;
+
+    public boolean isAppidCleared()
+    {
+        return appidCleared;
+    }
+
+    public void setAppidCleared(boolean appidCleared)
+    {
+        this.appidCleared = appidCleared;
+    }
+
     /** 自动开通的老板登录账号（非表字段，仅新增商户时回带一次） */
     private String ownerUserName;
 

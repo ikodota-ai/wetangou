@@ -11,6 +11,8 @@ Page({
     merchantId: null,
     stores: [],
     canSwitchStore: false,
+    noStore: false,
+    noStoreTip: '',
     needBindWx: false,
     todayVerifyCount: 0,
     todayVerifyAmount: '0.00',
@@ -86,6 +88,9 @@ Page({
           pendingBillCount: d.pendingBillCount || 0,
           todayBookingCount: d.todayBookingCount || 0,
           recentOrders: d.recentOrders || [],
+          // 商户还没建门店：后端返 noStore=true + 引导文案，首页显示提示而不是一屏 0
+          noStore: !!d.noStore,
+          noStoreTip: d.noStoreTip || '',
           stores: (me && me.stores && me.stores.length) ? me.stores : this.data.stores,
           canSwitchStore: ((me && me.stores) || this.data.stores || []).length > 1,
           showGmv: role.isManagerOrAbove(),

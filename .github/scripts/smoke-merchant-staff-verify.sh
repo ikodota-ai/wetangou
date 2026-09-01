@@ -16,6 +16,11 @@
 #  4. 切店端点：旧的 /api/store/staff/switch-store 第一行就要求 userType=store，
 #     商家端任何角色都必然被拒，核销页那段切店代码是死代码 → 新增
 #     /api/merchant/staff/switch-store。
+#  5. 平台刚建完商户时该商户还没有门店，老板第一次进商家版 /home 直接 500
+#     「未绑定门店」→ 整页白屏，看不到任何提示。只读端点改为返回空数据 +
+#     noStore/needCreateStore 引导，写操作仍必须有门店（且文案按角色区分）。
+#  6. 预约确认/拒绝比的是 token 里当前激活门店，多店老板不切店就审不了别店的报名
+#     → 改用授权门店集合 hasStore()。
 #
 # 验证：
 #   A) 店员密码登录 → userType=staff / 带 staffUserId
@@ -26,6 +31,9 @@
 #   F) 老板切店到授权集合内门店 → 200，/me 的 storeId 真的变了
 #   G) 老板切到别家商户门店 → 拒
 #   H) 老板跨店确认买单（授权集合内）→ 200，confirmUser 带 userId
+#   I) 老板不切店直接审别店预约报名 → 200（按授权集合判，不是只比激活门店）
+#   J) 0 门店商户老板进 /home → 200 + noStore/needCreateStore 引导，只读列表返空数组，
+#      写操作仍被拒；无门店店员拿到的是「联系店长」而不是「去建门店」
 #
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-merchant-staff-verify.sh
@@ -70,6 +78,8 @@ STAFF_UID=""
 OWNER_UID=""
 ORDER_A=""
 BILL_A=""
+NOSTORE_MID=""
+SIGNUP_I=""
 cleanup() {
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
@@ -84,6 +94,14 @@ cleanup() {
     sql "delete from sys_user where user_id=$OWNER_UID;"
   fi
   sql "delete from biz_member where openid='mock_smokemsv_member';"
+  if [ -n "$NOSTORE_MID" ]; then
+    sql "delete from biz_merchant_staff where merchant_id=$NOSTORE_MID;"
+    sql "delete from sys_user_role where user_id in (select user_id from sys_user where merchant_id=$NOSTORE_MID);"
+    sql "delete from biz_merchant_user where merchant_id=$NOSTORE_MID;"
+    sql "delete from sys_user where merchant_id=$NOSTORE_MID;"
+    sql "delete from biz_merchant where merchant_id=$NOSTORE_MID;"
+  fi
+  [ -n "$SIGNUP_I" ] && sql "update biz_booking_member set status='0', confirm_user=null, confirm_time=null, review_remark=null where id=$SIGNUP_I;"
 }
 trap cleanup EXIT
 
@@ -196,6 +214,50 @@ if [ -n "$BILL_A" ]; then
   ck "确认人落 userId" "$(sqlv "select confirm_user from biz_pay_bill where bill_id=$BILL_A;")" "store:$OWNER_UID"
 else
   echo "  SKIP: 买单造数失败，跳过 H"
+fi
+
+# ---- I) 老板不切店直接审别店预约报名（按授权集合判，不是只比激活门店）----
+# 当前激活门店已在 F 切成 STORE_B，故意找一个「不是 STORE_B」的门店的待审报名
+SIGNUP_I=$(sqlv "select bm.id from biz_booking_member bm join biz_booking b on b.booking_id=bm.booking_id
+                 where bm.status='0' and b.store_id<>$STORE_B and b.store_id in (select store_id from biz_store where merchant_id=$MID) limit 1;")
+if [ -n "$SIGNUP_I" ]; then
+  RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/booking/confirm/$SIGNUP_I" -H 'Content-Type: application/json'     -H "Authorization: Bearer $OTK" -H "X-App-Id: $APPID" -d '{"remark":"smoke"}')
+  echo "[I] 老板不切店审别店报名 signup=$SIGNUP_I（激活店=$STORE_B）"
+  ckc "确认成功" "$RESP" "已确认"
+  ck "报名转已确认" "$(sqlv "select status from biz_booking_member where id=$SIGNUP_I;")" "2"
+  ck "审核人落 userId" "$(sqlv "select confirm_user from biz_booking_member where id=$SIGNUP_I;")" "mstaff-$OWNER_UID"
+else
+  echo "  SKIP: 找不到别店的待审报名，跳过 I"
+fi
+
+# ---- J) 0 门店商户：老板进商家版应拿到引导态而不是 500 ----
+ATK=$(curl -s -X POST "$BASE_URL/login" -H 'Content-Type: application/json'   -d '{"username":"admin","password":"admin123"}' | jtop token)
+if [ -n "$ATK" ]; then
+  MRESP=$(curl -s -X POST "$BASE_URL/biz/merchant" -H "Authorization: Bearer $ATK"     -H 'Content-Type: application/json'     -d '{"merchantName":"smoke零门店商户","phone":"13800000000","status":"0"}')
+  NOSTORE_MID=$(echo "$MRESP" | jtop merchantId)
+  NS_USER=$(echo "$MRESP" | jtop ownerUserName)
+  NS_PWD=$(echo "$MRESP" | jtop ownerInitPassword)
+  echo "[J] 0 门店商户 merchantId=$NOSTORE_MID"
+  # 建商户必须成功：uk_appid 是唯一索引且历史默认值 ''，空 appid 不落 NULL 时
+  # 第二个不填 appid 的商户会报 Duplicate entry '' for key 'uk_appid'
+  ck "建商户返回老板账号" "$([ -n "$NS_USER" ] && echo yes || echo no)" "yes"
+
+  if [ -n "$NS_USER" ]; then
+    NTK=$(curl -s -X POST "$BASE_URL/api/merchant/staff/login" -H 'Content-Type: application/json'       -H "X-App-Id: $APPID" -d "{\"username\":\"$NS_USER\",\"password\":\"$NS_PWD\"}" | jtop token)
+    HOME=$(curl -s "$BASE_URL/api/merchant/staff/home" -H "Authorization: Bearer $NTK" -H "X-App-Id: $APPID")
+    ck "首页不再 500"        "$(echo "$HOME" | jtop code)"           "200"
+    ck "返回 noStore 标记"    "$(echo "$HOME" | jget noStore)"        "True"
+    ck "老板可建店引导"       "$(echo "$HOME" | jget needCreateStore)" "True"
+    # 只读列表应返空数组而不是报错
+    for E in today/orders today/bills today/bookings booking/signup/list; do
+      ck "只读 $E 返 200" "$(curl -s "$BASE_URL/api/merchant/staff/$E"         -H "Authorization: Bearer $NTK" -H "X-App-Id: $APPID" | jtop code)" "200"
+    done
+    # 写操作仍必须有门店
+    RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/booking/confirm/1" -H 'Content-Type: application/json'       -H "Authorization: Bearer $NTK" -H "X-App-Id: $APPID" -d '{}')
+    ckc "写操作仍被拒且提示建门店" "$RESP" "请先创建门店"
+  fi
+else
+  echo "  SKIP: admin 登录失败，跳过 J"
 fi
 
 echo

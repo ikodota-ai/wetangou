@@ -64,6 +64,18 @@ public interface MerchantMapper
     public int updateMerchant(Merchant merchant);
 
     /**
+     * 把 appid 置为 NULL（解绑小程序）。
+     *
+     * <p>为什么要专用语句：updateMerchant 的动态 set 是 {@code <if test="appid != null">}，
+     * 置 null 时那一行不会生成，appid 永远清不掉；而 appid 是 UNIQUE KEY 且历史数据落的是 ''，
+     * 留着空串会让下一个不填 appid 的商户建不出来（Duplicate entry '' for key 'uk_appid'）。</p>
+     *
+     * @param merchantId 商户ID
+     * @return 影响行数
+     */
+    public int clearAppid(Long merchantId);
+
+    /**
      * 批量删除商户
      *
      * @param merchantIds 需要删除的数据主键集合

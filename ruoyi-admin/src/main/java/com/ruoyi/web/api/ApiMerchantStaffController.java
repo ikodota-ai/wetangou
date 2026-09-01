@@ -773,11 +773,31 @@ public class ApiMerchantStaffController
 
     private LoginMember requireMerchantLogin()
     {
+        return requireMerchantLogin(true);
+    }
+
+    /**
+     * 商家端身份校验。
+     *
+     * @param needStore 是否必须已有激活门店。写操作（核销、审核预约）必须为 true；
+     *                  只读的工作台首页传 false —— 平台刚建完商户时该商户还没有任何门店，
+     *                  老板（store_id=0 展开后 storeIds 为空）第一次进商家版会被
+     *                  「未绑定门店」500 挡成白屏，看不到任何提示也不知道下一步该干什么。
+     *                  首页应该返回空数据 + needCreateStore 引导，而不是报错。
+     */
+    private LoginMember requireMerchantLogin(boolean needStore)
+    {
         LoginMember m = MemberContextHolder.get();
         if (m == null) throw new ServiceException("未登录");
         String ut = m.getUserType();
         if (!("merchant".equals(ut) || "owner".equals(ut) || "manager".equals(ut) || "staff".equals(ut))) throw new ServiceException("非商家员工身份");
-        if (m.getStoreId() == null) throw new ServiceException("未绑定门店");
+        if (needStore && m.getStoreId() == null)
+        {
+            // 老板/店长可自己建门店；店员只能等店长建好再分配
+            throw new ServiceException(m.isManagerOrAbove()
+                    ? "该商家还没有门店，请先创建门店"
+                    : "你的账号还没有分配门店，请联系店长");
+        }
         return m;
     }
 
@@ -786,8 +806,28 @@ public class ApiMerchantStaffController
     @GetMapping("/home")
     public AjaxResult dashboardHome()
     {
-        LoginMember m = requireMerchantLogin();
+        LoginMember m = requireMerchantLogin(false);
         Long storeId = m.getStoreId();
+        if (storeId == null)
+        {
+            // 商户还没有门店：返回空数据 + 引导标记，让商家端首页显示「先去创建门店」，
+            // 而不是整页 500。needCreateStore 只对能建店的角色为 true。
+            Map<String, Object> empty = new HashMap<>();
+            empty.put("storeId", null);
+            empty.put("storeName", "");
+            empty.put("todayVerifyCount", 0);
+            empty.put("todayVerifyAmount", java.math.BigDecimal.ZERO);
+            empty.put("todayOrderCount", 0);
+            empty.put("pendingBillCount", 0);
+            empty.put("todayBookingCount", 0);
+            empty.put("recentOrders", new ArrayList<Order>());
+            empty.put("noStore", true);
+            empty.put("needCreateStore", m.isManagerOrAbove());
+            empty.put("noStoreTip", m.isManagerOrAbove()
+                    ? "该商家还没有门店，请先在管理后台创建门店后再来经营"
+                    : "你的账号还没有分配门店，请联系店长");
+            return AjaxResult.success(empty);
+        }
         Store store = storeService.selectStoreByStoreId(storeId);
         Date todayStart = startOfToday();
         Date todayEnd = endOfToday();
@@ -845,7 +885,9 @@ public class ApiMerchantStaffController
     @GetMapping("/today/orders")
     public AjaxResult todayOrders()
     {
-        LoginMember m = requireMerchantLogin();
+        LoginMember m = requireMerchantLogin(false);
+        // 无门店（商户刚建、门店还没创建）→ 空列表，不报错
+        if (m.getStoreId() == null) return AjaxResult.success(new ArrayList<Order>());
         Order q = new Order(); q.setStoreId(m.getStoreId());
         List<Order> all = orderService.selectOrderList(q);
         all.sort((a, b) -> {
@@ -869,7 +911,8 @@ public class ApiMerchantStaffController
     @GetMapping("/today/bills")
     public AjaxResult todayBills()
     {
-        LoginMember m = requireMerchantLogin();
+        LoginMember m = requireMerchantLogin(false);
+        if (m.getStoreId() == null) return AjaxResult.success(new ArrayList<PayBill>());
         PayBill q = new PayBill(); q.setStoreId(m.getStoreId());
         List<PayBill> all = payBillService.selectPayBillList(q);
         Date todayStart = startOfToday();
@@ -888,7 +931,8 @@ public class ApiMerchantStaffController
     @GetMapping("/today/bookings")
     public AjaxResult todayBookings()
     {
-        LoginMember m = requireMerchantLogin();
+        LoginMember m = requireMerchantLogin(false);
+        if (m.getStoreId() == null) return AjaxResult.success(new ArrayList<Booking>());
         Booking q = new Booking(); q.setStoreId(m.getStoreId());
         List<Booking> bookings = bookingService.selectBookingList(q);
         List<Booking> today = new ArrayList<>();
@@ -906,7 +950,9 @@ public class ApiMerchantStaffController
         BookingMember bm = bookingService.selectBookingMemberById(signupId);
         if (bm == null) return AjaxResult.error("报名记录不存在");
         Booking parent = bookingService.selectBookingByBookingId(bm.getBookingId());
-        if (parent == null || !m.getStoreId().equals(parent.getStoreId())) return AjaxResult.error("无权操作该报名");
+        // 用授权门店集合判，不是只比当前激活门店：多店员工/老板（store_id=0 展开）
+        // 不切店就审不了别的门店的报名
+        if (parent == null || !m.hasStore(parent.getStoreId())) return AjaxResult.error("无权操作该报名");
         if ("1".equals(bm.getStatus())) return AjaxResult.error("该报名已取消");
         if ("2".equals(bm.getStatus())) return AjaxResult.error("该报名已确认");
         if ("3".equals(bm.getStatus())) return AjaxResult.error("该报名已拒绝");
@@ -926,7 +972,8 @@ public class ApiMerchantStaffController
         BookingMember bm = bookingService.selectBookingMemberById(signupId);
         if (bm == null) return AjaxResult.error("报名记录不存在");
         Booking parent = bookingService.selectBookingByBookingId(bm.getBookingId());
-        if (parent == null || !m.getStoreId().equals(parent.getStoreId())) return AjaxResult.error("无权操作该报名");
+        // 同 confirm：按授权门店集合判
+        if (parent == null || !m.hasStore(parent.getStoreId())) return AjaxResult.error("无权操作该报名");
         if ("1".equals(bm.getStatus())) return AjaxResult.error("该报名已取消");
         if ("2".equals(bm.getStatus())) return AjaxResult.error("已确认，不能拒绝");
         if ("3".equals(bm.getStatus())) return AjaxResult.error("该报名已拒绝");
@@ -944,7 +991,8 @@ public class ApiMerchantStaffController
     @GetMapping("/booking/signup/list")
     public AjaxResult bookingSignupList()
     {
-        LoginMember m = requireMerchantLogin();
+        LoginMember m = requireMerchantLogin(false);
+        if (m.getStoreId() == null) return AjaxResult.success(new ArrayList<java.util.Map<String, Object>>());
         Booking q = new Booking(); q.setStoreId(m.getStoreId());
         List<Booking> bookings = bookingService.selectBookingList(q);
         List<java.util.Map<String, Object>> out = new ArrayList<>();

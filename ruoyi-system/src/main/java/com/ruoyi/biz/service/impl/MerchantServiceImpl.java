@@ -87,6 +87,7 @@ public class MerchantServiceImpl implements IMerchantService
     @Override
     public int insertMerchant(Merchant merchant)
     {
+        normalizeAppid(merchant);
         if (!checkAppidUnique(merchant))
         {
             throw new ServiceException("新增商户失败，小程序AppId已被占用：" + merchant.getAppid());
@@ -306,6 +307,7 @@ public class MerchantServiceImpl implements IMerchantService
     public int updateMerchant(Merchant merchant)
     {
         checkMerchantDataScope(merchant.getMerchantId());
+        normalizeAppid(merchant);
         if (!checkAppidUnique(merchant))
         {
             throw new ServiceException("修改商户失败，小程序AppId已被占用：" + merchant.getAppid());
@@ -318,6 +320,13 @@ public class MerchantServiceImpl implements IMerchantService
         }
         merchant.setUpdateBy(SecurityUtils.getUsername());
         int rows = merchantMapper.updateMerchant(merchant);
+        // 只有「显式提交空 appid」才清，不能凭 getAppid()==null 判断 ——
+        // 编辑商户名时 JSON 不带 appid 字段也是 null，那种情况绝不能把已配好的 appid 抹掉。
+        // 动态 set 里 <if appid != null> 不会生成置空语句，所以要走专用 clearAppid。
+        if (merchant.isAppidCleared() && merchant.getMerchantId() != null)
+        {
+            merchantMapper.clearAppid(merchant.getMerchantId());
+        }
         tenantService.clearMerchantCache(merchant.getMerchantId());
         return rows;
     }
@@ -347,6 +356,39 @@ public class MerchantServiceImpl implements IMerchantService
     /**
      * 校验appid唯一性
      */
+    /**
+     * 未填 appid 时必须落 NULL，不能落空串。
+     *
+     * <p>根因：biz_merchant.appid 是 UNIQUE KEY 且默认值 ''。MySQL 唯一索引允许多个 NULL，
+     * 但不允许多个 ''。于是「第一个不填 appid 的商户」能建，第二个必然报
+     * Duplicate entry '' for key 'uk_appid' —— 平台开通新商户时如果没同时填小程序 appid
+     * （很常见：先建商户，等商家提供小程序资质后再回来配），第二家起就永远建不出来。
+     * 实测：商户 203 落了 ''，再建 zzt7 直接 500。</p>
+     *
+     * <p>顺带 trim：前端粘贴 appid 常带首尾空格，带空格的 appid 匹配不上任何请求。</p>
+     */
+    private void normalizeAppid(Merchant merchant)
+    {
+        if (merchant.getAppid() != null)
+        {
+            String v = merchant.getAppid().trim();
+            if (v.isEmpty())
+            {
+                // 显式提交了空 appid = 要求解绑小程序，记标记让 update 走 clearAppid
+                merchant.setAppid(null);
+                merchant.setAppidCleared(true);
+            }
+            else
+            {
+                merchant.setAppid(v);
+            }
+        }
+        if (merchant.getPayAppid() != null)
+        {
+            merchant.setPayAppid(merchant.getPayAppid().trim());
+        }
+    }
+
     @Override
     public boolean checkAppidUnique(Merchant merchant)
     {

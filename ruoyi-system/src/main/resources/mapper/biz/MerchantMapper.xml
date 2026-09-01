@@ -74,6 +74,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where m.merchant_id = #{merchantId} and m.del_flag = '0'
     </select>
 
+    <!-- 解绑小程序：置 NULL 而不是 ''，避免占用 uk_appid 唯一索引（多个 NULL 允许，多个 '' 不允许） -->
+    <update id="clearAppid" parameterType="Long">
+        update biz_merchant set appid = null where merchant_id = #{merchantId}
+    </update>
+
     <select id="selectMerchantByAppid" parameterType="String" resultMap="MerchantResult">
         <include refid="selectMerchantVo"/>
         where m.appid = #{appid} and m.del_flag = '0'
