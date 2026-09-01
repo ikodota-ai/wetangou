@@ -35,6 +35,13 @@ Page({
     });
   },
 
+  // 商家信息是 app.bootMerchant 异步拉的，onLoad 时通常还没到 ——
+  // 门店没配客服的那几项这时会算成空且不再重算。拿到商家后重算一次。
+  onMerchantUpdate() {
+    const store = app.globalData.store || (app.globalData.stores && app.globalData.stores[0]);
+    if (store) this.apply(store);
+  },
+
   callService() {
     const tel = this.data.phone;
     if (!tel) return wx.showToast({ title: '商家暂未配置客服电话', icon: 'none' });

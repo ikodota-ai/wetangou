@@ -1,6 +1,7 @@
 const app = getApp();
 const { api } = require('../../utils/request.js');
 const { haversineKm, formatDistance } = require('../../utils/util.js');
+const { resolveContact } = require('../../utils/contact.js');
 
 Page({
   // bookingTypes 来自后台「字典管理 → 预约类型」，不再写死一张「堂食预约」卡。
@@ -99,8 +100,13 @@ Page({
     if (!s.latitude || !s.longitude) return wx.showToast({ title: '暂无门店坐标', icon: 'none' });
     wx.openLocation({ latitude: s.latitude, longitude: s.longitude, name: s.name, address: s.address });
   },
+  // 客服电话必须走统一降级（utils/contact.js）：门店 -> 商家。
+  // 原先这里自己写 `store.servicePhone || store.phone`，少了商家兜底那一级 ——
+  // 门店没填客服/门店电话时直接提示「暂无客服电话」，而后台商家客服是配了的。
+  // 首页「在线咨询」和 store/service 页都已收口到 resolveContact，这里是漏的一处。
   goService() {
-    const phone = this.data.store.servicePhone || this.data.store.phone;
+    const merchant = (app.globalData && app.globalData.merchant) || {};
+    const phone = resolveContact(this.data.store, merchant).servicePhone;
     if (!phone) return wx.showToast({ title: '暂无客服电话', icon: 'none' });
     wx.showActionSheet({
       itemList: ['拨打电话'],

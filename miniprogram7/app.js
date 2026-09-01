@@ -1,6 +1,7 @@
 // app.js 洞天团购小程序（miniprogram7）入口
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 const { decide: decideStorePick } = require('./utils/storePick.js');
+const { broadcast } = require('./utils/broadcast.js');
 
 App({
   onLaunch() {
@@ -169,11 +170,58 @@ App({
           this.globalData.merchant = Object.assign({}, this.globalData.merchant || {}, d)
           // 拿到 merchantId 后立即预拉跨店自取商品
           this.loadAllPickupGoods()
+          // 必须通知已在场的页面。
+          //
+          // 客服信息（电话/二维码/服务时间）的降级链是「门店 -> 商家」，
+          // 而 bootMerchant 是异步的：首页 onLoad 里 _contactPatch(store) 读的
+          // globalData.merchant 这时通常还是初始空对象 {merchantId:null,...}。
+          // 门店没配客服二维码（生产门店 100 的 service_qrcode 就是空串）时，
+          // 本该降级到商家的二维码 —— 但商家数据还没回来，算出来是空，
+          // 之后再也没人重算，弹窗里就永久显示「暂未配置客服二维码」。
+          // 门店客服电话为空的商户同理，「拨打电话」提示暂无。
+          this.notifyMerchantUpdate(this.globalData.merchant)
         }
       }).catch((e) => console.warn('[app] bootMerchant FAIL', e))
     } catch (e) {
       console.warn('[app] bootMerchant SYNC FAIL', e)
     }
+  },
+  /**
+   * 广播「会员资料已更新」到当前页面栈上实现了 onUserUpdate 的页面。
+   *
+   * 这个方法此前**根本不存在** —— app.js / login / mine/profile / order/submit
+   * 共 8 处都写成 `appInst.notifyUserUpdate && appInst.notifyUserUpdate(...)`，
+   * `&&` 把 undefined 短路掉，所以调用全部静默失效，而 5 个页面
+   * （mine/index、mine/profile、goods/detail、order/submit、promoter/index）
+   * 都实现了 onUserUpdate 在等这个广播。表现为：在「我的-资料」里刚授权完
+   * 手机号，返回下单页手机号还是空 —— 只能靠 onShow 再拉一次接口兜。
+   */
+  notifyUserUpdate(user) {
+    this._broadcast('onUserUpdate', user === undefined ? this.globalData.user : user)
+  },
+  /**
+   * 广播「商家公开信息已更新」，同上机制（页面实现 onMerchantUpdate 接收）
+   */
+  notifyMerchantUpdate(merchant) {
+    this._broadcast('onMerchantUpdate', merchant === undefined ? this.globalData.merchant : merchant)
+  },
+  /**
+   * 给页面栈上所有实现了 hook 的页面派发一次。
+   *
+   * 单个页面回调抛错不能影响其他页面 —— 所以每个 try 独立包一层，
+   * 而不是把整个循环包起来（那样第一个页面抛错后面全收不到）。
+   */
+  _broadcast(hook, payload) {
+    let pages = []
+    try {
+      pages = (typeof getCurrentPages === 'function' ? getCurrentPages() : []) || []
+    } catch (e) {
+      return 0
+    }
+    // 派发逻辑在 utils/broadcast.js（纯函数，被单测直接引用）
+    return broadcast(pages, hook, payload, (pg, err) => {
+      console.warn('[app] ' + hook + ' FAIL on ' + ((pg && pg.route) || '?'), err)
+    })
   },
   /**
    * 启动时拉会员资料（如已登录），让「我的」页直接显示真实头像/昵称

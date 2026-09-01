@@ -315,6 +315,27 @@ Page({
       }
     });
   },
+  /**
+   * app.bootMerchant 拉到商家信息后的回调。
+   *
+   * 客服四项的降级链是「门店 -> 商家」，而 bootMerchant 是异步的：
+   * onLoad 里第一次算 _contactPatch 时 globalData.merchant 往往还是空的，
+   * 门店没配的那几项就算成了空值，且此后没有任何时机重算 ——
+   * 表现为「后台商家客服明明配了，小程序仍显示暂未配置」。
+   * 这里在商家数据到位后按当前门店重算一次。
+   */
+  onMerchantUpdate() {
+    const cur = (app.globalData && app.globalData.store) || this.data.store
+    if (!cur) return
+    this.setData(this._contactPatch(cur))
+    // banner 首拉时 merchantId 还没到（当时故意不传该参数拿平台+商户全量），
+    // 拿到 merchantId 后按商户再精确拉一次
+    if (!this.data.banners || !this.data.banners.length) this.loadBanners()
+    // 预约服务 tab 同理：loadBookingGoods 优先用 merchantId（跨店可约）
+    if (!this.data.bookingGoods || !this.data.bookingGoods.length) {
+      this.loadBookingGoods(cur.storeId)
+    }
+  },
   // 把「门店优先、商家兜底」的结果整理成 setData 用的补丁。
   // 抽出来是因为要在两个地方调（首拉 + pickNearestStore 回调），
   // 降级规则本身在 utils/contact.js 里，纯函数好测。
