@@ -1,6 +1,6 @@
 // app.js 洞天团购小程序（miniprogram7）入口
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
-const { decide: decideStorePick } = require('./utils/storePick.js');
+const { decide: decideStorePick, decideLocation } = require('./utils/storePick.js');
 const { broadcast } = require('./utils/broadcast.js');
 
 App({
@@ -314,10 +314,20 @@ App({
       }
     }
 
-    // 异步取位 + 查最近（懒加载：仅在 location 还没拿到时才调）
+    // silent=true：只用已有/缓存的位置，绝不主动调 wx.getLocation 弹授权框。
+    //
+    // bootDefaultStore() 一直传着 { silent: true }，但 pickNearestStore 从来
+    // 没读过这个字段（opts 只被读了 force）—— 于是 onLaunch 阶段就会弹系统
+    // 位置授权框，而 wx.getLocation 在用户不点的情况下既不 success 也不 fail，
+    // 一直挂着。首启无缓存时同步占位走的是异步 fetchList，授权框挡在前面时
+    // globalData.store 迟迟不到，首页 3.5s 兜底定时器就被触发 ——
+    // 这正是用户真机日志里「[home] 3.5s 仍无 store，触发降级」的成因。
+    // （生产接口实测只要 0.2s，不是网络慢。）
+    // 判定收口在 utils/storePick.js 的 decideLocation（纯函数，被单测直接引用）
     const tryLazyLoc = () => {
       const loc = this.globalData.location
-      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+      const ld = decideLocation(opts, loc)
+      if (ld.useExisting) {
         // 已有位置 → 直接调 nearest
         api.storeNearest({ latitude: loc.lat, longitude: loc.lng, limit: 5 }).then((res) => {
           const rows = (res && (res.rows || res.data || res)) || []
@@ -327,6 +337,10 @@ App({
         }).catch(() => {})  // 失败：静默
         return
       }
+      // silent 模式到此为止：没有可用位置就保留「按商户取第一个门店」的结果。
+      // 位置授权留给首页真正需要时（用户点「查看距离」）再弹，
+      // 那时是用户主动触发的，不会挡住首屏。
+      if (!ld.requestPermission) return
       // 缓存全空 → 静默 fuzzy
       try {
         _reqLoc((newLoc) => {

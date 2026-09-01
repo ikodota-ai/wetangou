@@ -45,4 +45,33 @@ function decide(prev, next, source) {
   }
 }
 
-module.exports = { decide: decide }
+/**
+ * 「这次要不要主动调 wx.getLocation 弹位置授权框」
+ *
+ * 抽出来的动机：`silent` 这个开关 bootDefaultStore() 一直在传，
+ * 但 pickNearestStore 从来没读过它（opts 只被读了 force）——
+ * 于是 onLaunch 阶段就弹授权框。而 wx.getLocation 在用户不点时
+ * 既不 success 也不 fail，一直挂着，首屏门店因此迟迟不到，
+ * 触发首页 3.5s 降级 → 评分/设施/客服全拉不到。
+ * 这是第五个「写了但没生效」的开关（同型：notifyUserUpdate 从未定义）。
+ *
+ * @param {Object} opts     pickNearestStore 的 opts
+ * @param {Object} location 当前 globalData.location（可为空）
+ * @returns {{useExisting:Boolean, requestPermission:Boolean}}
+ *          useExisting        直接用已有位置查最近门店
+ *          requestPermission  主动弹授权框
+ */
+function decideLocation(opts, location) {
+  var hasLoc = !!(location &&
+    typeof location.lat === 'number' && isFinite(location.lat) &&
+    typeof location.lng === 'number' && isFinite(location.lng))
+  if (hasLoc) {
+    // 已有位置：无论 silent 都可以查最近门店（不需要弹框）
+    return { useExisting: true, requestPermission: false }
+  }
+  // 没位置：silent 模式绝不弹框，保留「按商户取第一个门店」的结果。
+  // 授权留给用户主动点「查看距离」时再弹 —— 那时不会挡住首屏。
+  return { useExisting: false, requestPermission: !(opts && opts.silent) }
+}
+
+module.exports = { decide: decide, decideLocation: decideLocation }
