@@ -107,17 +107,26 @@ echo
 # 1. 门店评分
 # ============================================================
 echo "【1】首页门店评分"
+# 取样必须优先挑「已填 rating」的门店，不能无脑取列表首行。
+# 之前就是取首行：本地首行是门店 200（rating 空），于是这一项永远只报
+# 「⚠️ 去后台填评分」，三条接口到底返不返 rating 一次都没被真验过 ——
+# 真要是 mapper 漏了 select rating，这个脚本也会一路绿着放过去。
+# 全部门店都没填时才回落到首行，此时报 ⚠️ 是对的（确实是没数据）。
 SID=$(curl -s "${H[@]}" "$BASE/api/store/list" | python3 -c "
 import sys,json
 rows=json.load(sys.stdin).get('data') or []
-print(rows[0].get('storeId') if rows else '')")
+if not rows:
+    print(''); raise SystemExit
+rated=[r for r in rows if r.get('rating') is not None]
+print((rated[0] if rated else rows[0]).get('storeId'))")
 if [ -z "$SID" ]; then
   bad "拿不到门店列表，后面的门店项无法验证"
 else
   R_LST=$(curl -s "${H[@]}" "$BASE/api/store/list" | python3 -c "
 import sys,json
 rows=json.load(sys.stdin).get('data') or []
-print('' if not rows or rows[0].get('rating') is None else rows[0]['rating'])")
+m=[r for r in rows if str(r.get('storeId'))=='$SID']
+print('' if not m or m[0].get('rating') is None else m[0]['rating'])")
   R_DET=$(curl -s "${H[@]}" "$BASE/api/store/$SID" | jq_get data.rating)
   R_NEA=$(curl -s "${H[@]}" "$BASE/api/store/nearest?limit=5" | python3 -c "
 import sys,json
