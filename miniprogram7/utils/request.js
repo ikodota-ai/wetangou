@@ -222,6 +222,8 @@ const api = {
   payOrder: (id) => request(`/api/order/pay/${id}`, { method: 'POST' }),
   orderList: (params) => request('/api/order/list', { data: params }),
   orderDetail: (id) => request(`/api/order/${id}`),
+  // 按商户订单号查（微信支付「商品订单详情path」跳回来时只有 order_no）
+  orderDetailByNo: (no) => request(`/api/order/no/${no}`),
   orderQrcodeData: (id) => request(`/api/order/${id}/qrcode-data`),
   verifyOrder: (data) => request('/api/order/verify', { method: 'POST', data }),
   // 员工工作台

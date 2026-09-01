@@ -183,7 +183,7 @@ public class ApiOrderController
     }
 
     /**
-     * 订单详情
+     * 订单详情（按主键）
      */
     @LoginRequired
     @GetMapping("/{orderId}")
@@ -194,6 +194,39 @@ public class ApiOrderController
         {
             throw new ServiceException("订单不存在");
         }
+        return detailOf(order);
+    }
+
+    /**
+     * 订单详情（按商户订单号）
+     *
+     * <p>给微信支付「商品订单详情path」用。那个配置项里的订单号占位符，
+     * 微信填进来的是下单时传的 out_trade_no —— 也就是 biz_order.order_no
+     * （形如 D1787398679265359），不是数据库主键 order_id。
+     * 只有 /{orderId} 这一个入口时，用户从微信账单点「查看订单」跳进小程序，
+     * 参数拿 order_no 去请求会直接 400（Long 转换失败）。</p>
+     *
+     * <p>路径特意加 /no/ 前缀区分：order_no 全是 D/P 开头的字符串，
+     * 但如果放同一个 /{x} 上让 Spring 按类型试探，数字型订单号会被两个
+     * 方法同时匹配到，属于埋雷。</p>
+     */
+    @LoginRequired
+    @GetMapping("/no/{orderNo}")
+    public AjaxResult detailByNo(@PathVariable String orderNo)
+    {
+        Order order = orderService.selectOrderByOrderNo(orderNo);
+        if (order == null)
+        {
+            throw new ServiceException("订单不存在");
+        }
+        return detailOf(order);
+    }
+
+    /**
+     * 两个详情入口共用的归属校验 —— 越权判断不能只写在其中一个上。
+     */
+    private AjaxResult detailOf(Order order)
+    {
         if (!order.getMemberId().equals(MemberContextHolder.getMemberId()))
         {
             throw new ServiceException("无权查看他人订单");
