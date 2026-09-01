@@ -135,10 +135,17 @@ Page({
       const cur = app.globalData.store
       if (cur && cur.storeId) this.setData({ store: this._compatStoreView(cur) })
     }
-    // getFuzzyLocation 精度到 1~5km，够算门店距离，且授权门槛比 getLocation 低
-    const fn = typeof wx.getFuzzyLocation === 'function' ? wx.getFuzzyLocation : wx.getLocation
+    // 只用 getLocation：app.json 的 requiredPrivateInfos 里
+    // getFuzzyLocation 和 getLocation 互斥，只能声明一个（我们声明的是
+    // getLocation）。原来"fuzzy 优先"的写法会去调一个没声明的隐私接口，
+    // 必然被拒后才降级，等于每次都白跑一次。
+    //
+    // type 必须是 gcj02，不能用 wgs84：门店经纬度是后台用腾讯地图选点存的，
+    // 腾讯地图坐标系就是 gcj02。两边坐标系不一致时 haversine 算出来会偏
+    // 几百米（同城差异约 300~600m），表现为「距离显示得离谱」。
+    // app.js 的 _reqLoc 一直用的 gcj02，这里原先写 wgs84 是不一致的。
     try {
-      fn({ type: 'wgs84', success: done, fail: () => done(null) })
+      wx.getLocation({ type: 'gcj02', success: done, fail: () => done(null) })
     } catch (e) { done(null) }
   },
 

@@ -150,7 +150,7 @@ App({
    *   B) 懒加载取位（异步，**只在需要时**才发）：
    *      4) 如果 globalData.location 已有（之前 fuzzy 拿过）→ 直接用，调 storeNearest
    *      5) 如果 wx.storage.lastUserLocation 有缓存 → 还原 + 调 storeNearest
-   *      6) 都没有 → 静默调 wx.getFuzzyLocation（用户已授权时不弹；首次未授权弹一次系统框）
+   *      6) 都没有 → 静默调 wx.getLocation（用户已授权时不弹；首次未授权弹一次系统框）
    *      7) 拿到位置 → 持久化 + 调 storeNearest → 升级 store
    *      8) fuzzy fail（用户拒绝 / 系统未授权）→ 静默，保留同步占位的店
    *
@@ -232,34 +232,22 @@ App({
     }).catch(() => fetchList(src + '_fail'))
 
     // 静默取位：用户已授权时不再弹，未授权时弹一次（之后不再弹）
+    //
+    // 只用 getLocation，不再优先尝试 getFuzzyLocation ——
+    // app.json 的 requiredPrivateInfos 里这两个是**互斥**的，同时声明
+    // 编译直接报「'getFuzzyLocation' 与 'getLocation' 互斥」(code 10009)。
+    // 既然只能声明 getLocation，那 getFuzzyLocation 在运行时必然被拒
+    // （没声明的隐私接口调用直接 fail），原来"fuzzy 优先、失败再降级"的
+    // 写法等于每次取位都白跑一次注定失败的调用。
     const _reqLoc = function (cb) {
-      if (typeof wx.getFuzzyLocation === 'function') {
-        wx.getFuzzyLocation({
+      try {
+        wx.getLocation({
           type: 'gcj02',
           success: cb,
-          fail: function () {
-            // fuzzy 失败：fallback 一次 getLocation
-            try {
-              wx.getLocation({
-                type: 'gcj02',
-                success: cb,
-                fail: function () { cb(null) }
-              })
-            } catch (e) {
-              cb(null)
-            }
-          }
+          fail: function () { cb(null) }
         })
-      } else {
-        try {
-          wx.getLocation({
-            type: 'gcj02',
-            success: cb,
-            fail: function () { cb(null) }
-          })
-        } catch (e) {
-          cb(null)
-        }
+      } catch (e) {
+        cb(null)
       }
     }
 
@@ -306,7 +294,7 @@ App({
           })
         })
       } catch (e) {
-        // getFuzzyLocation 抛错（极少见）→ 静默
+        // 取位抛错（极少见）→ 静默
       }
     }
 
