@@ -72,6 +72,53 @@
                     </execution>
                 </executions>
             </plugin>
+            <!--
+                小程序模板同步：后台「一键打包小程序代码包」(/biz/codepack/{merchantId})
+                读的是 classpath:template/miniprogram7/。
+
+                这份模板原先是手工从 miniprogram7/ 复制的一份副本，结果它停在 2026-08-06，
+                此后 miniprogram7/ 又改了 59 个 commit（下单页选券入口、门店评分、客服电话
+                门店优先兜底、预约类型字典化、requiredPrivateInfos 等）一次都没同步过去。
+                商家从后台下载到的始终是三周前的旧代码 —— 表现就是「代码里明明改好了，
+                真机上还是没有」，例如到店自取下单页看不到优惠券入口。
+
+                改为构建期从唯一源 miniprogram7/ 自动拷贝，副本不再入库，从根上消除漂移。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-miniprogram-template</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/template/miniprogram7</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../miniprogram7</directory>
+                                    <!-- 开发产物 / 工具私有配置 / 本地调试脚本不进商家代码包 -->
+                                    <excludes>
+                                        <exclude>node_modules/**</exclude>
+                                        <exclude>tests/**</exclude>
+                                        <exclude>package.json</exclude>
+                                        <exclude>package-lock.json</exclude>
+                                        <exclude>project.private.config.json</exclude>
+                                        <exclude>vitest.config.*</exclude>
+                                        <exclude>**/.bak/**</exclude>
+                                        <exclude>**/*.bak</exclude>
+                                        <exclude>DEBUG*.md</exclude>
+                                        <exclude>DEBUG*.sql</exclude>
+                                        <exclude>README.md</exclude>
+                                    </excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>   
                 <groupId>org.apache.maven.plugins</groupId>   
                 <artifactId>maven-war-plugin</artifactId>   

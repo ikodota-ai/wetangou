@@ -1,9 +1,0 @@
-<view class="page">
-  <view class="box card">
-    <image class="cover" src="/assets/img/RestaurantImg.png" mode="aspectFill"></image>
-    <text class="name">{{product.name || '商品'}}</text>
-    <view class="price"><text class="now">¥{{product.price || '0.00'}}</text></view>
-    <view class="qr"><view class="qr-c"></view></view>
-    <text class="tip">扫码或长按小程序码</text>
-  </view>
-</view>

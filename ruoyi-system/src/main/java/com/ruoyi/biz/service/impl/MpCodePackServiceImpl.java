@@ -205,14 +205,49 @@ public class MpCodePackServiceImpl implements IMpCodePackService
     }
 
     /**
-     * 改写 utils/config.js 的 BASE_URL。
-     * 模板里形如：const BASE_URL = 'http://172.31.26.216:8080';
+     * 改写 utils/config.js 里的 API 地址。
+     *
+     * <p>原实现只认 {@code const BASE_URL = '...'} 这一种写法。后来 config.js 重构成
+     * {@code resolveBaseUrlDefault()} 函数 + {@code BASE_URL_FALLBACKS} 探测列表，
+     * 这个正则就再也匹配不上了 —— 但它 replaceAll 匹配不到并不报错，
+     * 于是打包接口一直返回 200、下载的 zip 里 API 地址却还是模板里写死的那个。
+     * 后台弹窗让运营填的「API 地址」实际上是个摆设（实测传
+     * http://192.168.9.9:8080 打出来的包里一个字节都没变）。</p>
+     *
+     * <p>现在覆盖三种写法，并且要求至少命中一处，命中不到直接抛错 ——
+     * 宁可打包失败让人知道，也不要静默发出一个连不上后端的代码包。
+     * 两处都必须改：默认值决定首次请求打哪里，FALLBACKS 决定探测候选，
+     * 只改前者的话真机探测仍会切回模板里的线上域名。</p>
      */
     private String rewriteConfigJs(String s, String baseUrl)
     {
         // 必须转义单引号 / 反斜杠，避免字符串被破坏
         String escaped = baseUrl.replace("\\", "\\\\").replace("'", "\\'");
-        s = s.replaceAll("(const\\s+BASE_URL\\s*=\\s*['\"]).*?(['\"];)", "$1" + escaped + "$2");
+        int hit = 0;
+
+        // 1) 旧写法：const BASE_URL = 'xxx';
+        String r1 = s.replaceAll("(const\\s+BASE_URL\\s*=\\s*['\"])[^'\"]*(['\"];)", "$1" + escaped + "$2");
+        if (!r1.equals(s)) { hit++; }
+        s = r1;
+
+        // 2) 现写法：resolveBaseUrlDefault() 末尾的 return 'xxx';
+        String r2 = s.replaceAll("(function\\s+resolveBaseUrlDefault\\s*\\(\\)\\s*\\{[\\s\\S]*?return\\s+['\"])[^'\"]*(['\"]\\s*;)",
+                "$1" + escaped + "$2");
+        if (!r2.equals(s)) { hit++; }
+        s = r2;
+
+        // 3) 探测候选列表整体替换成这一个地址，避免真机探测又切回模板里的域名
+        String r3 = s.replaceAll("(const\\s+BASE_URL_FALLBACKS\\s*=\\s*\\[)[\\s\\S]*?(\\]\\s*;)",
+                "$1\n  '" + escaped + "',\n$2");
+        if (!r3.equals(s)) { hit++; }
+        s = r3;
+
+        if (hit == 0)
+        {
+            throw new ServiceException("改写 " + CONFIG_JS_FILE + " 失败：没找到 API 地址定义。"
+                    + "小程序模板结构可能又变了，请同步更新 MpCodePackServiceImpl.rewriteConfigJs");
+        }
+        log.info("[codePack] rewrite {} baseUrl={} hit={}", CONFIG_JS_FILE, baseUrl, hit);
         return s;
     }
 

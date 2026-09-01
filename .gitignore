@@ -101,3 +101,8 @@ miniprogram7/pages/login/.bak/
 
 # 前端部署包（本地产物，勿入库）
 ruoyi-ui/dist.zip
+
+# 小程序代码包模板不再入库：它曾是 miniprogram7/ 的手工副本，停在 2026-08-06,
+# 之后漂了 59 个 commit 没人同步，商家从后台下载到的一直是旧代码。
+# 现由 ruoyi-admin/pom.xml 在 generate-resources 阶段自动拷贝，唯一源是 miniprogram7/。
+ruoyi-admin/src/main/resources/template/miniprogram7/

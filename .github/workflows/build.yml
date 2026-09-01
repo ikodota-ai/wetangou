@@ -72,6 +72,12 @@ jobs:
         env:
           MAVEN_OPTS: -Xmx2g
 
+      # 挡住「后台一键打包小程序代码包」发出旧代码 ——
+      # 那份模板曾是手工副本，停在 8-06 漂了 59 个 commit，
+      # 商家下载到的一直是三周前的版本（症状：改好的功能真机上没有）
+      - name: Lint miniprogram template sync
+        run: bash .github/scripts/lint-mp-template.sh
+
       - name: Frontend - npm ci + build
         working-directory: ruoyi-ui
         run: |
