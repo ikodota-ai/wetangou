@@ -236,14 +236,50 @@ public class ApiAuthController
 
     /**
      * 获取当前登录会员信息
+     *
+     * <p>不能直接 return AjaxResult.success(member)：Member.phone 上有
+     * {@code @Sensitive(PHONE)}，而 SensitiveJsonSerializer.desensitization() 在
+     * 拿不到 LoginUser 时一律返 true（匿名即脱敏），小程序 /api/** 全是 @Anonymous，
+     * 所以实体一路过 Jackson 就变成 138****7777。会员看自己的手机号必须是明文，
+     * 否则下单页/买单页把它 Object.assign 进 globalData.user 后，
+     * 带星号的号码会覆盖登录接口给的明文并被提交到订单。</p>
      */
     @LoginRequired
     @PostMapping("/info")
     public AjaxResult info()
     {
         LoginMember loginMember = MemberContextHolder.get();
-        Member member = memberService.selectMemberByMemberId(loginMember.getMemberId());
-        return AjaxResult.success(member);
+        Member m = memberService.selectMemberByMemberId(loginMember.getMemberId());
+        if (m == null)
+        {
+            return AjaxResult.success();
+        }
+        return AjaxResult.success(toMemberVo(m));
+    }
+
+    /**
+     * 会员实体 → 明文 VO（与 /api/member/profile 字段保持一致，前端两处可互换消费）
+     */
+    private java.util.Map<String, Object> toMemberVo(Member m)
+    {
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("memberId", m.getMemberId());
+        vo.put("merchantId", m.getMerchantId());
+        vo.put("openid", m.getOpenid());
+        vo.put("unionid", m.getUnionid());
+        vo.put("nickname", m.getNickname());
+        vo.put("nickName", m.getNickname());
+        vo.put("avatar", m.getAvatar());
+        vo.put("avatarUrl", m.getAvatar());
+        vo.put("phone", m.getPhone());
+        vo.put("gender", m.getGender());
+        vo.put("birthday", m.getBirthday());
+        vo.put("status", m.getStatus());
+        vo.put("lastLoginTime", m.getLastLoginTime());
+        vo.put("inviteBy", m.getInviteBy());
+        vo.put("inviteTime", m.getInviteTime());
+        vo.put("createTime", m.getCreateTime());
+        return vo;
     }
 
     /**

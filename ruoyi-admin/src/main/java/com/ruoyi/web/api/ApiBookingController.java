@@ -314,7 +314,65 @@ public class ApiBookingController
             }
         }
         booking.setBookingMembers(mine);
-        return AjaxResult.success(booking);
+        // 不能直接 return 实体：BookingMember.phone / storePhone 上都挂着
+        // @Sensitive(PHONE)，而 SensitiveJsonSerializer 在拿不到 LoginUser 时一律脱敏
+        // （小程序 /api/** 全是 @Anonymous），嵌套的报名手机号会变 138****7777、
+        // 门店电话会变成拨不出去的 134****3069。这里只回本人的报名，手工转 Map 保明文。
+        java.util.Map<String, Object> vo = new java.util.LinkedHashMap<>();
+        vo.put("bookingId", booking.getBookingId());
+        vo.put("merchantId", booking.getMerchantId());
+        vo.put("bookingNo", booking.getBookingNo());
+        vo.put("storeId", booking.getStoreId());
+        vo.put("storeName", booking.getStoreName());
+        vo.put("productId", booking.getProductId());
+        vo.put("serviceName", booking.getServiceName());
+        vo.put("bookingType", booking.getBookingType());
+        vo.put("bookingDate", booking.getBookingDate());
+        vo.put("timeSlot", booking.getTimeSlot());
+        vo.put("status", booking.getStatus());
+        vo.put("signupCount", booking.getSignupCount());
+        vo.put("signupPeople", booking.getSignupPeople());
+        vo.put("remark", booking.getRemark());
+        vo.put("createTime", booking.getCreateTime());
+        vo.put("bookingMembers", toSignupVoList(mine));
+        return AjaxResult.success(vo);
+    }
+
+    /**
+     * 报名实体列表 → 明文 VO 列表（与 /api/booking/list 字段口径一致）
+     */
+    private java.util.List<java.util.Map<String, Object>> toSignupVoList(List<BookingMember> list)
+    {
+        java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+        if (list == null) return rows;
+        for (BookingMember signup : list)
+        {
+            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("id", signup.getId());
+            row.put("bookingId", signup.getBookingId());
+            row.put("memberId", signup.getMemberId());
+            row.put("memberName", signup.getMemberName());
+            row.put("contact", signup.getContact());
+            row.put("phone", signup.getPhone());
+            row.put("people", signup.getPeople());
+            row.put("status", signup.getStatus());
+            row.put("confirmUser", signup.getConfirmUser());
+            row.put("confirmTime", signup.getConfirmTime());
+            row.put("reviewRemark", signup.getReviewRemark());
+            row.put("remark", signup.getRemark());
+            row.put("createTime", signup.getCreateTime());
+            row.put("storeId", signup.getStoreId());
+            row.put("storeName", signup.getStoreName());
+            row.put("storeAddress", signup.getStoreAddress());
+            row.put("storePhone", signup.getStorePhone());
+            row.put("storeLatitude", signup.getStoreLatitude());
+            row.put("storeLongitude", signup.getStoreLongitude());
+            row.put("serviceName", signup.getServiceName());
+            row.put("bookingDate", signup.getBookingDate());
+            row.put("timeSlot", signup.getTimeSlot());
+            rows.add(row);
+        }
+        return rows;
     }
 
     /**

@@ -23,6 +23,18 @@
 #   前端 wx.makePhoneCall 拨的是 134****3069，根本拨不出去
 #   （Store.java 里 phone/servicePhone 特意没加 @Sensitive 就是为了能拨）。
 #
+# I~J) 直接 return 实体的接口也必须明文（@Sensitive 注解链路）
+#   前一轮只 grep 了 desensitizer() 调用，漏掉了另一条更隐蔽的路径：
+#   SensitiveJsonSerializer.desensitization() 在拿不到 LoginUser 时 return true
+#   （匿名一律脱敏），而小程序 /api/** 全是 @Anonymous。于是任何
+#   `return AjaxResult.success(实体)` 只要实体字段挂了 @Sensitive(PHONE)
+#   就会被 Jackson 脱敏 —— 无需任何手工 desensitizer() 调用。
+#   命中的两个：
+#     POST /api/auth/info      返 Member 实体，Member.phone 有 @Sensitive
+#     GET  /api/booking/{id}   返 Booking 实体，嵌套 BookingMember.phone/storePhone 有 @Sensitive
+#   两处都改成手工 Map 拷贝（不动注解：admin 端 biz/booking 列表用同一实体，
+#   改注解会让后台展示也变明文，风险大于逐接口拷贝）。
+#
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-booking-type-phone.sh
 set -e
@@ -129,6 +141,35 @@ print((rows[0] if rows else {}).get("storePhone") or "")
 ')
 echo "[H] 预约列表 storePhone=$L_SPH"
 ck "列表 storePhone 明文" "$(echo "$L_SPH" | grep -c '\*' || true)" "0"
+
+# I) POST /api/auth/info 直接返 Member 实体 —— @Sensitive 注解会脱敏
+INFO=$(curl -s -X POST "$BASE_URL/api/auth/info" -H "Authorization: Bearer $MTK" -H "X-App-Id: $APPID")
+I_PH=$(echo "$INFO" | python3 -c 'import sys,json;print((json.load(sys.stdin).get("data") or {}).get("phone") or "")')
+echo "[I] /api/auth/info phone = $I_PH"
+ck "auth/info phone 明文"     "$(echo "$I_PH" | grep -c '\*' || true)" "0"
+ck "auth/info phone 与库一致" "$I_PH" "13800009999"
+
+# J) GET /api/booking/{bookingId} 返 Booking 实体，嵌套 bookingMembers 会被脱敏
+BDET=$(curl -s "$BASE_URL/api/booking/$BID2" -H "Authorization: Bearer $MTK" -H "X-App-Id: $APPID")
+J_PH=$(echo "$BDET" | python3 -c '
+import sys,json
+d=json.load(sys.stdin).get("data") or {}
+ms=d.get("bookingMembers") or []
+print((ms[0] if ms else {}).get("phone") or "")
+')
+J_SPH=$(echo "$BDET" | python3 -c '
+import sys,json
+d=json.load(sys.stdin).get("data") or {}
+ms=d.get("bookingMembers") or []
+print((ms[0] if ms else {}).get("storePhone") or "")
+')
+J_TYPE=$(echo "$BDET" | python3 -c 'import sys,json;print((json.load(sys.stdin).get("data") or {}).get("bookingType") or "")')
+echo "[J] /api/booking/$BID2 嵌套 phone=$J_PH storePhone=$J_SPH bookingType=$J_TYPE"
+ck "场次详情嵌套 phone 明文"      "$(echo "$J_PH"  | grep -c '\*' || true)" "0"
+ck "场次详情嵌套 phone 与库一致"  "$J_PH" "13800009999"
+ck "场次详情嵌套 storePhone 明文" "$(echo "$J_SPH" | grep -c '\*' || true)" "0"
+# 手工转 Map 后字段不能漏：bookingType 是本轮新加的列，前端要靠它显示类型
+ck "场次详情仍返 bookingType"     "$J_TYPE" "dine_in"
 
 echo
 if [ "$FAIL" = "0" ]; then
