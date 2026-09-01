@@ -43,6 +43,8 @@
 #   K) 招店员闭环：老板(自动开通账号) 能自己发码 / 看员工名单 / 看待审列表；
 #      发码时带别家 merchantId 或别家门店都被拒；店员扫码入职落 status=3 待审，
 #      老板审核通过后店员静默 wxLogin 免密进商家版并能核销
+#   L) 商家端建商品：老板能建(落草稿)+上架+在商家端列表可见，租户字段被强制覆盖为
+#      自己商户；店员(STAFF)、代理商、平台账号都不能建
 #
 # 前置：后端在 8080 运行（druid profile），本地 mysql 可连
 # 用法：bash .github/scripts/smoke-merchant-staff-verify.sh
@@ -121,6 +123,9 @@ cleanup() {
     sql "delete from sys_user where user_id=$K_STAFF_UID;"
   fi
   sql "delete from biz_merchant_staff_invite where remark like 'smokemsv%';"
+  # L 组：商家端建出来的商品（含 biz_product_store 关联）
+  sql "delete from biz_product_store where product_id in (select product_id from biz_product where product_name like 'smokemsv_prod%');"
+  sql "delete from biz_product where product_name like 'smokemsv_prod%';"
 }
 trap cleanup EXIT
 
@@ -367,6 +372,57 @@ if [ -n "$ATK" ]; then
   fi
 else
   echo "  SKIP: admin 登录失败，跳过 K"
+fi
+
+# ---- L) 商家端建商品：老板能建能上架，店员/代理商/平台都不能 ----
+# 用户的核心诉求就是「老板、店长能进商家版添加商品和核销」，核销由 A~C 覆盖，
+# 建商品这条链路在这里锁住。
+OWNER_MTK=$(mlogin smokemsv_owner | jtop token)
+if [ -n "$OWNER_MTK" ]; then
+  # 老板建商品：租户字段不可由前端指定，服务端强制覆盖为自己商户
+  RESP=$(curl -s -X POST "$BASE_URL/api/product/add" -H "X-App-Id: $APPID" \
+    -H "Authorization: Bearer $OWNER_MTK" -H 'Content-Type: application/json' \
+    -d "{\"productName\":\"smokemsv_prod\",\"typeCode\":\"GROUPON\",\"storeIds\":\"$STORE_A\",\"merchantId\":99999,\"price\":9.9,\"originalPrice\":19.9,\"maxPerOrder\":1,\"stock\":100}")
+  echo "[L] 老板建商品"
+  ck "建商品成功" "$(echo "$RESP" | jtop code)" "200"
+  # 必须限定 merchant_id：同名商品若存在历史残留或别家商户的行，这里会取错行，
+  # 后面上架就报「无权操作该商品」500（首次编写时真踩到）
+  L_PID=$(sqlv "select product_id from biz_product where product_name='smokemsv_prod' and merchant_id=$MID order by product_id desc limit 1;")
+  ck "商品已落库" "$([ -n "$L_PID" ] && echo yes || echo no)" "yes"
+  if [ -n "$L_PID" ]; then
+    # 前端传了 merchantId=99999，必须被覆盖成老板自己的商户，否则商品跨租户
+    ck "merchantId 被强制覆盖" "$(sqlv "select merchant_id from biz_product where product_id=$L_PID;")" "$MID"
+    ck "主门店取 storeIds 首个" "$(sqlv "select store_id from biz_product where product_id=$L_PID;")" "$STORE_A"
+    # 新建一律按草稿收（status=1 下架），避免没填全的商品直接对顾客可见
+    ck "新建落草稿(下架)" "$(sqlv "select status from biz_product where product_id=$L_PID;")" "1"
+
+    # 上架
+    UPRESP=$(curl -s -X PUT "$BASE_URL/api/product/status" -H "X-App-Id: $APPID" \
+      -H "Authorization: Bearer $OWNER_MTK" -H 'Content-Type: application/json' \
+      -d "{\"productId\":$L_PID,\"status\":\"0\"}")
+    ck "上架返回 200" "$(echo "$UPRESP" | jtop code)" "200"
+    ck "上架后 status=0" "$(sqlv "select status from biz_product where product_id=$L_PID;")" "0"
+
+    # 商家端列表要能看到自己刚建的（顾客端 /api/product/list 写死 status=0，
+    # 草稿看不见，所以商家端必须用 /api/product/merchant/list）
+    ck "商家端列表含新商品" "$(curl -s "$BASE_URL/api/product/merchant/list?pageSize=200" \
+      -H "X-App-Id: $APPID" -H "Authorization: Bearer $OWNER_MTK" \
+      | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+rows=d.get('rows') or (d.get('data') or {}).get('rows') or []
+print('yes' if any(str(r.get('productId'))=='$L_PID' for r in rows) else 'no')
+")" "yes"
+  fi
+
+  # 店员不能建商品（核销员改价上架等于绕过老板）
+  RESP=$(curl -s -X POST "$BASE_URL/api/product/add" -H "X-App-Id: $APPID" \
+    -H "Authorization: Bearer $STK" -H 'Content-Type: application/json' \
+    -d "{\"productName\":\"smokemsv_prod_staff\",\"typeCode\":\"GROUPON\",\"storeIds\":\"$STORE_A\",\"price\":1,\"maxPerOrder\":1}")
+  ckc "店员建商品被拒" "$RESP" "无权限访问该接口"
+  ck "店员的商品没落库" "$(sqlv "select count(*) from biz_product where product_name='smokemsv_prod_staff';")" "0"
+else
+  echo "  SKIP: 老板小程序端登录失败，跳过 L"
 fi
 
 echo
