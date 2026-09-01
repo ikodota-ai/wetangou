@@ -103,9 +103,13 @@ Page({
       wx.showToast({ title: (err && (err.msg || err.message)) || '领取失败', icon: 'none' });
     });
   },
+  // 买单页在 app.json 里注册的是 pages/pay/index，之前这里写的
+  // '/pages/pay/index/index' 多了一层 —— 该路径不存在，navigateTo 静默失败，
+  // 于是「我的代金券 → 去买单」这个按钮点了永远没反应。
+  // 首页 goPay 用的是对的路径，两处不一致就是漏改的证据。
   goPay() {
     const id = this.data.storeId;
-    wx.navigateTo({ url: '/pages/pay/index/index' + (id ? '?storeId=' + id : '') });
+    wx.navigateTo({ url: '/pages/pay/index' + (id ? '?storeId=' + id : '') });
   },
   goLogin() { wx.navigateTo({ url: '/pages/login/login' }); }
 });

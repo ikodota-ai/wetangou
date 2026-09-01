@@ -49,6 +49,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join biz_merchant mch on mch.merchant_id = o.merchant_id
     </sql>
 
+    <!-- 券占用统计：只算未失效状态（0 待支付 / 1 待使用 / 2 已核销）。
+         已取消(3)/已退款(4)的订单不该继续占着券，否则用户取消订单后券就废了。 -->
+    <select id="countVoucherHeldOrders" resultType="int">
+        select count(1) from biz_order
+        where member_voucher_id = #{memberVoucherId}
+          and status in ('0', '1', '2')
+        <if test="excludeOrderId != null"> and order_id != #{excludeOrderId}</if>
+    </select>
+
     <select id="selectOrderByOrderNo" parameterType="String" resultMap="OrderResult">
         <include refid="selectOrderVo"/>
         where o.order_no = #{orderNo}
@@ -189,6 +198,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="updateTime != null">update_time = #{updateTime},</if>
             <if test="remark != null">remark = #{remark},</if>
         </trim>
+        where order_id = #{orderId}
+    </update>
+
+    <update id="clearVoucher">
+        update biz_order set member_voucher_id = null, update_time = sysdate()
         where order_id = #{orderId}
     </update>
 

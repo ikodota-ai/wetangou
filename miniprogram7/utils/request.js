@@ -224,6 +224,10 @@ const api = {
   orderDetail: (id) => request(`/api/order/${id}`),
   // 按商户订单号查（微信支付「商品订单详情path」跳回来时只有 order_no）
   orderDetailByNo: (no) => request(`/api/order/no/${no}`),
+  // 待支付订单换券：memberVoucherId 传 null = 取消用券。
+  // 后端会重算 discount/pay_amount，并换一个 order_no（旧的已被微信预支付单锁住金额）
+  orderChangeVoucher: (id, memberVoucherId) =>
+    request(`/api/order/${id}/voucher`, { method: 'POST', data: { memberVoucherId: memberVoucherId || null } }),
   orderQrcodeData: (id) => request(`/api/order/${id}/qrcode-data`),
   verifyOrder: (data) => request('/api/order/verify', { method: 'POST', data }),
   // 员工工作台
@@ -261,6 +265,9 @@ const api = {
   merchantStaffBookingReject:  (signupId, body) => request('/api/merchant/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),
   // 预约
   bookingSlots: (params) => request('/api/booking/slots', { data: params }),
+  // 可预约日期：天数取门店「可提前预约天数」，歇业日会标 closed。
+  // 原先前端 getNextDays(7) 写死 7 天，运营调不了也排不掉歇业日。
+  bookingDays: (params) => request('/api/booking/days', { data: params }),
   // 可选预约类型：后台「字典管理 → 预约类型」维护，前端不再写死「堂食预约」
   bookingTypes: () => request('/api/booking/types'),
   createBooking: (data) => request('/api/booking', { method: 'POST', data }),

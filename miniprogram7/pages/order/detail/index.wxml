@@ -33,7 +33,17 @@
 
   <view class="sum card">
     <view class="row"><text class="lab">商品总价</text><text class="val">¥{{order.totalAmount}}</text></view>
-    <view class="row"><text class="lab">优惠抵扣</text><text class="val">-¥{{order.discountAmount}}</text></view>
+    <!-- 待支付时这一行可点，进选券弹窗；已支付/已核销就只是展示结果 -->
+    <view class="row voucher-row" wx:if="{{order.status === '0'}}" bindtap="openVoucher">
+      <text class="lab">优惠券</text>
+      <view class="v-right">
+        <text class="v-disc" wx:if="{{order.discountAmount > 0}}">-¥{{order.discountAmount}}</text>
+        <text class="v-tip" wx:elif="{{voucherCount}}">{{voucherCount}}张可用</text>
+        <text class="v-none" wx:else>暂无可用</text>
+        <text class="v-arrow">></text>
+      </view>
+    </view>
+    <view class="row" wx:else><text class="lab">优惠抵扣</text><text class="val">-¥{{order.discountAmount}}</text></view>
     <view class="row"><text class="lab">实付金额</text><text class="val pay">¥{{order.payAmount}}</text></view>
   </view>
 
@@ -48,6 +58,34 @@
 
   <!-- 待支付订单的底部操作栏。做成 fixed 常驻，避免订单信息长时按钮被顶到屏外。
        上面用等高占位撑开，否则最后一行信息会被盖住 -->
+  <!-- 代金券选择：与下单页 pages/order/submit、买单页 pages/pay 交互保持一致 -->
+  <view class="mask" wx:if="{{showVoucher}}" bindtap="closeVoucher"></view>
+  <view class="sheet" wx:if="{{showVoucher}}">
+    <view class="sheet-head">
+      <text class="sh-t">选择代金券</text>
+      <text class="sh-c" bindtap="closeVoucher">关闭</text>
+    </view>
+    <scroll-view class="sheet-body" scroll-y>
+      <view class="v-item none" bindtap="clearVoucher">
+        <text class="vi-name">不使用代金券</text>
+      </view>
+      <view class="v-item {{item.usable ? '' : 'dis'}}" wx:for="{{voucherList}}" wx:key="id"
+            data-id="{{item.id}}" bindtap="pickVoucher">
+        <view class="vi-left">
+          <text class="vi-face">¥{{item.faceValue}}</text>
+          <text class="vi-cond">满{{item.threshold}}可用</text>
+        </view>
+        <view class="vi-right">
+          <text class="vi-exp" wx:if="{{item.expireText}}">{{item.expireText}} 到期</text>
+          <text class="vi-tag" wx:if="{{!item.usable}}">{{item.limitText || '不可用'}}</text>
+        </view>
+      </view>
+      <view class="v-empty" wx:if="{{!voucherList.length}}">
+        <text>暂无代金券，可到首页「领券中心」领取</text>
+      </view>
+    </scroll-view>
+  </view>
+
   <view class="pay-holder" wx:if="{{order.status === '0'}}"></view>
   <view class="pay-bar" wx:if="{{order.status === '0'}}">
     <view class="pb-sum">

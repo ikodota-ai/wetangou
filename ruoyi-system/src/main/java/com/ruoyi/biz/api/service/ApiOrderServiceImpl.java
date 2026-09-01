@@ -24,6 +24,7 @@ import com.ruoyi.biz.service.IDistributorService;
 import com.ruoyi.biz.service.IStoredCardService;
 import com.ruoyi.biz.domain.StoredCard;
 import com.ruoyi.biz.mapper.DistributorMapper;
+import com.ruoyi.biz.mapper.OrderMapper;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.domain.Distributor;
 
@@ -62,6 +63,11 @@ public class ApiOrderServiceImpl implements IApiOrderService
 
     @Autowired
     private DistributorMapper distributorMapper;
+
+    // 取消用券要把 member_voucher_id 置 NULL，而 updateOrder 的动态 SQL
+    // 对 null 一律跳过，只能走一条显式的 clearVoucher
+    @Autowired
+    private OrderMapper orderMapper;
 
     /**
      * 会员下单（到店自取）：生成待付款订单，含核销码占位
@@ -166,6 +172,65 @@ public class ApiOrderServiceImpl implements IApiOrderService
         order.setCreateTime(new Date());
         orderService.insertOrder(order);
         return order;
+    }
+
+    /**
+     * 待支付订单换券（选券 / 换一张 / 取消用券）。
+     *
+     * <p>为什么需要这个：券入口原先只在下单页（提交订单之前）有。一旦订单建出来
+     * 进了待支付，用户想再用券就只剩「放弃这单重新下」一条路 —— 而重新下单又会
+     * 被那笔待付单占着限购额度。到店自取这类先下单后到店付的场景尤其明显。</p>
+     *
+     * <p><b>必须重新生成 order_no</b>：order_no 就是微信支付的 out_trade_no，
+     * 而 JSAPI 下单后金额已锁在微信侧那笔预支付单上。沿用旧单号再改金额，
+     * 微信会以首次下单的金额为准（或直接报单号重复），出现「页面显示实付 180、
+     * 实际扣 200」的资损。换号等于作废旧预支付单，重新走一次统一下单。</p>
+     *
+     * @param memberId        当前登录会员（用于归属校验）
+     * @param orderId         订单主键
+     * @param memberVoucherId 要用的券；传 null 表示取消用券
+     * @return 改券后的订单
+     */
+    @Transactional
+    public Order changeVoucher(Long memberId, Long orderId, Long memberVoucherId)
+    {
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null)
+        {
+            throw new ServiceException("订单不存在");
+        }
+        if (!order.getMemberId().equals(memberId))
+        {
+            throw new ServiceException("无权修改他人订单");
+        }
+        if (!"0".equals(order.getStatus()))
+        {
+            throw new ServiceException("仅待支付订单可以修改代金券");
+        }
+
+        BigDecimal totalAmount = order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount();
+        // 排除自身：换成原本已选中的那张券时，不能被自己占用的记录挡住
+        BigDecimal discount = voucherUsageService.validateAndDiscount(
+                memberVoucherId, memberId, totalAmount, order.getStoreId(), orderId, null);
+
+        Order patch = new Order();
+        patch.setOrderId(orderId);
+        patch.setDiscountAmount(discount);
+        patch.setPayAmount(totalAmount.subtract(discount));
+        patch.setOrderNo(genNo("D"));
+        // 取消用券要把字段真置回 NULL。updateOrder 的 <if test="memberVoucherId != null">
+        // 会把 null 直接跳过，所以这条单独走一个显式 update。
+        if (memberVoucherId == null)
+        {
+            orderService.updateOrder(patch);
+            orderMapper.clearVoucher(orderId);
+        }
+        else
+        {
+            patch.setMemberVoucherId(memberVoucherId);
+            orderService.updateOrder(patch);
+        }
+        return orderService.selectOrderByOrderId(orderId);
     }
 
     /**

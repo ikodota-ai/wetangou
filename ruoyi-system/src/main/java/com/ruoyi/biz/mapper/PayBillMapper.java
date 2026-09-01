@@ -2,6 +2,7 @@ package com.ruoyi.biz.mapper;
 
 import java.util.List;
 import com.ruoyi.common.annotation.IgnoreTenant;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.biz.domain.PayBill;
 
 /**
@@ -36,6 +37,20 @@ public interface PayBillMapper
      * @return 买单流水集合
      */
     public List<PayBill> selectPayBillList(PayBill payBill);
+
+    /**
+     * 该会员券当前被几个「未失效」的买单占用（status 0 待确认 / 1 待支付 / 2 已完成）。
+     *
+     * <p>和订单侧同一个问题：券的「已使用」是支付回调才置的，建单只是把
+     * member_voucher_id 记到买单上，于是一张券可以同时挂在多个待支付买单上
+     * 各抵一次。买单和商品下单共用一套券，所以两张表都要算进占用。</p>
+     *
+     * @param memberVoucherId 会员券 id
+     * @param excludeBillId   要排除的买单主键，可为 null
+     * @return 占用该券的买单数
+     */
+    public int countVoucherHeldBills(@Param("memberVoucherId") Long memberVoucherId,
+            @Param("excludeBillId") Long excludeBillId);
 
     /**
      * 新增买单流水

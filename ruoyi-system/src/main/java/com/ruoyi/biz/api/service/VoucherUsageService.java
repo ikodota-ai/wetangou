@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import com.ruoyi.biz.domain.MemberVoucher;
 import com.ruoyi.biz.domain.Voucher;
+import com.ruoyi.biz.mapper.OrderMapper;
+import com.ruoyi.biz.mapper.PayBillMapper;
 import com.ruoyi.biz.service.IMemberVoucherService;
 import com.ruoyi.biz.service.IVoucherService;
 import com.ruoyi.common.exception.ServiceException;
@@ -51,6 +53,14 @@ public class VoucherUsageService
     @Autowired
     private IVoucherService voucherService;
 
+    // 直接用 mapper 而不是 service：只需要一个 count 查询，
+    // 走 selectOrderList 会被租户过滤切面改写 where，会员自己的券反而查不全
+    @Autowired
+    private OrderMapper orderMapper;
+
+    @Autowired
+    private PayBillMapper payBillMapper;
+
     /**
      * 校验券可用并返回实际抵扣金额。
      *
@@ -61,6 +71,20 @@ public class VoucherUsageService
      * @return 实际抵扣金额，永不为负、永不超过 amount
      */
     public BigDecimal validateAndDiscount(Long memberVoucherId, Long memberId, BigDecimal amount, Long storeId)
+    {
+        return validateAndDiscount(memberVoucherId, memberId, amount, storeId, null, null);
+    }
+
+    /**
+     * 同上，但允许把「当前这一单」排除在占用统计之外。
+     *
+     * <p>待支付订单换券时会用到：换成原本就选中的那张券，不能被自己占用的记录挡住。</p>
+     *
+     * @param excludeOrderId 排除的订单主键（订单侧换券传自身 id）
+     * @param excludeBillId  排除的买单主键（买单侧传自身 id）
+     */
+    public BigDecimal validateAndDiscount(Long memberVoucherId, Long memberId, BigDecimal amount, Long storeId,
+            Long excludeOrderId, Long excludeBillId)
     {
         if (memberVoucherId == null)
         {
@@ -85,6 +109,7 @@ public class VoucherUsageService
             throw new ServiceException("未达到代金券使用门槛");
         }
         assertStoreMatch(mv, storeId, now);
+        assertNotHeld(memberVoucherId, excludeOrderId, excludeBillId);
 
         BigDecimal discount = mv.getFaceValue() == null ? BigDecimal.ZERO : mv.getFaceValue();
         if (discount.compareTo(total) > 0)
@@ -96,6 +121,25 @@ public class VoucherUsageService
             discount = BigDecimal.ZERO;
         }
         return discount;
+    }
+
+    /**
+     * 占用校验：这张券是否已经挂在别的未失效订单/买单上。
+     *
+     * <p>为什么不能只看 member_voucher.status：那个字段要等支付成功回调才置 '1'，
+     * 待支付阶段一直是 '0'。只看 status 的话，用户在下单页反复提交就能让
+     * 同一张券在 N 个待付单里各抵一次。</p>
+     */
+    private void assertNotHeld(Long memberVoucherId, Long excludeOrderId, Long excludeBillId)
+    {
+        if (orderMapper.countVoucherHeldOrders(memberVoucherId, excludeOrderId) > 0)
+        {
+            throw new ServiceException("该代金券已用于另一笔待支付订单，请先完成或取消那笔订单");
+        }
+        if (payBillMapper.countVoucherHeldBills(memberVoucherId, excludeBillId) > 0)
+        {
+            throw new ServiceException("该代金券已用于另一笔买单，请先完成或取消那笔买单");
+        }
     }
 
     /**

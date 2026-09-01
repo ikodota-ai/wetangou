@@ -33,6 +33,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join biz_member m on m.member_id = b.member_id
     </sql>
 
+    <!-- 券占用统计：只算未失效状态（0 待确认 / 1 待支付 / 2 已完成）。
+         已取消(3)不占券，否则用户取消买单后手里的券就废了。 -->
+    <select id="countVoucherHeldBills" resultType="int">
+        select count(1) from biz_pay_bill
+        where member_voucher_id = #{memberVoucherId}
+          and status in ('0', '1', '2')
+        <if test="excludeBillId != null"> and bill_id != #{excludeBillId}</if>
+    </select>
+
     <select id="selectPayBillByBillNo" parameterType="String" resultMap="PayBillResult">
         <include refid="selectPayBillVo"/>
         where b.bill_no = #{billNo}

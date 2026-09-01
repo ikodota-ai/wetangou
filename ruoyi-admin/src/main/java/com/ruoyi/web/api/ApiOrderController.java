@@ -76,6 +76,23 @@ public class ApiOrderController
     }
 
     /**
+     * 待支付订单换券（选券 / 换一张 / 取消用券）。
+     *
+     * <p>券入口原先只有下单页那一处，订单一建出来就没法再用券了 ——
+     * 「到店自取」这类先下单、到店才付的场景里，用户领了券也用不上。</p>
+     *
+     * <p>body: {"memberVoucherId": 123}；传 null 或不传该字段 = 取消用券。</p>
+     */
+    @LoginRequired
+    @PostMapping("/{orderId}/voucher")
+    public AjaxResult changeVoucher(@PathVariable Long orderId, @RequestBody(required = false) JSONObject body)
+    {
+        Long memberVoucherId = body == null ? null : body.getLong("memberVoucherId");
+        Order order = apiOrderService.changeVoucher(MemberContextHolder.getMemberId(), orderId, memberVoucherId);
+        return AjaxResult.success(order);
+    }
+
+    /**
      * 发起支付：返回小程序 wx.requestPayment 参数。
      * mock模式（未配齐微信支付凭证）直接置为支付成功并返回 mock=true。
      */

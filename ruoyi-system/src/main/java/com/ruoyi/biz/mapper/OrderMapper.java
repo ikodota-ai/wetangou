@@ -2,6 +2,7 @@ package com.ruoyi.biz.mapper;
 
 import java.util.List;
 import com.ruoyi.biz.domain.Order;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.common.annotation.IgnoreTenant;
 
 /**
@@ -38,6 +39,25 @@ public interface OrderMapper
     public List<Order> selectOrderList(Order order);
 
     /**
+     * 该会员券当前被几个「未失效」的订单占用（status 0 待支付 / 1 待使用 / 2 已核销）。
+     *
+     * <p>为什么必须有这个查询：券的「已使用」是在支付成功回调里才置的，
+     * 下单只是把 member_voucher_id 记到订单上。于是同一张券可以在多个待支付
+     * 订单里各抵一次 —— 实测一张 ¥20 券连开 3 单，三单都 discount=20，
+     * 支付后 use_order_id 只记住第一单，商家凭空少收 ¥40。</p>
+     *
+     * <p>排除自身订单（excludeOrderId）是为了支持「待支付订单换券」：
+     * 换成同一张券时不能被自己占用的记录挡住。</p>
+     *
+     * @param memberVoucherId 会员券 id
+     * @param excludeOrderId  要排除的订单主键，可为 null
+     * @return 占用该券的订单数
+     */
+    @IgnoreTenant
+    public int countVoucherHeldOrders(@Param("memberVoucherId") Long memberVoucherId,
+            @Param("excludeOrderId") Long excludeOrderId);
+
+    /**
      * 新增订单
      * 
      * @param order 订单
@@ -52,6 +72,19 @@ public interface OrderMapper
      * @return 结果
      */
     public int updateOrder(Order order);
+
+    /**
+     * 把订单上的代金券清空（取消用券）。
+     *
+     * <p>不能复用 updateOrder：它的动态 SQL 是
+     * {@code <if test="memberVoucherId != null">}，传 null 那一列会被整段跳过，
+     * 于是「取消用券」在库里永远不生效 —— 金额减了、券还挂着。</p>
+     *
+     * @param orderId 订单主键
+     * @return 结果
+     */
+    @IgnoreTenant
+    public int clearVoucher(@Param("orderId") Long orderId);
 
     /**
      * 删除订单
