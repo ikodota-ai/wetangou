@@ -33,8 +33,17 @@ Page({
   _bannerToastShown: false,
   _firstLoadDone: false,
   _slowTimer: null,
+  _lastAppliedStoreId: null,
   onLoad() {
     // 3.5s 内还没拿到 store → 触发降级 + 主动再 fetch 一次（避免白板卡死）
+    //
+    // 这条降级分支曾经是第四个「后台配了却不显示」的根因：它只 setData({store})，
+    // 不调 loadFacilities / _contactPatch / loadBookingGoods。
+    // 而它恰恰是**最容易走到**的分支 —— 用户真机日志里就是
+    // 「[home] 3.5s 仍无 store，触发降级」：首启无缓存时 pickNearestStore 要走
+    // storeList → 拿位置 → storeNearest 好几个来回，冷启动 + 弱网很容易超 3.5s。
+    // 于是评分/设施/客服/预约商品全部拿不到，表现和「回调被 changed 短路」一模一样。
+    // 现在两条路径都收口到 _applyStore()，不允许再有第二处「拿到门店后该做什么」。
     this._slowTimer = setTimeout(() => {
       if (!this.data.store || !this.data.store.storeId) {
         console.warn('[home] 3.5s 仍无 store，触发降级');
@@ -50,8 +59,9 @@ Page({
         api.storeList({ page: 1, pageSize: 1 }).then((res) => {
           const rows = (res && (res.rows || res.data || res)) || [];
           if (Array.isArray(rows) && rows.length && rows[0].storeId) {
-            const viewStore = this._compatStoreView(rows[0]);
-            this.setData({ store: viewStore });
+            // 必须走 _applyStore：只 setData({store}) 的话店名有了，
+            // 但评分/设施/客服/预约商品一个都不会拉
+            this._applyStore(rows[0]);
           }
         }).catch(() => {});
       }
@@ -146,34 +156,55 @@ Page({
   loadData() {
     // pickNearestStore 的回调现在每次都会触发（app.js 里去掉了 changed 短路），
     // 所以设施标签 / 客服信息 / 可预约商品都不用再在这里「先主动拉一次」绕一遍。
-    // 门店级列表按 storeId 去重，避免占位店 → 最近店切换时重复请求。
-    let lastStoreId = null
+    // 门店级列表的去重标记在 _applyStore 里（this._lastAppliedStoreId）——
+    // 降级分支也会调 _applyStore，两个调用点必须共用同一份标记。
     app.pickNearestStore((store) => {
       if (!store) {
         console.warn('[home] pickNearestStore returned null')
         return
       }
       console.log('[home] pickNearestStore =>', JSON.stringify(store).slice(0, 300))
-      // 距离计算走 _compatStoreView（包含「计算中…」占位 + 缺位置时后台异步补位）
-      const viewStore = this._compatStoreView(store)
-      this.setData(Object.assign({
-        store: viewStore,
-        goods: app.globalData.goods || []
-      }, this._contactPatch(store)))
-      // 「到店自取」tab 用的是跨店商品，globalData.goods 是按 storeId 拉的，可能为空
-      // 这里主动按 merchantId 再拉一次补齐（不论 pickNearestStore 有没有先填过）
-      app.loadAllPickupGoods().then((list) => {
-        if (Array.isArray(list) && list.length && this.data.tab === 'pickup') {
-          this.setData({ goods: list })
-        }
-      })
-      // banner 不在这里 —— 它与门店无关，已在 onLoad 拉过。
-      if (store.storeId !== lastStoreId) {
-        lastStoreId = store.storeId
-        this.loadFacilities(store.storeId)
-        this.loadBookingGoods(store.storeId)
-      }
+      this._applyStore(store)
     });
+  },
+
+  /**
+   * 「拿到一个门店之后该做的全部事情」——唯一入口。
+   *
+   * 抽出来的动机：这套动作原先只写在 pickNearestStore 的回调里，
+   * 而 onLoad 的 3.5s 降级分支自己 setData({store}) 就完事了，
+   * 于是走降级路径时评分/设施/客服/预约商品全都不会拉 ——
+   * 这是「后台配了却不显示」的第四个根因，而且是最常走到的那条路径
+   * （首启无缓存时 pickNearestStore 要 storeList → 取位 → storeNearest
+   *   好几个来回，冷启动 + 弱网很容易超 3.5s）。
+   *
+   * 谁再加第三条「拿到门店」的路径，也必须调这里，不要再复制一遍。
+   */
+  _applyStore(store) {
+    if (!store || !store.storeId) return
+    // 距离计算走 _compatStoreView（包含缺位置时的「查看距离」入口 + 评分视图）
+    const viewStore = this._compatStoreView(store)
+    this.setData(Object.assign({
+      store: viewStore,
+      goods: app.globalData.goods || []
+    }, this._contactPatch(store)))
+    // 「到店自取」tab 用的是跨店商品，globalData.goods 是按 storeId 拉的，可能为空
+    // 这里主动按 merchantId 再拉一次补齐（不论 pickNearestStore 有没有先填过）
+    app.loadAllPickupGoods().then((list) => {
+      if (Array.isArray(list) && list.length && this.data.tab === 'pickup') {
+        this.setData({ goods: list })
+      }
+    })
+    // banner 不在这里 —— 它与门店无关，已在 onLoad 拉过。
+    //
+    // 门店级数据按 storeId 去重，避免「占位店 → 最近店」升级时重复请求。
+    // 去重标记放实例上而不是 loadData 的闭包里：降级分支和回调是两个调用点，
+    // 闭包变量它们看不到同一份。
+    if (store.storeId !== this._lastAppliedStoreId) {
+      this._lastAppliedStoreId = store.storeId
+      this.loadFacilities(store.storeId)
+      this.loadBookingGoods(store.storeId)
+    }
   },
 
   // 拉后端 banner；不兜底：无数据 / 失败 / 缺 imageUrl 都视为错误并提示

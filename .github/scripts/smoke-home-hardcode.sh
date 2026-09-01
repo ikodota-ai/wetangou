@@ -132,6 +132,18 @@ chkf  "J6) 预约首页客服电话走统一降级 resolveContact" "$MP/pages/bo
 chkfn_code "J7) 预约首页不再自己写 servicePhone || phone" "$MP/pages/booking/index.js" "this.data.store.servicePhone || this.data.store.phone"
 chkf  "J8) 广播逻辑收口在 utils/broadcast.js" "$MP/app.js" "require('./utils/broadcast.js')"
 
+# ---------- K. 3.5s 降级路径必须和正常回调做同样的事 ----------
+# 这是「后台配了却不显示」的第四个根因，而且是最容易走到的那条：
+# onLoad 的 3.5s 兜底定时器原先只 setData({store})，不拉设施/不算客服/不拉预约商品。
+# 首启无缓存时 pickNearestStore 要走 storeList → 取位 → storeNearest 好几个来回，
+# 冷启动 + 弱网很容易超 3.5s —— 用户真机日志里就是「[home] 3.5s 仍无 store，触发降级」。
+chkf  "K1) 存在唯一入口 _applyStore" "$HJS" "_applyStore(store) {"
+chkf  "K2) 降级分支调 _applyStore（不是自己 setData 店名）" "$HJS" "this._applyStore(rows\[0\]);"
+chkf  "K3) pickNearestStore 回调也走 _applyStore" "$HJS" "this._applyStore(store)"
+chkfn_code "K4) 降级分支不再只 setData 门店视图" "$HJS" "setData({ store: this._compatStoreView(rows\[0\]) })"
+chkf  "K5) 去重标记放实例上（两个调用点要共用）" "$HJS" "this._lastAppliedStoreId"
+chkfn_code "K6) loadData 里不再有闭包 lastStoreId（降级分支看不到它）" "$HJS" "let lastStoreId = null"
+
 echo ""
 echo "结果: PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
