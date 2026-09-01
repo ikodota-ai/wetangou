@@ -63,6 +63,44 @@ if echo "$MINFO" | python3 -c "import sys,json;d=json.load(sys.stdin).get('data'
 else
   bad "merchant/info 缺 phone 字段 → jar 未更新"
 fi
+
+# 后台前端包也要一起看。第 1 项「门店评分」在小程序上看不到，
+# 真因不只是没填数据 —— 生产 /admin 的 dist 是旧包，
+# 门店编辑弹窗里压根没有「门店评分」这个表单项，用户根本没地方填。
+# 同理 v10 的「可提前预约 / 时段粒度 / 每周歇业日」也是后台可配项，
+# 旧包里同样不存在。所以 jar 和 dist 必须成对部署。
+#
+# 检查方式：index.html 里有 webpack 的 chunk→hash 映射表，
+# 从中取门店页 chunk 的真实文件名，下载后 grep 中文表单标签。
+ADMIN_HTML=$(curl -s "$BASE/admin/index.html")
+if [ -z "$ADMIN_HTML" ]; then
+  skip "取不到 $BASE/admin/index.html（后台可能部署在别的路径）"
+else
+  # 定位门店管理页的 chunk 分两步（chunk 名和内容 hash 存在两个不同文件里）：
+  #   1) app.*.js 里有 './biz/store/index.vue':['202b','chunk-xxxxxxxx'] 的路由映射
+  #   2) index.html 内联的 webpack runtime 里有 'chunk-xxxxxxxx':'<内容hash>'
+  APP_JS=$(printf '%s' "$ADMIN_HTML" | grep -o 'static/js/app\.[0-9a-f]*\.js' | head -1)
+  STORE_CHUNK=$(curl -s "$BASE/admin/$APP_JS" \
+    | grep -o '"./biz/store/index.vue":\["[^"]*","chunk-[0-9a-f]*"' \
+    | grep -o 'chunk-[0-9a-f]*' | head -1)
+  STORE_HASH=$(printf '%s' "$ADMIN_HTML" | grep -o "\"$STORE_CHUNK\":\"[0-9a-f]*\"" | head -1 | sed 's/.*:"//; s/"$//')
+  if [ -z "$STORE_CHUNK" ] || [ -z "$STORE_HASH" ]; then
+    skip "解析不出后台门店页 chunk（app=$APP_JS chunk=$STORE_CHUNK hash=$STORE_HASH）"
+  else
+    SJS=$(curl -s "$BASE/admin/static/js/$STORE_CHUNK.$STORE_HASH.js")
+    MISSING=""
+    for k in 门店评分 可提前预约 时段粒度 每周歇业日; do
+      printf '%s' "$SJS" | grep -q "$k" || MISSING="$MISSING $k"
+    done
+    if [ -z "$MISSING" ]; then
+      ok "后台 dist 已更新（门店页含 评分/可提前预约/时段粒度/每周歇业日）"
+    else
+      bad "后台 dist 是旧包，门店管理页缺表单项：$MISSING"
+      echo "       → 这就是「后台没地方填门店评分」的原因，不是漏填"
+      echo "       → cd ruoyi-ui && npm run build:prod，dist 传成 /data/wwwroot/daodian/www/admin"
+    fi
+  fi
+fi
 echo
 
 # ============================================================
