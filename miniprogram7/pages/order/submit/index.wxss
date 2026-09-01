@@ -39,6 +39,32 @@
 .sr-val { font-size: 28rpx; color: #1A1A1A; }
 .sr-pay { font-size: 32rpx; font-weight: 600; color: var(--color-primary); }
 
+/* 优惠券行：可点，样式与买单页 pages/pay 的选券入口对齐 */
+.sr-right { display: flex; align-items: center; }
+.sr-disc { font-size: 28rpx; color: var(--color-primary); }
+.sr-tip { font-size: 28rpx; color: var(--color-primary); }
+.sr-none { font-size: 28rpx; color: #999; }
+.sr-arrow { font-size: 26rpx; color: #999; margin-left: 8rpx; }
+
+/* 选券弹窗 */
+.mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 60; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-radius: 24rpx 24rpx 0 0; z-index: 61; max-height: 70vh; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 32rpx; border-bottom: 1rpx solid #F0F0F0; }
+.sh-t { font-size: 32rpx; font-weight: 600; color: #1A1A1A; }
+.sh-c { font-size: 28rpx; color: #999; }
+.sheet-body { flex: 1; padding: 16rpx 32rpx 32rpx; }
+.v-item { display: flex; justify-content: space-between; align-items: center; padding: 28rpx 0; border-bottom: 1rpx solid #F5F5F5; }
+.v-item.dis { opacity: 0.45; }
+.v-item.none { justify-content: center; }
+.vi-left { display: flex; flex-direction: column; }
+.vi-face { font-size: 34rpx; font-weight: 700; color: #E64340; }
+.vi-cond { font-size: 24rpx; color: #999; margin-top: 6rpx; }
+.vi-right { display: flex; flex-direction: column; align-items: flex-end; }
+.vi-exp { font-size: 24rpx; color: #999; }
+.vi-tag { font-size: 22rpx; color: #E6A23C; margin-top: 6rpx; }
+.vi-name { font-size: 28rpx; color: #666; }
+.v-empty { padding: 60rpx 0; text-align: center; font-size: 28rpx; color: #999; }
+
 .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; padding: 16rpx 32rpx; background: #FFFFFF; border-top: 1rpx solid #F0F0F0; padding-bottom: calc(16rpx + env(safe-area-inset-bottom)); z-index: 50; }
 .bb-total { display: block; font-size: 26rpx; color: #1A1A1A; }
 .bb-num { font-size: 36rpx; font-weight: 700; color: var(--color-primary); }

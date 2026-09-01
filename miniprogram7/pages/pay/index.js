@@ -1,6 +1,7 @@
 const app = getApp();
 const { api } = require('../../utils/request.js');
 const { formatMoney } = require('../../utils/util.js');
+const voucherUtil = require('../../utils/voucher.js');
 
 // 轮询间隔与上限。
 // 只在门店关掉了「买单自动确认」时才会用到 —— 默认门店建单即 status=1，
@@ -69,9 +70,11 @@ Page({
       const rows = (res && (res.data || res.rows || res)) || [];
       const vouchers = (Array.isArray(rows) ? rows : []).map((v) => ({
         id: v.id,
+        status: v.status,
         faceValue: formatMoney(v.faceValue),
         threshold: formatMoney(v.threshold),
-        expireTime: v.expireTime ? String(v.expireTime).slice(0, 10) : ''
+        expireTime: v.expireTime || '',
+        expireText: v.expireTime ? String(v.expireTime).slice(0, 10) : ''
       }));
       this.setData({ vouchers });
       this.refreshUsable();
@@ -85,11 +88,14 @@ Page({
   },
   refreshUsable() {
     const base = this.discountBase();
-    const usable = this.data.vouchers.filter((v) => base >= parseFloat(v.threshold));
+    // 原先只比门槛，漏了过期判断：member_voucher 的 status 靠定时任务刷，
+    // 已过期但任务还没跑到的券 status 仍是 '0'，会被当成可用，
+    // 用户选了提交才被后端「代金券不可用」打回
+    const usable = voucherUtil.usableList(this.data.vouchers, base);
     this.setData({ voucherCount: usable.length });
     // 已选券因金额变化不再满足门槛时自动取消，避免提交被后端拒绝
     const cur = this.data.voucher;
-    if (cur && base < parseFloat(cur.threshold)) {
+    if (cur && !voucherUtil.isUsable(cur, base)) {
       this.setData({ voucher: null, voucherText: '未使用' });
       wx.showToast({ title: '金额变化，已取消所选代金券', icon: 'none' });
     }
@@ -127,7 +133,7 @@ Page({
     }
     const list = this.data.vouchers.map((v) => ({
       ...v,
-      usable: base >= parseFloat(v.threshold)
+      usable: voucherUtil.isUsable(v, base)
     }));
     this.setData({ showVoucher: true, voucherList: list });
   },
@@ -136,8 +142,8 @@ Page({
     const id = e.currentTarget.dataset.id;
     const v = this.data.vouchers.find((x) => String(x.id) === String(id));
     if (!v) return;
-    if (this.discountBase() < parseFloat(v.threshold)) {
-      wx.showToast({ title: '未达到使用门槛', icon: 'none' });
+    if (!voucherUtil.isUsable(v, this.discountBase())) {
+      wx.showToast({ title: '该券暂不可用', icon: 'none' });
       return;
     }
     this.setData({

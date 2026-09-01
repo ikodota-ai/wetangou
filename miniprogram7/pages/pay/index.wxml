@@ -66,8 +66,8 @@
           <text class="vi-cond">满{{item.threshold}}可用</text>
         </view>
         <view class="vi-right">
-          <text class="vi-exp" wx:if="{{item.expireTime}}">{{item.expireTime}} 到期</text>
-          <text class="vi-tag" wx:if="{{!item.usable}}">未达门槛</text>
+          <text class="vi-exp" wx:if="{{item.expireText}}">{{item.expireText}} 到期</text>
+          <text class="vi-tag" wx:if="{{!item.usable}}">不可用</text>
         </view>
       </view>
       <view class="v-empty" wx:if="{{!voucherList.length}}">
