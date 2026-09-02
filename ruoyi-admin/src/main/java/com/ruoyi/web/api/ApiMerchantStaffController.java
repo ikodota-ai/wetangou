@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.exception.ServiceException;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.annotation.RequireRole;
@@ -976,6 +978,171 @@ public class ApiMerchantStaffController
             today.add(b);
         }
         return AjaxResult.success(today);
+    }
+
+    /**
+     * 核销记录（商家端「核销记录」页的数据源）。
+     *
+     * <p>为什么必须有这个端点：在此之前商家端根本没有核销记录查询。首页「核销记录」
+     * 入口点进去的 pages/merchant/history 调的是 today/bills（买单流水），
+     * 标题也写着「今日买单流水」—— 店长想查「今天谁核了哪些券」，看到的是买单，
+     * 而买单和核销是两码事。核销页(pages/merchant/verify)里那份「最近核销」只存在
+     * 本机 storage、最多 20 条、换台手机或清了缓存就没了，店长手机上永远看不到
+     * 店员核的单，对账只能翻 PC 后台。</p>
+     *
+     * <p>入参：</p>
+     * <ul>
+     *   <li>{@code date} 可选，yyyy-MM-dd，缺省今天</li>
+     *   <li>{@code mine} 可选，1 = 只看自己核的（店员默认视角就够用）</li>
+     *   <li>{@code storeId} 可选，多店老板指定某店；不传则查全部授权门店</li>
+     * </ul>
+     *
+     * <p>门店范围取 token 里的授权门店集合而不是当前激活门店：多店老板不切店
+     * 也该能看到全店核销汇总，否则得一家家切过去看。显式传 storeId 时必须在
+     * 授权集合内，否则拒（防越权看别家门店流水）。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = BizRole.STAFF, includeHigher = true)
+    @GetMapping("/verify/records")
+    public AjaxResult verifyRecords(
+            @RequestParam(value = "date", required = false) String date,
+            @RequestParam(value = "mine", required = false) String mine,
+            @RequestParam(value = "storeId", required = false) Long storeId)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        Map<String, Object> empty = new LinkedHashMap<>();
+        empty.put("rows", new ArrayList<Order>());
+        empty.put("total", 0);
+        empty.put("totalAmount", java.math.BigDecimal.ZERO);
+        empty.put("date", date == null ? DateUtils.parseDateToStr("yyyy-MM-dd", new Date()) : date);
+        // 商户刚建、门店还没创建 → 空数据而不是 500，否则整页白屏
+        List<Long> authStores = m.getStoreIds();
+        if (authStores == null || authStores.isEmpty())
+        {
+            empty.put("noStore", true);
+            return AjaxResult.success(empty);
+        }
+        // 显式指定门店必须在授权集合内
+        List<Long> scope;
+        if (storeId != null && storeId > 0)
+        {
+            if (!m.hasStore(storeId)) throw new ServiceException("无权查看其他门店的核销记录");
+            scope = java.util.Collections.singletonList(storeId);
+        }
+        else
+        {
+            scope = authStores;
+        }
+
+        Date day = startOfToday();
+        if (StringUtils.isNotEmpty(date))
+        {
+            // 必须自己严格解析，不能用 DateUtils.parseDate：那个方法带一串
+            // 备选 pattern（含 "yyyy-MM"），"2026-13-99" 会先被 yyyy-MM 匹配上，
+            // 13 月溢出成 2027-01、尾巴 "-99" 被吞掉，实测返回 2027-04-09。
+            // 店长手滑输错日期，看到的是一个莫名其妙的未来日期 + 空列表，
+            // 而不是「日期不对」。这里锁死 yyyy-MM-dd 且关掉 lenient。
+            String ds = date.trim();
+            if (!ds.matches("\\d{4}-\\d{2}-\\d{2}")) throw new ServiceException("日期格式应为 yyyy-MM-dd");
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            sdf.setLenient(false);
+            try { day = sdf.parse(ds); }
+            catch (java.text.ParseException e) { throw new ServiceException("日期不存在：" + ds); }
+        }
+        Calendar c = Calendar.getInstance();
+        c.setTime(day);
+        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0);
+        Date begin = c.getTime();
+        c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59);
+        c.set(Calendar.SECOND, 59); c.set(Calendar.MILLISECOND, 999);
+        Date end = c.getTime();
+
+        Order q = new Order();
+        q.setMerchantId(m.getMerchantId());
+        Map<String, Object> params = q.getParams();
+        StringBuilder sids = new StringBuilder();
+        for (Long sid : scope) { if (sids.length() > 0) sids.append(','); sids.append(sid); }
+        params.put("storeIds", sids.toString());
+        params.put("verifyBegin", DateUtils.parseDateToStr("yyyy-MM-dd HH:mm:ss", begin));
+        params.put("verifyEnd", DateUtils.parseDateToStr("yyyy-MM-dd HH:mm:ss", end));
+        // 店员看自己那份就够；老板/店长默认看全店，想看某人再传 mine
+        if ("1".equals(mine) || "true".equals(mine))
+        {
+            Long uid = m.getStaffUserId();
+            if (uid == null) return AjaxResult.success(empty);
+            q.setVerifyUser("store:" + uid);
+        }
+        List<Order> rows = orderService.selectVerifiedOrderList(q);
+
+        // 核销人显示名：库里存的是 "store:<sysUserId>"，直接渲染出来是一串
+        // 「store:61」，店长看不出是谁。这里批量换成 biz_merchant_staff.real_name。
+        Map<String, String> nameOf = staffNameMap(m.getMerchantId());
+        java.math.BigDecimal sum = java.math.BigDecimal.ZERO;
+        List<Map<String, Object>> vos = new ArrayList<>();
+        for (Order o : rows)
+        {
+            Map<String, Object> vo = new LinkedHashMap<>();
+            vo.put("orderId", o.getOrderId());
+            vo.put("orderNo", o.getOrderNo());
+            vo.put("productName", o.getProductName());
+            vo.put("payAmount", o.getPayAmount());
+            vo.put("num", o.getNum());
+            vo.put("storeId", o.getStoreId());
+            vo.put("storeName", o.getStoreName());
+            vo.put("verifyCode", o.getVerifyCode());
+            vo.put("verifyTime", o.getVerifyTime());
+            vo.put("verifyUser", o.getVerifyUser());
+            vo.put("verifyUserName", resolveVerifyUserName(o.getVerifyUser(), nameOf));
+            vos.add(vo);
+            if (o.getPayAmount() != null) sum = sum.add(o.getPayAmount());
+        }
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("rows", vos);
+        r.put("total", vos.size());
+        r.put("totalAmount", sum);
+        r.put("date", DateUtils.parseDateToStr("yyyy-MM-dd", begin));
+        r.put("mine", "1".equals(mine) || "true".equals(mine));
+        r.put("storeIds", scope);
+        r.put("canSeeAll", m.isManagerOrAbove());
+        return AjaxResult.success(r);
+    }
+
+    /** userId → 真实姓名（核销人展示用），查不到就留空由调用方兜底 */
+    private Map<String, String> staffNameMap(Long merchantId)
+    {
+        Map<String, String> map = new java.util.HashMap<>();
+        if (merchantId == null) return map;
+        MerchantStaff sq = new MerchantStaff();
+        sq.setMerchantId(merchantId);
+        List<MerchantStaff> list = staffService.selectList(sq);
+        if (list == null) return map;
+        for (MerchantStaff st : list)
+        {
+            if (st.getUserId() == null) continue;
+            String nm = StringUtils.isNotEmpty(st.getRealName()) ? st.getRealName() : ("员工" + st.getUserId());
+            map.putIfAbsent(String.valueOf(st.getUserId()), nm);
+        }
+        return map;
+    }
+
+    /**
+     * 把 verify_user 解析成人能看懂的名字。
+     *
+     * <p>库里有两种前缀：当前代码写的 {@code store:<sysUserId>}，以及早期链路
+     * 遗留的 {@code member:<memberId>}（本地就有 4 条）。后者查不到员工姓名，
+     * 直接返回原值总比显示空白好 —— 至少店长知道这单是老链路核的。</p>
+     */
+    private String resolveVerifyUserName(String verifyUser, Map<String, String> nameOf)
+    {
+        if (StringUtils.isEmpty(verifyUser)) return "";
+        if (verifyUser.startsWith("store:"))
+        {
+            String uid = verifyUser.substring("store:".length());
+            String nm = nameOf.get(uid);
+            return nm == null ? ("员工" + uid) : nm;
+        }
+        return verifyUser;
     }
 
     @LoginRequired

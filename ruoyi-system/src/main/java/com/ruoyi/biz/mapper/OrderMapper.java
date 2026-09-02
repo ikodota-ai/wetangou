@@ -39,6 +39,19 @@ public interface OrderMapper
     public List<Order> selectOrderList(Order order);
 
     /**
+     * 核销记录查询：按核销时间倒序，只返回真正核销过的单（verify_time 非空）。
+     *
+     * <p>为什么不能复用 selectOrderList：那个查询的时间区间打在 create_time 上，
+     * 而团购最常见的就是「昨天买、今天来店里核」—— 用下单时间筛，店长今天的
+     * 核销记录里会看不到这些单，反而混进今天下单但还没核的单。核销记录必须
+     * 按 verify_time 筛。</p>
+     *
+     * <p>params 支持 storeIds（find_in_set，多店老板一次看全部授权门店）、
+     * verifyBegin / verifyEnd（核销时间区间）、verifyUser（核销人精确匹配）。</p>
+     */
+    public List<Order> selectVerifiedOrderList(Order order);
+
+    /**
      * 该会员券当前被几个「未失效」的订单占用（status 0 待支付 / 1 待使用 / 2 已核销）。
      *
      * <p>为什么必须有这个查询：券的「已使用」是在支付成功回调里才置的，

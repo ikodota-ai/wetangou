@@ -36,6 +36,12 @@ public interface IOrderService
     public List<Order> selectOrderList(Order order);
 
     /**
+     * 核销记录查询（按 verify_time 倒序，只含已核销单）。
+     * 详见 {@link com.ruoyi.biz.mapper.OrderMapper#selectVerifiedOrderList}。
+     */
+    public List<Order> selectVerifiedOrderList(Order order);
+
+    /**
      * 新增订单
      * 
      * @param order 订单

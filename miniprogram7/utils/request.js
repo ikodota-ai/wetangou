@@ -284,6 +284,18 @@ const api = {
   merchantStaffTodayOrders: () => request('/api/merchant/staff/today/orders'),
   merchantStaffTodayBills: () => request('/api/merchant/staff/today/bills'),
   merchantStaffTodayBookings: () => request('/api/merchant/staff/today/bookings'),
+  // 核销记录：商家端首页「核销记录」入口的数据源。
+  // 之前那个入口点进去调的是 today/bills（买单流水），核销和买单是两码事；
+  // verify 页里的「最近核销」只存本机 storage，换台手机就没了。
+  // params: { date:'yyyy-MM-dd', mine:1 只看自己核的, storeId 指定门店 }
+  merchantStaffVerifyRecords: (params) => {
+    const p = params || {}
+    const qs = Object.keys(p)
+      .filter((k) => p[k] !== undefined && p[k] !== null && p[k] !== '')
+      .map((k) => k + '=' + encodeURIComponent(p[k]))
+      .join('&')
+    return request('/api/merchant/staff/verify/records' + (qs ? '?' + qs : ''))
+  },
   merchantStaffBookingSignupList: () => request('/api/merchant/staff/booking/signup/list'),
   merchantStaffBookingConfirm: (signupId, body) => request('/api/merchant/staff/booking/confirm/' + signupId, { method: 'POST', data: body || {} }),
   merchantStaffBookingReject:  (signupId, body) => request('/api/merchant/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),

@@ -50,6 +50,12 @@ public class OrderServiceImpl implements IOrderService
         return orderMapper.selectOrderList(order);
     }
 
+    @Override
+    public List<Order> selectVerifiedOrderList(Order order)
+    {
+        return orderMapper.selectVerifiedOrderList(order);
+    }
+
     /**
      * 新增订单
      * 

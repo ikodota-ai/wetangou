@@ -101,6 +101,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by o.order_id desc
     </select>
     
+    <!-- 核销记录：只取真核销过的单，按核销时间倒序。
+         时间区间必须打在 verify_time 上而不是 create_time —— 团购最常见的场景
+         就是「昨天买、今天来核」，按下单时间筛会漏掉这些单，同时把今天下单
+         但还没核的单混进来，店长对不上账。 -->
+    <select id="selectVerifiedOrderList" parameterType="Order" resultMap="OrderResult">
+        <include refid="selectOrderVo"/>
+        <where>
+            and o.verify_time is not null
+            <if test="merchantId != null "> and o.merchant_id = #{merchantId}</if>
+            <if test="storeId != null "> and o.store_id = #{storeId}</if>
+            <if test="verifyUser != null and verifyUser != ''"> and o.verify_user = #{verifyUser}</if>
+            <if test="params != null and params.storeIds != null and params.storeIds != ''">
+                and find_in_set(o.store_id, #{params.storeIds})
+            </if>
+            <if test="params != null and params.verifyBegin != null and params.verifyBegin != ''">
+                and o.verify_time &gt;= #{params.verifyBegin}
+            </if>
+            <if test="params != null and params.verifyEnd != null and params.verifyEnd != ''">
+                and o.verify_time &lt;= #{params.verifyEnd}
+            </if>
+        </where>
+        order by o.verify_time desc, o.order_id desc
+    </select>
+
     <select id="selectOrderByOrderId" parameterType="Long" resultMap="OrderResult">
         <include refid="selectOrderVo"/>
         where o.order_id = #{orderId}

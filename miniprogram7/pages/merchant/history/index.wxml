@@ -1,24 +1,45 @@
 <view class="page">
-  <view class="head card">
-    <text class="title">今日买单流水</text>
-    <text class="sub">共 {{list.length}} 条</text>
+  <!-- 日期条：核销记录天天要对账，默认今天，可往前翻。
+       今天已是最后一天，往后的箭头置灰（不然店长翻到明天看到空列表会以为丢数据）。 -->
+  <view class="datebar card">
+    <view class="dnav" bindtap="onPrevDay">‹</view>
+    <picker mode="date" value="{{date}}" bindchange="onPickDate">
+      <view class="dpick">{{date}}{{isToday ? '（今天）' : ''}}</view>
+    </picker>
+    <view class="dnav {{isToday ? 'off' : ''}}" bindtap="onNextDay">›</view>
   </view>
-  <view class="empty" wx:if="{{!list.length && loaded}}">
-    <text>今日还没有买单记录</text>
+
+  <view class="head card">
+    <view class="hl">
+      <text class="title">核销 {{total}} 笔</text>
+      <text class="sub">合计 ¥{{totalAmount}}</text>
+    </view>
+    <!-- 店员本来就只能看到自己核的，没必要给切换；老板/店长默认看全店 -->
+    <view class="toggle {{mine ? 'on' : ''}}" wx:if="{{canSeeAll}}" bindtap="onToggleMine">
+      {{mine ? '只看我核的' : '全店'}}
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{noStore}}">
+    <text>还没有门店，核销记录会在门店开始营业后出现</text>
+  </view>
+  <view class="empty" wx:elif="{{!list.length && loaded}}">
+    <text>{{isToday ? '今天还没有核销记录' : date + ' 没有核销记录'}}</text>
   </view>
   <view class="list" wx:else>
-    <view class="item card" wx:for="{{list}}" wx:key="billId">
+    <view class="item card" wx:for="{{list}}" wx:key="orderId"
+          data-no="{{item.orderNo}}" bindtap="onCopyNo">
       <view class="row1">
-        <text class="no">{{item.billNo}}</text>
-        <text class="amount">¥{{item.payAmount}}</text>
+        <text class="pname">{{item.productName || '团购券'}}{{item.numStr}}</text>
+        <text class="amount">¥{{item.amountStr}}</text>
       </view>
       <view class="row2">
-        <text class="meta">金额 ¥{{item.amount}}  优惠 ¥{{item.discountAmount}}</text>
-        <text class="status s-{{item.status}}">{{item.statusText}}</text>
+        <text class="meta">{{item.orderNo}}</text>
+        <text class="who">{{item.verifyUserName}}</text>
       </view>
       <view class="row3">
-        <text class="time">{{item.createTimeStr}}</text>
-        <view class="btn" wx:if="{{item.status === '0'}}" data-id="{{item.billId}}" bindtap="onConfirm">确认买单</view>
+        <text class="time">{{item.verifyTimeStr}} 核销</text>
+        <text class="store" wx:if="{{multiStore}}">{{item.storeName}}</text>
       </view>
     </view>
   </view>

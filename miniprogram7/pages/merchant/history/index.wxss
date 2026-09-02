@@ -18,3 +18,13 @@
 .time { font-size: 22rpx; color: #AAA; }
 .btn { background: #5A8A4A; color: #fff; font-size: 24rpx; padding: 8rpx 20rpx; border-radius: 20rpx; }
 .btn:active { opacity: 0.7; }
+.datebar { display: flex; align-items: center; justify-content: space-between; }
+.dnav { font-size: 40rpx; color: #5A8A4A; padding: 0 32rpx; line-height: 1; }
+.dnav.off { color: #CCC; }
+.dpick { font-size: 28rpx; color: #1A1A1A; }
+.hl { display: flex; flex-direction: column; }
+.toggle { font-size: 24rpx; color: #5A8A4A; border: 1rpx solid #5A8A4A; padding: 6rpx 18rpx; border-radius: 20rpx; }
+.toggle.on { background: #5A8A4A; color: #fff; }
+.pname { font-size: 28rpx; color: #1A1A1A; font-weight: 500; flex: 1; margin-right: 16rpx; }
+.who { font-size: 22rpx; color: #5A8A4A; }
+.store { font-size: 22rpx; color: #AAA; }

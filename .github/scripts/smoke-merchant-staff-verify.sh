@@ -107,9 +107,11 @@ O_MGR_UID=""
 O_STF_UID=""
 P_STF_UID=""
 SB_ORDERS=""        # B2 段自建的核销订单（storeId 兜底用）
+VR_ORDERS=""        # Q 段自建的核销记录订单
 API_INV_IDS=""      # 商家端 /staff/invite 发出来的码：API 不打 smoke remark（生产代码不该埋测试标记），只能靠这里记 id
 cleanup() {
   sql "delete from biz_order where order_no like 'SMKSB\\_%';"
+  sql "delete from biz_order where order_no like 'SMKVR\\_%';"
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
   if [ -n "$STAFF_UID" ]; then
@@ -851,6 +853,94 @@ fi
 if [ -n "$AGENT_TK" ]; then
   ck "代理商访问店员名单被拒" "$(mapi GET staff/list "$AGENT_TK" | jtop code)" "403"
 fi
+
+# Q 核销记录（商家端首页「核销记录」入口的数据源）
+#
+# 之前商家端根本没有核销记录查询：那个入口点进去的 pages/merchant/history
+# 调的是 today/bills（买单流水），标题也写着「今日买单流水」，而买单和核销
+# 是两码事；核销页里那份「最近核销」只存本机 storage、最多 20 条、换台手机
+# 或清了缓存就没了 —— 店长手机上永远看不到店员核的单。
+#
+# 这段锁住三件容易回退的事：
+#  1. 时间区间必须打在 verify_time 上。团购最常见就是「昨天买、今天来核」，
+#     一旦有人图省事改回 create_time，这类单会从当天记录里消失（反向验证过：
+#     改成 create_time 后前天下单今天核销的那笔就查不到了，金额也跟着少）。
+#  2. 只返回真核销过的单（verify_time 非空），未核销单不能混进来充数。
+#  3. 门店范围按 token 里的授权集合走，显式传别家门店必须拒。
+if [ -n "$STK" ] && [ -n "$STAFF_UID" ]; then
+  VR_TODAY=$(sqlv "select date_format(now(), '%Y-%m-%d');")
+  VR_YEST=$(sqlv "select date_format(date_sub(now(), interval 1 day), '%Y-%m-%d');")
+  # A 跨天：前天下单 / 今天核销（create_time 筛法会漏掉它，这是本段的核心断言）
+  # B 今天下单今天核销  C 别人核的  D 昨天核的  E 没核销的  F 别店的
+  sql "insert into biz_order (order_no, store_id, member_id, merchant_id, product_id, product_name, pay_amount, num, status, verify_code, create_time, verify_time, verify_user) values
+   ('SMKVR_A',$STORE_A,1,$MID,1000,'smoke跨天核销',88.00,1,'2','SMKVRCA', date_sub(now(), interval 2 day), now(), 'store:$STAFF_UID'),
+   ('SMKVR_B',$STORE_A,1,$MID,1000,'smoke当天核销',12.50,2,'2','SMKVRCB', now(), now(), 'store:$STAFF_UID'),
+   ('SMKVR_C',$STORE_A,1,$MID,1000,'smoke他人核销',30.00,1,'2','SMKVRCC', now(), now(), 'store:999999'),
+   ('SMKVR_D',$STORE_A,1,$MID,1000,'smoke昨日核销',55.00,1,'2','SMKVRCD', date_sub(now(), interval 3 day), date_sub(now(), interval 1 day), 'store:$STAFF_UID'),
+   ('SMKVR_E',$STORE_A,1,$MID,1000,'smoke未核销',99.00,1,'1','SMKVRCE', now(), null, null),
+   ('SMKVR_F',$STORE_B,1,$MID,1000,'smoke别店核销',77.00,1,'2','SMKVRCF', now(), now(), 'store:999999');"
+  VR_ORDERS=1
+  # 只统计本段自建的单，避免被库里存量核销单干扰
+  vrcnt() { python3 -c "
+import sys,json
+d=json.load(sys.stdin); b=d.get('data') or {}
+rows=[r for r in (b.get('rows') or []) if str(r.get('orderNo','')).startswith('SMKVR')]
+print(len(rows))
+"; }
+  vrhas() { python3 -c "
+import sys,json
+d=json.load(sys.stdin); b=d.get('data') or {}
+print('yes' if any(r.get('orderNo')=='$1' for r in (b.get('rows') or [])) else 'no')
+"; }
+  vrname() { python3 -c "
+import sys,json
+d=json.load(sys.stdin); b=d.get('data') or {}
+for r in (b.get('rows') or []):
+    if r.get('orderNo')=='$1': print(r.get('verifyUserName') or ''); break
+else: print('')
+"; }
+
+  echo "[Q] 核销记录"
+  VR_ALL=$(mapi GET "verify/records?date=$VR_TODAY" "$STK")
+  ck "端点可用"              "$(echo "$VR_ALL" | jtop code)" "200"
+  # 今天该有 A(跨天) + B(当天) + C(他人)，共 3 笔
+  ck "今日核销 3 笔"          "$(echo "$VR_ALL" | vrcnt)" "3"
+  ck "跨天核销单在今天里"      "$(echo "$VR_ALL" | vrhas SMKVR_A)" "yes"
+  ck "未核销单不混进来"        "$(echo "$VR_ALL" | vrhas SMKVR_E)" "no"
+  ck "昨日核销单不在今天"      "$(echo "$VR_ALL" | vrhas SMKVR_D)" "no"
+  ck "别店核销单不在范围内"    "$(echo "$VR_ALL" | vrhas SMKVR_F)" "no"
+  # 核销人要显示真名，不能是裸的 store:61（店长看不出是谁）
+  ckc "核销人显示真实姓名"     "$(echo "$VR_ALL" | vrname SMKVR_A)" "$(sqlv "select real_name from biz_merchant_staff where user_id=$STAFF_UID limit 1;")"
+
+  # mine=1 只看自己核的：A + B，C 是别人核的要排除
+  VR_MINE=$(mapi GET "verify/records?date=$VR_TODAY&mine=1" "$STK")
+  ck "只看我核的 2 笔"        "$(echo "$VR_MINE" | vrcnt)" "2"
+  ck "  → 别人核的被排除"     "$(echo "$VR_MINE" | vrhas SMKVR_C)" "no"
+
+  # 翻到昨天：只该有 D
+  VR_Y=$(mapi GET "verify/records?date=$VR_YEST" "$STK")
+  ck "昨日只有 1 笔"          "$(echo "$VR_Y" | vrcnt)" "1"
+  ck "  → 是昨日那笔"         "$(echo "$VR_Y" | vrhas SMKVR_D)" "yes"
+
+  # 门店范围：授权内可查，别家门店必须拒
+  ck "指定授权内门店可查"      "$(mapi GET "verify/records?storeId=$STORE_A" "$STK" | jtop code)" "200"
+  ckc "指定别家门店被拒"       "$(mapi GET "verify/records?storeId=$STORE_B" "$STK")" "无权查看其他门店的核销记录"
+
+  # 日期校验：DateUtils.parseDate 带 yyyy-MM 备选 pattern，"2026-13-99" 会被
+  # 解析成 2027-04-09（13 月溢出 + 尾巴被吞），店长手滑输错只看到空列表。
+  ckc "非法月日被拒"           "$(mapi GET "verify/records?date=2026-13-99" "$STK")" "日期不存在"
+  ckc "不存在的日期被拒"       "$(mapi GET "verify/records?date=2026-02-30" "$STK")" "日期不存在"
+  ckc "非日期串被拒"           "$(mapi GET "verify/records?date=abc" "$STK")" "日期格式应为"
+  # 店员看不到「全店/只看我」切换（canSeeAll 仅 OWNER/MANAGER）
+  ck "店员 canSeeAll=false"   "$(echo "$VR_ALL" | jget canSeeAll)" "False"
+fi
+if [ -n "$MGR_TK" ]; then
+  ck "店长 canSeeAll=true"    "$(mapi GET verify/records "$MGR_TK" | jget canSeeAll)" "True"
+fi
+if [ -n "$PLAT_TK" ]; then
+  ck "平台账号查核销记录被拒"  "$(mapi GET verify/records "$PLAT_TK" | jtop code)" "403"
+fi
+ck "无 token 查核销记录被拒"   "$(curl -s "$BASE_URL/api/merchant/staff/verify/records" -H "X-App-Id: $APPID" | jtop code)" "401"
 
 echo
 if [ $FAIL -eq 0 ]; then echo "smoke-merchant-staff-verify: ALL PASSED"; else echo "smoke-merchant-staff-verify: FAILED"; exit 1; fi
