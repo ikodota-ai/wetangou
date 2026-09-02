@@ -151,29 +151,42 @@ public class ApiProductController
     }
 
     /**
-     * 商品详情
+     * 商品详情。
+     *
+     * <p>顾客端（商品详情页 / 下单页 / 分享页）和商家端编辑页回填都走这一个端点，
+     * 但两边可见范围不同，必须在这里分开判：
+     * <ul>
+     *   <li>顾客态：只能看本 appid 商户的<b>上架</b>商品。原先这个端点既不判商户
+     *       也不判状态 —— 商品 id 是自增连号，随手把 URL 里的 id 加一就能翻出
+     *       别家商户的商品，连人家还没上架的草稿（定价、库存、门店）都一起吐出来。
+     *       /list 一直是带 status=0 和商户条件的，只有详情这条漏了。</li>
+     *   <li>商家态（带员工 token）：能看自己商户的草稿 —— 编辑页回填就靠它，
+     *       否则商家在小程序里建完草稿点「编辑」会直接被判成无权访问。
+     *       但仍不能跨商户。</li>
+     * </ul>
+     *
+     * <p>两种情况都返回同一句「商品不存在或已下架」而不点明「无权访问」：
+     * 否则返回文案本身就成了探测别家商品 id 是否存在的信道。</p>
      */
     @GetMapping("/{productId}")
     public AjaxResult detail(@PathVariable Long productId)
     {
         Product p = productService.selectProductByProductId(productId);
-        if (p != null)
+        if (p == null || !isVisibleToCaller(p))
         {
-            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
-            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+            return AjaxResult.error("商品不存在或已下架");
         }
+        p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
+        p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
         // E1 收口：统一 subitemGroups 放顶层。历史曾有 data 子对象冗余，
         // 现已确认无客户端依赖（admin 用 listGroups 端点，小程序 pages/goods/detail/index.js
         // 第 50 行读 d.subitemGroups 顶层），删 dataMap 冗余让 API 干净。
         AjaxResult result = AjaxResult.success(p);
-        if (p != null)
+        String t = p.getTypeCode() == null ? "" : p.getTypeCode();
+        if ("GROUPON".equals(t) || "COMBO".equals(t))
         {
-            String t = p.getTypeCode() == null ? "" : p.getTypeCode();
-            if ("GROUPON".equals(t) || "COMBO".equals(t))
-            {
-                List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
-                result.put("subitemGroups", groups);
-            }
+            List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
+            result.put("subitemGroups", groups);
         }
         return result;
     }
@@ -389,6 +402,48 @@ public class ApiProductController
         exist.setStatus(body.getStatus());
         int rows = productService.updateProduct(exist);
         return rows > 0 ? AjaxResult.success() : AjaxResult.error("操作失败");
+    }
+
+    /**
+     * 该商品对当前调用方是否可见。
+     *
+     * <p>商户归属一律以服务端解析的为准，不看任何请求参数：
+     * 商家态取员工 token 里的 merchantId，顾客态取 X-App-Id 解析出来的租户上下文
+     * （MemberAuthInterceptor 对匿名请求会按 appid 写入 TenantContextHolder）。</p>
+     *
+     * <p>兜底策略是「解析不到商户就只放行上架商品」而不是全放行：appid 缺失时
+     * 拦截器会 fallback 到默认商户，此时若把未上架商品也放出去，等于给默认商户
+     * 开了一个不带 header 就能读草稿的后门。</p>
+     */
+    private boolean isVisibleToCaller(Product p)
+    {
+        Long owner = p.getMerchantId();
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        // 商家态：自己商户的商品含草稿都可见（编辑页回填需要），别家一概不可见
+        if (me != null && me.isStaffSession() && me.getMerchantId() != null)
+        {
+            return owner != null && owner.equals(me.getMerchantId());
+        }
+        // 顾客态：先卡上架，再卡商户
+        if (!STATUS_ON.equals(p.getStatus()))
+        {
+            return false;
+        }
+        com.ruoyi.common.core.domain.model.TenantContext ctx =
+                com.ruoyi.common.utils.TenantContextHolder.get();
+        if (ctx == null || ctx.isPlatform())
+        {
+            return true;
+        }
+        if (ctx.isMerchant() && ctx.getMerchantId() != null)
+        {
+            return owner != null && owner.equals(ctx.getMerchantId());
+        }
+        if (ctx.isAgent() && ctx.getMerchantIds() != null)
+        {
+            return owner != null && ctx.getMerchantIds().contains(owner);
+        }
+        return true;
     }
 
     /**

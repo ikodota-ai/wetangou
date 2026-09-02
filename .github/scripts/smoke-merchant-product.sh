@@ -44,6 +44,7 @@ if [ -z "$STK" ]; then echo "  ❌ 登录失败，后续跳过: $LOGIN"; exit 1;
 ok "登录成功 merchantId=$MID storeId=$SID"
 AUTH="Authorization: Bearer $STK"
 JSON='Content-Type: application/json'
+APPID="wx9e147c4e2151b123"   # 本地 appid → 商户 1，用于顾客态租户解析
 
 # 收尾清理：不管中途哪步失败都把测试商品删掉
 CREATED=""
@@ -94,7 +95,13 @@ PID=$(echo "$DRAFT" | python3 -c 'import sys,json;print(json.load(sys.stdin).get
 # ---------- 3) 小程序提交的 ext 必须真落库 ----------
 # 原先 saveExtByTypeCode 用 new ProductExt() 从零构造，把 body.ext 整个丢掉。
 echo "[3] 小程序提交的 ext 是否落库"
-DET=$(curl -s "$H/api/product/$PID")
+# 必须带员工 token：详情端点对顾客态只放行上架商品，草稿要靠商家态才看得到。
+# 不带 token 拿这条草稿会被判「商品不存在或已下架」，下面所有回填断言会连环失败。
+DET=$(curl -s "$H/api/product/$PID" -H "$AUTH" -H "X-App-Id: $APPID")
+# 反过来锁死顾客侧：同一条草稿顾客态必须读不到，否则未上架的定价/库存就漏出去了
+CDET=$(curl -s "$H/api/product/$PID" -H "X-App-Id: $APPID")
+chk_msg "顾客态读不到自家草稿" "商品不存在或已下架" "$CDET"
+chk_code "商家态能读自家草稿(编辑回填)" 200 "$DET"
 for kv in "saleChannels:MINI_HOME,GROUP_SHARE" "staffPromote:1" "codeType:MERCHANT"; do
   k="${kv%%:*}"; want="${kv#*:}"
   got=$(echo "$DET" | python3 -c "import sys,json;print((json.load(sys.stdin)['data'].get('ext') or {}).get('$k'))")
@@ -210,6 +217,15 @@ if [ -n "$OTHER" ]; then
   chk_msg "改别家商品被拒" "无权编辑" "$X1"
   X2=$(curl -s -X PUT "$H/api/product/status" -H "$AUTH" -H "$JSON" -d "{\"productId\":$OTHER,\"status\":\"0\"}")
   chk_msg "上架别家商品被拒" "无权操作" "$X2"
+  # 详情端点也必须挡住：商品 id 自增连号，URL 里 id 加一就能翻别家商户的定价/库存/门店。
+  # 编辑和上架早就判了归属，只有 GET 详情这条一直裸奔。
+  X3=$(curl -s "$H/api/product/$OTHER" -H "X-App-Id: $APPID")
+  chk_msg "顾客态读别家商品被拒" "商品不存在或已下架" "$X3"
+  X4=$(curl -s "$H/api/product/$OTHER" -H "$AUTH" -H "X-App-Id: $APPID")
+  chk_msg "商家态读别家商品被拒" "商品不存在或已下架" "$X4"
+  # 不能靠不带 header 绕过（缺 appid 时拦截器会 fallback 到默认商户）
+  X5=$(curl -s "$H/api/product/$OTHER")
+  chk_msg "不带 X-App-Id 也读不到别家商品" "商品不存在或已下架" "$X5"
 else
   echo "  ⚠️  跳过：库里没有别家商户的商品可用于越权测试"
 fi
@@ -217,9 +233,9 @@ fi
 BADS=$(/usr/local/mysql/bin/mysql -uroot -p133301 ry-vue -N -e \
   "select store_id from biz_store where merchant_id<>$MID limit 1;" 2>/dev/null)
 if [ -n "$BADS" ]; then
-  X3=$(curl -s -X POST "$H/api/product/add" -H "$AUTH" -H "$JSON" \
+  XS=$(curl -s -X POST "$H/api/product/add" -H "$AUTH" -H "$JSON" \
     -d "{\"storeIds\":\"$SID,$BADS\",\"typeCode\":\"GROUPON\",\"productName\":\"SMOKE_跨店\",\"price\":10,\"status\":\"1\"}")
-  chk_msg "建品带别家门店被拒" "不属于该商家" "$X3"
+  chk_msg "建品带别家门店被拒" "不属于该商家" "$XS"
 fi
 
 # ---------- 12) 未登录 ----------
