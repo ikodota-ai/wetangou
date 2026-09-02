@@ -110,6 +110,50 @@ ck "推客页 js 读 promoterEnabled" "$([ "${G:-0}" -ge 3 ] && echo yes || echo
 G=$(grep -c 'this.data.promoterEnabled' "$PJS" 2>/dev/null || true)
 ck "推客页 onJoin/loadCenter 有开关拦截" "$([ "${G:-0}" -ge 2 ] && echo yes || echo no)" "yes"
 
+# ---- 10) 【核心】服务端必须自己挡，不能只靠前端隐藏入口。
+#     实测过的真洞：开关=0 时直接 POST /api/distributor/join 返 200 并真的
+#     在 biz_distributor 建了一条 distributor_id=999927。前端隐藏入口只是
+#     体验层，分享卡片/海报 path/扫码/手搓请求都能绕过。
+#     守法：DistributorAuthInterceptor 在 @Anonymous 判定**之前**先判开关
+#     （/join 是 @Anonymous 的，放后面等于不生效）。
+MTOKEN=$(curl -s -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' \
+  -H "X-App-Id: $APP" -d '{"code":"smoke_promoter_sw","appid":"'"$APP"'"}' \
+  | python3 -c 'import sys,json;print(json.loads(sys.stdin.read() or "{}").get("token",""))')
+ck "mock 登录拿到会员 token" "$([ -n "$MTOKEN" ] && echo yes || echo no)" "yes"
+
+# 取业务 code（拦截器手写 JSON，code 是数字）
+bcode() { curl -s -X "$1" "$BASE$2" -H "Authorization: Bearer $MTOKEN" -H "X-App-Id: $APP" \
+  | python3 -c 'import sys,json
+try: print(json.loads(sys.stdin.read() or "{}").get("code"))
+except Exception: print("parse_error")'; }
+
+q "update biz_merchant set promoter_enabled='0' where merchant_id=$MID"; evict
+ck "关闭时 POST /api/distributor/join 被拒(403)"        "$(bcode POST /api/distributor/join)"          "403"
+ck "关闭时 GET  /api/distributor/center 被拒(403)"      "$(bcode GET  /api/distributor/center)"        "403"
+ck "关闭时 GET  /api/distributor/qrcode 被拒(403)"      "$(bcode GET  /api/distributor/qrcode)"        "403"
+ck "关闭时 GET  /api/distributor/fans 被拒(403)"        "$(bcode GET  /api/distributor/fans)"          "403"
+ck "关闭时 GET  /api/distributor/withdraw/list 被拒"    "$(bcode GET  /api/distributor/withdraw/list)" "403"
+# 最要紧的一条：被拒之后库里不能留下推客记录
+LEFT=$(q "select count(*) from biz_distributor d join biz_member m on m.member_id=d.member_id
+          where m.openid='mock_smoke_promoter_sw'")
+ck "关闭时被拒后库里没建出推客记录" "${LEFT:-x}" "0"
+
+# ---- 11) 开关打开后语义要完全恢复：非推客拿到的仍是原来那句「您还不是推客」，
+#         而不是被开关误伤成「未开通」；join 仍然可用（否则谁都成不了推客）。
+q "update biz_merchant set promoter_enabled='1' where merchant_id=$MID"; evict
+MSG=$(curl -s "$BASE/api/distributor/center" -H "Authorization: Bearer $MTOKEN" -H "X-App-Id: $APP" \
+  | python3 -c 'import sys,json;print((json.loads(sys.stdin.read() or "{}").get("msg") or ""))')
+case "$MSG" in *"还不是推客"*) ck "开启时非推客返原始提示（未被开关误伤）" "ok" "ok" ;;
+               *) ck "开启时非推客返原始提示（未被开关误伤）" "$MSG" "含'还不是推客'" ;; esac
+ck "开启时 join 仍可用(200)" "$(bcode POST /api/distributor/join)" "200"
+
+# 清理本脚本 mock 登录产生的会员/推客
+q "delete d from biz_distributor d join biz_member m on m.member_id=d.member_id
+   where m.openid='mock_smoke_promoter_sw'"
+q "delete from biz_member where openid='mock_smoke_promoter_sw'"
+LEFT=$(q "select count(*) from biz_member where openid='mock_smoke_promoter_sw'")
+ck "测试数据已清理" "${LEFT:-x}" "0"
+
 echo
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

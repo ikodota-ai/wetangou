@@ -11,7 +11,11 @@ import com.ruoyi.biz.domain.Distributor;
 import com.ruoyi.biz.domain.Member;
 import com.ruoyi.biz.service.IDistributorService;
 import com.ruoyi.biz.service.IMemberService;
+import com.ruoyi.biz.service.ITenantService;
+import com.ruoyi.biz.domain.Merchant;
 import com.ruoyi.common.annotation.Anonymous;
+import com.ruoyi.common.core.domain.model.TenantContext;
+import com.ruoyi.common.utils.TenantContextHolder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -35,6 +39,8 @@ public class DistributorAuthInterceptor implements HandlerInterceptor
     private IDistributorService distributorService;
     @Autowired
     private IMemberService memberService;
+    @Autowired
+    private ITenantService tenantService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -42,6 +48,19 @@ public class DistributorAuthInterceptor implements HandlerInterceptor
     {
         if (!(handler instanceof HandlerMethod)) return true;
         HandlerMethod hm = (HandlerMethod) handler;
+
+        // 0) 商户级推客总开关。必须排在 @Anonymous 之前 ——
+        //    /join 是 @Anonymous 的（未成为推客的人也要能申请），如果放在后面，
+        //    商户明明关了推客功能，任何人直接 POST /api/distributor/join 仍会真的
+        //    在 biz_distributor 建一条记录（实测：开关=0 时 join 返 200 并建出
+        //    distributor_id=999927）。前端隐藏入口只是体验层，服务端必须自己挡。
+        //    /agent/summary 也是 @Anonymous，但那是代理商视角、不属于 C 端推客业务，
+        //    所以按路径排除，别把代理商的佣金概览一起关掉。
+        if (!isPromoterEnabled() && !isAgentScoped(request))
+        {
+            writeError(response, 403, "该商家暂未开通推客功能");
+            return false;
+        }
 
         // 1) @Anonymous 放行
         if (hm.hasMethodAnnotation(Anonymous.class) || hm.getBeanType().isAnnotationPresent(Anonymous.class))
@@ -83,6 +102,43 @@ public class DistributorAuthInterceptor implements HandlerInterceptor
             return false;
         }
         return true;
+    }
+
+    /**
+     * 当前请求所属商户是否开了推客功能。
+     *
+     * 商户由 MemberAuthInterceptor 按 X-App-Id 解析进 TenantContext（本拦截器
+     * 注册在它后面，所以这里一定拿得到）。取不到商户时一律放行 —— 宁可放过，
+     * 也不要因为解析失败把已开通商户的推客全锁在外面。
+     *
+     * 空值兜底成"已开通"：merchant:appid:* 缓存是 fastjson 序列化对象且没有 TTL，
+     * 加 promoter_enabled 列之前写进 Redis 的老快照反序列化回来是 null，
+     * 若按"非 1 即关"处理，升级瞬间所有存量商户的推客都会被 403。
+     */
+    private boolean isPromoterEnabled()
+    {
+        try
+        {
+            TenantContext ctx = TenantContextHolder.get();
+            Long merchantId = ctx == null ? null : ctx.getMerchantId();
+            if (merchantId == null) return true;
+            Merchant merchant = tenantService.getMerchantById(merchantId);
+            if (merchant == null) return true;
+            String flag = merchant.getPromoterEnabled();
+            return flag == null || flag.isEmpty() || !"0".equals(flag);
+        }
+        catch (Exception e)
+        {
+            // 开关判断本身出错不能变成"全员禁用"
+            return true;
+        }
+    }
+
+    /** /api/distributor/agent/** 是代理商视角，不受 C 端推客开关约束 */
+    private static boolean isAgentScoped(HttpServletRequest request)
+    {
+        String uri = request.getRequestURI();
+        return uri != null && uri.contains("/api/distributor/agent/");
     }
 
     private Distributor findDistributor(LoginMember lm, String openid)
