@@ -66,11 +66,20 @@
       <view class="m-text"><text class="m-t">今日订单</text><text class="m-d">查看今日订单流水</text></view>
       <view class="arr"></view>
     </view>
-  </view>
+    <!-- 原先这条和下面的店员管理都写在 .modules 闭合标签之外，脱离了卡片容器与
+         wx:if="{{!noStore}}"：没门店时「创建商品」照样显示，点进去必然失败 -->
     <view class="module-item" bindtap="goCreateProduct" wx:if="{{showCreateProduct}}">
       <view class="m-text"><text class="m-t">创建商品</text><text class="m-d">新增团购 / 代金券</text></view>
       <view class="arr"></view>
     </view>
+    <view class="module-item" bindtap="goTeam" wx:if="{{showTeam}}">
+      <view class="m-text">
+        <text class="m-t">店员管理<text class="m-badge" wx:if="{{pendingStaffCount}}">{{pendingStaffCount}}</text></text>
+        <text class="m-d">邀请店员 / 审核入职 / 重置密码</text>
+      </view>
+      <view class="arr"></view>
+    </view>
+  </view>
 
   <view class="recent card" wx:if="{{recentOrders.length}}">
     <view class="section-title">最近订单</view>

@@ -22,6 +22,8 @@ Page({
     recentOrders: [],
     showGmv: false,
     showCreateProduct: false,
+    showTeam: false,
+    pendingStaffCount: 0,
     showBill: true,
     isStaffOnly: false
   },
@@ -55,6 +57,9 @@ Page({
       showGmv: role.isManagerOrAbove(),
       showCreateProduct: role.isManagerOrAbove(),
       showBill: role.isManagerOrAbove(),
+      // 不能用 isManagerOrAbove()：它含 PLATFORM，而平台账号已被后端禁入商家端，
+      // 用它控制入口会给平台账号显示一个点进去必然 403 的按钮
+      showTeam: role.canManageStaff(),
       isStaffOnly: role.isStaff() && !role.isManager() && !role.isOwner()
     })
   },
@@ -96,9 +101,22 @@ Page({
           showGmv: role.isManagerOrAbove(),
           showCreateProduct: role.isManagerOrAbove(),
           showBill: role.isManagerOrAbove(),
+          showTeam: role.canManageStaff(),
           isStaffOnly: role.isStaff() && !role.isManager() && !role.isOwner()
         })
+        // 待审核角标：让店长一进首页就知道有人在等入职，不必主动点进去翻
+        if (role.canManageStaff()) this.loadPendingStaff()
       })
+  },
+
+  /** 待审核入职数量（失败静默：这只是个角标，不该拖垮首页） */
+  loadPendingStaff() {
+    return api.merchantStaffAuditList()
+      .then((res) => {
+        const list = (res && res.data) || res || []
+        this.setData({ pendingStaffCount: (list && list.length) || 0 })
+      })
+      .catch(() => {})
   },
 
   orderStatusText(s) {
@@ -147,6 +165,7 @@ Page({
 
   goOrders() { wx.navigateTo({ url: '/pages/merchant/order/index' }) },
   goHistory(){ wx.navigateTo({ url: '/pages/merchant/history/index' }) },
+  goTeam()   { wx.navigateTo({ url: '/pages/merchant/team/index' }) },
   goMe()     { wx.navigateTo({ url: '/pages/merchant/me/index' }) },
   /**
    * 切回会员版。

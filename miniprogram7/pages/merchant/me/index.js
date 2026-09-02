@@ -7,7 +7,8 @@ Page({
     storeName: '',
     role: '',
     openid: '',
-    openidBound: false
+    openidBound: false,
+    showTeam: false
   },
 
   onShow() {
@@ -25,7 +26,10 @@ Page({
           storeName: this.pickStoreName(data),
           role: data.role || '员工',
           openid: data.openid || '',
-          openidBound: !!data.openidBound
+          openidBound: !!data.openidBound,
+          // 用 /me 返的 role 判，而不是本地缓存的 roles：换账号登录时缓存可能还是上一个人的。
+          // 平台账号不在此列 —— 后端已禁止平台访问整片商家端。
+          showTeam: data.role === 'OWNER' || data.role === 'MANAGER'
         })
       })
       .catch((err) => {
@@ -42,6 +46,10 @@ Page({
     const cur = stores.filter(x => x.storeId === data.storeId)[0]
     if (cur) return cur.storeName
     return data && data.storeId ? ('门店' + data.storeId) : ''
+  },
+
+  goTeam() {
+    wx.navigateTo({ url: '/pages/merchant/team/index' })
   },
 
   goProfile() {

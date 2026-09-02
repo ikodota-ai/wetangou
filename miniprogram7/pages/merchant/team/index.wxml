@@ -1,0 +1,113 @@
+<view class="page">
+  <view class="tabs">
+    <view class="tab {{tab==='audit'?'on':''}}" data-tab="audit" bindtap="switchTab">
+      待审核<text class="badge" wx:if="{{auditList.length}}">{{auditList.length}}</text>
+    </view>
+    <view class="tab {{tab==='team'?'on':''}}" data-tab="team" bindtap="switchTab">员工</view>
+    <view class="tab {{tab==='invite'?'on':''}}" data-tab="invite" bindtap="switchTab">邀请码</view>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">加载中…</view>
+
+  <!-- 待审核 -->
+  <block wx:if="{{!loading && tab==='audit'}}">
+    <view class="empty" wx:if="{{!auditList.length}}">
+      <text>暂无待审核申请</text>
+      <text class="hint">新人用微信「扫一扫」扫邀请码后会出现在这里</text>
+    </view>
+    <view class="card" wx:for="{{auditList}}" wx:key="id">
+      <view class="row">
+        <text class="name">{{item.displayName}}</text>
+        <text class="tag">{{item.roleLabel}}</text>
+      </view>
+      <view class="meta">{{item.storeName || ('门店' + item.storeId)}} · 申请时间 {{item.createTime || '-'}}</view>
+      <view class="meta" wx:if="{{item.phone}}">手机 {{item.phone}}</view>
+      <view class="ops" wx:if="{{item.canOperate}}">
+        <view class="btn ghost" data-id="{{item.id}}" bindtap="onReject">拒绝</view>
+        <view class="btn primary" data-id="{{item.id}}" bindtap="onApprove">通过</view>
+      </view>
+      <view class="meta warn" wx:else>该角色需老板审核</view>
+    </view>
+  </block>
+
+  <!-- 员工名单 -->
+  <block wx:if="{{!loading && tab==='team'}}">
+    <view class="empty" wx:if="{{!teamList.length}}">
+      <text>还没有员工</text>
+      <text class="hint">点下方「邀请店员」生成邀请码</text>
+    </view>
+    <view class="card" wx:for="{{teamList}}" wx:key="id">
+      <view class="row">
+        <text class="name">{{item.displayName}}</text>
+        <text class="tag">{{item.roleLabel}}</text>
+        <text class="state {{item.status==='1'?'off':'on'}}">{{item.statusLabel}}</text>
+      </view>
+      <view class="meta">{{item.storeId === 0 ? '全部门店' : (item.storeName || ('门店' + item.storeId))}}</view>
+      <view class="meta" wx:if="{{item.userName}}">登录账号 {{item.userName}}</view>
+      <view class="meta" wx:if="{{item.phone}}">手机 {{item.phone}}</view>
+      <view class="ops" wx:if="{{item.canOperate}}">
+        <view class="btn ghost" data-userid="{{item.userId}}" data-name="{{item.displayName}}" bindtap="onResetPwd">重置密码</view>
+        <view class="btn danger" wx:if="{{item.status!=='1'}}" data-id="{{item.id}}" data-name="{{item.displayName}}" bindtap="onDismiss">办理离职</view>
+        <view class="btn primary" wx:else data-id="{{item.id}}" bindtap="onRestore">复职</view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 邀请码 -->
+  <block wx:if="{{!loading && tab==='invite'}}">
+    <view class="empty" wx:if="{{!inviteList.length}}">
+      <text>还没有发出邀请码</text>
+      <text class="hint">生成后让新人用微信「扫一扫」扫码入职</text>
+    </view>
+    <view class="card" wx:for="{{inviteList}}" wx:key="inviteId">
+      <view class="row">
+        <text class="name mono">{{item.inviteCode}}</text>
+        <text class="tag">{{item.roleLabel}}</text>
+        <text class="state {{item.stateLabel==='待扫码'?'on':'off'}}">{{item.stateLabel}}</text>
+      </view>
+      <view class="meta">{{item.storeName || ('门店' + item.storeId)}} · 有效至 {{item.expireAt || '-'}}</view>
+      <view class="ops">
+        <view class="btn ghost" data-code="{{item.inviteCode}}" bindtap="copyCode">复制短码</view>
+        <view class="btn ghost" data-url="{{item.wxacodeFull}}" bindtap="previewQrcode">二维码</view>
+        <view class="btn primary" data-id="{{item.inviteId}}" data-role="{{item.role}}" bindtap="goPoster">生成海报</view>
+      </view>
+    </view>
+  </block>
+
+  <view class="fab" wx:if="{{!loading && myRole}}" bindtap="openInvite">邀请店员</view>
+
+  <!-- 生成邀请码面板 -->
+  <view class="mask" wx:if="{{invitePanel}}" bindtap="closeInvite"></view>
+  <view class="panel" wx:if="{{invitePanel}}">
+    <view class="panel-title">邀请店员</view>
+
+    <block wx:if="{{!inviteResult}}">
+      <view class="panel-label">选择角色</view>
+      <view class="role-picks">
+        <view class="pick {{inviteRole===r.code?'on':''}}" wx:for="{{roleOptions}}" wx:for-item="r" wx:key="code"
+              data-role="{{r.code}}" bindtap="pickInviteRole">{{r.label}}</view>
+      </view>
+      <view class="panel-hint">邀请码 7 天内有效，只能用一次。生成后让新人用微信「扫一扫」扫码。</view>
+      <view class="btn primary block {{submitting?'disabled':''}}" bindtap="onCreateInvite">
+        {{submitting ? '生成中…' : '生成邀请码'}}
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="qr-wrap">
+        <image class="qr" wx:if="{{inviteResult.wxacodeFull}}" src="{{inviteResult.wxacodeFull}}" mode="aspectFit"
+               data-url="{{inviteResult.wxacodeFull}}" bindtap="previewQrcode"></image>
+        <view class="qr placeholder" wx:else>二维码生成失败<text class="hint">可口述下方短码让新人手输</text></view>
+      </view>
+      <view class="code-row">
+        <text class="code mono">{{inviteResult.inviteCode}}</text>
+        <view class="btn ghost sm" bindtap="copyCode">复制</view>
+      </view>
+      <view class="panel-hint">角色：{{inviteResult.roleLabel}} · 有效至 {{inviteResult.expireAt || '7 天内'}}</view>
+      <view class="panel-hint">新人扫码后会进入待审核，需你在「待审核」里点通过才能登录。</view>
+      <view class="btn primary block" wx:if="{{inviteResult.inviteId}}" data-id="{{inviteResult.inviteId}}"
+            data-role="{{inviteResult.role}}" bindtap="goPoster">生成招人海报</view>
+      <view class="btn ghost block" bindtap="closeInvite">完成</view>
+    </block>
+  </view>
+</view>

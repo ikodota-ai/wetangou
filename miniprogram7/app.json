@@ -43,6 +43,8 @@
     "pages/merchant/booking/index",
     "pages/merchant/order/index",
     "pages/merchant/me/index",
+    "pages/merchant/team/index",
+    "pages/merchant/poster-invite/index",
     "pages/merchant/history/index",
     "pages/merchant/profile/index",
     "pages/merchant/product/create/index",

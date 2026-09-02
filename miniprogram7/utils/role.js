@@ -48,6 +48,14 @@ function isOwner()    { return getRoles().indexOf(BizRole.OWNER)    >= 0; }
 function isManager()  { return getRoles().indexOf(BizRole.MANAGER)  >= 0; }
 function isStaff()    { return getRoles().indexOf(BizRole.STAFF)    >= 0; }
 function isManagerOrAbove() { return isOwner() || isManager() || isPlatform(); }
+/**
+ * 是否商家端管人角色（老板 / 店长），用于店员管理入口。
+ *
+ * <p>不能用 isManagerOrAbove()：那个把 PLATFORM 也算进来，而平台账号已被
+ * 后端 RoleAuthInterceptor 禁止访问整片商家端（/api/merchant/staff/** 一律 403）。
+ * 用它控制入口会给平台账号显示一个点进去必然 403 的按钮。</p>
+ */
+function canManageStaff() { return isOwner() || isManager(); }
 function isOwnerOnly()      { return isOwner() && !isPlatform(); } // 纯商家 owner（平台超管不算）
 
 /** 商家端：OWNER/MANAGER/STAFF 任一都算商家端登录（含平台超管） */
@@ -57,5 +65,5 @@ module.exports = {
   BizRole, UserType,
   getMember, getRoles, getUserType,
   isPlatform, isAgent, isOwner, isManager, isStaff,
-  isManagerOrAbove, isOwnerOnly, isMerchantSide
+  isManagerOrAbove, isOwnerOnly, isMerchantSide, canManageStaff
 };

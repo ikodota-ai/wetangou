@@ -8,6 +8,10 @@
   </view>
 
   <view class="list card">
+    <view class="li" bindtap="goTeam" wx:if="{{showTeam}}">
+      <text>店员管理</text>
+      <view class="arr"></view>
+    </view>
     <view class="li" bindtap="goProfile">
       <text>补录姓名 / 手机号</text>
       <view class="arr"></view>

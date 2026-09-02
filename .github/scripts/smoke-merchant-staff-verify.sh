@@ -105,6 +105,8 @@ ORDER_K=""
 M_UID=""
 O_MGR_UID=""
 O_STF_UID=""
+P_STF_UID=""
+API_INV_IDS=""      # 商家端 /staff/invite 发出来的码：API 不打 smoke remark（生产代码不该埋测试标记），只能靠这里记 id
 cleanup() {
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
@@ -155,6 +157,23 @@ cleanup() {
       sql "delete from sys_user where user_id=$U;"
     fi
   done
+  # P 组：商家端小程序里招进来的店员 + 发出去的邀请码
+  # 商家端 /staff/invite 生成的码没有 smokemsv remark（那是生产端点，不该为测试埋标记），
+  # 所以既按记下的 id 删，又按 create_by=mstaff-<老板/店长 uid> 兜底 —— 否则每跑一次
+  # 就在 biz_merchant_staff_invite 里漏几条脏码，跑上几十轮后「废码没落库」这类
+  # count 断言会被历史残留污染。
+  for I in $API_INV_IDS; do sql "delete from biz_merchant_staff_invite where invite_id=$I;"; done
+  [ -n "$OWNER_UID" ] && sql "delete from biz_merchant_staff_invite where create_by='mstaff-$OWNER_UID';"
+  MGR_SELF_UID=$(sqlv "select user_id from sys_user where user_name='manager_c43' and del_flag='0' limit 1;")
+  [ -n "$MGR_SELF_UID" ] && sql "delete from biz_merchant_staff_invite where create_by='mstaff-$MGR_SELF_UID';"
+  if [ -n "$P_STF_UID" ]; then
+    sql "delete from biz_merchant_staff where user_id=$P_STF_UID;"
+    sql "delete from sys_user_role where user_id=$P_STF_UID;"
+    sql "delete from biz_merchant_user where user_id=$P_STF_UID;"
+    sql "delete from sys_user where user_id=$P_STF_UID;"
+  fi
+  # 老板给自己重置过密码，必须还原成 admin123，否则后续跑批登不进来
+  [ -n "$OWNER_UID" ] && sql "update sys_user set password='$PWD_HASH' where user_id=$OWNER_UID;"
   # L 组：商家端建出来的商品（含 biz_product_store 关联）
   sql "delete from biz_product_store where product_id in (select product_id from biz_product where product_name like 'smokemsv_prod%');"
   sql "delete from biz_product where product_name like 'smokemsv_prod%';"
@@ -638,6 +657,168 @@ print(sum(1 for r in rows if r.get('merchantId') not in (None, $MID)))")
     ck "店员没拿到任何 PC 角色" "$(sqlv "select count(*) from sys_user_role where user_id=$O_STF_UID;")" "0"
     ck "店员租户归属仍已落库"   "$(sqlv "select concat(user_type,'/',merchant_id) from biz_merchant_user where user_id=$O_STF_UID;")" "2/$MID"
   fi
+fi
+
+# ---- P) 商家端「店员管理」：店长在店里用手机就地招人/审核/重置密码 ----
+# 为什么锁这组：招店员的四个动作原本只有 PC 后台有。店长的工作场景在店里、
+# 手上只有手机 —— 新人站柜台前扫码入职，店长得跑去开电脑登后台才能点通过，
+# 真实门店没人会走这个流程。这组锁住整条链在小程序端可用，且权限不能松：
+#   · 店员(STAFF)一个管人端点都不能碰（否则能给自己发 OWNER 码提权）
+#   · 角色管理是「严格高于」：店长不能审/改/重置另一个店长，更不能碰老板
+#   · 门店归属必须校验，否则发出去的是「自己商户 + 别家门店」的死码
+mapi() { # mapi <method> <path> <token> [body]
+  if [ "$1" = "GET" ]; then
+    curl -s "$BASE_URL/api/merchant/staff/$2" -H "X-App-Id: $APPID" -H "Authorization: Bearer $3"
+  else
+    curl -s -X "$1" "$BASE_URL/api/merchant/staff/$2" -H "X-App-Id: $APPID" \
+      -H "Authorization: Bearer $3" -H 'Content-Type: application/json' -d "${4:-\{\}}"
+  fi
+}
+
+if [ -n "$OTK" ]; then
+  echo "[P] 商家端店员管理"
+
+  # P1 三个只读端点在小程序端可用
+  ck "老板看员工名单(小程序)"   "$(mapi GET staff/list "$OTK"        | jtop code)" "200"
+  ck "老板看待审列表(小程序)"   "$(mapi GET staff/audit/list "$OTK"  | jtop code)" "200"
+  ck "老板看邀请码列表(小程序)" "$(mapi GET staff/invite/list "$OTK" | jtop code)" "200"
+
+  # P2 发码：默认当前门店，落库 scene 必须与门店一致（否则是永远扫不动的死码）
+  RESP=$(mapi POST staff/invite "$OTK" '{"role":"STAFF","storeId":'"$STORE_A"'}')
+  ckc "老板在小程序发店员码" "$RESP" "已生成邀请码"
+  P_CODE=$(echo "$RESP" | jtop inviteCode)
+  P_IID=$(echo "$RESP" | jtop inviteId)
+  APII=$(echo "$RESP" | jtop inviteId); [ -n "$APII" ] && API_INV_IDS="$API_INV_IDS $APII"
+  ck "发码返回短码" "$([ -n "$P_CODE" ] && echo yes || echo no)" "yes"
+  ck "落库 scene 与门店一致" \
+     "$(sqlv "select scene from biz_merchant_staff_invite where invite_code='$P_CODE';")" \
+     "invite:$MID:$STORE_A:AUTO"
+  ck "落库门店与请求一致" \
+     "$(sqlv "select store_id from biz_merchant_staff_invite where invite_code='$P_CODE';")" "$STORE_A"
+
+  # P3 越权发码必须拒
+  ckc "不能邀请 OWNER"      "$(mapi POST staff/invite "$OTK" '{"role":"OWNER"}')"  "只能邀请店长或店员"
+  ckc "不能给别家门店招人"  "$(mapi POST staff/invite "$OTK" '{"role":"STAFF","storeId":999999}')" "无权为该门店招人"
+  ck  "废码没落库" "$(sqlv "select count(*) from biz_merchant_staff_invite where store_id=999999;")" "0"
+
+  # P4 小程序码复用：第二次取必须命中缓存，不重复烧微信 wxacode 配额
+  if [ -n "$P_IID" ]; then
+    Q1=$(mapi GET "staff/invite/qrcode/$P_IID" "$OTK")
+    ck "取小程序码成功"   "$(echo "$Q1" | jtop code)"   "200"
+    U1=$(echo "$Q1" | jtop url)
+    Q2=$(mapi GET "staff/invite/qrcode/$P_IID" "$OTK")
+    ck "二次取命中缓存"   "$(echo "$Q2" | jtop cached)" "True"
+    ck "两次 URL 完全一致" "$(echo "$Q2" | jtop url)"   "$U1"
+  fi
+
+  # P5 完整闭环：新人扫码入职 → 老板在小程序审核 → 新人能登商家版
+  if [ -n "$P_CODE" ]; then
+    RESP=$(curl -s -X POST "$BASE_URL/api/merchant/staff/acceptInvite" -H "X-App-Id: $APPID" \
+      -H 'Content-Type: application/json' \
+      -d "{\"code\":\"smokemsv_pteam\",\"scene\":\"invite:$MID:$STORE_A:$P_CODE\",\"nickName\":\"smokemsv_pteam\"}")
+    ckc "新人扫码入职" "$RESP" "等待店长审核"
+    P_STF_UID=$(sqlv "select user_id from sys_user where openid='mock_smokemsv_pteam' and del_flag='0' order by user_id desc limit 1;")
+    P_SID=$(sqlv "select id from biz_merchant_staff where user_id=$P_STF_UID limit 1;")
+    ck "入职后是待审核态" "$(sqlv "select status from biz_merchant_staff where id=$P_SID;")" "3"
+    # 待审核的人必须出现在小程序待审列表里，否则店长根本看不到要审谁
+    ck "待审列表含该新人" \
+       "$(mapi GET staff/audit/list "$OTK" | python3 -c "
+import sys,json
+d=json.load(sys.stdin); rows=d.get('data') or []
+print(sum(1 for r in rows if str(r.get('id'))=='$P_SID'))")" "1"
+
+    ckc "老板在小程序审核通过" "$(mapi POST staff/audit "$OTK" '{"id":'"$P_SID"',"approve":true}')" "已通过"
+    ck  "审核后转在职" "$(sqlv "select status from biz_merchant_staff where id=$P_SID;")" "0"
+    ckc "重复审核被拒"  "$(mapi POST staff/audit "$OTK" '{"id":'"$P_SID"',"approve":true}')" "不在待审核状态"
+
+    # P6 重置密码：新密码必须真能登进商家版（这是店员丢密码后唯一的补救途径）
+    RESP=$(mapi POST staff/resetPwd "$OTK" '{"userId":'"$P_STF_UID"'}')
+    ckc "老板在小程序重置店员密码" "$RESP" "已重置密码"
+    P_NEWPWD=$(echo "$RESP" | jtop newPassword)
+    P_UNAME=$(echo "$RESP" | jtop userName)
+    LOGIN=$(curl -s -X POST "$BASE_URL/api/merchant/staff/login" -H "X-App-Id: $APPID" \
+      -H 'Content-Type: application/json' -d "{\"username\":\"$P_UNAME\",\"password\":\"$P_NEWPWD\"}")
+    ck "新密码能登商家版" "$(echo "$LOGIN" | jtop code)"     "200"
+    ck "登录角色是 STAFF"  "$(echo "$LOGIN" | jget staffRole)" "STAFF"
+
+    # P7 离职：登录必须被挡住，历史核销记录不受影响（用离职态而不是删账号）
+    ckc "老板办店员离职" "$(mapi POST staff/dismiss "$OTK" '{"id":'"$P_SID"'}')" "已办理离职"
+    ck  "离职后 status=1" "$(sqlv "select status from biz_merchant_staff where id=$P_SID;")" "1"
+    LOGIN=$(curl -s -X POST "$BASE_URL/api/merchant/staff/login" -H "X-App-Id: $APPID" \
+      -H 'Content-Type: application/json' -d "{\"username\":\"$P_UNAME\",\"password\":\"$P_NEWPWD\"}")
+    ckc "离职后登不进商家版" "$LOGIN" "未关联商家"
+    ck  "员工账号仍保留(不是物理删)" "$(sqlv "select count(*) from sys_user where user_id=$P_STF_UID and del_flag='0';")" "1"
+    ckc "重复离职被拒" "$(mapi POST staff/dismiss "$OTK" '{"id":'"$P_SID"'}')" "已离职"
+    ckc "复职成功"     "$(mapi POST staff/restore "$OTK" '{"id":'"$P_SID"'}')" "已复职"
+    ck  "复职后 status=0" "$(sqlv "select status from biz_merchant_staff where id=$P_SID;")" "0"
+  fi
+
+  # P8 自我保护：不能办自己离职，但可以给自己换密码
+  # canManageRole 是「严格大于」，自己对自己必然不满足 —— 自我保护分支必须排在它前面，
+  # 否则老板看到的是「无权操作该角色的员工」，会以为权限配错了去找平台。
+  O_SELF_SID=$(sqlv "select id from biz_merchant_staff where user_id=$OWNER_UID limit 1;")
+  ckc "不能办自己离职(提示要准确)" "$(mapi POST staff/dismiss "$OTK" '{"id":'"$O_SELF_SID"'}')" "不能对自己办理离职"
+  RESP=$(mapi POST staff/resetPwd "$OTK" '{"userId":'"$OWNER_UID"'}')
+  ckc "可以给自己换密码" "$RESP" "已重置密码"
+  O_SELF_PWD=$(echo "$RESP" | jtop newPassword)
+  # 必须先存变量：把跨行命令替换直接嵌进 ck 参数里，shell 解析后参数会错位，
+  # 实际值落到期望值那一位上，于是「500 = 500」判成 OK —— 假绿。
+  SELF_LOGIN=$(curl -s -X POST "$BASE_URL/api/merchant/staff/login" -H "X-App-Id: $APPID" \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"smokemsv_owner\",\"password\":\"$O_SELF_PWD\"}")
+  ck "自己的新密码能登录" "$(echo "$SELF_LOGIN" | jtop code)" "200"
+fi
+
+# P9 店员一个管人端点都不能碰（否则店员能给自己发 OWNER 码提权）
+if [ -n "$STK" ]; then
+  for E in staff/list staff/audit/list staff/invite/list; do
+    ck "店员访问 $E 被拒" "$(mapi GET "$E" "$STK" | jtop code)" "403"
+  done
+  for E in staff/invite staff/audit staff/resetPwd staff/dismiss staff/restore; do
+    ck "店员调 $E 被拒" "$(mapi POST "$E" "$STK" '{}' | jtop code)" "403"
+  done
+  # 收口不能把店员本职功能一起砍掉
+  ck "店员核销工作台仍可用" "$(mapi GET home "$STK" | jtop code)" "200"
+fi
+
+# P10 店长只能管店员，不能碰另一个店长/老板（rank 严格大于）
+MGR_TK=$(mlogin manager_c43 | jget token)
+if [ -n "$MGR_TK" ]; then
+  ckc "店长不能邀请店长" "$(mapi POST staff/invite "$MGR_TK" '{"role":"MANAGER"}')" "无权邀请该角色"
+  if [ -n "$OWNER_UID" ]; then
+    # 只断言「被拒」而不锁具体文案：smokemsv_owner 是 store_id=0（全商户）老板，
+    # 门店 100 的店长会先被 isStaffVisible 的 store_id=0 分支挡住（提示「无权重置该员工密码」），
+    # 走不到 canManageRole 那句。两道都是必须的拦截，文案取决于哪道先命中。
+    ck "店长不能重置老板密码" "$(mapi POST staff/resetPwd "$MGR_TK" '{"userId":'"$OWNER_UID"'}' | jtop code)" "500"
+    O_SELF_SID2=$(sqlv "select id from biz_merchant_staff where user_id=$OWNER_UID limit 1;")
+    ck "店长不能办老板离职" "$(mapi POST staff/dismiss "$MGR_TK" '{"id":'"$O_SELF_SID2"'}' | jtop code)" "500"
+    # 用 P8 那次自助重置后的密码验证，不能用 admin123 —— P8 已经把它换掉了。
+    # 这条锁的是「店长那两次尝试真的没改到老板密码」，而不是密码本身是什么。
+    OWNER_STILL=$(curl -s -X POST "$BASE_URL/api/merchant/staff/login" -H "X-App-Id: $APPID" \
+      -H 'Content-Type: application/json' \
+      -d "{\"username\":\"smokemsv_owner\",\"password\":\"$O_SELF_PWD\"}")
+    ck "老板密码没被店长改掉" "$(echo "$OWNER_STILL" | jtop code)" "200"
+  fi
+  # 同门店场景：店长与老板同在门店 100 时，必须由 canManageRole 挡住（rank 严格大于）
+  SAME_STORE_OWNER=$(sqlv "select ms.user_id from biz_merchant_staff ms join sys_user u on u.user_id=ms.user_id where ms.merchant_id=$MID and ms.store_id=$STORE_A and ms.role='OWNER' and u.del_flag='0' limit 1;")
+  if [ -n "$SAME_STORE_OWNER" ]; then
+    ckc "同门店店长仍不能重置老板密码" \
+       "$(mapi POST staff/resetPwd "$MGR_TK" '{"userId":'"$SAME_STORE_OWNER"'}')" "无权重置该角色"
+  fi
+  MGR_INV=$(mapi POST staff/invite "$MGR_TK" '{"role":"STAFF","storeId":'"$STORE_A"'}')
+  ckc "店长可以邀请店员" "$MGR_INV" "已生成邀请码"
+  MGR_IID=$(echo "$MGR_INV" | jtop inviteId); [ -n "$MGR_IID" ] && API_INV_IDS="$API_INV_IDS $MGR_IID"
+fi
+
+# P11 平台/代理商账号不得借店员管理穿透进商家端
+if [ -n "$PLAT_TK" ]; then
+  for E in staff/list staff/audit/list; do
+    ck "平台账号访问 $E 被拒" "$(mapi GET "$E" "$PLAT_TK" | jtop code)" "403"
+  done
+  ck "平台账号发邀请码被拒" "$(mapi POST staff/invite "$PLAT_TK" '{"role":"STAFF"}' | jtop code)" "403"
+fi
+if [ -n "$AGENT_TK" ]; then
+  ck "代理商访问店员名单被拒" "$(mapi GET staff/list "$AGENT_TK" | jtop code)" "403"
 fi
 
 echo

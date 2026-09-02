@@ -3,7 +3,9 @@ const app = getApp();
 const { api, toFullUrl } = require('../../../utils/request.js');
 const { drawStaffInvite } = require('../../../utils/poster.js');
 
-const ROLE_LABEL = { OWNER: '店长', MANAGER: '管理员', STAFF: '员工' };
+// 与后端 BizRole 口径一致：OWNER=老板 / MANAGER=店长 / STAFF=店员。
+// 原先这里写成 OWNER:'店长' / MANAGER:'管理员'，海报上的职位和实际权限对不上。
+const ROLE_LABEL = { OWNER: '老板', MANAGER: '店长', STAFF: '店员' };
 
 Page({
   data: {
@@ -14,6 +16,7 @@ Page({
   },
 
   onLoad(opts) {
+    this.opts = opts || {};
     this.inviteId = opts && opts.inviteId;
     this.setData({ inviteId: this.inviteId });
     if (!this.inviteId) {
@@ -41,7 +44,10 @@ Page({
         this.scene = scene;
         const staff = wx.getStorageSync('staffUser') || {};
         const storeName = staff.storeName || ('门店' + (staff.storeId || ''));
-        const roleLabel = ROLE_LABEL[staff.staffRole] || '员工';
+        // 海报上要写的是「被邀请人的角色」，取邀请码自身的 role。
+        // 原先取 staff.staffRole（当前登录者的角色），店长发店员码时海报会写成
+        // 「扫码成为 XX 的店长」—— 招进来的人看到的职位是错的。
+        const roleLabel = ROLE_LABEL[d.role] || ROLE_LABEL[this.opts && this.opts.role] || '员工';
         return drawStaffInvite({
           canvasId: 'posterCanvas',
           qrcodeUrl: toFullUrl(url),

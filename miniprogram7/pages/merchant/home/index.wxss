@@ -27,6 +27,7 @@
 .m-text { flex: 1; }
 .m-t { display: block; font-size: 30rpx; color: #1A1A1A; font-weight: 600; }
 .m-d { display: block; font-size: 24rpx; color: #999; margin-top: 4rpx; }
+.m-badge { display: inline-block; min-width: 32rpx; margin-left: 12rpx; padding: 0 8rpx; border-radius: 16rpx; background: #D9342B; color: #fff; font-size: 20rpx; font-weight: 400; line-height: 32rpx; text-align: center; }
 .arr { width: 14rpx; height: 14rpx; border-top: 4rpx solid #C0C0C0; border-right: 4rpx solid #C0C0C0; transform: rotate(45deg); }
 
 .section-title { font-size: 26rpx; color: #888; margin-bottom: 16rpx; font-weight: 600; }

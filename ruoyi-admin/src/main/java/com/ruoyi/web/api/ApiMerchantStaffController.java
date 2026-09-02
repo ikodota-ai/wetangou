@@ -77,6 +77,7 @@ public class ApiMerchantStaffController
 
     @Autowired private ISysUserService userService;
     @Autowired private SysRoleMapper roleMapper;
+    @Autowired private com.ruoyi.framework.config.ServerConfig serverConfig;
 
     /** PC 后台「商户管理员」角色的 role_key（老板/店长复用） */
     private static final String MERCHANT_PC_ROLE_KEY = "merchant";
@@ -1074,6 +1075,435 @@ public class ApiMerchantStaffController
             return t2.compareTo(t1); // String compare as fallback (dates are yyyy-MM-dd)
         });
         return AjaxResult.success(out);
+    }
+
+    // =============================================================
+    // 商家端「店员管理」（OWNER / MANAGER）
+    //
+    // 为什么必须做在小程序里：招店员的四个动作（看名单、审待审、发邀请码、重置密码）
+    // 此前只有 PC 后台有。而店长的实际工作场景就在店里、手上只有手机 ——
+    // 新店员站在柜台前扫码入职，店长得先跑去开电脑登后台才能点通过，
+    // 这个流程在真实门店里没人会走。店员管理是商家端最基础的一环，不能只在 PC 上。
+    //
+    // 权限：OWNER / MANAGER 才可见（STAFF 只核销，不得管人，否则店员能给自己发
+    // OWNER 邀请码提权）。范围一律按 token 里的 merchantId + 授权门店集合判，
+    // 不信任请求体传上来的任何 id。
+    // =============================================================
+
+    /** 商家端可管理的角色白名单：绝不能放开到任意字符串，否则能造出未定义角色 */
+    private static final java.util.List<String> ASSIGNABLE_ROLES = java.util.Arrays.asList("MANAGER", "STAFF");
+
+    /**
+     * 店员名单（当前商户，按授权门店过滤）。
+     *
+     * <p>status: 0 在职 / 1 离职 / 3 待审核。手机号脱敏后返回 ——
+     * 店长看名单不需要完整号码，避免整店员工手机号在小程序端明文流转。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @GetMapping("/staff/list")
+    public AjaxResult staffList(@RequestParam(required = false) String status)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        MerchantStaff q = new MerchantStaff();
+        q.setMerchantId(m.getMerchantId());
+        if (StringUtils.isNotEmpty(status)) q.setStatus(status);
+        List<MerchantStaff> list = staffService.selectList(q);
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (list != null)
+        {
+            for (MerchantStaff ms : list)
+            {
+                // 老板 store_id=0（全商户），其名下门店集合已在登录时展开；
+                // 这里按授权门店过滤，店长只该看到自己管的门店的人。
+                if (!isStaffVisible(m, ms)) continue;
+                out.add(toStaffView(ms));
+            }
+        }
+        return AjaxResult.success(out);
+    }
+
+    /** 待审核列表（扫码入职后 status=3，等 OWNER/MANAGER 点通过） */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @GetMapping("/staff/audit/list")
+    public AjaxResult staffAuditList()
+    {
+        return staffList("3");
+    }
+
+    /**
+     * 审核扫码入职申请：approve=true → 在职；false → 删除关联（账号保留，可重发码）。
+     *
+     * <p>与 PC 端 BizStaffInviteController.audit 同语义，差别只在身份来源：
+     * 这里用小程序 token 的 merchantId + 门店集合，PC 端用 TenantFilterHelper。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @PostMapping("/staff/audit")
+    public AjaxResult staffAudit(@RequestBody Map<String, Object> body)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        Long id = asLong(body == null ? null : body.get("id"));
+        if (id == null) return AjaxResult.error("缺少 id");
+        Object approveRaw = body.get("approve");
+        if (approveRaw == null) return AjaxResult.error("缺少 approve 字段");
+        boolean approve = Boolean.parseBoolean(String.valueOf(approveRaw));
+
+        MerchantStaff db = staffService.selectById(id);
+        if (db == null) return AjaxResult.error("员工关联不存在");
+        if (!isStaffVisible(m, db)) return AjaxResult.error("无权审核该员工");
+        if (!STAFF_STATUS_PENDING.equals(db.getStatus())) return AjaxResult.error("该员工不在待审核状态");
+        // 不许审出一个比自己权限还高的人（店长审出老板 = 自我提权）
+        if (!canManageRole(m, db.getRole())) return AjaxResult.error("无权审核该角色的员工");
+
+        if (approve)
+        {
+            db.setStatus("0");
+            db.setUpdateBy(currentStaffTag(m));
+            return staffService.update(db) > 0 ? AjaxResult.success("已通过") : AjaxResult.error("操作失败");
+        }
+        return staffService.deleteById(db.getId()) > 0 ? AjaxResult.success("已拒绝") : AjaxResult.error("操作失败");
+    }
+
+    /**
+     * 生成店员邀请码（含小程序码，供店长在店里当场让新人「扫一扫」）。
+     *
+     * <p>storeId 不传时默认当前激活门店；传了必须在授权门店集合内 ——
+     * 否则会造出「自己商户 + 别家门店」的死码（PC 端同型缺陷已修，见
+     * BizStaffInviteController.add 的注释）。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @PostMapping("/staff/invite")
+    public AjaxResult createStaffInvite(@RequestBody(required = false) Map<String, Object> body)
+    {
+        LoginMember m = requireMerchantLogin();
+        Long storeId = asLong(body == null ? null : body.get("storeId"));
+        if (storeId == null) storeId = m.getStoreId();
+        if (storeId == null) return AjaxResult.error("请先选择门店");
+        if (!m.hasStore(storeId)) return AjaxResult.error("无权为该门店招人");
+
+        String role = body == null ? null : trimToNull(body.get("role"));
+        if (role == null) role = "STAFF";
+        role = role.toUpperCase();
+        if (!ASSIGNABLE_ROLES.contains(role)) return AjaxResult.error("只能邀请店长或店员");
+        if (!canManageRole(m, role)) return AjaxResult.error("无权邀请该角色");
+
+        MerchantStaffInvite inv = new MerchantStaffInvite();
+        inv.setMerchantId(m.getMerchantId());
+        inv.setStoreId(storeId);
+        inv.setRole(role);
+        inv.setInviteCode(inviteService.generateShortCode());
+        // 默认 7 天有效：邀请码会被转发/截图，长期有效等于长期可提权
+        inv.setExpireAt(new Date(System.currentTimeMillis() + 7L * 24 * 3600 * 1000));
+        inv.setScene("invite:" + m.getMerchantId() + ":" + storeId + ":AUTO");
+        inv.setStatus("0");
+        inv.setCreateBy(currentStaffTag(m));
+        if (inviteService.insert(inv) <= 0) return AjaxResult.error("生成失败");
+
+        AjaxResult r = AjaxResult.success("已生成邀请码：" + inv.getInviteCode());
+        r.put("inviteCode", inv.getInviteCode());
+        r.put("inviteId", inv.getInviteId());
+        r.put("role", role);
+        r.put("storeId", storeId);
+        r.put("expireAt", inv.getExpireAt());
+        // 小程序码生成失败不阻塞：店长仍可口述 6 位短码让新人手输
+        try
+        {
+            String scene = "invite:" + m.getMerchantId() + ":" + storeId + ":" + inv.getInviteCode();
+            byte[] png = wxMaService.getWxaCodeUnlimited(scene, "pages/merchant/scan/index", m.getMerchantId());
+            if (png != null && png.length > 0)
+            {
+                String dir = com.ruoyi.common.config.RuoYiConfig.getProfile() + "/staffInvite";
+                java.io.File dirFile = new java.io.File(dir);
+                if (dirFile.exists() || dirFile.mkdirs())
+                {
+                    String fileName = "inv_" + inv.getInviteCode() + "_" + System.currentTimeMillis() + ".png";
+                    java.io.File target = new java.io.File(dir, fileName);
+                    try (java.io.FileOutputStream fos = new java.io.FileOutputStream(target)) { fos.write(png); }
+                    String fullUrl = serverConfig.getUrl() + com.ruoyi.common.constant.Constants.RESOURCE_PREFIX
+                            + "/staffInvite/" + fileName;
+                    inv.setWxacodeUrl(fullUrl);
+                    inviteService.update(inv);
+                    r.put("wxacodeUrl", fullUrl);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.warn("[Staff] 商家端邀请码小程序码生成失败 code={}", inv.getInviteCode(), ex);
+        }
+        return r;
+    }
+
+    /**
+     * 取某张邀请码的小程序码（供海报页画图用）。
+     *
+     * <p>已有 wxacodeUrl 直接复用，不重复调微信接口 —— wxacodeUnlimited 有日调用
+     * 配额，店长每次进海报页都重新生成会白烧配额（PC 端 /biz/staffInvite/qrcode
+     * 就是每次都重新落一个新文件，同一张码在磁盘上会堆出好几份）。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @GetMapping("/staff/invite/qrcode/{inviteId}")
+    public AjaxResult staffInviteQrcode(@PathVariable("inviteId") Long inviteId)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        MerchantStaffInvite inv = inviteService.selectById(inviteId);
+        if (inv == null) return AjaxResult.error("邀请码不存在");
+        if (inv.getMerchantId() == null || !inv.getMerchantId().equals(m.getMerchantId())
+                || inv.getStoreId() == null || !m.hasStore(inv.getStoreId()))
+        {
+            return AjaxResult.error("无权查看该邀请码");
+        }
+        String scene = "invite:" + inv.getMerchantId() + ":" + inv.getStoreId() + ":" + inv.getInviteCode();
+        AjaxResult r = AjaxResult.success();
+        r.put("inviteCode", inv.getInviteCode());
+        r.put("scene", scene);
+        r.put("role", inv.getRole());
+        if (StringUtils.isNotEmpty(inv.getWxacodeUrl()))
+        {
+            r.put("url", inv.getWxacodeUrl());
+            r.put("cached", true);
+            return r;
+        }
+        try
+        {
+            byte[] png = wxMaService.getWxaCodeUnlimited(scene, "pages/merchant/scan/index", inv.getMerchantId());
+            if (png == null || png.length == 0) return AjaxResult.error("生成小程序码失败");
+            String dir = com.ruoyi.common.config.RuoYiConfig.getProfile() + "/staffInvite";
+            java.io.File dirFile = new java.io.File(dir);
+            if (!dirFile.exists() && !dirFile.mkdirs()) return AjaxResult.error("无法创建目录");
+            String fileName = "inv_" + inv.getInviteCode() + "_" + System.currentTimeMillis() + ".png";
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(new java.io.File(dir, fileName)))
+            {
+                fos.write(png);
+            }
+            String fullUrl = serverConfig.getUrl() + com.ruoyi.common.constant.Constants.RESOURCE_PREFIX
+                    + "/staffInvite/" + fileName;
+            inv.setWxacodeUrl(fullUrl);
+            inviteService.update(inv);
+            r.put("url", fullUrl);
+            r.put("cached", false);
+            return r;
+        }
+        catch (Exception ex)
+        {
+            log.error("[Staff] 邀请码小程序码生成失败 inviteId={}", inviteId, ex);
+            return AjaxResult.error("生成小程序码失败");
+        }
+    }
+
+    /** 本店未使用且未过期的邀请码，供店长回看已发出去的码 */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @GetMapping("/staff/invite/list")
+    public AjaxResult staffInviteList()
+    {
+        LoginMember m = requireMerchantLogin(false);
+        MerchantStaffInvite q = new MerchantStaffInvite();
+        q.setMerchantId(m.getMerchantId());
+        List<MerchantStaffInvite> list = inviteService.selectList(q);
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (list != null)
+        {
+            for (MerchantStaffInvite inv : list)
+            {
+                if (inv.getStoreId() == null || !m.hasStore(inv.getStoreId())) continue;
+                Map<String, Object> o = new HashMap<>();
+                o.put("inviteId", inv.getInviteId());
+                o.put("inviteCode", inv.getInviteCode());
+                o.put("role", inv.getRole());
+                o.put("storeId", inv.getStoreId());
+                o.put("status", inv.getStatus());
+                o.put("expireAt", inv.getExpireAt());
+                o.put("wxacodeUrl", inv.getWxacodeUrl());
+                o.put("createTime", inv.getCreateTime());
+                out.add(o);
+            }
+        }
+        return AjaxResult.success(out);
+    }
+
+    /**
+     * 重置店员登录密码，新密码明文只在本次响应返回一次。
+     *
+     * <p>这是店员丢失密码后唯一的补救途径：扫码入职时自动生成的密码
+     * 从未告知过任何人，店员一旦换微信（openid 变了）就再也进不来。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @PostMapping("/staff/resetPwd")
+    public AjaxResult staffResetPwd(@RequestBody Map<String, Object> body)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        Long userId = asLong(body == null ? null : body.get("userId"));
+        if (userId == null) return AjaxResult.error("缺少 userId");
+        MerchantStaff link = staffService.selectByUserId(userId);
+        if (link == null) return AjaxResult.error("该账号不是商家员工");
+        if (!isStaffVisible(m, link)) return AjaxResult.error("无权重置该员工密码");
+        // 给自己换密码要放行：canManageRole 是「严格大于」，自己对自己必然不满足，
+        // 于是老板想给自己换个记得住的密码会被自己的系统拒掉，只能去求平台管理员。
+        // 已经用当前 token 证明了身份，重置自己的密码没有提权风险。
+        boolean self = userId.equals(m.getStaffUserId());
+        if (!self && !canManageRole(m, link.getRole())) return AjaxResult.error("无权重置该角色的密码");
+
+        SysUser user = userService.selectUserByUserId(userId);
+        if (user == null) return AjaxResult.error("员工账号不存在");
+        String rawPwd = randomPassword();
+        SysUser upd = new SysUser();
+        upd.setUserId(userId);
+        upd.setPassword(SecurityUtils.encryptPassword(rawPwd));
+        upd.setUpdateBy(currentStaffTag(m));
+        if (userService.resetPwd(upd) <= 0) return AjaxResult.error("重置失败");
+        AjaxResult r = AjaxResult.success("已重置密码");
+        r.put("userName", user.getUserName());
+        r.put("newPassword", rawPwd);
+        return r;
+    }
+
+    /**
+     * 店员离职（status=1），不删账号也不删关联。
+     *
+     * <p>为什么用离职态而不是物理删除：核销记录里存的是 store:{userId}，
+     * 删了账号历史核销就查不到经手人了。离职后 wxLogin / 密码登录都会被
+     * 「该账号未关联商家」挡住（登录只认 status=0）。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @PostMapping("/staff/dismiss")
+    public AjaxResult staffDismiss(@RequestBody Map<String, Object> body)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        Long id = asLong(body == null ? null : body.get("id"));
+        if (id == null) return AjaxResult.error("缺少 id");
+        MerchantStaff db = staffService.selectById(id);
+        if (db == null) return AjaxResult.error("员工关联不存在");
+        if (!isStaffVisible(m, db)) return AjaxResult.error("无权操作该员工");
+        // 自我保护必须排在 canManageRole 之前：同级比较是「严格大于」，
+        // 自己对自己一定不满足，会先撞上「无权操作该角色的员工」——
+        // 拦是拦住了，但老板会以为是权限配错了而去找平台，实际原因是不能办自己。
+        if (db.getUserId() != null && db.getUserId().equals(m.getStaffUserId()))
+        {
+            return AjaxResult.error("不能对自己办理离职");
+        }
+        if (!canManageRole(m, db.getRole())) return AjaxResult.error("无权操作该角色的员工");
+        if ("1".equals(db.getStatus())) return AjaxResult.error("该员工已离职");
+        db.setStatus("1");
+        db.setUpdateBy(currentStaffTag(m));
+        return staffService.update(db) > 0 ? AjaxResult.success("已办理离职") : AjaxResult.error("操作失败");
+    }
+
+    /** 离职员工复职（status=1 → 0） */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER})
+    @PostMapping("/staff/restore")
+    public AjaxResult staffRestore(@RequestBody Map<String, Object> body)
+    {
+        LoginMember m = requireMerchantLogin(false);
+        Long id = asLong(body == null ? null : body.get("id"));
+        if (id == null) return AjaxResult.error("缺少 id");
+        MerchantStaff db = staffService.selectById(id);
+        if (db == null) return AjaxResult.error("员工关联不存在");
+        if (!isStaffVisible(m, db)) return AjaxResult.error("无权操作该员工");
+        if (!canManageRole(m, db.getRole())) return AjaxResult.error("无权操作该角色的员工");
+        if (!"1".equals(db.getStatus())) return AjaxResult.error("该员工不在离职状态");
+        db.setStatus("0");
+        db.setUpdateBy(currentStaffTag(m));
+        return staffService.update(db) > 0 ? AjaxResult.success("已复职") : AjaxResult.error("操作失败");
+    }
+
+    // ===== 店员管理内部工具 =====
+
+    /**
+     * 该员工是否在当前登录者的可管理范围内。
+     *
+     * <p>两道：同商户 + 门店在授权集合内。store_id=0 表示「全商户所有门店」，
+     * 只有同样管全商户的人（老板）能看到，店长不该看到跨门店的全局员工。</p>
+     */
+    private boolean isStaffVisible(LoginMember m, MerchantStaff ms)
+    {
+        if (ms == null || m == null) return false;
+        if (ms.getMerchantId() == null || !ms.getMerchantId().equals(m.getMerchantId())) return false;
+        Long sid = ms.getStoreId();
+        if (sid == null) return false;
+        if (sid == 0L)
+        {
+            // 全商户员工（老板）：只有自己也是全商户视角时可见
+            return m.getStoreIds() == null || m.getStoreIds().isEmpty() || isWholeMerchantScope(m);
+        }
+        return m.hasStore(sid);
+    }
+
+    /** 登录者是否「全商户视角」（biz_merchant_staff.store_id=0 的老板） */
+    private boolean isWholeMerchantScope(LoginMember m)
+    {
+        MerchantStaff link = m.getStaffUserId() == null ? null : staffService.selectByUserId(m.getStaffUserId());
+        return link != null && link.getStoreId() != null && link.getStoreId() == 0L;
+    }
+
+    /**
+     * 当前登录者能否管理目标角色。
+     *
+     * <p>必须严格高于：店长(rank 2)只能管店员(rank 1)，不能审/改/重置另一个店长，
+     * 更不能碰老板。否则任一店长可以把自己审成老板、或重置老板密码接管整个商户。</p>
+     */
+    private boolean canManageRole(LoginMember m, String targetRole)
+    {
+        BizRole mine = m.getStaffRole();
+        if (mine == null) return false;
+        return mine.rank() > BizRole.fromStaffRole(targetRole).rank();
+    }
+
+    /** 员工列表对外视图：手机号脱敏，不吐 openid 原文 */
+    private Map<String, Object> toStaffView(MerchantStaff ms)
+    {
+        Map<String, Object> o = new HashMap<>();
+        o.put("id", ms.getId());
+        o.put("userId", ms.getUserId());
+        o.put("userName", ms.getUserName());
+        o.put("realName", ms.getRealName());
+        o.put("nickName", ms.getNickName());
+        o.put("role", ms.getRole());
+        o.put("storeId", ms.getStoreId());
+        o.put("storeName", ms.getStoreName());
+        o.put("status", ms.getStatus());
+        o.put("hiredAt", ms.getHiredAt());
+        o.put("createTime", ms.getCreateTime());
+        o.put("phone", ms.getPhone() == null ? null : DesensitizedType.PHONE.desensitizer().apply(ms.getPhone()));
+        return o;
+    }
+
+    /** 操作留痕标识：mstaff-{userId}，与预约审核的 confirmUser 口径一致 */
+    private String currentStaffTag(LoginMember m)
+    {
+        return m.getStaffUserId() == null ? "merchant-staff" : ("mstaff-" + m.getStaffUserId());
+    }
+
+    private static Long asLong(Object v)
+    {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return null;
+        try { return Long.valueOf(s); } catch (NumberFormatException e) { return null; }
+    }
+
+    private static String trimToNull(Object v)
+    {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    /** 重置密码用：8 位大小写+数字，避开易混字符（0/O/1/l/I） */
+    private String randomPassword()
+    {
+        String pool = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        java.security.SecureRandom rnd = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(8);
+        for (int i = 0; i < 8; i++) sb.append(pool.charAt(rnd.nextInt(pool.length())));
+        return sb.toString();
     }
 
     // ===== 时间工具 =====

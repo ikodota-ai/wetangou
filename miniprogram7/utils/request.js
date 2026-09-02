@@ -281,6 +281,17 @@ const api = {
   merchantStaffBookingSignupList: () => request('/api/merchant/staff/booking/signup/list'),
   merchantStaffBookingConfirm: (signupId, body) => request('/api/merchant/staff/booking/confirm/' + signupId, { method: 'POST', data: body || {} }),
   merchantStaffBookingReject:  (signupId, body) => request('/api/merchant/staff/booking/reject/'  + signupId, { method: 'POST', data: body || {} }),
+  // 商家端店员管理（OWNER/MANAGER）：店里就地招人/审核/重置密码，不必回 PC 后台
+  merchantStaffTeamList: (status) => request('/api/merchant/staff/staff/list' + (status ? '?status=' + encodeURIComponent(status) : '')),
+  merchantStaffAuditList: () => request('/api/merchant/staff/staff/audit/list'),
+  merchantStaffAudit: (id, approve) => request('/api/merchant/staff/staff/audit', { method: 'POST', data: { id, approve } }),
+  merchantStaffInviteCreate: (data) => request('/api/merchant/staff/staff/invite', { method: 'POST', data: data || {} }),
+  merchantStaffInviteList: () => request('/api/merchant/staff/staff/invite/list'),
+  merchantStaffResetPwd: (userId) => request('/api/merchant/staff/staff/resetPwd', { method: 'POST', data: { userId } }),
+  merchantStaffDismiss: (id) => request('/api/merchant/staff/staff/dismiss', { method: 'POST', data: { id } }),
+  merchantStaffRestore: (id) => request('/api/merchant/staff/staff/restore', { method: 'POST', data: { id } }),
+  // 海报页画图用：已有小程序码则复用，不重复烧微信 wxacode 配额
+  merchantStaffInviteQrcode: (inviteId) => request('/api/merchant/staff/staff/invite/qrcode/' + inviteId),
   // 预约
   bookingSlots: (params) => request('/api/booking/slots', { data: params }),
   // 可预约日期：天数取门店「可提前预约天数」，歇业日会标 closed。
