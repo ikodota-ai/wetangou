@@ -155,6 +155,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="typeCode != null  and typeCode != ''"> and p.type_code = #{typeCode}</if>
             <if test="status != null  and status != ''"> and p.status = #{status}</if>
             <if test="params != null and params.storeIds != null and params.storeIds != ''"> and find_in_set(p.store_id, #{params.storeIds})</if>
+            <!-- 已删除的商品不进任何列表。
+                 del_flag='2' 在 RuoYi 里就是「已删除」，但这张表原先只在
+                 resultMap 里映射了这一列、从不拿它当条件，于是库里 126 条
+                 del_flag='2'（且全是 status='0' 上架态）会被一起返回：
+                 顾客端 /api/product/list 把已删商品摆在首页可下单，
+                 商家端列表也多出 125 条自己删过的（total 359 实际在售 234）。
+                 详情端点 selectProductByProductId 不加这个条件 —— 历史订单
+                 要靠它反查商品名/封面，过滤掉会让老订单详情变成空白。 -->
+            and (p.del_flag is null or p.del_flag != '2')
         </where>
         order by p.sort asc, p.product_id desc
     </select>

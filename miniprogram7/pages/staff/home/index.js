@@ -1,6 +1,10 @@
 const app = getApp()
 const { request, api } = require('../../../utils/request.js')
 
+// 最近订单的状态文案必须在 js 里映射好塞进 recentOrders：
+// WXML 调不到 Page 方法，{{orderStatusText(item.status)}} 恒渲染成空。
+const ORDER_STATUS_TEXT = { '0': '待付款', '1': '待使用', '2': '已完成', '3': '已退款', '4': '已取消' }
+
 Page({
   data: {
     storeId: null,
@@ -50,17 +54,15 @@ Page({
           todayOrderCount: d.todayOrderCount || 0,
           pendingBillCount: d.pendingBillCount || 0,
           todayBookingCount: d.todayBookingCount || 0,
-          recentOrders: d.recentOrders || []
+          recentOrders: (d.recentOrders || []).map(o => Object.assign({}, o, {
+            statusText: ORDER_STATUS_TEXT[o.status] || o.status
+          }))
         })
       })
       .catch((err) => {
         console.error('[staff home] err', err)
         wx.showToast({ title: (err && (err.msg || err.message)) || '加载失败', icon: 'none' })
       })
-  },
-
-  orderStatusText(s) {
-    return ({ '0': '待付款', '1': '待使用', '2': '已完成', '3': '已退款', '4': '已取消' })[s] || s
   },
 
   goVerify() {

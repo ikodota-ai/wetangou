@@ -67,6 +67,13 @@ jobs:
       - name: Lint Vue SFC structure
         run: bash .github/scripts/lint-vue-sfc.sh
 
+      # 挡住「WXML 里调 Page 方法/数组方法」这类静默失效 ——
+      # 小程序模板只认 wxs 模块的函数，写错不报错不白屏，只是渲染成空。
+      # 已复发 9 次：订单/买单/核销记录的状态列、首页最近订单、商品类型标签，
+      # 最严重的是顾客端商品详情的购买按钮（恒灰且一个字都没有）。
+      - name: Lint WXML expressions
+        run: bash .github/scripts/lint-wxml-expr.sh
+
       - name: Backend - mvn package
         run: mvn -B -e -ntp clean package
         env:

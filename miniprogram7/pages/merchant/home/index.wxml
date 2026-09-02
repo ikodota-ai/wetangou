@@ -95,7 +95,7 @@
       </view>
       <view class="ro-right">
         <text class="ro-amt">¥{{item.payAmount || 0}}</text>
-        <text class="ro-status">{{orderStatusText(item.status)}}</text>
+        <text class="ro-status">{{item.statusText}}</text>
       </view>
     </view>
   </view>

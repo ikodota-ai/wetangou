@@ -14,7 +14,7 @@
       </view>
       <view class="row2">
         <text class="name">{{item.productName || '团购'}}</text>
-        <text class="status s-{{item.status}}">{{statusText(item.status)}}</text>
+        <text class="status s-{{item.status}}">{{item.statusText}}</text>
       </view>
       <view class="row3">
         <text class="code" wx:if="{{item.verifyCode}}">核销码 {{item.verifyCode}}</text>

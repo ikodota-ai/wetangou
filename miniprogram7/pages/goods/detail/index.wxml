@@ -219,7 +219,7 @@
       <view class="bb-ic ic-order"></view>
       <text>订单</text>
     </view>
-    <view class="buy-btn {{canBuy() ? 'enabled' : 'disabled'}}" bindtap="onBuy">{{buyBtnDisabledText()}}</view>
+    <view class="buy-btn {{canBuyNow ? 'enabled' : 'disabled'}}" bindtap="onBuy">{{buyBtnLabel}}</view>
   </view>
 
   <!-- 分享卡弹窗 -->

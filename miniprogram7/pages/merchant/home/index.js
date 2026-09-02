@@ -1,5 +1,10 @@
 const app = getApp()
 const { api } = require('../../../utils/request.js')
+
+// 首页「最近订单」的状态文案。必须在 js 里映射好塞进 recentOrders，
+// 不能在 WXML 里调 Page 方法 —— 小程序模板只认 wxs 模块的函数，
+// {{orderStatusText(item.status)}} 恒渲染成空，首页最近订单那一列一直空白。
+const ORDER_STATUS_TEXT = { '0': '待付款', '1': '待使用', '2': '已完成', '3': '已退款', '4': '已取消' }
 const role = require('../../../utils/role.js')
 const identity = require('../../../utils/identity.js')
 
@@ -92,7 +97,9 @@ Page({
           todayOrderCount: d.todayOrderCount || 0,
           pendingBillCount: d.pendingBillCount || 0,
           todayBookingCount: d.todayBookingCount || 0,
-          recentOrders: d.recentOrders || [],
+          recentOrders: (d.recentOrders || []).map(o => Object.assign({}, o, {
+            statusText: ORDER_STATUS_TEXT[o.status] || o.status
+          })),
           // 商户还没建门店：后端返 noStore=true + 引导文案，首页显示提示而不是一屏 0
           noStore: !!d.noStore,
           noStoreTip: d.noStoreTip || '',
@@ -117,10 +124,6 @@ Page({
         this.setData({ pendingStaffCount: (list && list.length) || 0 })
       })
       .catch(() => {})
-  },
-
-  orderStatusText(s) {
-    return ({ '0': '待付款', '1': '待使用', '2': '已完成', '3': '已退款', '4': '已取消' })[s] || s
   },
 
   /**

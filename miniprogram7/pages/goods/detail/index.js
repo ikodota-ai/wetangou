@@ -5,6 +5,8 @@ Page({
   data: {
     id: null,
     product: null,
+    canBuyNow: false,
+    buyBtnLabel: '加载中…',
     imgIdx: 0,
     showShare: false,
     showAuthPhone: false,
@@ -57,7 +59,17 @@ Page({
             this.setData({ state: 'error', errorMsg: '数据规范化失败: ' + e.message });
             return;
           }
-          this.setData({ product: normalized, state: 'loaded' });
+          // 购买按钮的可点态和文案必须在这里算好塞进 data。
+          // 模板原先写 {{canBuy() ? 'enabled' : 'disabled'}} 和 {{buyBtnDisabledText()}} ——
+          // WXML 调不到 Page 方法，前者恒得 undefined（按钮永远是 disabled 灰态），
+          // 后者恒渲染成空字符串（按钮上一个字都没有）。也就是说所有商品的
+          // 购买按钮都是一个没字的灰块，顾客根本不知道能不能买、买多少钱。
+          this.setData({
+            product: normalized,
+            state: 'loaded',
+            canBuyNow: this.canBuy(normalized),
+            buyBtnLabel: this.buyBtnDisabledText(normalized)
+          });
         } else if (p && p.code && p.code !== 200) {
           // 后端返回非 200 的业务码
           this.setData({ state: 'error', errorMsg: p.msg || '后端返回业务错误' });
@@ -200,8 +212,8 @@ Page({
     return str.length >= 10 ? str.substring(0, 10) : str
   },
   /** 是否允许立即购买 */
-  canBuy() {
-    const p = this.data.product
+  canBuy(prod) {
+    const p = prod || this.data.product
     if (!p) return false
     if (p.stock === 0) return false
     if (p.saleStartDate && this._dateInFuture(p.saleStartDate)) return false
@@ -209,24 +221,26 @@ Page({
     return true
   },
   /** 购买按钮 disabled 文案 */
-  buyBtnDisabledText() {
-    const p = this.data.product
+  buyBtnDisabledText(prod) {
+    const p = prod || this.data.product
     if (!p) return '加载中…'
     if (p.stock === 0) return '已售罄'
     if (p.saleStartDate && this._dateInFuture(p.saleStartDate)) return '未到售卖期'
     if (p.saleEndDate && this._dateInPast(p.saleEndDate)) return '已过售卖期'
-    return this.buyBtnText()
+    return this.buyBtnText(p)
   },
-  buyBtnText() {
-    const t = this.data.product && this.data.product.typeCode
-    if (t === 'BILL') return '买单 ¥' + (this.data.product.price || '0.00')
-    if (t === 'BOOKING') return '立即预约 ¥' + (this.data.product.price || '0.00')
-    if (t === 'VOUCHER') return '购买代金券 ¥' + (this.data.product.price || '0.00')
-    if (t === 'TIMECARD') return '购买次卡 ¥' + (this.data.product.price || '0.00')
-    if (t === 'STORED_CARD') return '充值 ¥' + (this.data.product.price || '0.00')
-    if (t === 'PERIOD_CARD') return '开通周期卡 ¥' + (this.data.product.price || '0.00')
-    if (t === 'COMBO') return '购买组合券包 ¥' + (this.data.product.price || '0.00')
-    return '立即购买 ¥' + (this.data.product.price || '0.00')
+  buyBtnText(prod) {
+    const p = prod || this.data.product
+    const t = p && p.typeCode
+    const price = (p && p.price) || '0.00'
+    if (t === 'BILL') return '买单 ¥' + price
+    if (t === 'BOOKING') return '立即预约 ¥' + price
+    if (t === 'VOUCHER') return '购买代金券 ¥' + price
+    if (t === 'TIMECARD') return '购买次卡 ¥' + price
+    if (t === 'STORED_CARD') return '充值 ¥' + price
+    if (t === 'PERIOD_CARD') return '开通周期卡 ¥' + price
+    if (t === 'COMBO') return '购买组合券包 ¥' + price
+    return '立即购买 ¥' + price
   },
   onGotPhone(e) {
     if (e.detail.errMsg && e.detail.errMsg.indexOf('ok') !== -1) {

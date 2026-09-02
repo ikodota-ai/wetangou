@@ -14,7 +14,10 @@ set -e
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
 USER="${ADMIN_USER:-admin}"
 PASS="${ADMIN_PASS:-admin123}"
-PRODUCT_ID="${PRODUCT_ID:-2000}"
+# 必须挑一个 del_flag<>'2' 的在售商品：列表查询现在会过滤已删商品，
+# 而原先用的 2000 恰好是 del_flag='2'（库里 126 条历史已删数据之一），
+# 拿它做基准等于在「已删商品」上验证功能。1000 是种子里的在售团购。
+PRODUCT_ID="${PRODUCT_ID:-1000}"
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-3306}"
 DB_USER="${DB_USER:-root}"

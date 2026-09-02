@@ -14,7 +14,7 @@
       </view>
       <view class="row2">
         <text class="meta">金额 ¥{{item.amount}}  优惠 ¥{{item.discountAmount}}</text>
-        <text class="status s-{{item.status}}">{{statusText(item.status)}}</text>
+        <text class="status s-{{item.status}}">{{item.statusText}}</text>
       </view>
       <view class="row3">
         <text class="time">{{item.createTimeStr}}</text>
