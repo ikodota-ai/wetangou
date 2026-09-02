@@ -266,11 +266,24 @@ public class ApiOrderController
         {
             throw new ServiceException("核销码或订单编号至少填一个");
         }
-        if (storeId == null)
+        LoginMember loginMember = MemberContextHolder.get();
+        // 员工态下门店从 token 兜底，不强制前端传。
+        //
+        // 原先无条件要求 body.storeId，而商家端核销页传的是 `storeId || 0`：
+        // 页面刚进来还没 syncStaff、或缓存里 staffUser 没 storeId 时就会传 0，
+        // 后端先过 storeId==null 检查（0 不是 null），再撞上 hasStore(0)
+        // 直接抛「无权操作其他门店」—— 店员扫了客人的码，只看到一句
+        // 「无权操作其他门店」，完全不知道是自己这边门店没同步上。
+        // 门店本来就在员工 token 里，让前端传一遍再校验一遍纯属多余。
+        if (loginMember != null && loginMember.isStaffSession()
+                && (storeId == null || storeId <= 0))
+        {
+            storeId = loginMember.getStoreId();
+        }
+        if (storeId == null || storeId <= 0)
         {
             throw new ServiceException("门店ID不能为空");
         }
-        LoginMember loginMember = MemberContextHolder.get();
         // 员工只能在自己被授权的门店核销。
         // 原来比的是 token 里的单个 storeId，多店员工（含 store_id=0 展开的老板）
         // 切到别的店就核销不了；改用 hasStore 比整个授权门店集合。

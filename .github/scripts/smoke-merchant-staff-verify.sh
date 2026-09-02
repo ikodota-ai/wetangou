@@ -106,8 +106,10 @@ M_UID=""
 O_MGR_UID=""
 O_STF_UID=""
 P_STF_UID=""
+SB_ORDERS=""        # B2 段自建的核销订单（storeId 兜底用）
 API_INV_IDS=""      # 商家端 /staff/invite 发出来的码：API 不打 smoke remark（生产代码不该埋测试标记），只能靠这里记 id
 cleanup() {
+  sql "delete from biz_order where order_no like 'SMKSB\\_%';"
   [ -n "$ORDER_A" ] && sql "update biz_order set status='1', verify_time=null, verify_user=null where order_id=$ORDER_A;"
   [ -n "$BILL_A" ]  && sql "delete from biz_pay_bill where bill_id=$BILL_A;"
   if [ -n "$STAFF_UID" ]; then
@@ -231,6 +233,35 @@ else
   echo "[C] 店员核销授权集合外门店"
   ckc "被拒" "$RESP" "无权操作其他门店"
 fi
+
+# ---- B2) storeId 由员工 token 兜底 ----
+# 核销页原来传的是 `storeId || 0`：页面刚进来还没 syncStaff、或缓存里 staffUser
+# 没 storeId 时就传 0。后端先过 storeId==null 检查（0 不是 null），再撞上
+# hasStore(0) 不匹配 → 抛「无权操作其他门店」。店员扫了客人的码只看到这句，
+# 完全不知道是自己这边门店没同步上，一线只能反复退出重进。
+# 门店本来就在员工 token 里，让前端传一遍再校验一遍纯属多余 → 员工态下
+# storeId 缺失/为 0 时从 token 补。这段锁住三种入参都能核销，且越权仍被拒。
+sql "insert into biz_order (order_no, store_id, member_id, merchant_id, product_id, product_name, pay_amount, status, verify_code, create_time) values
+ ('SMKSB_N',$STORE_A,1,$MID,1000,'smoke兜底-不传store',9.90,'1','SMKSBCODEN',now()),
+ ('SMKSB_Z',$STORE_A,1,$MID,1000,'smoke兜底-传0',9.90,'1','SMKSBCODEZ',now()),
+ ('SMKSB_X',$STORE_A,1,$MID,1000,'smoke兜底-越权',9.90,'1','SMKSBCODEX',now());"
+SB_ORDERS=1
+vfs() { # vfs <body> → 打印 code
+  curl -s -X POST "$BASE_URL/api/order/verify" -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $STK" -H "X-App-Id: $APPID" -d "$1"
+}
+echo "[B2] storeId 由员工 token 兜底"
+ck "不传 storeId 也能核销"  "$(vfs '{"verifyCode":"SMKSBCODEN"}' | jtop code)" "200"
+ck "  → 订单转已核销"       "$(sqlv "select status from biz_order where order_no='SMKSB_N';")" "2"
+ck "  → 核销人落 userId"    "$(sqlv "select verify_user from biz_order where order_no='SMKSB_N';")" "store:$STAFF_UID"
+ck "storeId=0 也能核销"     "$(vfs '{"verifyCode":"SMKSBCODEZ","storeId":0}' | jtop code)" "200"
+ck "  → 订单转已核销"       "$(sqlv "select status from biz_order where order_no='SMKSB_Z';")" "2"
+# 兜底只对「缺失/0」生效，显式传别家门店必须照旧拒 —— 否则等于把越权校验废了
+ckc "显式传别店仍被拒"      "$(vfs '{"verifyCode":"SMKSBCODEX","storeId":'"$STORE_B"'}')" "无权操作其他门店"
+ck "  → 越权单保持未核销"   "$(sqlv "select status from biz_order where order_no='SMKSB_X';")" "1"
+# 用 orderNo（不带 verifyCode）走的是另一条解析分支，兜底同样要生效
+ck "orderNo 入参也兜底"     "$(vfs '{"orderNo":"SMKSB_X"}' | jtop code)" "200"
+ckc "核销码和订单号都空则拒" "$(vfs '{}')" "核销码或订单编号至少填一个"
 
 # ---- D) 会员 token 调核销 → 403 ----
 MTK=$(curl -s -X POST "$BASE_URL/api/auth/login" -H 'Content-Type: application/json' \

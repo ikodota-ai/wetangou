@@ -105,39 +105,53 @@ Page({
       this.setData({ history: list.slice(0, 10) })
     } catch(e) {}
   },
+  /**
+   * 核销提交。
+   *
+   * 这里原来是手拼 wx.request，绕开了 utils/request.js 的统一封装，代价有三个：
+   *  1) 取 token 直接读 storage 的 'token'。会员端和商家端是两个 token
+   *     （memberToken / staffToken），封装里按 currentIdentity 选；裸读 'token'
+   *     在「会员版 → 切到商家版」之后如果 current 指向没同步好，就会拿会员 token
+   *     去打商家端接口，必然 401。
+   *  2) 401 不走 _clearAuth(authScope)，两个 token 该清哪个无人处理，
+   *     店员会卡在「点一次核销弹一次未登录」的死循环里，只能删小程序重进。
+   *  3) BASE_URL 是启动时的静态值，request.js 的 probeBaseUrl 探测到可用地址后
+   *     更新的是内部 _activeBaseUrl，这里读不到 —— 换网络环境就打到废弃地址。
+   *
+   * storeId 也不再传：门店本来就在员工 token 里，后端已按 token 兜底。
+   * 之前传的是 `storeId || 0`，页面刚进来还没 syncStaff 时就是 0，
+   * 后端 hasStore(0) 不匹配 → 抛「无权操作其他门店」，店员完全看不懂。
+   */
   onSubmit() {
-    const { verifyCode, orderNo, storeId, submitting } = this.data
+    const { verifyCode, orderNo, submitting } = this.data
     if (submitting) return
     if (!verifyCode && !orderNo) { wx.showToast({ title: '请填写核销码或订单号', icon: 'none' }); return }
     this.setData({ submitting: true })
     wx.showLoading({ title: '核销中...', mask: true })
-    // 复用 /api/order/verify（公开接口）
-    wx.request({
-      url: require('../../../utils/request.js').BASE_URL + '/api/order/verify',
-      method: 'POST',
-      header: {
-        'content-type': 'application/json',
-        'Authorization': 'Bearer ' + (wx.getStorageSync('token') || ''),
-        'X-App-Id': require('../../../utils/request.js').APPID
-      },
-      data: { verifyCode: verifyCode || '', orderNo: orderNo || '', storeId: storeId || 0 },
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const d = res.data || {}
-          if (d.code === 200 || d.success) {
-            wx.showToast({ title: '核销成功', icon: 'success' })
-            const item = (d.data && d.data.order) || { orderNo: orderNo || verifyCode, productName: '团购券', payAmount: 0, verifyTimeStr: new Date().toISOString().slice(0,16) }
-            this.saveHistory({ ...item, verifyTimeStr: new Date().toISOString().slice(0,16) })
-            this.setData({ verifyCode: '', orderNo: '' })
-          } else {
-            wx.showToast({ title: d.msg || '核销失败', icon: 'none' })
-          }
-        } else {
-          wx.showToast({ title: 'HTTP ' + res.statusCode, icon: 'none' })
-        }
-      },
-      fail: () => { wx.hideLoading(); wx.showToast({ title: '网络失败', icon: 'none' }) },
-      complete: () => { wx.hideLoading(); this.setData({ submitting: false }) }
-    })
+    api.verifyOrder({ verifyCode: verifyCode || '', orderNo: orderNo || '' })
+      .then((o) => {
+        wx.showToast({ title: '核销成功', icon: 'success' })
+        // 后端返的是 AjaxResult.success(order)，封装已剥掉 data 层，o 就是订单本身。
+        // 原代码取 d.data.order —— 那层 order 包装根本不存在，恒 undefined，
+        // 于是每次都落到 || 后面的占位对象：历史记录里全是「团购券 / ¥0 / 无 orderId」。
+        const order = o || {}
+        this.saveHistory({
+          orderId: order.orderId,
+          orderNo: order.orderNo || orderNo || verifyCode,
+          productName: order.productName || '团购券',
+          payAmount: order.payAmount == null ? 0 : order.payAmount,
+          verifyCode: order.verifyCode || verifyCode,
+          verifyTimeStr: order.verifyTime ? String(order.verifyTime).slice(0, 16)
+                                          : new Date().toISOString().slice(0, 16)
+        })
+        this.setData({ verifyCode: '', orderNo: '' })
+      })
+      .catch((err) => {
+        wx.showToast({ title: (err && (err.msg || err.errMsg)) || '核销失败', icon: 'none' })
+      })
+      .finally(() => {
+        wx.hideLoading()
+        this.setData({ submitting: false })
+      })
   }
 })
