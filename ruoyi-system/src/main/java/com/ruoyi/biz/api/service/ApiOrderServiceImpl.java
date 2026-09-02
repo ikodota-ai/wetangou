@@ -290,6 +290,21 @@ public class ApiOrderServiceImpl implements IApiOrderService
     }
 
     /**
+     * 不可核销时的具体原因（拼在「订单状态」之后）。
+     *
+     * <p>店员看到的完整文案例如「订单状态已核销过了，无需重复核销」。
+     * 未知状态兜底成中性描述，不暴露内部状态码。</p>
+     */
+    private String verifyRejectReason(String status)
+    {
+        if ("0".equals(status)) return "还是待付款，请让客人先完成支付";
+        if ("2".equals(status)) return "已核销过了，无需重复核销";
+        if ("3".equals(status)) return "是已退款，不能核销";
+        if ("4".equals(status)) return "是已取消，不能核销";
+        return "不可核销";
+    }
+
+    /**
      * 核销订单（门店店员）
      */
     @Transactional
@@ -313,7 +328,12 @@ public class ApiOrderServiceImpl implements IApiOrderService
         }
         if (!"1".equals(order.getStatus()))
         {
-            throw new ServiceException("订单状态不可核销");
+            // 按状态给出具体原因。原来一律返「订单状态不可核销」，店员完全无法处置：
+            // 两个店员同时盯着今日订单列表，一个刚核完，另一个点下去只看到这句话 ——
+            // 不知道是已经核过了（那就放客人走）、还是客人压根没付款（要让客人先付）、
+            // 还是已退款（要拒绝入场）。这三种情况店员的下一步动作完全不同。
+            // 「订单状态」四个字保留在文案里（smoke-c36 幂等用例按它断言）。
+            throw new ServiceException("订单状态" + verifyRejectReason(order.getStatus()));
         }
         if (order.getExpireTime() != null && order.getExpireTime().before(new Date()))
         {

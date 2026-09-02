@@ -265,6 +265,26 @@ ck "  → 越权单保持未核销"   "$(sqlv "select status from biz_order wher
 ck "orderNo 入参也兜底"     "$(vfs '{"orderNo":"SMKSB_X"}' | jtop code)" "200"
 ckc "核销码和订单号都空则拒" "$(vfs '{}')" "核销码或订单编号至少填一个"
 
+# B3 不可核销时必须说清是哪种情况。
+# 原来四种状态一律返「订单状态不可核销」，店员完全无法处置：两个店员同时盯着
+# 今日订单列表，一个刚核完另一个点下去，只看到这句话 —— 不知道是已经核过了
+# （放客人走）、客人压根没付款（让客人先付）、还是已退款（拒绝入场），
+# 这三种情况店员的下一步动作完全不同。
+# 注意「订单状态」四个字必须留在文案里：smoke-c36 的储值卡幂等用例按它断言。
+echo "[B3] 不可核销时说清原因"
+sql "insert into biz_order (order_no, store_id, member_id, merchant_id, product_id, product_name, pay_amount, status, verify_code, create_time) values
+ ('SMKSB_P0',$STORE_A,1,$MID,1000,'smoke待付款',9.90,'0','SMKSBP0',now()),
+ ('SMKSB_P3',$STORE_A,1,$MID,1000,'smoke已退款',9.90,'3','SMKSBP3',now()),
+ ('SMKSB_P4',$STORE_A,1,$MID,1000,'smoke已取消',9.90,'4','SMKSBP4',now());"
+# SMKSB_N 上面刚核过 → 已核销态
+ckc "重复核销说「已核销过了」"  "$(vfs '{"verifyCode":"SMKSBCODEN"}')" "已核销过了"
+ckc "待付款说「先完成支付」"    "$(vfs '{"verifyCode":"SMKSBP0"}')" "请让客人先完成支付"
+ckc "已退款说「不能核销」"      "$(vfs '{"verifyCode":"SMKSBP3"}')" "是已退款，不能核销"
+ckc "已取消说「不能核销」"      "$(vfs '{"verifyCode":"SMKSBP4"}')" "是已取消，不能核销"
+# 保留前缀，别把 smoke-c36 的幂等断言弄红
+ckc "文案仍含「订单状态」前缀"  "$(vfs '{"verifyCode":"SMKSBCODEN"}')" "订单状态"
+ck "  → 被拒的单状态没被改动"   "$(sqlv "select status from biz_order where order_no='SMKSB_P0';")" "0"
+
 # ---- D) 会员 token 调核销 → 403 ----
 MTK=$(curl -s -X POST "$BASE_URL/api/auth/login" -H 'Content-Type: application/json' \
   -H "X-App-Id: $APPID" -d "{\"code\":\"smokemsv_member\",\"appid\":\"$APPID\"}" | jget token)
