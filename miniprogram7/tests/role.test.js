@@ -36,6 +36,16 @@ describe('role.isPlatform', () => {
     expect(role.isAgent()).toBe(false)
   })
 
+  // 纯平台账号（没挂到任何商户下）不算店长及以上。
+  // 必须与后端 LoginMember.isManagerOrAbove()=hasAnyRole(OWNER,MANAGER) 同口径：
+  // 前端原先多算了 isPlatform()，比后端宽松，导致平台账号进商家端首页会看到
+  // 「建商品 / 到店买单 / 今日流水」三个点进去必然 403 的入口。
+  it('纯 PLATFORM → isManagerOrAbove/canManageStaff 都是 false（与后端同口径）', () => {
+    _store.member = { userType: 'platform', roles: ['PLATFORM'] }
+    expect(role.isManagerOrAbove()).toBe(false)
+    expect(role.canManageStaff()).toBe(false)
+  })
+
   it('AGENT 角色 → isAgent true', () => {
     _store.member = { userType: 'agent', roles: ['AGENT'] }
     expect(role.isAgent()).toBe(true)
@@ -64,7 +74,10 @@ describe('role.isPlatform', () => {
     _store.member = { userType: 'platform', roles: ['PLATFORM', 'OWNER'] }
     expect(role.isPlatform()).toBe(true)
     expect(role.isOwner()).toBe(true)
+    // 仍为 true，但走的是 isOwner() 这条真实商家身份，不是 PLATFORM 本身 ——
+    // 运营把自己挂到某商户下当老板时后端也会放行，所以入口该显示
     expect(role.isManagerOrAbove()).toBe(true)
+    expect(role.canManageStaff()).toBe(true)
   })
 })
 

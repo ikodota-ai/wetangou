@@ -127,6 +127,23 @@ Page({
   },
 
   /**
+   * 按身份决定登录后落在哪个首页。
+   *
+   * <p>为什么必须分流：这里和 pages/merchant/login 调的是同一个
+   * /api/merchant/staff/login，而那个端点明确放行「平台/代理商可无员工关联」，
+   * 所以平台和代理商账号从会员登录页展开的「账号密码登录」也能登进来。
+   * 但 RoleAuthInterceptor 收口后，整片 /api/merchant/staff/** 对 PLATFORM /
+   * AGENT 一律 403 —— 无条件 reLaunch 到商家端首页的结果是：首页那两个请求全
+   * 被 catch 吞掉，渲染成一屏 0，看着像系统坏了而不是「你不该来这」。
+   * pages/merchant/login 早就按 userType 分流到各自的专属首页了，这里漏了。</p>
+   */
+  _homeUrlByUserType(userType) {
+    if (userType === 'platform') return '/pages/platform/home/index'
+    if (userType === 'agent') return '/pages/agent/home/index'
+    return '/pages/merchant/home/index'
+  },
+
+  /**
    * 处理登录结果：按 loginType 分发
    */
   _handleLoginResult(data) {
@@ -179,7 +196,8 @@ Page({
         logged: true
       })
       wx.showToast({ title: '商家端登录成功', icon: 'success' })
-      setTimeout(() => wx.reLaunch({ url: '/pages/merchant/home/index' }), 600)
+      const dest1 = this._homeUrlByUserType(staffInfo.userType)
+      setTimeout(() => wx.reLaunch({ url: dest1 }), 600)
     } else {
       // 会员身份
       const memberId = data.memberId || (data.data && data.data.memberId)
@@ -252,7 +270,8 @@ Page({
         appInst.globalData.staff = staffInfo
         const bound = data && data.openidAutoBound
         wx.showToast({ title: bound ? '已绑定微信，下次可免密' : '商家端登录成功', icon: 'success' })
-        setTimeout(() => wx.reLaunch({ url: '/pages/merchant/home/index' }), 600)
+        const dest2 = this._homeUrlByUserType(staffInfo.userType)
+        setTimeout(() => wx.reLaunch({ url: dest2 }), 600)
       })
       .catch((err) => {
         wx.hideLoading()
