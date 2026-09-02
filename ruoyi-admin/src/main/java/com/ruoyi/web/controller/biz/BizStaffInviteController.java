@@ -220,6 +220,11 @@ public class BizStaffInviteController extends BaseController
      * 员工需重新用账号密码登录（登录时会自动绑定新微信）。</p>
      *
      * <p>只清 sys_user.openid，不动 biz_merchant_staff 关联 —— 解绑 ≠ 解除雇佣关系。</p>
+     *
+     * <p>必须和 resetStaffPwd 做同样的租户校验：这个端点原先只查 sys_user 就直接解绑，
+     * 实测用商户 1 的店长 token 打 /staff/unbindWx/{别家商户员工的 userId} 返回 200，
+     * 库里那个 openid 真被清成 NULL —— 别家店的员工下一秒就免密登不进商家版，
+     * 得等他们自己的店长重置密码才能恢复。userId 是自增数字，顺手 +1 就能试出来。</p>
      */
     @Log(title = "商家员工", businessType = BusinessType.UPDATE)
     @PreAuthorize("@ss.hasPermi('biz:staffInvite:edit')")
@@ -228,6 +233,9 @@ public class BizStaffInviteController extends BaseController
     {
         com.ruoyi.common.core.domain.entity.SysUser user = userService.selectUserByUserId(userId);
         if (user == null) return error("员工账号不存在");
+        MerchantStaff link = staffService.selectByUserId(userId);
+        if (link == null) return error(NOT_MY_STAFF);
+        com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(link.getMerchantId());
         if (StringUtils.isEmpty(user.getOpenid())) {
             return error("该员工尚未绑定微信");
         }
@@ -260,7 +268,7 @@ public class BizStaffInviteController extends BaseController
         if (user == null) return error("员工账号不存在");
         // 防越权：只能重置本商户（代理商为名下商户）员工的密码
         MerchantStaff link = staffService.selectByUserId(userId);
-        if (link == null) return error("该账号不是商家员工");
+        if (link == null) return error(NOT_MY_STAFF);
         com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(link.getMerchantId());
 
         String rawPwd = randomPassword();
@@ -277,6 +285,16 @@ public class BizStaffInviteController extends BaseController
         r.put("newPassword", rawPwd);
         return r;
     }
+
+    /**
+     * 「查不到员工关联」的统一话术。
+     *
+     * <p>为什么不说「该账号不是商家员工」：selectByUserId 会被 TenantSqlInterceptor
+     * 按当前登录身份改写，别家商户的员工在店长眼里根本查不出来（link 为 null），
+     * 于是店长看到的是「不是商家员工」—— 会以为自己找错了人、反复重试，
+     * 实际是没权限。两种情形都要能对上号，所以话术要兼容。</p>
+     */
+    private static final String NOT_MY_STAFF = "该账号不是本商户的员工，或你无权管理";
 
     /** 初始/重置密码：8 位大小写+数字，避开易混字符（0/O/1/l/I） */
     private String randomPassword()

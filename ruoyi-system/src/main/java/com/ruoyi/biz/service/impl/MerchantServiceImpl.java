@@ -28,11 +28,14 @@ public class MerchantServiceImpl implements IMerchantService
 {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MerchantServiceImpl.class);
 
-    /** PC 后台「商户管理员」角色（sys_role.role_key=merchant） */
-    private static final Long OWNER_PC_ROLE_ID = 5L;
+    /** PC 后台「商户管理员」角色的 role_key（role_id 各环境不一致，只认 key） */
+    private static final String OWNER_PC_ROLE_KEY = "merchant";
 
     @Autowired
     private MerchantMapper merchantMapper;
+
+    @Autowired
+    private com.ruoyi.system.mapper.SysRoleMapper roleMapper;
 
     @Autowired
     private AgentMapper agentMapper;
@@ -164,7 +167,11 @@ public class MerchantServiceImpl implements IMerchantService
             u.setTenantUserType("2");
             u.setTenantMerchantId(merchant.getMerchantId());
             // PC 后台「商户管理员」角色，让老板也能登录后台
-            u.setRoleIds(new Long[] { OWNER_PC_ROLE_ID });
+            Long pcRoleId = resolveOwnerPcRoleId();
+            if (pcRoleId != null)
+            {
+                u.setRoleIds(new Long[] { pcRoleId });
+            }
             u.setCreateBy(SecurityUtils.getUsername());
             u.setCreateTime(new Date());
             userService.insertUser(u);
@@ -190,6 +197,42 @@ public class MerchantServiceImpl implements IMerchantService
         {
             log.error("[Merchant] 自动开通老板账号失败 merchantId={}", merchant.getMerchantId(), e);
         }
+    }
+
+    /**
+     * 查 PC 后台「商户管理员」角色 id；查不到返 null（只记警告，不阻断建商户）。
+     *
+     * <p>为什么不能写死 5L：role_id 由建库时的插入顺序决定，各环境不一致。
+     * sql/biz_tenant_menu.sql 插这条角色时用的是
+     * {@code WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE role_key='merchant')} ——
+     * 也就是「已存在同 key 就跳过」，那么在一个先有别的角色、后跑该脚本的库里，
+     * role_key='merchant' 完全可能落在 6/7/8。此时写死 5L 会把新建商户的老板
+     * 绑到 role_id=5 那个「另一个角色」上：轻则老板进后台看不到商品/门店菜单，
+     * 重则误绑到高权角色（本地库 role_id=5 恰好就是 merchant，所以一直没暴露）。</p>
+     *
+     * <p>必须走 mapper 而不是 ISysRoleService.selectRoleList：后者带 @DataScope 切面，
+     * 会去 SecurityContext 取当前登录用户拼数据范围，而本方法也被
+     * resetOwnerAccount 的补建分支调用，链路里不一定有完整上下文。
+     * 与 ApiMerchantStaffController.resolvePcRoleId 保持同一口径。</p>
+     */
+    private Long resolveOwnerPcRoleId()
+    {
+        try
+        {
+            com.ruoyi.common.core.domain.entity.SysRole role = roleMapper.checkRoleKeyUnique(OWNER_PC_ROLE_KEY);
+            if (role != null && role.getRoleId() != null)
+            {
+                return role.getRoleId();
+            }
+        }
+        catch (Exception e)
+        {
+            log.error("[Merchant] 查询 role_key={} 失败，老板账号将没有后台权限", OWNER_PC_ROLE_KEY, e);
+            return null;
+        }
+        log.warn("[Merchant] 未找到 role_key={} 的 PC 角色，老板账号将没有后台权限（请先执行 sql/biz_tenant_menu.sql）",
+                OWNER_PC_ROLE_KEY);
+        return null;
     }
 
     /**

@@ -15,64 +15,50 @@
 -- 数据范围本来就由 TenantFilterHelper.assertDataScope 限制在名下商户，
 -- 给菜单权限不会造成跨租户越权（越权场景另有 smoke 覆盖）。
 --
--- 按 perms 定位，不写死 menu_id（menu_id 由各菜单脚本插入顺序决定，各库不一致）。
+-- 按 perms 定位菜单、按 role_key 定位角色，两者都不写死 id：
+-- menu_id 由各菜单脚本插入顺序决定，role_id 由 sys_role 插入顺序决定，各库都不一致。
+-- 原版本写死 role_id=5(商户)/4(代理商)，而 sql/biz_tenant_menu.sql 建这两个角色用的是
+-- 「WHERE NOT EXISTS (role_key=...)」——在一个先有其它角色的库里，merchant 完全可能落到 6/7，
+-- 那时这个脚本就把 staffInvite 权限补给了 role_id=5 的另一个角色，老板依旧 403。
 --
 -- 幂等：可重复执行。
 -- ============================================================================
 
--- 1) 商户管理员：绑定店员邀请菜单 + 全部按钮
+-- 1) 商户管理员 + 代理商：绑定店员邀请菜单的全部按钮
+--    代理商也要给：它要帮名下商户做开通支持，数据范围由 TenantFilterHelper.assertDataScope
+--    限制在名下商户，给菜单权限不造成跨租户越权（越权场景另有 smoke 覆盖）。
 INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 5, m.menu_id
-FROM sys_menu m
-WHERE m.perms IN (
+SELECT r.role_id, m.menu_id
+FROM sys_role r
+JOIN sys_menu m
+  ON m.perms IN (
         'biz:staffInvite:list',
         'biz:staffInvite:query',
         'biz:staffInvite:add',
         'biz:staffInvite:edit',
         'biz:staffInvite:remove'
-      )
+     )
+WHERE r.role_key IN ('merchant', 'agent')
+  AND r.del_flag = '0'
   AND NOT EXISTS (
-        SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 5 AND rm.menu_id = m.menu_id
+        SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = r.role_id AND rm.menu_id = m.menu_id
       );
 
 -- 2) 店员邀请是「店员管理」页的入口，父菜单没绑的话菜单树里不显示（接口能调但点不进去）
 INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 5, p.menu_id
-FROM sys_menu c
-JOIN sys_menu p ON p.menu_id = c.parent_id
-WHERE c.perms = 'biz:staffInvite:list'
-  AND p.menu_id > 0
+SELECT r.role_id, p.menu_id
+FROM sys_role r
+JOIN sys_menu c ON c.perms = 'biz:staffInvite:list'
+JOIN sys_menu p ON p.menu_id = c.parent_id AND p.menu_id > 0
+WHERE r.role_key IN ('merchant', 'agent')
+  AND r.del_flag = '0'
   AND NOT EXISTS (
-        SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 5 AND rm.menu_id = p.menu_id
+        SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = r.role_id AND rm.menu_id = p.menu_id
       );
 
--- 3) 代理商同样需要（数据范围由 assertDataScope 限制在名下商户）
-INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 4, m.menu_id
-FROM sys_menu m
-WHERE m.perms IN (
-        'biz:staffInvite:list',
-        'biz:staffInvite:query',
-        'biz:staffInvite:add',
-        'biz:staffInvite:edit',
-        'biz:staffInvite:remove'
-      )
-  AND NOT EXISTS (
-        SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 4 AND rm.menu_id = m.menu_id
-      );
-
-INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 4, p.menu_id
-FROM sys_menu c
-JOIN sys_menu p ON p.menu_id = c.parent_id
-WHERE c.perms = 'biz:staffInvite:list'
-  AND p.menu_id > 0
-  AND NOT EXISTS (
-        SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 4 AND rm.menu_id = p.menu_id
-      );
-
--- 4) 校验：两个角色都应各有 5 条 staffInvite 权限
--- SELECT rm.role_id, COUNT(*) FROM sys_role_menu rm
+-- 3) 校验：两个角色都应各有 5 条 staffInvite 权限
+-- SELECT r.role_key, COUNT(*) FROM sys_role_menu rm
 --   JOIN sys_menu m ON m.menu_id = rm.menu_id
---  WHERE m.perms LIKE 'biz:staffInvite:%' AND rm.role_id IN (4,5)
---  GROUP BY rm.role_id;
+--   JOIN sys_role r ON r.role_id = rm.role_id
+--  WHERE m.perms LIKE 'biz:staffInvite:%' AND r.role_key IN ('merchant','agent')
+--  GROUP BY r.role_key;
