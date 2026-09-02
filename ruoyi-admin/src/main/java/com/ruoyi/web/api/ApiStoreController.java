@@ -116,6 +116,17 @@ public class ApiStoreController
         StoreAlbum query = new StoreAlbum();
         query.setStoreId(storeId);
         List<StoreAlbum> list = storeAlbumService.selectStoreAlbumList(query);
+        // 同门店列表/详情的 logo：库里存的是相对路径（实测 4 条
+        // /profile/upload/demo/*.jpg），不补成绝对 URL 的话，小程序 <image src>
+        // 走原生加载不经过任何代理，直接 404。这个端点原先是三个图片出口里
+        // 唯一漏做绝对化的。
+        if (list != null)
+        {
+            for (StoreAlbum a : list)
+            {
+                a.setImageUrl(ImageUrlUtils.toAbsolute(a.getImageUrl()));
+            }
+        }
         return AjaxResult.success(list);
     }
 

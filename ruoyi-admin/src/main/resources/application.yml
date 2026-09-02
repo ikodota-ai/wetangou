@@ -38,6 +38,16 @@ server:
   port: 8080
   # 同时监听 IPv4 + IPv6，避免 localhost 在 Node.js / curl 不同栈下被 RST
   address: 0.0.0.0
+  # 采纳 Nginx 传来的 X-Forwarded-Proto / X-Forwarded-Host。
+  # 生产是 Nginx(443) 反代到后端 http://127.0.0.1:8083，不采纳这些头时
+  # request.getRequestURL() 拿到的是后端自己监听的 http://127.0.0.1:8083，
+  # 而 ServerConfig.getUrl() 和 ImageUrlUtils.toAbsolute() 都基于它拼图片绝对地址：
+  #   1) 小程序 <image> 收到 http:// 地址直接报「图片链接不再支持 HTTP 协议，
+  #      请升级到 HTTPS」并显示白图（门店 logo / banner / 相册全中）；
+  #   2) 头像上传接口把这个地址写进库，换台设备就打不开（库里的
+  #      http://172.31.26.216:8080/profile/avatar/... 这类脏数据就是这么来的）。
+  # 没有代理头时（本地直连）该策略不改变任何行为，所以放基础配置对全 profile 生效。
+  forward-headers-strategy: framework
   servlet:
     # 应用的访问路径
     context-path: /

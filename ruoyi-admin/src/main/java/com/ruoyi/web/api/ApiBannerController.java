@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.utils.image.ImageUrlUtils;
 import com.ruoyi.biz.domain.Banner;
 import com.ruoyi.biz.service.IBannerService;
 
@@ -42,6 +43,15 @@ public class ApiBannerController
             q.setMerchantId(merchantId);
         }
         List<Banner> list = bannerService.selectActiveBanners(q);
+        // banner 图同样可能是 /profile/ 相对路径。小程序首页 <image src> 拿到
+        // 相对路径会 404，页面上就是「后台配了轮播图但首页顶部空白」。
+        if (list != null)
+        {
+            for (Banner b : list)
+            {
+                b.setImageUrl(ImageUrlUtils.toAbsolute(b.getImageUrl()));
+            }
+        }
         return AjaxResult.success(list);
     }
 }
