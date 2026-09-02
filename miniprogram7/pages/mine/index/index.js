@@ -70,20 +70,29 @@ Page({
     this.setData({ logged: !!user.logged, user: this._viewUser(user) })
   },
 
-  goStaffLogin() {
-    // 已登录员工：直接进工作台首页；否则进登录页
-    const staff = wx.getStorageSync('staffUser') || {}
-    if (staff && staff.userType === 'store' && wx.getStorageSync('token')) {
-      wx.reLaunch({ url: '/pages/staff/home/index' })
-    } else {
-      wx.navigateTo({ url: '/pages/login/login?showMore=1' })
-    }
-  },
+  /**
+   * 商家员工登录入口（「我的」页没有商家身份时显示的那一个）。
+   *
+   * 这里原来并排挂着两个入口：「员工 / 商家登录」走 goStaffLogin，
+   * 「商家员工登录」走 goMerchantLogin。两个长得一样、都要账号密码，
+   * 但去的是两套不同的商家端 —— 老板拿着店长给的账号，五成概率点中
+   * 上面那个，落进旧门店端（/api/store/staff/login），而那个端点要求
+   * biz_store_user 里挂过门店，商家版的账号一律没挂，只会看到
+   * 「该账号未关联门店，无门店端权限」。实测 owner_c43 / staff_c43 都被拒。
+   *
+   * 现在只留一个入口，一律进新商家版登录页。旧门店端 8 个页面暂时保留
+   * （biz_store_user 里还有 staff001 一个历史账号能登），但不再从这里进 ——
+   * 已登录旧门店端的人 onShow 时会被下面 staffActive 分支照常送回工作台。
+   */
   goMerchantLogin() {
-    // 商家员工账号密码登录（已有账号场景）。
     // 新员工入职不走这里：店长后台生成的是小程序码，
     // 用微信「扫一扫」直接拉起 pages/merchant/scan/index 提交入职申请。
     wx.navigateTo({ url: '/pages/merchant/login/index' })
+  },
+
+  /** 已在旧门店端登录态的历史用户，回工作台（不新增入口，只是别把人锁在外面） */
+  goLegacyStoreHome() {
+    wx.reLaunch({ url: '/pages/staff/home/index' })
   },
 
   /**

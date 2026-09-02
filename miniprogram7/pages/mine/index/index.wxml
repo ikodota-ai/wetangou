@@ -98,19 +98,24 @@
       <text class="staff-entry-sub">{{switchHint}}</text>
     </view>
 
-    <!-- 没有商家身份 → 账号密码登录 -->
-    <view class="staff-entry" wx:else bindtap="goStaffLogin">
-      <text class="staff-entry-text">员工 / 商家登录</text>
-    </view>
-
     <!--
-      商家员工账号登录入口（不是扫码入职）：
-      新员工入职走微信「扫一扫」扫小程序码直达 pages/merchant/scan，
-      这里只给「已有账号但本机未登录」的员工用。
+      没有商家身份 → 只给一个账号密码入口。
+      原来这里并排挂着两个（「员工 / 商家登录」和「商家员工登录」），长得一样、
+      都要账号密码，但去的是两套不同的商家端：前者进旧门店端，而旧门店端要求
+      biz_store_user 里挂过门店，商家版的账号一律没挂，点中就只看到
+      「该账号未关联门店，无门店端权限」。老板拿着店长给的账号有五成概率点错。
+      新员工入职也不在这里：店长后台生成的是小程序码，用微信「扫一扫」
+      直达 pages/merchant/scan 提交入职申请。
     -->
-    <view class="staff-entry" wx:if="{{!canSwitchStaff}}" bindtap="goMerchantLogin">
+    <view class="staff-entry" wx:if="{{!canSwitchStaff && !staffActive}}" bindtap="goMerchantLogin">
       <text class="staff-entry-text">商家员工登录</text>
       <text class="staff-entry-sub">已有店长分配的账号</text>
+    </view>
+
+    <!-- 历史遗留：已在旧门店端登录过的人，别把他锁在外面 -->
+    <view class="staff-entry" wx:if="{{staffActive}}" bindtap="goLegacyStoreHome">
+      <text class="staff-entry-text">进入门店工作台</text>
+      <text class="staff-entry-sub">当前为门店端登录态</text>
     </view>
 
     <view class="logout btn-ghost" wx:if="{{logged}}" bindtap="onLogout">退出登录</view>
