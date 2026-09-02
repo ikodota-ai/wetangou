@@ -211,8 +211,9 @@ Page({
     }
     // 商户推客功能开关（后台「商户管理 → 编辑 → 推客功能」）：
     // 关时 wxml 的 wx:if 已经把入口隐藏了，这里是兜底 ——
-    // onShow 拉 merchant/info 失败时 promoterEnabled 保持默认 true，入口仍会渲染出来，
-    // 靠这个判断挡住；也防止 setData 后用户抢在下一帧点中。
+    // 开关值来自 app.js bootMerchant，那是异步的：它没回来/失败时
+    // promoterEnabled 保持默认 true，入口仍会渲染出来，靠这个判断挡住；
+    // 也防止 setData 后用户抢在下一帧点中。
     const merchant = (app.globalData && app.globalData.merchant) || {}
     if (String(merchant.promoterEnabled) === '0') {
       wx.showModal({ title: '未开通', content: '该商家暂未开通推客功能', showCancel: false })

@@ -109,6 +109,10 @@ G=$(grep -c 'promoterEnabled' "$PJS" 2>/dev/null || true)
 ck "推客页 js 读 promoterEnabled" "$([ "${G:-0}" -ge 3 ] && echo yes || echo no)" "yes"
 G=$(grep -c 'this.data.promoterEnabled' "$PJS" 2>/dev/null || true)
 ck "推客页 onJoin/loadCenter 有开关拦截" "$([ "${G:-0}" -ge 2 ] && echo yes || echo no)" "yes"
+# 推客页要能被服务端 403 反向纠正（直达本页时 bootMerchant 可能还没回来/失败，
+# 本地 promoterEnabled 还是默认 true，会先渲染出整个数据面板）。
+G=$(grep -c "未开通推客" "$PJS" 2>/dev/null || true)
+ck "推客页凭服务端 403 文案自愈成未开通" "$([ "${G:-0}" -ge 1 ] && echo yes || echo no)" "yes"
 
 # ---- 10) 【核心】服务端必须自己挡，不能只靠前端隐藏入口。
 #     实测过的真洞：开关=0 时直接 POST /api/distributor/join 返 200 并真的
@@ -146,6 +150,15 @@ MSG=$(curl -s "$BASE/api/distributor/center" -H "Authorization: Bearer $MTOKEN" 
 case "$MSG" in *"还不是推客"*) ck "开启时非推客返原始提示（未被开关误伤）" "ok" "ok" ;;
                *) ck "开启时非推客返原始提示（未被开关误伤）" "$MSG" "含'还不是推客'" ;; esac
 ck "开启时 join 仍可用(200)" "$(bcode POST /api/distributor/join)" "200"
+
+# ---- 12) 服务端 403 文案必须能被前端那段自愈判断命中（前端匹配 '未开通推客'）。
+#      两边是字符串耦合，谁改了文案而没改对面，自愈就静默失效 —— 所以这里锁住。
+q "update biz_merchant set promoter_enabled='0' where merchant_id=$MID"; evict
+SMSG=$(curl -s "$BASE/api/distributor/center" -H "Authorization: Bearer $MTOKEN" -H "X-App-Id: $APP" \
+  | python3 -c 'import sys,json;print((json.loads(sys.stdin.read() or "{}").get("msg") or ""))')
+case "$SMSG" in *未开通推客*) ck "服务端 403 文案含前端匹配串「未开通推客」" "ok" "ok" ;;
+                *) ck "服务端 403 文案含前端匹配串「未开通推客」" "$SMSG" "含'未开通推客'" ;; esac
+q "update biz_merchant set promoter_enabled='1' where merchant_id=$MID"; evict
 
 # 清理本脚本 mock 登录产生的会员/推客
 q "delete d from biz_distributor d join biz_member m on m.member_id=d.member_id

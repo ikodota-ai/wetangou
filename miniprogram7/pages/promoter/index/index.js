@@ -87,7 +87,17 @@ Page({
       this.loadOrders();
       this.loadFans();
     }).catch((err) => {
-      // 网络/接口失败：保留已设的 joined 状态，仅清 loading
+      // 服务端说「未开通」就以服务端为准。
+      // 需要这一条是因为：本页可以被分享卡片/海报 path/扫码直达，此时
+      // app.js bootMerchant 可能还没回来甚至失败，promoterEnabled 保持
+      // 默认 true，页面会先渲染出整个数据面板 —— 而服务端已经在
+      // DistributorAuthInterceptor 里 403 了。让 403 反过来纠正本地开关，
+      // 页面就能自愈成「未开通」占位，不必依赖 merchant/info 是否到位。
+      if (err && String(err.msg || '').indexOf('未开通推客') >= 0) {
+        this.setData({ promoterEnabled: false, joined: false, loading: false });
+        return;
+      }
+      // 其他网络/接口失败：保留已设的 joined 状态，仅清 loading
       this.setData({ loading: false });
       console.warn('[loadCenter] FAIL =>', JSON.stringify(err));
     });
