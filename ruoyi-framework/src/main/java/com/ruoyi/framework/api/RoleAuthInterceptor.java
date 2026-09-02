@@ -97,7 +97,9 @@ public class RoleAuthInterceptor implements HandlerInterceptor
         {
             response.setStatus(HttpServletResponse.SC_OK);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":\"403\",\"msg\":\"当前角色无权限访问该接口（需要 " + needRoles(allowed) + "）\"}");
+            // 同 DistributorAuthInterceptor：code 返数字，字符串 "403" 会被前端漏判
+            // （实测店员点「招人」拿到 403，前端却进成功分支渲染出空白邀请码）。
+            response.getWriter().write("{\"code\":403,\"msg\":\"当前角色无权限访问该接口（需要 " + needRoles(allowed) + "）\"}");
             return false;
         }
         return true;

@@ -114,6 +114,9 @@ public class DistributorAuthInterceptor implements HandlerInterceptor
     {
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":\"" + code + "\",\"msg\":\"" + msg + "\"}");
+        // code 必须是数字：小程序 request.js 判的是业务码，AjaxResult 那条链一直返数字，
+        // 这里以前写成字符串 "403"，两边不一致会让前端漏判（实测非推客提交提现，
+        // 后端返 {"code":"403"} 但前端走了成功分支，弹「提现申请已提交」）。
+        response.getWriter().write("{\"code\":" + code + ",\"msg\":\"" + msg + "\"}");
     }
 }

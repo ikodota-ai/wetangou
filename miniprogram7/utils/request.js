@@ -141,9 +141,13 @@ function request(url, options = {}) {
       success: (res) => {
         if (res.statusCode === 200) {
           const d = res.data || {};
-          if (d.code === 200 || d.code === 0 || d.success) {
+          // 业务码要按数字比：后端两个拦截器（DistributorAuthInterceptor /
+          // RoleAuthInterceptor）是手写 JSON 输出的，code 是字符串 "401"/"403"，
+          // 而 AjaxResult 那条链是数字。只用 === 比数字会漏掉字符串那一半。
+          const bizCode = (d.code === undefined || d.code === null) ? null : Number(d.code)
+          if (bizCode === 200 || bizCode === 0 || d.success) {
             resolve(d.data || d);
-          } else if (d.code === 401) {
+          } else if (bizCode === 401) {
             const authScope = d.authScope || ''
             _clearAuth(authScope)
             // 静默重登：仅会员态 401 自动重试一次
@@ -153,8 +157,16 @@ function request(url, options = {}) {
               return
             }
             reject({ code: 401, msg: d.msg || '未登录', authScope: authScope });
-          } else {
+          } else if (bizCode === null || Number.isNaN(bizCode)) {
+            // 响应体压根没有 code 字段（个别端点直接返裸数据）：保持原样透传，
+            // 否则会把正常数据误判成失败。
             resolve(d);
+          } else {
+            // HTTP 200 + 业务失败码（403 无权限 / 500 业务异常 …）以前一律
+            // resolve(d)，于是调用方的 .then() 照常执行 —— 提现页会在
+            // 「您还不是推客」时弹「提现申请已提交」，店员点「招人」拿到
+            // 403 也照样进成功分支渲染出一张空白邀请码。必须 reject 交给 .catch。
+            reject({ code: bizCode, msg: d.msg || '请求失败', data: d.data });
           }
         } else if (res.statusCode === 401) {
           _clearAuth('')
@@ -181,7 +193,9 @@ function uploadFile(url, filePath, name = 'file', formData = {}) {
       success: (res) => {
         let d = res.data;
         try { d = JSON.parse(res.data); } catch (e) {}
-        if (res.statusCode === 200 && (d.code === 200 || d.code === 0)) resolve(d.data || d);
+        // 同 request()：拦截器手写的 code 是字符串，用 Number() 归一后再比
+        const bizCode = (d && d.code !== undefined && d.code !== null) ? Number(d.code) : null
+        if (res.statusCode === 200 && (bizCode === 200 || bizCode === 0)) resolve(d.data || d);
         else reject(d);
       },
       fail: reject
