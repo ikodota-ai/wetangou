@@ -118,6 +118,30 @@ for n in 牛肉 羊肉 时蔬; do
   chk_code "加单品 $n" 200 "$S"
 done
 
+# 名称缺失必须给人话，不能把 SQL 异常糊到用户脸上。
+# biz_product_subitem.subitem_name 是 NOT NULL 且无默认值，端点原先不校验就直接
+# insert，MySQL 抛 "Field 'subitem_name' doesn't have a default value"，RuoYi 的
+# 全局异常处理把整段 SQL 异常原文塞进 msg 返给端上 —— 商家在手机上看到的是一屏
+# "### Error updating database ... ProductSubitemMapper.xml"，完全不知道是名称没填。
+# 字段名写错（比如传 itemName）也是同一个下场，排查成本极高。
+for BAD in '{"groupId":GRPID,"itemName":"字段名写错","num":1}' \
+           '{"groupId":GRPID,"subitemName":"","quantity":1}' \
+           '{"groupId":GRPID,"subitemName":"   ","quantity":1}' \
+           '{"groupId":GRPID,"quantity":1}'; do
+  BODY=$(echo "$BAD" | sed "s/GRPID/$GRP/")
+  BR=$(curl -s -X POST "$H/api/product/subitem" -H "$AUTH" -H "$JSON" -d "$BODY")
+  chk_msg "缺名称给人话提示: $BODY" "请填写单品名称" "$BR"
+  # 反面：绝不能把 SQL 细节漏出去
+  case "$BR" in
+    *"Error updating database"*|*"doesn't have a default value"*|*Mapper.xml*)
+      bad "缺名称时把 SQL 异常返给了端上: $BR";;
+    *) ok "  → 未泄漏 SQL 异常";;
+  esac
+done
+# 上面 4 次失败请求都不该落库，仍应只有 3 个单品
+LEFT=$($MYSQL -N -B -e "select count(*) from biz_product_subitem where group_id=$GRP;" 2>/dev/null)
+chk_eq "失败请求没污染数据（仍 3 个单品）" 3 "$LEFT"
+
 READ=$(curl -s -H "$AUTH" "$H/api/product/subitem/groups?productId=$PID")
 CNT=$(echo "$READ" | python3 -c '
 import sys,json

@@ -27,6 +27,7 @@ import com.ruoyi.biz.service.ICategoryService;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
 
 /**
@@ -598,6 +599,15 @@ public class ApiProductController
         if (subitem == null || subitem.getGroupId() == null)
         {
             throw new ServiceException("缺少 groupId");
+        }
+        // 名称必须在这里判：biz_product_subitem.subitem_name 是 NOT NULL 且无默认值，
+        // 不校验就直接 insert，MySQL 抛 "Field 'subitem_name' doesn't have a default value"，
+        // 而 RuoYi 的全局异常处理会把整段 SQL 异常原文塞进 msg 返给端上 ——
+        // 商家在手机上看到的是一屏 "### Error updating database ... ProductSubitemMapper.xml"，
+        // 完全不知道是名称没填。字段名写错（比如传 itemName 而不是 subitemName）也是这个下场。
+        if (StringUtils.isEmpty(subitem.getSubitemName()))
+        {
+            throw new ServiceException("请填写单品名称（字段 subitemName）");
         }
         ProductSubitemGroup g = subitemGroupService.selectById(subitem.getGroupId());
         if (g == null)
