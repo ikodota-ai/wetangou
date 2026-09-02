@@ -115,8 +115,10 @@ ck "G) 合法日期+对齐时段成功"   "$(echo "$ROK" | jcode)" "200"
 BID=$(echo "$ROK" | jget bookingId)
 ck "G2) 场次真落库"             "$(sql1 "select count(1) from biz_booking where booking_id='${BID:-0}';")" "1"
 
-# 越权提交一条都不许落库
-ck "G3) 被拒的 6 次都没落库"    "$(sql1 "select count(1) from biz_booking where store_id=$STORE and booking_date in ('$CLOSED','$OVER','$PAST');")" "0"
+# 越权提交一条都不许落库。按 create_time 限 5 分钟内，避免撞上历史遗留数据
+# （库里这两条 BKTEST1 / B1785800650397903 的 booking_date 都是 2026-08-04，
+#  不加时间过滤就会每秒假 FAIL）。
+ck "G3) 被拒的 6 次都没落库"    "$(sql1 "select count(1) from biz_booking where store_id=$STORE and booking_date in ('$CLOSED','$OVER','$PAST') and create_time >= now() - interval 5 minute;")" "0"
 
 ck "H) 无 token → 401" "$(curl -s -X POST "$BASE_URL/api/booking" -H 'Content-Type: application/json' \
   -H "X-App-Id: $APPID" -d "{\"storeId\":$STORE,\"bookingDate\":\"$OPEN\",\"timeSlot\":\"10:30\"}" | jcode)" "401"
