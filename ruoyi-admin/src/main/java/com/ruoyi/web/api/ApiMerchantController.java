@@ -89,6 +89,15 @@ public class ApiMerchantController
         data.put("serviceQrcode", safeAbsolute(merchant.getServiceQrcode()));
         data.put("businessHours", merchant.getBusinessHours());
         data.put("serviceHours", merchant.getServiceHours());
+        // 推客总开关。必须兜底成 '1'（启用）而不是直接透传：
+        // 商户缓存（merchant:appid:*）是永不过期的 fastjson 序列化对象，
+        // 新增 promoter_enabled 列前写进 Redis 的那份快照里根本没这个 key，
+        // 反序列化回来就是 null —— 实测本地 merchant 1 库里是 '1'，
+        // 接口却返 null，小程序据此判定未开通，已开通商户的推客入口凭空消失。
+        // 加了列之后老缓存不会自动失效（没 TTL，只有编辑商户才 evict），
+        // 所以这个兜底在生产上线那一刻就会生效，不能省。
+        String promoterEnabled = merchant.getPromoterEnabled();
+        data.put("promoterEnabled", StringUtils.isEmpty(promoterEnabled) ? "1" : promoterEnabled);
         return AjaxResult.success(data);
     }
 

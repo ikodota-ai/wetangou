@@ -14,6 +14,7 @@ Page({
     businessHours: '',
     // 员工身份标识：true=当前是员工 token
     staffActive: false,
+    promoterEnabled: true,
     // 是否可一键切到商家版（本地已有商家会话，或该微信绑过员工账号）
     canSwitchStaff: false,
     switchHint: ''
@@ -32,6 +33,7 @@ Page({
     this.setData({ staffActive: !!(staff && staff.userType === 'store') })
     this.refreshSwitchEntry()
     this.syncUser()
+    this.syncPromoterSwitch()
 
     // 已登录 + 资料不完整 + 未弹过提示 → 弹完善资料
     if (this.data.logged && !this.data.hasShowTip && !this.isProfileComplete()) {
@@ -68,6 +70,31 @@ Page({
 
   onUserUpdate(user) {
     this.setData({ logged: !!user.logged, user: this._viewUser(user) })
+  },
+
+  /**
+   * app.js bootMerchant 是异步的：本页 onShow 跑在它之前时
+   * globalData.merchant 还是初始空对象，推客开关读不到。
+   * 所以既在 onShow 读一次（热切 tab 时已有缓存），
+   * 又实现这个广播钩子接 bootMerchant 回来的那一次（冷启动首屏）。
+   */
+  onMerchantUpdate() {
+    this.syncPromoterSwitch()
+  },
+
+  /**
+   * 推客总开关：后台「商户管理 → 编辑 → 推客功能」关掉后
+   * 「我的」页不再渲染「推客中心」入口。
+   *
+   * 默认 true 而不是 false —— 接口没回来/请求失败时宁可显示入口
+   * （点进去后端 /api/distributor/* 仍会按真实状态拦），
+   * 也不要让已开通商户的推客看到入口凭空消失。
+   */
+  syncPromoterSwitch() {
+    const m = (app.globalData && app.globalData.merchant) || {}
+    if (m.promoterEnabled === undefined || m.promoterEnabled === null) return
+    const enabled = String(m.promoterEnabled) !== '0'
+    if (enabled !== this.data.promoterEnabled) this.setData({ promoterEnabled: enabled })
   },
 
   /**
@@ -180,6 +207,15 @@ Page({
   goPromoter() {
     if (!this.data.logged) {
       wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
+    // 商户推客功能开关（后台「商户管理 → 编辑 → 推客功能」）：
+    // 关时 wxml 的 wx:if 已经把入口隐藏了，这里是兜底 ——
+    // onShow 拉 merchant/info 失败时 promoterEnabled 保持默认 true，入口仍会渲染出来，
+    // 靠这个判断挡住；也防止 setData 后用户抢在下一帧点中。
+    const merchant = (app.globalData && app.globalData.merchant) || {}
+    if (String(merchant.promoterEnabled) === '0') {
+      wx.showModal({ title: '未开通', content: '该商家暂未开通推客功能', showCancel: false })
       return
     }
     wx.navigateTo({ url: '/pages/promoter/index/index' })

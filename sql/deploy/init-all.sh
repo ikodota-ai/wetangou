@@ -131,6 +131,7 @@ run biz_merchant_appid_null_v11      # 空 appid 洗成 NULL（uk_appid 不容�
 run biz_merchant_staff_perms_v12     # 商户管理员/代理商补店员邀请权限（老板原本招不了店员，全 403）
 run biz_staff_tenant_backfill_v13    # 回填扫码入职员工的租户归属（缺记录会兜底成平台身份、看到别家商户数据）
 run biz_staff_pc_role_backfill_v14   # 回填老板/店长缺失的 PC 角色（无角色 = 后台全 403，重置不了员工密码）
+run biz_merchant_promoter_enabled_20260903  # 商户级推客总开关（关掉后小程序不显示「推客中心」入口）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

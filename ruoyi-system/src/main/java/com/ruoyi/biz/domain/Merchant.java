@@ -113,6 +113,9 @@ public class Merchant extends BaseEntity
     /** 联调mock开关（0开启 1关闭） */
     private String mockEnabled;
 
+    /** 推客功能是否启用（1=启用 0=关闭） */
+    private String promoterEnabled;
+
     /** 服务到期时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date serviceExpire;
@@ -387,6 +390,16 @@ public class Merchant extends BaseEntity
     public void setMockEnabled(String mockEnabled)
     {
         this.mockEnabled = mockEnabled;
+    }
+
+    public String getPromoterEnabled()
+    {
+        return promoterEnabled;
+    }
+
+    public void setPromoterEnabled(String promoterEnabled)
+    {
+        this.promoterEnabled = promoterEnabled;
     }
 
     public Date getServiceExpire()

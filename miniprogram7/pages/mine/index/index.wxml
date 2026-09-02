@@ -57,7 +57,7 @@
         <text class="f-t">会员资料</text>
         <view class="arr"></view>
       </view>
-      <view class="func-item" wx:if="{{logged}}" bindtap="goPromoter">
+      <view class="func-item" wx:if="{{logged &amp;&amp; promoterEnabled}}" bindtap="goPromoter">
         <view class="f-ic f-promoter">
           <text class="f-p-y">¥</text>
         </view>

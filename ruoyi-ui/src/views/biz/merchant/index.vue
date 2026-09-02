@@ -254,6 +254,15 @@
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="推客功能" prop="promoterEnabled">
+              <el-radio-group v-model="form.promoterEnabled">
+                <el-radio label="1">启用</el-radio>
+                <el-radio label="0">关闭</el-radio>
+              </el-radio-group>
+              <div class="form-tip">关闭后该商户小程序「我的」页不再显示「推客中心」入口；已加入的推客数据保留，重新启用即恢复。</div>
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="备注" prop="remark">
               <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
@@ -457,6 +466,7 @@ export default {
         licenseNo: null,
         licenseImg: null,
         serviceExpire: null,
+        promoterEnabled: "1",
         status: "0",
         remark: null
       };

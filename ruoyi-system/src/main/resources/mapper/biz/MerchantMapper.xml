@@ -32,6 +32,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="payApiV3Key"    column="pay_api_v3_key"    />
         <result property="payNotifyUrl"    column="pay_notify_url"    />
         <result property="mockEnabled"    column="mock_enabled"    />
+        <result property="promoterEnabled"    column="promoter_enabled"    />
         <result property="serviceExpire"    column="service_expire"    />
         <result property="status"    column="status"    />
         <result property="delFlag"    column="del_flag"    />
@@ -48,7 +49,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                m.license_no, m.license_img,
                m.appid, m.app_secret, m.mp_auth_mode,
                m.pay_mode, m.pay_mch_id, m.pay_appid, m.pay_cert_serial, m.pay_key_path,
-               m.pay_api_v3_key, m.pay_notify_url, m.mock_enabled, m.service_expire,
+               m.pay_api_v3_key, m.pay_notify_url, m.mock_enabled, m.promoter_enabled, m.service_expire,
                m.status, m.del_flag, m.create_by, m.create_time, m.update_by, m.update_time, m.remark
         from biz_merchant m
         left join biz_agent a on a.agent_id = m.agent_id
@@ -116,6 +117,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="payApiV3Key != null">pay_api_v3_key,</if>
             <if test="payNotifyUrl != null">pay_notify_url,</if>
             <if test="mockEnabled != null">mock_enabled,</if>
+            <if test="promoterEnabled != null">promoter_enabled,</if>
             <if test="serviceExpire != null">service_expire,</if>
             <if test="status != null">status,</if>
             <if test="createBy != null">create_by,</if>
@@ -148,6 +150,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="payApiV3Key != null">#{payApiV3Key},</if>
             <if test="payNotifyUrl != null">#{payNotifyUrl},</if>
             <if test="mockEnabled != null">#{mockEnabled},</if>
+            <if test="promoterEnabled != null">#{promoterEnabled},</if>
             <if test="serviceExpire != null">#{serviceExpire},</if>
             <if test="status != null">#{status},</if>
             <if test="createBy != null">#{createBy},</if>
@@ -183,6 +186,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="payApiV3Key != null">pay_api_v3_key = #{payApiV3Key},</if>
             <if test="payNotifyUrl != null">pay_notify_url = #{payNotifyUrl},</if>
             <if test="mockEnabled != null">mock_enabled = #{mockEnabled},</if>
+            <if test="promoterEnabled != null">promoter_enabled = #{promoterEnabled},</if>
             <if test="serviceExpire != null">service_expire = #{serviceExpire},</if>
             <if test="status != null">status = #{status},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>

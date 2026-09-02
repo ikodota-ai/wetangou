@@ -13,6 +13,9 @@ Page({
       withdrawingAmount: '0.00',
       frozenAmount: '0.00'
     },
+    // 商户级推客总开关（后台「商户管理 → 编辑 → 推客功能」）。
+    // 默认 true：接口没回来时不误报「未开通」。
+    promoterEnabled: true,
     tab: 'order',
     orderCount: 0,
     fanCount: 0,
@@ -25,13 +28,36 @@ Page({
   },
   onLoad() {
     this.setData({ user: app.globalData.user });
+    this.syncPromoterSwitch();
   },
   onShow() {
+    this.syncPromoterSwitch();
     // 提现后返回需刷新余额
     this.loadCenter();
   },
   onUserUpdate(user) { this.setData({ user }); },
+  // bootMerchant 异步：冷启动直接落到本页时 globalData.merchant 还是空对象
+  onMerchantUpdate() { this.syncPromoterSwitch(); },
+  /**
+   * 「我的」页已经用 wx:if 隐了入口，这里仍要再判一次 ——
+   * 本页可以被绕过入口直达：分享卡片 / 扫码 / 海报里的 path、
+   * 以及开关刚关掉但用户小程序还停在旧页面栈上的场景。
+   * 关闭时整页替换成「未开通」占位，不能让「成为推客」按钮还点得动
+   * （点了后端 join 会真的建推客记录）。
+   */
+  syncPromoterSwitch() {
+    const m = (app.globalData && app.globalData.merchant) || {};
+    if (m.promoterEnabled === undefined || m.promoterEnabled === null) return;
+    const enabled = String(m.promoterEnabled) !== '0';
+    if (enabled !== this.data.promoterEnabled) this.setData({ promoterEnabled: enabled });
+  },
   loadCenter() {
+    // 开关关闭时不打 /api/distributor/center：那个端点挂 @DistributorRequired，
+    // 非推客一律 403，白跑一次请求还会在控制台刷错误日志。
+    if (!this.data.promoterEnabled) {
+      this.setData({ loading: false });
+      return;
+    }
     if (!app.globalData.user.logged) {
       this.setData({ joined: false });
       return;
@@ -115,6 +141,10 @@ Page({
   },
   onJoin() {
     if (this.data.joining) return;
+    if (!this.data.promoterEnabled) {
+      wx.showModal({ title: '未开通', content: '该商家暂未开通推客功能', showCancel: false });
+      return;
+    }
     if (!app.globalData.user.logged) {
       wx.navigateTo({ url: '/pages/login/login' });
       return;

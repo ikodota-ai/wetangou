@@ -14,7 +14,17 @@
     </view>
   </view>
 
-  <view class="content">
+  <!-- 商户没开推客功能：整页只留占位，不渲染任何数据/按钮。
+       「我的」页已经隐了入口，但本页可被分享卡片/海报 path/扫码直达。 -->
+  <view class="content" wx:if="{{!promoterEnabled}}">
+    <view class="card empty-card">
+      <view class="empty-ic"></view>
+      <text class="empty-title">未开通</text>
+      <text class="empty-text">该商家暂未开通推客功能</text>
+    </view>
+  </view>
+
+  <view class="content" wx:else>
     <view class="data-card card">
       <view class="data-head">
         <text class="data-t">数据概览</text>
