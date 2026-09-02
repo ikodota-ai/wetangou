@@ -1180,7 +1180,9 @@ public class ApiMerchantStaffController
         bm.setStatus("2");
         bm.setConfirmUser(m.getStaffUserId() == null ? "merchant-staff" : ("mstaff-" + m.getStaffUserId()));
         bm.setConfirmTime(new Date());
-        if (body != null && body.get("remark") != null) bm.setReviewRemark(String.valueOf(body.get("remark")));
+        // 同 reject：统一走 trimToNull，避免写入 "null" 字面量或全空白备注
+        String confirmRemark = body == null ? null : trimToNull(body.get("remark"));
+        if (confirmRemark != null) bm.setReviewRemark(confirmRemark);
         bookingService.updateBookingMember(bm);
         return AjaxResult.success("已确认");
     }
@@ -1198,8 +1200,11 @@ public class ApiMerchantStaffController
         if ("1".equals(bm.getStatus())) return AjaxResult.error("该报名已取消");
         if ("2".equals(bm.getStatus())) return AjaxResult.error("已确认，不能拒绝");
         if ("3".equals(bm.getStatus())) return AjaxResult.error("该报名已拒绝");
-        String reason = body == null ? null : String.valueOf(body.get("reason"));
-        if (reason == null || reason.trim().isEmpty()) return AjaxResult.error("请填写拒绝原因");
+        // 必须走 trimToNull：String.valueOf(null) 返回的是字符串 "null" 而不是 null，
+        // 缺 reason 字段时会直接绕过下面的空校验，把「拒绝原因：null」写进库给顾客看。
+        // 实测不带 reason 打这个端点返回「已拒绝」，review_remark 落库就是 'null'。
+        String reason = body == null ? null : trimToNull(body.get("reason"));
+        if (reason == null) return AjaxResult.error("请填写拒绝原因，顾客会看到这句话");
         bm.setStatus("3");
         bm.setConfirmUser(m.getStaffUserId() == null ? "merchant-staff" : ("mstaff-" + m.getStaffUserId()));
         bm.setConfirmTime(new Date());
@@ -1276,9 +1281,12 @@ public class ApiMerchantStaffController
             }
         }
         out.sort((a, b) -> {
-            String t1 = String.valueOf(a.get("signupTime")); if (t1 == null) t1 = "";
-            String t2 = String.valueOf(b.get("signupTime")); if (t2 == null) t2 = "";
-            return t2.compareTo(t1); // String compare as fallback (dates are yyyy-MM-dd)
+            // String.valueOf 之后再判 null 是死代码（它永不返回 null，只会返回 "null"）：
+            // 没有 signupTime 的记录会拿到字符串 "null"，倒序比较时 'n' > '2' 会把它顶到最前面，
+            // 店员一打开预约页最上面几条全是时间未知的脏数据。改用 trimToNull + 空串兜底。
+            String t1 = trimToNull(a.get("signupTime")); if (t1 == null) t1 = "";
+            String t2 = trimToNull(b.get("signupTime")); if (t2 == null) t2 = "";
+            return t2.compareTo(t1); // 日期是 yyyy-MM-dd 前缀，字符串倒序即时间倒序
         });
         return AjaxResult.success(out);
     }
@@ -1765,7 +1773,10 @@ public class ApiMerchantStaffController
     {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
-        return s.isEmpty() ? null : s;
+        // "null" / "undefined" 一律当空：小程序端 JSON.stringify 一个 undefined 字段
+        // 或后端 String.valueOf(null) 都会产出这两个字面量，它们不是用户真填的内容。
+        if (s.isEmpty() || "null".equals(s) || "undefined".equals(s)) return null;
+        return s;
     }
 
     /** 重置密码用：8 位大小写+数字，避开易混字符（0/O/1/l/I） */
