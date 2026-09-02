@@ -735,7 +735,18 @@ Page({
           // 让列表页知道刚建了草稿，回去要切到「未上架」tab，
           // 否则商家停在「已上架」tab 一条都看不到，会以为没保存成功
           wx.setStorageSync('productDraftCreated', 1)
-          wx.navigateBack({ delta: 1 })
+          // 弹窗写的是「可在商品列表中上架」，那就必须真的把人送到列表页。
+          // 原先无条件 navigateBack：从首页直接进建品页时会退回首页，而上架按钮
+          // 只在列表页上 —— 提示指了一个用户到不了的地方。
+          // 栈里有列表页就退回去（保留它的滚动位置和 tab），没有则 redirect 过去。
+          const stack = getCurrentPages() || []
+          const hasList = stack.some(pg => pg && pg.route &&
+            pg.route.indexOf('pages/merchant/product/list') > -1)
+          if (hasList) {
+            wx.navigateBack({ delta: 1 })
+          } else {
+            wx.redirectTo({ url: '/pages/merchant/product/list/index' })
+          }
         }
       })
     }).catch((err) => {

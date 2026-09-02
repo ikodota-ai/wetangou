@@ -68,8 +68,13 @@
     </view>
     <!-- 原先这条和下面的店员管理都写在 .modules 闭合标签之外，脱离了卡片容器与
          wx:if="{{!noStore}}"：没门店时「创建商品」照样显示，点进去必然失败 -->
-    <view class="module-item" bindtap="goCreateProduct" wx:if="{{showCreateProduct}}">
-      <view class="m-text"><text class="m-t">创建商品</text><text class="m-d">新增团购 / 代金券</text></view>
+    <!-- 入口指向商品列表而不是直接进建品页：新建的商品一律落草稿，上架按钮只在
+         列表页上。原先首页只有「创建商品」、整个商家端没有任何地方能进列表页
+         （product/list 零引用），建品页存完草稿又是 navigateBack 退回首页 ——
+         草稿建出来就永远上不了架。列表页自带底部常驻「创建商品」按钮，
+         从这儿进去建品一步不多。 -->
+    <view class="module-item" bindtap="goProductList" wx:if="{{showCreateProduct}}">
+      <view class="m-text"><text class="m-t">商品管理</text><text class="m-d">新建 / 编辑 / 上下架团购、代金券</text></view>
       <view class="arr"></view>
     </view>
     <view class="module-item" bindtap="goTeam" wx:if="{{showTeam}}">

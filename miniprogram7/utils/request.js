@@ -227,12 +227,18 @@ const api = {
   // 上下架
   productToggle: (data) => request('/api/product/status', { method: 'PUT', data }),
   // 商品搭配-商品组
-  productSubitemGroups: (params) => request('/biz/productSubitem/groups', { data: params }),
-  productSubitemGroupAdd: (data) => request('/biz/productSubitem/group', { method: 'POST', data }),
-  productSubitemGroupDel: (id) => request('/biz/productSubitem/group/' + id, { method: 'DELETE' }),
+  // 必须打 /api/product/subitem/**，不能打 PC 那套 /biz/productSubitem/**：
+  // /biz/** 挂 Spring Security + @PreAuthorize，判的是后台 sys_user 的 perms；
+  // 小程序员工 token 走 MemberAuthInterceptor 这条独立链路，拿它打 /biz/**
+  // 一律 401（实测「请求访问 /biz/productSubitem/groups 认证失败」）。
+  // 打错地址的后果是商品搭配页每个按钮都失败 —— 团购在手机上永远配不了套餐内容。
+  productSubitemGroups: (params) => request('/api/product/subitem/groups', { data: params }),
+  productSubitemGroupAdd: (data) => request('/api/product/subitem/group', { method: 'POST', data }),
+  productSubitemGroupUpdate: (data) => request('/api/product/subitem/group', { method: 'PUT', data }),
+  productSubitemGroupDel: (id) => request('/api/product/subitem/group/' + id, { method: 'DELETE' }),
   // 商品搭配-单品
-  productSubitemAdd: (data) => request('/biz/productSubitem/subitem', { method: 'POST', data }),
-  productSubitemDel: (id) => request('/biz/productSubitem/subitem/' + id, { method: 'DELETE' }),
+  productSubitemAdd: (data) => request('/api/product/subitem', { method: 'POST', data }),
+  productSubitemDel: (id) => request('/api/product/subitem/' + id, { method: 'DELETE' }),
   // 订单
   createOrder: (data) => request('/api/order', { method: 'POST', data }),
   prepayOrder: (id) => request(`/api/order/prepay/${id}`, { method: 'POST' }),

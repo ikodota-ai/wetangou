@@ -162,6 +162,10 @@ Page({
   goCreateProduct() {
     wx.navigateTo({ url: '/pages/merchant/product/create/index' })
   },
+  /** 商品管理：列表页才有上下架按钮，建品也从列表页底部进 */
+  goProductList() {
+    wx.navigateTo({ url: '/pages/merchant/product/list/index' })
+  },
 
   goOrders() { wx.navigateTo({ url: '/pages/merchant/order/index' }) },
   goHistory(){ wx.navigateTo({ url: '/pages/merchant/history/index' }) },

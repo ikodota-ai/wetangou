@@ -88,6 +88,19 @@ Page({
   onEdit(e) { wx.navigateTo({ url: '/pages/merchant/product/create/index?productId=' + e.currentTarget.dataset.id }) },
 
   /**
+   * 编辑商品搭配（子品分组 / 组合券包明细）。
+   *
+   * product/combo 页是唯一能编搭配的界面，onLoad 要 productId + typeCode 两个参数，
+   * 但此前全项目零引用 —— 团购建出来配不了套餐内容，只能去 PC 后台的高级编辑。
+   */
+  onEditCombo(e) {
+    const ds = e.currentTarget.dataset
+    wx.navigateTo({
+      url: '/pages/merchant/product/combo/index?productId=' + ds.id + '&typeCode=' + (ds.type || 'GROUPON')
+    })
+  },
+
+  /**
    * 上下架。
    *
    * 为什么必须有：商家端建品现在统一落草稿（status=1，与后台「商品高级编辑」一致），

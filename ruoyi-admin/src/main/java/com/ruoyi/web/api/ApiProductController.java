@@ -2,6 +2,7 @@ package com.ruoyi.web.api;
 
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,6 +54,9 @@ public class ApiProductController
 
     @Autowired
     private IProductSubitemGroupService subitemGroupService;
+
+    @Autowired
+    private com.ruoyi.biz.service.IProductSubitemService subitemService;
 
     @Autowired
     private com.ruoyi.biz.service.ISaleChannelService channelService;
@@ -444,6 +448,254 @@ public class ApiProductController
             return owner != null && ctx.getMerchantIds().contains(owner);
         }
         return true;
+    }
+
+    // ===================== 商家端：商品搭配（子品分组 / 几选几）=====================
+    //
+    // 为什么要在小程序侧重开一套而不直接用 PC 的 /biz/productSubitem/**：
+    // 那套挂在 Spring Security 下、靠 @PreAuthorize + 后台 sys_user 的 perms 判权，
+    // 小程序员工 token 走的是 MemberAuthInterceptor 这条完全独立的链路，
+    // 拿员工 token 打 /biz/** 一律 401（实测「请求访问 /biz/productSubitem/groups
+    // 认证失败」）。所以 pages/merchant/product/combo 那个页面即使把入口接上，
+    // 每个操作也必然 401 —— 团购在手机上永远配不了套餐内容。
+    //
+    // 三条约束都在服务端做，不靠前端传：
+    //   1) 商品必须属于当前登录员工的商户（assertMyProduct）
+    //   2) 组/子品必须属于该商品（防拿别家的 groupId 往自己商品上挂，或反向删别家的组）
+    //   3) 只有 OWNER/MANAGER 能改（店员只核销，不该动商品结构）
+
+    /** 某商品的搭配分组（含每组子品） */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @GetMapping("/subitem/groups")
+    public AjaxResult subitemGroups(@RequestParam("productId") Long productId)
+    {
+        assertMyProduct(productId);
+        return AjaxResult.success(subitemGroupService.selectByProductId(productId));
+    }
+
+    /** 新建搭配分组 */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @PostMapping("/subitem/group")
+    public AjaxResult addSubitemGroup(@RequestBody ProductSubitemGroup group)
+    {
+        if (group == null || group.getProductId() == null)
+        {
+            throw new ServiceException("缺少 productId");
+        }
+        assertMyProduct(group.getProductId());
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        group.setCreateBy("mstaff-" + (me == null ? "" : me.getStaffUserId()));
+        int rows = subitemGroupService.insert(group);
+        if (rows <= 0)
+        {
+            return AjaxResult.error("新建失败");
+        }
+        AjaxResult r = AjaxResult.success("已新建分组");
+        r.put("groupId", group.getGroupId());
+        return r;
+    }
+
+    /**
+     * 改分组（主要是「几选几」）。
+     *
+     * <p>pickRule 的合法性必须在服务端判：N 大于本组子品数就变成一个顾客永远
+     * 满足不了的规则，下单页会卡死；N 等于子品数则和 ALL 同义，归一成 ALL
+     * 避免同一语义在库里存两种值（PC 端 checkPickRule 就是这么做的，
+     * 两边规则必须一致，否则手机上配的组在 PC 上显示成另一回事）。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @PutMapping("/subitem/group")
+    public AjaxResult editSubitemGroup(@RequestBody ProductSubitemGroup group)
+    {
+        if (group == null || group.getGroupId() == null)
+        {
+            throw new ServiceException("缺少 groupId");
+        }
+        ProductSubitemGroup exist = subitemGroupService.selectById(group.getGroupId());
+        if (exist == null)
+        {
+            throw new ServiceException("分组不存在");
+        }
+        assertMyProduct(exist.getProductId());
+        // productId 不许改：否则能把自己的组挂到别人的商品上
+        group.setProductId(exist.getProductId());
+        String rule = group.getPickRule();
+        if (rule != null && !rule.trim().isEmpty() && !"ALL".equals(rule))
+        {
+            if (!rule.startsWith("PICK_"))
+            {
+                throw new ServiceException("选择规则格式不正确，应为 ALL 或 PICK_N");
+            }
+            int n;
+            try
+            {
+                n = Integer.parseInt(rule.substring("PICK_".length()));
+            }
+            catch (NumberFormatException e)
+            {
+                throw new ServiceException("选择规则格式不正确：" + rule);
+            }
+            if (n <= 0)
+            {
+                throw new ServiceException("可选数量必须大于 0");
+            }
+            int size = subitemService.selectByGroupId(group.getGroupId()).size();
+            if (size == 0)
+            {
+                throw new ServiceException("请先给该商品组添加单品，再设置几选几");
+            }
+            if (n > size)
+            {
+                throw new ServiceException("本组只有 " + size + " 个单品，不能设为选 " + n + " 个");
+            }
+            if (n == size)
+            {
+                group.setPickRule("ALL");
+            }
+        }
+        return subitemGroupService.update(group) > 0 ? AjaxResult.success() : AjaxResult.error("保存失败");
+    }
+
+    /** 删分组（连带该组子品由 service 处理）。DELETE 保持幂等，删不到不报错 */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @DeleteMapping("/subitem/group/{groupId}")
+    public AjaxResult removeSubitemGroup(@PathVariable("groupId") Long groupId)
+    {
+        ProductSubitemGroup exist = subitemGroupService.selectById(groupId);
+        if (exist != null)
+        {
+            assertMyProduct(exist.getProductId());
+            subitemGroupService.deleteById(groupId);
+        }
+        return AjaxResult.success();
+    }
+
+    /** 某分组下的子品 */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @GetMapping("/subitem/list")
+    public AjaxResult subitemList(@RequestParam("groupId") Long groupId)
+    {
+        ProductSubitemGroup g = subitemGroupService.selectById(groupId);
+        if (g == null)
+        {
+            throw new ServiceException("分组不存在");
+        }
+        assertMyProduct(g.getProductId());
+        return AjaxResult.success(subitemService.selectByGroupId(groupId));
+    }
+
+    /** 加子品 */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @PostMapping("/subitem")
+    public AjaxResult addSubitem(@RequestBody com.ruoyi.biz.domain.ProductSubitem subitem)
+    {
+        if (subitem == null || subitem.getGroupId() == null)
+        {
+            throw new ServiceException("缺少 groupId");
+        }
+        ProductSubitemGroup g = subitemGroupService.selectById(subitem.getGroupId());
+        if (g == null)
+        {
+            throw new ServiceException("分组不存在");
+        }
+        assertMyProduct(g.getProductId());
+        // productId 一律以分组归属为准，不信前端传值
+        subitem.setProductId(g.getProductId());
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        subitem.setCreateBy("mstaff-" + (me == null ? "" : me.getStaffUserId()));
+        int rows = subitemService.insert(subitem);
+        if (rows <= 0)
+        {
+            return AjaxResult.error("添加失败");
+        }
+        AjaxResult r = AjaxResult.success("已添加单品");
+        r.put("subitemId", subitem.getSubitemId());
+        return r;
+    }
+
+    /**
+     * 删子品，并把超出范围的「几选几」收回来。
+     *
+     * <p>一个组 3 个单品、规则 PICK_2，删掉 1 个后只剩 2 个，规则还写着选 2 ——
+     * 此时"选2"已等于全选却仍显示成限选，顾客看到的可选数量和实际不符。
+     * 与 PC 端 shrinkPickRule 同一套收敛逻辑。</p>
+     */
+    @LoginRequired
+    @RequireRole(value = {BizRole.OWNER, BizRole.MANAGER}, includeHigher = true)
+    @DeleteMapping("/subitem/{subitemId}")
+    public AjaxResult removeSubitem(@PathVariable("subitemId") Long subitemId)
+    {
+        com.ruoyi.biz.domain.ProductSubitem exist = subitemService.selectById(subitemId);
+        if (exist == null)
+        {
+            return AjaxResult.success();
+        }
+        ProductSubitemGroup g = exist.getGroupId() == null ? null
+                : subitemGroupService.selectById(exist.getGroupId());
+        if (g != null)
+        {
+            assertMyProduct(g.getProductId());
+        }
+        subitemService.deleteById(subitemId);
+        if (g != null)
+        {
+            shrinkPickRule(g);
+        }
+        return AjaxResult.success();
+    }
+
+    /** 删完单品后收敛 pickRule：N >= 剩余单品数就归成 ALL */
+    private void shrinkPickRule(ProductSubitemGroup group)
+    {
+        String rule = group.getPickRule();
+        if (rule == null || !rule.startsWith("PICK_"))
+        {
+            return;
+        }
+        int n;
+        try
+        {
+            n = Integer.parseInt(rule.substring("PICK_".length()));
+        }
+        catch (NumberFormatException e)
+        {
+            return;
+        }
+        if (n >= subitemService.selectByGroupId(group.getGroupId()).size())
+        {
+            group.setPickRule("ALL");
+            subitemGroupService.update(group);
+        }
+    }
+
+    /**
+     * 商品必须属于当前登录员工的商户，否则拒。
+     *
+     * <p>商户从 token 取，不看请求参数 —— 否则改个 productId 就能编别家的套餐结构。</p>
+     */
+    private void assertMyProduct(Long productId)
+    {
+        if (productId == null)
+        {
+            throw new ServiceException("缺少 productId");
+        }
+        com.ruoyi.biz.api.domain.LoginMember me = MemberContextHolder.get();
+        Long mine = me == null ? null : me.getMerchantId();
+        if (mine == null)
+        {
+            throw new ServiceException("登录态缺少商户信息，请重新登录");
+        }
+        Product p = productService.selectProductByProductId(productId);
+        if (p == null || p.getMerchantId() == null || !p.getMerchantId().equals(mine))
+        {
+            throw new ServiceException("商品不存在或无权操作");
+        }
     }
 
     /**

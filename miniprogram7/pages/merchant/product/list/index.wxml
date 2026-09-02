@@ -83,6 +83,13 @@
                 data-status="{{item.status}}"
                 data-name="{{item.productName}}">{{item.status === '0' ? '下架' : '上架'}}</view>
           <view class="op" bindtap="onEditStock" data-id="{{item.productId}}">改库存</view>
+          <!-- 搭配：只有团购和组合券包才有子品分组。product/combo 页是唯一能编搭配的
+               界面，但一直没有任何入口（app.json 注册了、页面写全了、后端接口也通，
+               就是点不到），团购建出来永远配不了套餐内容。 -->
+          <view class="op" wx:if="{{item.typeCode === 'GROUPON' || item.typeCode === 'COMBO'}}"
+                bindtap="onEditCombo"
+                data-id="{{item.productId}}"
+                data-type="{{item.typeCode}}">搭配</view>
           <view class="op primary" bindtap="onEdit" data-id="{{item.productId}}">编辑</view>
         </view>
       </view>

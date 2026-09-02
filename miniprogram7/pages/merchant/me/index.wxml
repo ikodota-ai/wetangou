@@ -8,6 +8,10 @@
   </view>
 
   <view class="list card">
+    <view class="li" bindtap="goProductList" wx:if="{{showTeam}}">
+      <text>商品管理</text>
+      <view class="arr"></view>
+    </view>
     <view class="li" bindtap="goTeam" wx:if="{{showTeam}}">
       <text>店员管理</text>
       <view class="arr"></view>

@@ -51,6 +51,10 @@ Page({
   goTeam() {
     wx.navigateTo({ url: '/pages/merchant/team/index' })
   },
+  /** 商品管理（与首页同一个入口，店长在「我的」里也找得到） */
+  goProductList() {
+    wx.navigateTo({ url: '/pages/merchant/product/list/index' })
+  },
 
   goProfile() {
     wx.navigateTo({ url: '/pages/merchant/profile/index' })

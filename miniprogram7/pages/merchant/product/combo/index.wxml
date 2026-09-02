@@ -9,7 +9,7 @@
     <view wx:for="{{groups}}" wx:key="groupId" wx:for-item="g" class="card group-card">
       <view class="group-head">
         <text class="g-name">{{g.groupName}}</text>
-        <view class="tag">{{g.pickRule || '全部可享'}}</view>
+        <view class="tag">{{g._pickText}}</view>
         <view class="del" bindtap="onDelGroup" data-id="{{g.groupId}}">删除</view>
       </view>
       <view wx:for="{{g.subitems}}" wx:key="subitemId" wx:for-item="s" class="subitem">
@@ -19,6 +19,13 @@
         <text class="s-del" bindtap="onDelSub" data-gid="{{g.groupId}}" data-sid="{{s.subitemId}}">×</text>
       </view>
       <view class="add-sub" bindtap="onAddSub" data-gid="{{g.groupId}}" data-gname="{{g.groupName}}">+ 添加单品</view>
+      <!-- 几选几放在组的最后：选项按本组实际单品数生成，没单品时不显示 -->
+      <view class="group-rule" wx:if="{{g._size > 0}}">
+        <text class="rule-lab">本组顾客可选</text>
+        <picker bindchange="onGroupRule" value="{{g._ruleIdx}}" range="{{g._ruleLabels}}" data-gid="{{g.groupId}}">
+          <view class="picker small"><text>{{g._ruleLabels[g._ruleIdx]}}</text><text class="arrow">›</text></view>
+        </picker>
+      </view>
     </view>
     <view class="add-card" bindtap="onAddGroup">
       <text>+ 添加商品组</text>
@@ -36,7 +43,7 @@
         <text class="del" bindtap="onDelCombo" data-idx="{{idx}}">×</text>
       </view>
       <view class="row-line">
-        <picker bindchange="onComboType" value="{{typeIdxOf(item.subitemType)}}" range="{{subitemTypeLabels}}" data-idx="{{idx}}">
+        <picker bindchange="onComboType" value="{{item._typeIdx}}" range="{{subitemTypeLabels}}" data-idx="{{idx}}">
           <view class="picker"><text>{{item.subitemTypeLabel || '请选择类型'}}</text><text class="arrow">›</text></view>
         </picker>
         <view class="qty">
@@ -45,7 +52,7 @@
         </view>
       </view>
       <view class="row-line">
-        <picker bindchange="onComboRule" value="{{ruleIdxOf(item.pickRule)}}" range="{{ruleLabels}}" data-idx="{{idx}}">
+        <picker bindchange="onComboRule" value="{{item._ruleIdx}}" range="{{comboRuleLabels}}" data-idx="{{idx}}">
           <view class="picker small"><text>{{item.pickRuleLabel || '全部可享'}}</text><text class="arrow">›</text></view>
         </picker>
         <view class="price-input">
@@ -72,11 +79,7 @@
     <view class="modal-body">
       <view class="modal-title">添加商品组</view>
       <view class="form-line"><text>组名称</text><input placeholder="如：主食" value="{{newGroup.groupName}}" bindinput="onGroupName" /></view>
-      <view class="form-line"><text>选择规则</text>
-        <picker bindchange="onGroupRule" value="{{groupRuleIdx}}" range="{{groupRuleLabels}}">
-          <view class="picker"><text>{{groupRuleLabels[groupRuleIdx]}}</text><text class="arrow">›</text></view>
-        </picker>
-      </view>
+      <view class="modal-tip">新建默认「全部可选」，添加完单品后可在组内设置几选几</view>
       <view class="modal-footer">
         <view class="btn plain" bindtap="onCloseGroup">取消</view>
         <view class="btn primary" bindtap="onConfirmGroup">添加</view>
