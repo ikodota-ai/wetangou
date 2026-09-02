@@ -74,6 +74,12 @@ jobs:
       - name: Lint WXML expressions
         run: bash .github/scripts/lint-wxml-expr.sh
 
+      # 挡住「bindtap 指向不存在的方法」—— 点了完全没反应，既不报错也不警告。
+      # 已复发 4 次，最严重的是今日订单列表那颗「核销」按钮（店员只能退出去
+      # 改走核销页手抄核销码）和核销页的「核销记录」入口（新功能的唯一入口）。
+      - name: Lint WXML event handlers
+        run: bash .github/scripts/lint-wxml-handler.sh
+
       - name: Backend - mvn package
         run: mvn -B -e -ntp clean package
         env:

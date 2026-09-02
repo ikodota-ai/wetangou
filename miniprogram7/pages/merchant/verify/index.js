@@ -1,4 +1,5 @@
 const { api } = require('../../../utils/request.js')
+const identity = require('../../../utils/identity.js')
 const HISTORY_KEY = 'merchantVerifyHistory'
 
 Page({
@@ -85,6 +86,45 @@ Page({
       wx.showToast({ title: (err && err.msg) || '切店失败', icon: 'none' })
     })
   },
+  /**
+   * 「核销记录」/「切换回会员」两个入口，以及「最近核销」里点一条的回填。
+   *
+   * 这三个 bindtap 在 WXML 上一直挂着，但这个文件里从来没有对应方法 ——
+   * 点了完全没反应、控制台也不报错。其中「核销记录」还是刚做出来的
+   * verify/records 那个功能在核销页的唯一入口，店员点进不去就等于没做。
+   */
+  goHistory() { wx.navigateTo({ url: '/pages/merchant/history/index' }) },
+
+  /**
+   * 切回会员版。与首页 goSwitchAccount 同口径：保留商家会话
+   * （不删 staffUser/staffToken），从「我的」再切回来是零请求。
+   */
+  goSwitchAccount() {
+    const r = identity.switchToMember()
+    if (r.ok) { wx.reLaunch({ url: '/pages/home/index' }); return }
+    wx.showModal({
+      title: '尚未登录会员',
+      content: '当前微信还没有会员登录记录，去用微信登录一次即可在两端来回切换。',
+      confirmText: '去登录',
+      success: (m) => { if (m.confirm) wx.reLaunch({ url: '/pages/login/login' }) }
+    })
+  },
+
+  /**
+   * 点「最近核销」里的一条：把核销码回填到输入框，不重新发起核销。
+   *
+   * 已核销的单再提交必然被后端拒（「该订单已核销」），弹个错误 toast 只会
+   * 让店员以为系统出问题。真实场景是客人说「刚那单是不是没核上」，
+   * 店员想把码填回去再确认一次 —— 所以这里只回填 + 提示，按不按确认由人决定。
+   */
+  onRepeat(e) {
+    const idx = Number((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.idx) || 0)
+    const item = (this.data.history || [])[idx]
+    if (!item) return
+    this.setData({ verifyCode: item.verifyCode || item.orderNo || '', orderNo: '' })
+    wx.showToast({ title: '已回填核销码', icon: 'none' })
+  },
+
   onCode(e) { this.setData({ verifyCode: e.detail.value }) },
   onOrderNo(e) { this.setData({ orderNo: e.detail.value }) },
   onScan() {
