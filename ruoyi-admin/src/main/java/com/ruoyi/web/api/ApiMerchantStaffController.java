@@ -74,6 +74,8 @@ public class ApiMerchantStaffController
     /** biz_merchant_staff.status：0=在职 1=离职 3=待审核 */
     private static final String STAFF_STATUS_ACTIVE = "0";
     private static final String STAFF_STATUS_PENDING = "3";
+    /** 已离职（staffDismiss 写入的值） */
+    private static final String STAFF_STATUS_DISMISSED = "1";
 
     private static final Logger log = LoggerFactory.getLogger(ApiMerchantStaffController.class);
 
@@ -1547,14 +1549,24 @@ public class ApiMerchantStaffController
         LoginMember m = requireMerchantLogin(false);
         Long userId = asLong(body == null ? null : body.get("userId"));
         if (userId == null) return AjaxResult.error("缺少 userId");
-        MerchantStaff link = staffService.selectByUserId(userId);
-        if (link == null) return AjaxResult.error("该账号不是商家员工");
-        if (!isStaffVisible(m, link)) return AjaxResult.error("无权重置该员工密码");
+        // 必须看该员工的「全部」在职关联，不能只看 selectByUserId 取回的第一条：
+        // 一个人可以在 A 店当店员、同时在 B 店当店长（biz_merchant_staff 一人多行）。
+        // selectByUserId 是 order by id asc limit 1，取回的往往是入职最早那条。
+        // 实测造了「store100=STAFF / store101=MANAGER」的员工，store100 的店长
+        // （只管 100）改掉了他的密码 —— 而这个密码同时是他在 store101 的店长凭证，
+        // 等于跨门店把别人店的店长踢下线。
+        List<MerchantStaff> links = staffLinksOf(userId);
+        if (links.isEmpty()) return AjaxResult.error("该账号不是商家员工");
+        for (MerchantStaff one : links)
+        {
+            if (!isStaffVisible(m, one)) return AjaxResult.error("该员工还在你管不到的门店任职，无权重置密码");
+        }
         // 给自己换密码要放行：canManageRole 是「严格大于」，自己对自己必然不满足，
         // 于是老板想给自己换个记得住的密码会被自己的系统拒掉，只能去求平台管理员。
         // 已经用当前 token 证明了身份，重置自己的密码没有提权风险。
         boolean self = userId.equals(m.getStaffUserId());
-        if (!self && !canManageRole(m, link.getRole())) return AjaxResult.error("无权重置该角色的密码");
+        // 角色也要取「最高」那个：只看第一条会把兼任店长的人误判成店员而放行
+        if (!self && !canManageRole(m, highestRoleOf(links))) return AjaxResult.error("无权重置该角色的密码");
 
         SysUser user = userService.selectUserByUserId(userId);
         if (user == null) return AjaxResult.error("员工账号不存在");
@@ -1596,8 +1608,8 @@ public class ApiMerchantStaffController
             return AjaxResult.error("不能对自己办理离职");
         }
         if (!canManageRole(m, db.getRole())) return AjaxResult.error("无权操作该角色的员工");
-        if ("1".equals(db.getStatus())) return AjaxResult.error("该员工已离职");
-        db.setStatus("1");
+        if (STAFF_STATUS_DISMISSED.equals(db.getStatus())) return AjaxResult.error("该员工已离职");
+        db.setStatus(STAFF_STATUS_DISMISSED);
         db.setUpdateBy(currentStaffTag(m));
         return staffService.update(db) > 0 ? AjaxResult.success("已办理离职") : AjaxResult.error("操作失败");
     }
@@ -1629,6 +1641,42 @@ public class ApiMerchantStaffController
      * <p>两道：同商户 + 门店在授权集合内。store_id=0 表示「全商户所有门店」，
      * 只有同样管全商户的人（老板）能看到，店长不该看到跨门店的全局员工。</p>
      */
+    /**
+     * 取某员工的全部在职/待审关联（一人可在多门店任职，各行角色可以不同）。
+     *
+     * <p>为什么不用 selectByUserId：它是 {@code order by id asc limit 1}，
+     * 只返回入职最早那一条。凡是「按员工身份做授权判断」的地方都不能用它，
+     * 否则一个人在别的门店的更高身份会被完全忽略。</p>
+     */
+    private List<MerchantStaff> staffLinksOf(Long userId)
+    {
+        if (userId == null) return java.util.Collections.emptyList();
+        MerchantStaff q = new MerchantStaff();
+        q.setUserId(userId);
+        List<MerchantStaff> all = staffService.selectList(q);
+        if (all == null) return java.util.Collections.emptyList();
+        List<MerchantStaff> out = new ArrayList<>();
+        for (MerchantStaff ms : all)
+        {
+            // 已离职(status=1)的关联不再构成权限约束
+            if (ms != null && !STAFF_STATUS_DISMISSED.equals(ms.getStatus())) out.add(ms);
+        }
+        return out;
+    }
+
+    /** 多条关联里取权限最高的角色（OWNER > MANAGER > STAFF） */
+    private String highestRoleOf(List<MerchantStaff> links)
+    {
+        String best = "STAFF";
+        int bestRank = 0;
+        for (MerchantStaff ms : links)
+        {
+            int r = BizRole.fromStaffRole(ms.getRole()).rank();
+            if (r > bestRank) { bestRank = r; best = ms.getRole(); }
+        }
+        return best;
+    }
+
     private boolean isStaffVisible(LoginMember m, MerchantStaff ms)
     {
         if (ms == null || m == null) return false;

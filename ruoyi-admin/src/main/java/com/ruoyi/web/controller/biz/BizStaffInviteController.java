@@ -233,9 +233,7 @@ public class BizStaffInviteController extends BaseController
     {
         com.ruoyi.common.core.domain.entity.SysUser user = userService.selectUserByUserId(userId);
         if (user == null) return error("员工账号不存在");
-        MerchantStaff link = staffService.selectByUserId(userId);
-        if (link == null) return error(NOT_MY_STAFF);
-        com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(link.getMerchantId());
+        if (!assertCanManageStaff(userId)) return error(NOT_MY_STAFF);
         if (StringUtils.isEmpty(user.getOpenid())) {
             return error("该员工尚未绑定微信");
         }
@@ -267,9 +265,7 @@ public class BizStaffInviteController extends BaseController
         com.ruoyi.common.core.domain.entity.SysUser user = userService.selectUserByUserId(userId);
         if (user == null) return error("员工账号不存在");
         // 防越权：只能重置本商户（代理商为名下商户）员工的密码
-        MerchantStaff link = staffService.selectByUserId(userId);
-        if (link == null) return error(NOT_MY_STAFF);
-        com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(link.getMerchantId());
+        if (!assertCanManageStaff(userId)) return error(NOT_MY_STAFF);
 
         String rawPwd = randomPassword();
         com.ruoyi.common.core.domain.entity.SysUser upd = new com.ruoyi.common.core.domain.entity.SysUser();
@@ -284,6 +280,32 @@ public class BizStaffInviteController extends BaseController
         r.put("userName", user.getUserName());
         r.put("newPassword", rawPwd);
         return r;
+    }
+
+    /**
+     * 校验当前登录身份能否管理该员工账号（改密码 / 解绑微信）。
+     *
+     * <p>必须遍历该员工的<b>全部</b>关联，不能用 selectByUserId：
+     * 后者是 {@code order by id asc limit 1}，只返回入职最早那一条。
+     * 一个人可以同时在两个商户任职（同一 sys_user 挂多行 biz_merchant_staff），
+     * 只校验第一条时，A 商户的店长能改掉他在 B 商户的登录凭证 ——
+     * 密码是账号级的，一改就把 B 商户那边一起踢下线。</p>
+     *
+     * <p>返回 false 表示「查不到关联」；越权由 assertDataScope 直接抛异常。</p>
+     */
+    private boolean assertCanManageStaff(Long userId)
+    {
+        MerchantStaff q = new MerchantStaff();
+        q.setUserId(userId);
+        List<MerchantStaff> links = staffService.selectList(q);
+        if (links == null || links.isEmpty()) return false;
+        for (MerchantStaff one : links)
+        {
+            // 已离职(status=1)的关联不再构成约束，否则老员工离职后原商户永远改不了他的密码
+            if ("1".equals(one.getStatus())) continue;
+            com.ruoyi.biz.tenant.TenantFilterHelper.assertDataScope(one.getMerchantId());
+        }
+        return true;
     }
 
     /**
