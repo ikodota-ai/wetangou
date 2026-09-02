@@ -1206,34 +1206,71 @@ public class ApiMerchantStaffController
         return AjaxResult.success("已拒绝");
     }
 
+    /**
+     * 预约报名列表（商家端「预约」页的数据源）。
+     *
+     * <p>这个端点原来自己给字段重命名，导致页面上一半信息是空白的：
+     * 返 memberName / memberPhone / bookingTime，而 booking/index.wxml 读的是
+     * contact / phone / timeSlot（和库里的列名一致）。名字对不上 → 店员看到的是
+     * 「匿名顾客 · 时间待定 · 无电话」，根本没法接单。people / serviceName / remark
+     * 三个更是压根没往外返，模板里那两行 wx:if 永远不成立。
+     * 现在一律用库字段名直出，不再中途改名。</p>
+     *
+     * <p>联系人取 contact（报名时填的）而不是 memberName（微信昵称）：
+     * 替朋友订位很常见，拿昵称去喊人喊不到；contact 为空才退回昵称。</p>
+     *
+     * <p>电话不脱敏。店员接单的动作就是回拨顾客确认到店，拿到 137****7777
+     * 根本拨不出去 —— 和支付链路那次「商家回拨也拨不出去」是同一个问题
+     * （见 .github/scripts/smoke-pay-phone-star.sh）。这是店内员工看自己门店的
+     * 报名单，本身就是业务必需信息。</p>
+     *
+     * <p>门店范围按 token 里的授权门店集合，不再只看当前激活门店：
+     * 多店老板不切店也该看到全部门店的报名，否则得一家家切过去。</p>
+     */
     @LoginRequired
     @GetMapping("/booking/signup/list")
     public AjaxResult bookingSignupList()
     {
         LoginMember m = requireMerchantLogin(false);
-        if (m.getStoreId() == null) return AjaxResult.success(new ArrayList<java.util.Map<String, Object>>());
-        Booking q = new Booking(); q.setStoreId(m.getStoreId());
-        List<Booking> bookings = bookingService.selectBookingList(q);
+        List<Long> scope = m.getStoreIds();
+        if (scope == null || scope.isEmpty())
+        {
+            return AjaxResult.success(new ArrayList<java.util.Map<String, Object>>());
+        }
         List<java.util.Map<String, Object>> out = new ArrayList<>();
-        for (Booking b : bookings) {
-            BookingMember bmq = new BookingMember(); bmq.setBookingId(b.getBookingId());
-            List<BookingMember> members = bookingService.selectBookingMemberList(bmq);
-            for (BookingMember bm : members) {
-                java.util.Map<String, Object> o = new HashMap<>();
-                o.put("signupId", bm.getId());
-                o.put("bookingId", b.getBookingId());
-                o.put("bookingDate", b.getBookingDate());
-                o.put("bookingTime", b.getTimeSlot());
-                o.put("storeName", b.getStoreName());
-                o.put("memberId", bm.getMemberId());
-                o.put("memberName", bm.getMemberName());
-                o.put("memberPhone", DesensitizedType.PHONE.desensitizer().apply(bm.getPhone()));
-                o.put("status", bm.getStatus());
-                o.put("confirmUser", bm.getConfirmUser());
-                o.put("confirmTime", bm.getConfirmTime());
-                o.put("reviewRemark", bm.getReviewRemark());
-                o.put("signupTime", bm.getBookingDate());
-                out.add(o);
+        for (Long sid : scope)
+        {
+            Booking q = new Booking(); q.setStoreId(sid);
+            List<Booking> bookings = bookingService.selectBookingList(q);
+            for (Booking b : bookings) {
+                BookingMember bmq = new BookingMember(); bmq.setBookingId(b.getBookingId());
+                List<BookingMember> members = bookingService.selectBookingMemberList(bmq);
+                for (BookingMember bm : members) {
+                    java.util.Map<String, Object> o = new HashMap<>();
+                    o.put("signupId", bm.getId());
+                    o.put("bookingId", b.getBookingId());
+                    o.put("bookingDate", b.getBookingDate());
+                    o.put("timeSlot", b.getTimeSlot());
+                    o.put("serviceName", b.getServiceName());
+                    o.put("storeId", b.getStoreId());
+                    o.put("storeName", b.getStoreName());
+                    o.put("memberId", bm.getMemberId());
+                    // 报名时填的联系人优先；没填才退回微信昵称
+                    o.put("contact", StringUtils.isNotEmpty(bm.getContact())
+                            ? bm.getContact() : bm.getMemberName());
+                    o.put("phone", bm.getPhone());
+                    o.put("people", bm.getPeople() == null ? 1 : bm.getPeople());
+                    o.put("remark", bm.getRemark());
+                    o.put("status", bm.getStatus());
+                    o.put("confirmUser", bm.getConfirmUser());
+                    o.put("confirmTime", bm.getConfirmTime());
+                    o.put("reviewRemark", bm.getReviewRemark());
+                    o.put("signupTime", bm.getBookingDate());
+                    // 兼容可能仍在读旧字段名的调用方（历史版本小程序未升级时不至于全空）
+                    o.put("memberName", o.get("contact"));
+                    o.put("bookingTime", b.getTimeSlot());
+                    out.add(o);
+                }
             }
         }
         out.sort((a, b) -> {
@@ -1473,6 +1510,8 @@ public class ApiMerchantStaffController
         q.setMerchantId(m.getMerchantId());
         List<MerchantStaffInvite> list = inviteService.selectList(q);
         List<Map<String, Object>> out = new ArrayList<>();
+        // 同一门店往往发过多张码，按 storeId 缓存名字，避免一行查一次库
+        Map<Long, String> storeNames = new HashMap<>();
         if (list != null)
         {
             for (MerchantStaffInvite inv : list)
@@ -1483,6 +1522,7 @@ public class ApiMerchantStaffController
                 o.put("inviteCode", inv.getInviteCode());
                 o.put("role", inv.getRole());
                 o.put("storeId", inv.getStoreId());
+                o.put("storeName", storeNameOf(storeNames, inv.getStoreId()));
                 o.put("status", inv.getStatus());
                 o.put("expireAt", inv.getExpireAt());
                 o.put("wxacodeUrl", inv.getWxacodeUrl());
@@ -1624,6 +1664,23 @@ public class ApiMerchantStaffController
     }
 
     /** 员工列表对外视图：手机号脱敏，不吐 openid 原文 */
+    /**
+     * 门店名（带本次请求内的缓存）。
+     *
+     * <p>邀请码列表里 storeName 原来根本没返，team/index.wxml 只能退化显示
+     * 「门店100」这种编号 —— 店长手上通常同时管着两三家店，看编号认不出是哪家，
+     * 也就没法判断这张码该发给谁。</p>
+     */
+    private String storeNameOf(Map<Long, String> cache, Long storeId)
+    {
+        if (storeId == null) return null;
+        if (cache.containsKey(storeId)) return cache.get(storeId);
+        Store s = storeService.selectStoreByStoreId(storeId);
+        String name = s == null ? null : s.getStoreName();
+        cache.put(storeId, name);
+        return name;
+    }
+
     private Map<String, Object> toStaffView(MerchantStaff ms)
     {
         Map<String, Object> o = new HashMap<>();
