@@ -28,6 +28,9 @@ public class WxMaConfig
     /** 参数key：是否开启mock登录 */
     public static final String KEY_MOCK_ENABLED = "wx.miniapp.mockEnabled";
 
+    /** 参数key：小程序码指向哪个版本（release=线上版 / trial=体验版 / develop=开发版） */
+    public static final String KEY_ENV_VERSION = "wx.miniapp.envVersion";
+
     @Autowired
     @Lazy
     private ISysConfigService sysConfigService;
@@ -100,6 +103,37 @@ public class WxMaConfig
             return "0".equals(merchant.getMockEnabled());
         }
         return isMockEnabled();
+    }
+
+    /**
+     * 小程序码/URL Scheme 指向的小程序版本。
+     *
+     * <p>微信 getwxacodeunlimited 不传 env_version 时默认 "release"，也就是
+     * 「线上已发布版本」。小程序**还没发布过**（或刚换了新 appid 尚未提审通过）时
+     * 根本不存在 release 版本，微信直接返 40066 invalid url —— 报错说的是 url/page
+     * 无效，很容易被误判成 page 路径写错、或以为要去 app.json 里加页面，
+     * 实际路径没问题，缺的是"线上版本"这个前提。
+     *
+     * <p>所以做成可配：未发布阶段在后台「微信配置」里填 trial（体验版）就能扫，
+     * 上线后改回 release。留空 = release，保持老行为不变。</p>
+     *
+     * @return release / trial / develop
+     */
+    public String getEnvVersion()
+    {
+        String value = sysConfigService.selectConfigByKey(KEY_ENV_VERSION);
+        if (StringUtils.isEmpty(value))
+        {
+            return "release";
+        }
+        value = value.trim().toLowerCase();
+        // 只认微信文档里这三个值，填错一律退回 release，
+        // 免得把不认识的字符串透传给微信换来另一个更难查的错误码
+        if ("trial".equals(value) || "develop".equals(value) || "release".equals(value))
+        {
+            return value;
+        }
+        return "release";
     }
 
     /**

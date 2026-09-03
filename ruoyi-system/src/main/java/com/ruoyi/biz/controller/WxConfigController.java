@@ -30,6 +30,7 @@ public class WxConfigController extends BaseSysConfigController
         KEY_NAMES.put("wx.miniapp.appId", "小程序AppId");
         KEY_NAMES.put("wx.miniapp.secret", "小程序AppSecret");
         KEY_NAMES.put("wx.miniapp.mockEnabled", "小程序mock登录开关");
+        KEY_NAMES.put("wx.miniapp.envVersion", "小程序码指向版本");
         KEY_NAMES.put("wx.pay.mchId", "微信支付商户号");
         KEY_NAMES.put("wx.pay.appId", "微信支付AppId");
         KEY_NAMES.put("wx.pay.certSerialNo", "微信支付证书序列号");

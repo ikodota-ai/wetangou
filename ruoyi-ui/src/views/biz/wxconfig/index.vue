@@ -8,6 +8,18 @@
       <el-form-item label="小程序AppSecret">
         <el-input v-model="form['wx.miniapp.secret']" placeholder="请输入小程序AppSecret" show-password style="width: 420px" />
       </el-form-item>
+      <el-form-item label="小程序码指向版本">
+        <el-radio-group v-model="form['wx.miniapp.envVersion']">
+          <el-radio label="release">正式版</el-radio>
+          <el-radio label="trial">体验版</el-radio>
+          <el-radio label="develop">开发版</el-radio>
+        </el-radio-group>
+        <div class="tip">
+          决定员工邀请码 / 核销码扫开后进哪个版本的小程序。<br />
+          小程序<b>还没发布</b>时必须选「体验版」——正式版根本不存在，微信会返
+          <code>40066 invalid url</code>，表现为「生成小程序码失败」。发布上线后改回「正式版」。
+        </div>
+      </el-form-item>
       <el-divider content-position="left">微信支付配置</el-divider>
       <el-form-item label="商户号">
         <el-input v-model="form['wx.pay.mchId']" placeholder="请输入微信支付商户号" style="width: 420px" />

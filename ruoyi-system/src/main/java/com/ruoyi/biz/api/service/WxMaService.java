@@ -222,9 +222,16 @@ public class WxMaService
         {
             body.put("page", page);
         }
-        // 280x280 太阳码 + 圆形头像缩进；不传 env_version 默认"release"
         body.put("width", 430);
+        // check_path=false：不校验 page 是否真实存在。必须关，否则未发布的小程序
+        // 任何 page 都被判为不存在。
         body.put("check_path", false);
+        // env_version 必须显式传。不传时微信按 "release"（线上已发布版本）处理，
+        // 小程序还没发布过就没有 release 版本，微信返
+        // {"errcode":40066,"errmsg":"invalid url"} —— 错误码指向 url/page，
+        // 实际 page 路径是对的，缺的是"已发布"这个前提，极易误判成路径写错。
+        // 未发布阶段后台「微信配置」填 trial 即可扫体验版，上线后改回 release。
+        body.put("env_version", wxMaConfig.getEnvVersion());
         String url = WXACODE_URL + "?access_token=" + accessToken;
         byte[] bytes = HttpUtils.sendPostBytes(url, body.toJSONString(), "application/json");
         if (bytes == null || bytes.length == 0)
@@ -323,6 +330,10 @@ public class WxMaService
         if (StringUtils.isNotEmpty(query)) {
             body.put("query", query);
         }
+        // 同 getWxaCodeUnlimited：不传 env_version 微信按"线上已发布版本"处理，
+        // 小程序未发布时生成的 Scheme 扫开是「该小程序未发布」。
+        // 店员扫桌上核销码走的就是这条链，所以这里也必须跟着走同一个开关。
+        body.put("env_version", wxMaConfig.getEnvVersion());
         String resp = com.ruoyi.common.utils.http.HttpUtils.sendPost(url, body.toJSONString());
         com.alibaba.fastjson2.JSONObject json = com.alibaba.fastjson2.JSONObject.parseObject(resp);
         if (json == null || json.getInteger("errcode") == null || json.getInteger("errcode") != 0) {
