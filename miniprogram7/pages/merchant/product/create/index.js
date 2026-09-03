@@ -227,7 +227,8 @@ Page({
     collectMethodLabel: '总部统一收款',
     // step: 1 = 选类型页, 2 = tab 表单页
     step: 1,
-    activeTab: 0,           // 0/1/2/3/4
+    activeTab: 0,           // 0/1/2/3/4：当前高亮的锚点（不再控制渲染）
+    scrollIntoView: '',     // 点标题时置为 sec-N 触发定位，滚动同步后清空
     tabLabels: ['基础信息', '商家信息', '商品信息', '售卖信息', '交易规则'],
     typeList: TYPE_LIST,
 
@@ -405,9 +406,19 @@ Page({
     const staff = wx.getStorageSync('staffUser') || {}
     const storeId = staff.storeId || null
     const storeIds = staff.storeIds && staff.storeIds.length ? staff.storeIds : (storeId ? [storeId] : [])
+    // 优先用带门店名的 stores（登录/切店接口返的），没有才退回「门店{id}」。
+    // 多店老板靠编号根本分不清是哪家店，勾错了保存时才被服务端拦下。
+    const nameOf = {}
+    ;(staff.stores || []).forEach(st => {
+      const sid = st && (st.storeId !== undefined ? st.storeId : st.id)
+      if (sid !== undefined && sid !== null) nameOf[sid] = st.storeName || st.label
+    })
     const opts = [{ id: 0, label: '请选择门店' }]
     if (storeIds && storeIds.length) {
-      storeIds.forEach(id => opts.push({ id, label: staff.storeName ? `${staff.storeName} #${id}` : `门店${id}` }))
+      storeIds.forEach(id => opts.push({
+        id,
+        label: nameOf[id] || (storeIds.length === 1 && staff.storeName ? staff.storeName : `门店${id}`)
+      }))
     }
     this.setData({
       storeName: staff.storeName || '',
@@ -583,10 +594,65 @@ Page({
     this.setData({ step: 1 })
   },
 
-  // ============ 第 2 页: tab 切换 + 表单 ============
+  // ============ 第 2 页: 锚点导航 + 连续表单 ============
+  //
+  // 原先 5 个区块用 wx:if="{{activeTab === N}}" 互斥渲染，等于 5 个独立页面：
+  // 填完「商品信息」要回到顶部点一次「售卖信息」才能继续，一次创建要点 4 次 tab；
+  // 而且未激活的区块根本没渲染，商家没法把整张表从头翻到尾核对一遍。
+  // 现在改成一整篇连续表单：点标题只做锚点定位，滚动时反过来同步高亮。
+
+  /** 点标题 → 滚到对应区块（不再切换渲染） */
   onTabChange(e) {
     const idx = Number(e.currentTarget.dataset.idx)
-    this.setData({ activeTab: idx })
+    // 先把高亮切过去，避免等 onFormScroll 回调才变（点了没反应的观感）；
+    // _anchorLock 期间忽略滚动回传，否则动画滚动过程中会被中间经过的区块反复改写
+    this._anchorLock = true
+    this.setData({ activeTab: idx, scrollIntoView: 'sec-' + idx })
+    setTimeout(() => { this._anchorLock = false }, 400)
+  },
+
+  /**
+   * 滚动 → 同步高亮当前区块。
+   *
+   * 用 createSelectorQuery 拿各区块相对滚动容器的位置，取「顶部已越过判定线
+   * 的最后一个区块」。判定线取容器高度的 1/3，而不是 0 —— 取 0 的话区块刚
+   * 冒头就切高亮，和肉眼看到的「当前正在填哪一段」对不上。
+   *
+   * 节流到 100ms：bindscroll 触发非常密，每次都跑 SelectorQuery 会明显掉帧。
+   */
+  onFormScroll() {
+    if (this._anchorLock) return
+    if (this._scrollTimer) return
+    this._scrollTimer = setTimeout(() => {
+      this._scrollTimer = null
+      this._syncActiveByScroll()
+    }, 100)
+  },
+
+  _syncActiveByScroll() {
+    const q = wx.createSelectorQuery().in(this)
+    q.select('.form-scroll').boundingClientRect()
+    q.selectAll('.form-section').boundingClientRect()
+    q.exec((res) => {
+      const box = res && res[0]
+      const list = (res && res[1]) || []
+      if (!box || !list.length) return
+      const line = box.top + box.height / 3
+      let idx = 0
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].top <= line) idx = i
+      }
+      // 滚到底时强制高亮最后一段：最后一个区块可能比 2/3 屏还短，
+      // 永远越不过判定线，不特判的话「交易规则」这一栏点不亮
+      if (box.height && list.length) {
+        const last = list[list.length - 1]
+        if (last.bottom <= box.bottom + 2) idx = list.length - 1
+      }
+      if (idx !== this.data.activeTab) {
+        // scrollIntoView 必须清掉：留着上一次的值，下次 setData 会把页面又拽回那个锚点
+        this.setData({ activeTab: idx, scrollIntoView: '' })
+      }
+    })
   },
 
   onField(e) {

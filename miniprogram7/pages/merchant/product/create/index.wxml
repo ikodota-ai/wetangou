@@ -29,9 +29,10 @@
     </view>
   </block>
 
-  <!-- ============ 第 2 页: 5 tab 表单 ============ -->
+  <!-- ============ 第 2 页: 连续表单（锚点导航 + 滚动联动） ============ -->
   <block wx:if="{{step === 2}}">
-    <!-- 顶部 tab 栏 -->
+    <!-- 锚点导航：点击只做定位，页面本身是连续的一整篇；
+         滚动时由 onFormScroll 反算当前区块并高亮，两个方向都要同步 -->
     <view class="tab-bar">
       <view wx:for="{{tabLabels}}" wx:key="*this"
             class="tab-item {{activeTab === index ? 'active' : ''}}"
@@ -42,8 +43,16 @@
       </view>
     </view>
 
-    <!-- ===== Tab 0: 基础信息（只读） ===== -->
-    <block wx:if="{{activeTab === 0}}">
+    <scroll-view class="form-scroll"
+                 scroll-y
+                 scroll-with-animation
+                 enable-flex
+                 scroll-into-view="{{scrollIntoView}}"
+                 scroll-into-view-alignment="start"
+                 bindscroll="onFormScroll">
+
+    <!-- ===== 区块 0: 基础信息（只读） ===== -->
+    <view class="form-section" id="sec-0">
       <view class="card">
         <view class="card-title">基础信息</view>
         <view class="readonly-row">
@@ -59,10 +68,10 @@
           <text class="link">查看详情 ›</text>
         </view>
       </view>
-    </block>
+    </view>
 
-    <!-- ===== Tab 1: 商家信息 ===== -->
-    <block wx:if="{{activeTab === 1}}">
+    <!-- ===== 区块 1: 商家信息 ===== -->
+    <view class="form-section" id="sec-1">
       <view class="card">
         <view class="card-title">商家信息</view>
         <view class="readonly-row">
@@ -87,10 +96,10 @@
           </view>
         </view>
       </view>
-    </block>
+    </view>
 
-    <!-- ===== Tab 2: 商品信息 ===== -->
-    <block wx:if="{{activeTab === 2}}">
+    <!-- ===== 区块 2: 商品信息 ===== -->
+    <view class="form-section" id="sec-2">
       <view class="card">
         <view class="card-title">商品信息</view>
         <view wx:for="{{sectionProduct}}" wx:key="key">
@@ -142,10 +151,10 @@
           </view>
         </view>
       </view>
-    </block>
+    </view>
 
-    <!-- ===== Tab 3: 售卖信息 ===== -->
-    <block wx:if="{{activeTab === 3}}">
+    <!-- ===== 区块 3: 售卖信息 ===== -->
+    <view class="form-section" id="sec-3">
       <view class="card">
         <view class="card-title">售卖信息</view>
         <view wx:for="{{sectionSale}}" wx:key="key">
@@ -186,10 +195,10 @@
           </view>
         </view>
       </view>
-    </block>
+    </view>
 
-    <!-- ===== Tab 4: 交易规则 ===== -->
-    <block wx:if="{{activeTab === 4}}">
+    <!-- ===== 区块 4: 交易规则 ===== -->
+    <view class="form-section" id="sec-4">
       <view class="card">
         <view class="card-title">交易规则</view>
         <view class="rule-row">
@@ -252,7 +261,8 @@
           </view>
         </view>
       </view>
-    </block>
+    </view>
+    </scroll-view>
 
     <!-- 底部固定双按钮 -->
     <view class="footer">
