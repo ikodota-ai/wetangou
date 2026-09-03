@@ -2,6 +2,15 @@
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
 const { decide: decideStorePick, decideLocation } = require('./utils/storePick.js');
 const { broadcast } = require('./utils/broadcast.js');
+const { APPID } = require('./utils/config.js');
+
+// 上次门店的缓存键必须带 appid。
+//
+// appid 就是租户边界：一个 appid 对应一个商户。原来固定用 'lastStoreId' 这个
+// 全局键，开发者工具里换一个商户的小程序（或同一设备装了同平台的两家小程序）
+// 再进来，读到的还是上一家残留的 storeId，app.js 拿它直接调 /api/store/{id}
+// 还原，首页就顶着 A 商户的招牌显示 B 商户的门店。
+const LAST_STORE_KEY = 'lastStoreId:' + APPID;
 
 App({
   onLaunch() {
@@ -146,7 +155,7 @@ App({
    *
    *   A) 同步占位（立即 callback，**不**等位置）：
    *      1) globalData.store 已有 → 直接用
-   *      2) wx.storage.lastStoreId → storeDetail 还原
+   *      2) wx.storage['lastStoreId:'+appid] → storeDetail 还原
    *      3) 都没有 → storeList 拿第一个
    *
    *   B) 懒加载取位（异步，**只在需要时**才发）：
@@ -268,7 +277,7 @@ App({
       const changed = d.changed
       this.globalData.store = s
       this.globalData.stores = [s]
-      try { wx.setStorageSync('lastStoreId', s.storeId) } catch (e) {}
+      try { wx.setStorageSync(LAST_STORE_KEY, s.storeId) } catch (e) {}
       this.loadGoods(s.storeId).catch(() => {})
       console.log('[pickNearestStore] source=' + source + ' storeId=' + s.storeId + ' name=' + (s.storeName || s.name || ''))
       // changed 不再决定「给不给回调」（那是三次复发的根因，见 storePick.js），
@@ -379,7 +388,7 @@ App({
       tryLazyLoc()
       return
     }
-    const cachedId = wx.getStorageSync && wx.getStorageSync('lastStoreId')
+    const cachedId = wx.getStorageSync && wx.getStorageSync(LAST_STORE_KEY)
     if (cachedId) {
       fetchDetail(cachedId, 'storage_placeholder')
       tryLazyLoc()

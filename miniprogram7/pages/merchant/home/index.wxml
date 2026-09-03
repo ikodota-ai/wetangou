@@ -104,5 +104,6 @@
     <view class="act" bindtap="goHistory"><text>核销记录</text></view>
     <view class="act" bindtap="goMe"><text>我的</text></view>
     <view class="act" bindtap="goSwitchAccount"><text>切换回会员</text></view>
+    <view class="act act-danger" bindtap="onLogoutStaff"><text>退出商家账号</text></view>
   </view>
 </view>

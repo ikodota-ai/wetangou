@@ -40,6 +40,10 @@
 .ro-amt { font-size: 30rpx; color: #D9342B; font-weight: 600; }
 .ro-status { font-size: 22rpx; color: #999; margin-top: 4rpx; }
 
-.actions { display: flex; gap: 16rpx; margin-top: 8rpx; }
-.act { flex: 1; background: #fff; border-radius: 16rpx; padding: 28rpx 0; text-align: center; font-size: 28rpx; color: #3A6B35; font-weight: 600; box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04); }
+/* 4 个入口挤一行每个只剩 150rpx，「退出商家账号」5 个字必然折行，
+   改成两列换行 */
+.actions { display: flex; flex-wrap: wrap; gap: 16rpx; margin-top: 8rpx; }
+.act { flex: 1 1 calc(50% - 8rpx); background: #fff; border-radius: 16rpx; padding: 28rpx 0; text-align: center; font-size: 28rpx; color: #3A6B35; font-weight: 600; box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04); }
 .act:active { opacity: 0.7; }
+/* 退出是破坏性操作，用红色和其余入口区分开 */
+.act-danger { color: #C0392B; }

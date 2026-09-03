@@ -17,6 +17,7 @@ import com.ruoyi.biz.domain.StoreAlbum;
 import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.biz.service.IStoreAlbumService;
 import com.ruoyi.common.utils.image.ImageUrlUtils;
+import com.ruoyi.biz.tenant.TenantFilterHelper;
 
 /**
  * 小程序-门店
@@ -80,6 +81,13 @@ public class ApiStoreController
         Store s = storeService.selectStoreByStoreId(storeId);
         if (s != null)
         {
+            // appid 即租户边界：selectStoreByStoreId 标了 @IgnoreTenant（按主键查不带
+            // merchant_id 条件），所以归属必须由调用方自己断言 —— PC 端 StoreController
+            // 一直是这么做的，小程序这三个端点漏了。
+            // 后果：lastStoreId 是不区分 appid 的全局缓存键，换一个商户的小程序进来，
+            // 会拿上一个商户残留的 storeId 直接调详情还原，首页就顶着 A 商户的招牌
+            // 显示 B 商户的门店。
+            TenantFilterHelper.assertDataScope(s.getMerchantId());
             s.setLogo(ImageUrlUtils.toAbsolute(s.getLogo()));
         }
         return AjaxResult.success(s);
@@ -95,6 +103,10 @@ public class ApiStoreController
     public AjaxResult services(@PathVariable Long storeId)
     {
         Store store = storeService.selectStoreByStoreId(storeId);
+        if (store != null)
+        {
+            TenantFilterHelper.assertDataScope(store.getMerchantId());
+        }
         List<String> labels = new ArrayList<String>();
         if (store != null && StringUtils.isNotEmpty(store.getServices()))
         {
@@ -113,6 +125,11 @@ public class ApiStoreController
     @GetMapping("/{storeId}/album")
     public AjaxResult album(@PathVariable Long storeId)
     {
+        Store owner = storeService.selectStoreByStoreId(storeId);
+        if (owner != null)
+        {
+            TenantFilterHelper.assertDataScope(owner.getMerchantId());
+        }
         StoreAlbum query = new StoreAlbum();
         query.setStoreId(storeId);
         List<StoreAlbum> list = storeAlbumService.selectStoreAlbumList(query);

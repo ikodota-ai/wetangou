@@ -223,7 +223,13 @@ class WithdrawRuleServiceTest
         Assertions.assertEquals(2, svc.countTodayApplied(1L));
         Assertions.assertEquals(1, svc.remainingTimes(1L));
 
-        WithdrawRuleService full = build(cfg(WithdrawRuleService.KEY_DAILY_TIMES, "2"), list);
+        // 必须显式放开受理时段：默认是 9:00-21:00，而 validate 先校验时段再校验次数。
+        // 不固定的话，凡是在 21:00 后或 9:00 前跑 CI，抛出来的是「不在受理时间」，
+        // 这条本意测「次数上限」的断言就会莫名其妙变红（实测 23:42 复现）。
+        WithdrawRuleService full = build(cfg(
+                WithdrawRuleService.KEY_DAILY_TIMES, "2",
+                WithdrawRuleService.KEY_START_HOUR, "0",
+                WithdrawRuleService.KEY_END_HOUR, "24"), list);
         Assertions.assertEquals(0, full.remainingTimes(1L));
         ServiceException e = Assertions.assertThrows(ServiceException.class,
                 () -> full.validate(1L, new BigDecimal("100"), new BigDecimal("1000")));
