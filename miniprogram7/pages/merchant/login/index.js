@@ -94,6 +94,16 @@ Page({
       isAgent: !!d.isAgent,
       merchantId: d.merchantId,
       storeId: d.storeId,
+      // storeIds / stores 必须存：商家端「新建商品 → 适用门店」读的是 staffUser.storeIds。
+      // 这里原先只存了单个 storeId，那边取不到 storeIds 就退化成 [storeId] ——
+      // 两个后果：① 多店老板只能勾到一家门店；② 更隐蔽的是，storeId 若是上一个
+      // 账号残留的旧值（切商户账号时 staffUser 只被覆盖不被清空），提交时就会带上
+      // 别家商户的门店，被服务端 assertStoresBelongToMerchant 拦下，
+      // 报「门店 X 不属于该商家」—— 而商家看着后台明明是自己的门店，无从下手。
+      // 另外三条登录链路（会员授权识别、identity 静默切换、扫码入职）一直都存了
+      // storeIds，唯独账号密码登录这条漏了，而这恰恰是老板/店长最常用的入口。
+      storeIds: d.storeIds || [],
+      stores: d.stores || [],
       storeName: d.storeName,
       realName: d.realName,
       token,

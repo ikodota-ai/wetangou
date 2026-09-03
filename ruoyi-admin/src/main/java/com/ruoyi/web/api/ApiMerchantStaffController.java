@@ -731,6 +731,10 @@ public class ApiMerchantStaffController
         ajax.put("storeId", lm.getStoreId());
         ajax.put("storeIds", storeIds);
         ajax.put("storeName", storeNameMap.getOrDefault(lm.getStoreId(), ""));
+        // stores（含门店名）必须一起返：商家端「新建商品 → 适用门店」要按名字勾选，
+        // 只给 storeIds 的话前端只能显示「门店100」这种编号，多店老板根本分不清哪家。
+        // /profile 与 /switch-store 一直返 stores，唯独登录这条链漏了。
+        ajax.put("stores", resolveStores(storeIds));
         ajax.put("merchantId", lm.getMerchantId());
         ajax.put("realName", me != null && StringUtils.isNotEmpty(me.getRealName()) ? me.getRealName() : user.getNickName());
         ajax.put("openidBound", user.getOpenidBound() == null ? 0 : user.getOpenidBound());
