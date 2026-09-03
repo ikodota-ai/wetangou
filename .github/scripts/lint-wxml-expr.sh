@@ -48,6 +48,20 @@ for f in $(find miniprogram7/pages miniprogram7/components -name '*.wxml' 2>/dev
     fi
   done
 
+  # {{ }} 里的 HTML 实体：微信编译器**不对表达式做实体解码**，
+  # 写 &amp;&amp; 会被当成字面量 & a m p ; 解析，直接编译失败：
+  #   Bad attr `wx:if` with message: unexpected `;` at pos10
+  # 而且本地 lint/vitest 全绿、只有真机调试上传时才炸（我就这么踩过一次：
+  # mine/index.wxml 写成 wx:if="{{logged &amp;&amp; promoterEnabled}}"）。
+  # 项目里其余 wxml 一律写裸 && / >，所以这里直接禁掉实体写法。
+  ent=$(grep -o '{{[^}]*}}' "$f" 2>/dev/null | grep -oE '&(amp|lt|gt|quot|apos|#[0-9]+);' | sort -u)
+  if [ -n "$ent" ]; then
+    for e in $ent; do
+      echo "  ❌ $f: {{...$e...}} WXML 表达式内不解码 HTML 实体，编译会失败；改用裸 && / < / >"
+      ERR=$((ERR+1))
+    done
+  fi
+
   # 数组/字符串方法调用：{{xxx.indexOf(..)}} / .includes( / .map( / .filter( / .join(
   bad=$(grep -o '{{[^}]*}}' "$f" 2>/dev/null | grep -oE '\.(indexOf|includes|map|filter|join|slice|split|toFixed|reduce|find|some|every)\s*\(' | sort -u)
   if [ -n "$bad" ]; then

@@ -92,7 +92,10 @@ ck "merchantName 非空" "$([ -n "$NAME" ] && [ "$NAME" != "<null>" ] && echo ye
 # ---- 8) 小程序端静态守卫：入口必须受开关控制，且 js 里有兜底判断
 WXML="miniprogram7/pages/mine/index/index.wxml"
 JS="miniprogram7/pages/mine/index/index.js"
-G=$(grep -c 'wx:if="{{logged &amp;&amp; promoterEnabled}}".*goPromoter' "$WXML" 2>/dev/null || true)
+# 注意断言的是裸 &&，不是 HTML 实体 &amp;&amp; —— WXML 的 {{}} 表达式里不做
+# 实体解码，写成 &amp;&amp; 微信编译器直接报
+# "Bad attr wx:if with message: unexpected `;`"，真机调试上传就失败。
+G=$(grep -c 'wx:if="{{logged && promoterEnabled}}".*goPromoter' "$WXML" 2>/dev/null || true)
 ck "wxml 推客入口受 promoterEnabled 控制" "$([ "${G:-0}" -ge 1 ] && echo yes || echo no)" "yes"
 G=$(grep -c "promoterEnabled) === '0'" "$JS" 2>/dev/null || true)
 ck "js goPromoter 有关闭态兜底拦截" "$([ "${G:-0}" -ge 1 ] && echo yes || echo no)" "yes"
