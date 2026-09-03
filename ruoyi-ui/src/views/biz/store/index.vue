@@ -348,6 +348,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listStore, getStore, delStore, addStore, updateStore } from "@/api/biz/store"
 import TencentMap from "@/components/TencentMap"
 
@@ -407,8 +408,7 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     // 服务字典值转标签
     serviceLabel(value) {

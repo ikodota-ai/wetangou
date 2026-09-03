@@ -183,6 +183,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listRecord, getRecord, delRecord, addRecord, updateRecord } from "@/api/biz/record"
 
 export default {
@@ -235,8 +236,7 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     /** 查询分账明细列表 */
     getList() {

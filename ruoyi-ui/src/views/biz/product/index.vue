@@ -180,6 +180,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listProduct, delProduct, changeProductStatus } from "@/api/biz/product"
 import { selectProductTypeList } from "@/api/biz/productType"
 
@@ -228,8 +229,7 @@ export default {
       })
     },
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     typeText(code) {
       // v2 字典化：从 typeList 查 typeName（替代原 hardcode map）

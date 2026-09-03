@@ -206,6 +206,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listMember, getMember, delMember, addMember, updateMember, decryptPhone } from "@/api/biz/member"
 
 export default {
@@ -253,8 +254,7 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     getList() {
       // 处理日期范围

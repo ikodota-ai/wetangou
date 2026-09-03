@@ -259,6 +259,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listWithdraw, getWithdraw, delWithdraw, addWithdraw, updateWithdraw, auditWithdraw } from "@/api/biz/withdraw"
 
 export default {
@@ -318,8 +319,7 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     /** 查询提现记录列表 */
     buildParams() {

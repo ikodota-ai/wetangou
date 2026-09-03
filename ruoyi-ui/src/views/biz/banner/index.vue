@@ -120,6 +120,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listBanner, getBanner, addBanner, updateBanner, delBanner } from '@/api/biz/banner'
 
 export default {
@@ -210,8 +211,7 @@ export default {
     },
     cancel() { this.open = false },
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     }
   }
 }

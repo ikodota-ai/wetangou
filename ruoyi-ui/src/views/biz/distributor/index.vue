@@ -238,6 +238,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listDistributor, getDistributor, delDistributor, addDistributor, updateDistributor, getDistributorQrcode } from "@/api/biz/distributor"
 
 export default {
@@ -315,8 +316,7 @@ export default {
     },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     /** 查询推客列表 */
     buildParams() {

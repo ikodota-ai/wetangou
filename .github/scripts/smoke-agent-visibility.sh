@@ -126,5 +126,14 @@ done
 # 读错的 vuex 路径必须绝迹（state.user 下没有嵌套 user 对象，恒为 undefined）
 ck "无 state.user.user.merchantId" "$(grep -rn 'state.user.user.merchantId' "$UI" --include='*.vue' | wc -l | tr -d ' ')" "0"
 
+# --- 7. identity.js 的行为（不是 grep）---
+# 上面那些 grep 只能证明页面「调用了」showMerchantField()，证明不了它还在按身份
+# 返回。实测把函数体改成 return true，34 项静态检查依然全绿，商户会重新看到
+# 商户选择器而无人发现 —— 所以这里真跑函数逐身份断言。
+IDENT_OUT=$(node .github/scripts/lib/check-identity-semantics.mjs 2>&1)
+IDENT_RC=$?
+ck "identity.js 行为断言"    "$IDENT_RC" "0"
+if [ "$IDENT_RC" != "0" ]; then echo "$IDENT_OUT" | grep '^FAIL' | sed 's/^/       /'; fi
+
 echo "=== PASS=$PASS FAIL=$FAIL ==="
 [ "$FAIL" -eq 0 ]

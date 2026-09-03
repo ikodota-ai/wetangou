@@ -149,6 +149,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listOrder, getOrder, delOrder, verifyOrder } from "@/api/biz/order"
 
 export default {
@@ -277,9 +278,7 @@ export default {
       }, `order_${new Date().getTime()}.xlsx`)
     },
     isShowMerchantFilter() {
-      // 商户账号自带 merchantId 上下文，前端再筛无意义
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     // 打开核销弹窗（顶部工具栏按钮）
     openVerifyDialog() {

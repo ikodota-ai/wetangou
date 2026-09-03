@@ -116,6 +116,7 @@
 </template>
 
 <script>
+import { showMerchantField } from "@/utils/identity"
 import { listMpAuth, getMpAuth, delMpAuth } from "@/api/biz/mpauth"
 import { listMerchant } from "@/api/biz/merchant"
 
@@ -152,10 +153,8 @@ export default {
   },
   computed: {
     // 商户账号(userType=2)只能看自己，隐藏商户筛选框避免误以为能切换
-    // 注意：store/getters.js 未暴露 userType，需直接读 state（与 biz/order 页一致）
     showMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     funcList() {
       if (!this.detail || !this.detail.funcInfo) return []

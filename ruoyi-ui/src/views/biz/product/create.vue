@@ -532,6 +532,7 @@
 </template>
 
 <script>
+import { showMerchantField, currentMerchantId as identityMerchantId } from "@/utils/identity"
 import { treeCategory } from '@/api/biz/category'
 import { addProduct, updateProduct, getProduct, changeProductStatus } from '@/api/biz/product'
 import { selectProductTypeList } from '@/api/biz/productType'
@@ -725,7 +726,7 @@ export default {
     this.loadTypeList()
     // 商户账号：商家就是自己，直接钉住 token 里的 merchantId
     // （原先这里用 store.user.name 兜底，平台账号会显示成登录名 "admin"）
-    const myMerchantId = (this.$store.state.user && this.$store.state.user.merchantId) || null
+    const myMerchantId = identityMerchantId()
     if (myMerchantId) this.$set(this.form, 'merchantId', myMerchantId)
     this.loadMerchantOptions()
     this.loadChannels()
@@ -821,14 +822,13 @@ export default {
       this.comboDrawer = false
       this.basicCollapsed = false
       this.activeTab = fresh.activeTab
-      const myMerchantId = (this.$store.state.user && this.$store.state.user.merchantId) || null
+      const myMerchantId = identityMerchantId()
       if (myMerchantId) this.$set(this.form, 'merchantId', myMerchantId)
       if (this.$refs.basicForm) this.$refs.basicForm.clearValidate()
     },
     /** 商户账号(userType=2)看不到商家下拉：它只能给自己建商品 */
     isShowMerchantSelect() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     /**
      * 按所属商家的 pay_mode 推导收款方式。
