@@ -26,6 +26,16 @@ public class LoginMember implements Serializable
     /** 所属商户ID（多商户隔离，按小程序appid确定） */
     private Long merchantId;
 
+    /**
+     * 签发这份登录态的小程序 appid。
+     *
+     * <p>多商户下每个商户一个小程序，token 必须锚定到签发它的 appid，否则
+     * A 商户小程序里拿到的 token 换个 B 商户的小程序照样能用（X-App-Id 只影响
+     * 匿名请求的租户上下文，带 token 的请求根本不看它）。
+     * 由 {@code MemberAuthInterceptor} 在每次请求时与 X-App-Id 比对。</p>
+     */
+    private String appid;
+
     /** 微信openid */
     private String openid;
 
@@ -111,6 +121,16 @@ public class LoginMember implements Serializable
     public void setMerchantId(Long merchantId)
     {
         this.merchantId = merchantId;
+    }
+
+    public String getAppid()
+    {
+        return appid;
+    }
+
+    public void setAppid(String appid)
+    {
+        this.appid = appid;
     }
 
     public String getUserType()

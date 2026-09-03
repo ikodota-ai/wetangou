@@ -66,6 +66,15 @@ public class MemberAuthInterceptor implements HandlerInterceptor
         LoginMember loginMember = memberTokenService.getLoginMember(request);
         if (loginMember != null)
         {
+            // token 与当前小程序必须同源：多商户下每商户一个小程序，
+            // 不校验的话 A 商户小程序里签发的 token，换到 B 商户的小程序里照样通行
+            // （X-App-Id 原本只用于匿名请求解析租户，带 token 的请求根本不看它）。
+            if (!appidMatches(loginMember, request))
+            {
+                writeError(response, 401, "登录态与当前小程序不匹配，请重新登录",
+                        loginMember.isStaffSession() ? "staff" : "member");
+                return false;
+            }
             memberTokenService.verifyToken(loginMember);
             MemberContextHolder.set(loginMember);
             // 写入租户上下文，使小程序端查询自动限定在会员所属商户
@@ -165,6 +174,43 @@ public class MemberAuthInterceptor implements HandlerInterceptor
      * <p>注意：放行后下面的「门店集合校验」也必须对新链路生效（同样用本方法判定），
      * 否则商家端员工带 storeId 参数就能操作别家门店。</p>
      */
+    /**
+     * 校验 token 与当前请求的小程序是否同源。
+     *
+     * <p>比对口径故意宽松，只拦「明确不一致」，避免误伤存量：</p>
+     * <ul>
+     *   <li>token 里没有 appid（本次改造之前签发的老 token）→ 放行，
+     *       等它自然过期即可，否则升级瞬间全量用户被踢下线</li>
+     *   <li>请求没带 X-App-Id（H5 / 后台代调 / 老版本小程序）→ 放行，
+     *       租户边界仍由 token 内的 merchantId 兜底</li>
+     *   <li>两者都有且不相等 → 拒绝，这就是跨小程序串用的情形</li>
+     * </ul>
+     */
+    private boolean appidMatches(LoginMember loginMember, HttpServletRequest request)
+    {
+        String tokenAppid = loginMember.getAppid();
+        if (StringUtils.isEmpty(tokenAppid))
+        {
+            return true;
+        }
+        String reqAppid = request.getHeader(HEADER_APPID);
+        if (StringUtils.isEmpty(reqAppid))
+        {
+            reqAppid = request.getParameter("appid");
+        }
+        if (StringUtils.isEmpty(reqAppid))
+        {
+            return true;
+        }
+        if (tokenAppid.equals(reqAppid))
+        {
+            return true;
+        }
+        log.warn("[appidMatches] token 签发 appid={} 与请求 X-App-Id={} 不一致，拒绝该请求 uri={}",
+                tokenAppid, reqAppid, request.getRequestURI());
+        return false;
+    }
+
     private boolean isStaffSession(LoginMember loginMember)
     {
         return loginMember != null && loginMember.isStaffSession();

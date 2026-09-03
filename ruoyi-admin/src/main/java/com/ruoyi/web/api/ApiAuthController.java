@@ -77,6 +77,16 @@ public class ApiAuthController
 
         // 多商户：按小程序appid确定所属商户，同一openid在不同商户下互相隔离
         Long merchantId = resolveMerchantId(appid);
+        // 以 body.appid 解析结果为准同步租户上下文。
+        // MemberAuthInterceptor 只看 X-App-Id header，调用方若只在 body 里带 appid
+        // （header 缺失），上下文会 fallback 到默认商户 1，于是
+        // selectMemberByOpenid 查的是商户 1、insert 又被 TenantEntityHelper 写成商户 1，
+        // 对已在商户 1 存在的 openid 直接撞 uk_merchant_openid 报 500。
+        if (merchantId != null)
+        {
+            com.ruoyi.common.utils.TenantContextHolder.set(
+                    com.ruoyi.common.core.domain.model.TenantContext.ofMerchant(merchantId));
+        }
 
         JSONObject session = wxMaService.code2Session(code, merchantId);
         String openid = session.getString("openid");
@@ -112,9 +122,21 @@ public class ApiAuthController
                         if (l.getStatus() == null || "0".equals(l.getStatus())) links.add(l);
                     }
                 }
+                // 同 /api/merchant/staff/login：员工身份必须收敛到当前小程序所属商户，
+                // 否则 A 商户的员工在 B 商户小程序里做会员授权，会被直接识别成员工并签发
+                // 商家端 token（连账号密码都不用输）。merchantId 由 resolveMerchantId(appid)
+                // 解出，appid 缺失时为默认商户，此处一律按解析结果过滤。
+                if (merchantId != null) {
+                    List<MerchantStaff> sameTenant = new java.util.ArrayList<>();
+                    for (MerchantStaff l : links) {
+                        if (merchantId.equals(l.getMerchantId())) sameTenant.add(l);
+                    }
+                    links = sameTenant;
+                }
                 if (!links.isEmpty()) {
                     linkedStaff = u;
                     LoginMember staffLm = buildStaffLoginMember(u, links);
+                    staffLm.setAppid(appid);
                     String staffToken = memberTokenService.createToken(staffLm);
                     staffLm.setToken(staffToken);
                     AjaxResult ajax = AjaxResult.success("员工登录成功");
@@ -181,6 +203,9 @@ public class ApiAuthController
         }
 
         LoginMember loginMember = new LoginMember(member);
+        // 会员 token 同样锚定 appid：会员数据本就按 merchantId 隔离，
+        // 但不锚定的话 token 换个小程序仍可用，租户边界只剩查询层一道
+        loginMember.setAppid(appid);
         String token = memberTokenService.createToken(loginMember);
 
         AjaxResult ajax = AjaxResult.success("登录成功");

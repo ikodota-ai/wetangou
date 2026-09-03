@@ -121,6 +121,18 @@ public class ApiMerchantStaffController
         String ut = user.getUserType();
         // 平台/代理商可无员工关联；但一旦有关联就说明是商户侧账号，不再当特权处理
         boolean isPrivileged = ("00".equals(ut) || "01".equals(ut)) && (allLinks == null || allLinks.isEmpty());
+
+        // 按当前小程序 appid 收敛身份：多商户下每个商户一个小程序，
+        // A 商户的员工在 B 商户的小程序里就不该是员工。
+        // wxLogin 一直有这步（filterLinksByMerchant），唯独密码登录漏了，
+        // 导致 A 商户老板在 B 商户小程序输账号密码照样进商家版，还能切到会员端。
+        String appid = body.getString("appid");
+        Long appMerchantId = resolveMerchantIdByAppid(appid);
+        if (appMerchantId != null) {
+            allLinks = filterLinksByMerchant(allLinks, appMerchantId);
+            // 平台/代理商特权只在「本人没有任何员工关联」时成立；
+            // 按 appid 过滤后为空不等于没关联，不能借此把商户侧账号提权成特权账号。
+        }
         // 只认在职关联：待审核/离职不得登录商家端
         List<MerchantStaff> links = filterActiveLinks(allLinks);
         if (links.isEmpty() && !isPrivileged) {
@@ -141,6 +153,8 @@ public class ApiMerchantStaffController
         else topUserType = "merchant"; // 占位，会被 buildLoginMember 按 role 覆盖
 
         LoginMember lm = buildLoginMember(user, links == null ? java.util.Collections.emptyList() : links, topUserType);
+        // token 锚定签发它的 appid：否则这份 token 拿到别家商户的小程序里照样通行
+        lm.setAppid(appid);
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
@@ -235,6 +249,7 @@ public class ApiMerchantStaffController
         else topUserType = "merchant";
 
         LoginMember lm = buildLoginMember(user, links == null ? java.util.Collections.emptyList() : links, topUserType);
+        lm.setAppid(body.getString("appid"));
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
@@ -347,6 +362,7 @@ public class ApiMerchantStaffController
         }
 
         LoginMember lm = buildLoginMember(user, activeLinks, "merchant");
+        lm.setAppid(body.getString("appid"));
         String token = memberTokenService.createToken(lm);
         lm.setToken(token);
 
