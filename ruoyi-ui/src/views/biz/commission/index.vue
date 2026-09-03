@@ -17,7 +17,7 @@
         />
       </el-form-item>
       <el-form-item label="门店" prop="storeIds">
-        <biz-select v-model="queryParams.storeIds" type="store" multiple width="220px" />
+        <biz-select v-model="queryParams.storeIds" type="store" :merchant-id="queryParams.merchantId" multiple width="220px" />
       </el-form-item>
       <el-form-item label="佣金金额" prop="amount">
         <el-input
@@ -174,7 +174,7 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="门店" prop="storeId">
-              <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" auto-pick-single @auto-pick="onStoreAutoPick" />
+              <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" :require-merchant="showMerchantFilter" auto-pick-single @auto-pick="onStoreAutoPick" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -208,6 +208,7 @@
 </template>
 
 <script>
+import { showMerchantField, isMerchant as identityIsMerchant, currentMerchantId as identityMerchantId } from "@/utils/identity"
 import { listCommission, getCommission, delCommission, addCommission, updateCommission, settleCommission } from "@/api/biz/commission"
 
 export default {
@@ -261,18 +262,15 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
     },
     // 商户账号自带 merchantId 上下文，表单里隐藏"所属商户"下拉
     isMerchant() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType === '2'
+      return identityIsMerchant()
     },
     // 商户账号登录时，从 vuex 取自己的 merchantId
     currentMerchantId() {
-      const u = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.user) || {}
-      return u.merchantId || null
+      return identityMerchantId()
     },
     // 切换商户时清空已选门店（防越权）
     onMerchantChange(val) {

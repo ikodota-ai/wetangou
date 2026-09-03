@@ -2,7 +2,7 @@
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="门店" prop="storeIds">
-        <biz-select v-model="queryParams.storeIds" type="store" multiple width="220px" />
+        <biz-select v-model="queryParams.storeIds" type="store" :merchant-id="queryParams.merchantId" multiple width="220px" />
       </el-form-item>
       <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
         <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />
@@ -123,8 +123,13 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
+            <el-form-item label="所属商户" prop="merchantId" v-if="showMerchantFilter">
+              <biz-select v-model="form.merchantId" type="merchant" @change="onFormMerchantChange" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
             <el-form-item label="门店" prop="storeId">
-              <biz-select v-model="form.storeId" type="store" />
+              <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" :require-merchant="showMerchantFilter" auto-pick-single />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -148,6 +153,7 @@
 </template>
 
 <script>
+import { showMerchantField, currentMerchantId as identityMerchantId } from "@/utils/identity"
 import { listAlbum, getAlbum, delAlbum, addAlbum, updateAlbum } from "@/api/biz/album"
 
 export default {
@@ -201,8 +207,16 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
+    },
+    // 商户账号自带 merchantId 上下文，表单直接落自己的商户，不给选
+    currentMerchantId() {
+      return identityMerchantId()
+    },
+    // 换商户必须清空已选门店：否则会留下上一个商户的 storeId，
+    // 提交时门店与商户不属于同一家，后端归属校验直接拒
+    onFormMerchantChange() {
+      this.form.storeId = null
     },
     /** 查询门店相册列表 */
     buildParams() {
@@ -227,6 +241,7 @@ export default {
     // 表单重置
     reset() {
       this.form = {
+        merchantId: this.currentMerchantId() || null,
         albumId: null,
         storeId: null,
         imageUrl: null,

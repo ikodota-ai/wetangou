@@ -19,7 +19,7 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
-      <el-form-item label="所属代理商" prop="agentId" label-width="90px">
+      <el-form-item label="所属代理商" prop="agentId" label-width="90px" v-if="showAgent">
         <el-select v-model="queryParams.agentId" placeholder="全部" clearable filterable style="width: 180px">
           <el-option
             v-for="item in agentOptions"
@@ -91,7 +91,7 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="编号" align="center" prop="merchantNo" width="120" />
       <el-table-column label="商户名称" align="left" prop="merchantName" min-width="160" show-overflow-tooltip />
-      <el-table-column label="所属代理商" align="center" prop="agentName" width="130" show-overflow-tooltip>
+      <el-table-column v-if="showAgent" label="所属代理商" align="center" prop="agentName" width="130" show-overflow-tooltip>
         <template slot-scope="scope">
           <span>{{ scope.row.agentName || '平台直营' }}</span>
         </template>
@@ -173,7 +173,7 @@
               <el-input v-model="form.merchantName" placeholder="请输入商户名称" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="12" v-if="showAgent">
             <el-form-item label="所属代理商" prop="agentId">
               <el-select v-model="form.agentId" placeholder="平台直营" clearable filterable style="width: 100%">
                 <el-option
@@ -375,6 +375,7 @@
 <script>
 import { listMerchant, getMerchant, delMerchant, addMerchant, updateMerchant, getPayNotifyUrl, resetOwnerPwd } from "@/api/biz/merchant"
 import { listAgent } from "@/api/biz/agent"
+import { showAgentField } from "@/utils/identity"
 import { getToken } from "@/utils/auth"
 
 export default {
@@ -389,6 +390,9 @@ export default {
       total: 0,
       merchantList: [],
       agentOptions: [],
+      // 平台不希望商户看到自己挂在哪个代理商名下（渠道关系属上游信息），
+      // 商户身份一律隐藏筛选项 / 列表列 / 表单项三处
+      showAgent: showAgentField(),
       title: "",
       open: false,
       wxOpen: false,
@@ -427,7 +431,7 @@ export default {
   },
   created() {
     this.getList();
-    this.getAgentOptions();
+    if (this.showAgent) this.getAgentOptions();
   },
   methods: {
     isExpired(time) {

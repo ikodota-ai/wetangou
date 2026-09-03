@@ -173,11 +173,11 @@
     <!-- 生成邀请码 -->
     <el-dialog title="生成邀请码" :visible.sync="inviteOpen" width="480px" append-to-body>
       <el-form ref="inviteForm" :model="inviteForm" :rules="inviteRules" label-width="100px">
-        <el-form-item label="商户" prop="merchantId">
+        <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
           <biz-select v-model="inviteForm.merchantId" type="merchant" width="100%" placeholder="请选择商户" @change="onInviteMerchantChange" />
         </el-form-item>
         <el-form-item label="门店" prop="storeId">
-          <biz-select v-model="inviteForm.storeId" type="store" :params="{ merchantId: inviteForm.merchantId }" width="100%" placeholder="请选择门店" />
+          <biz-select v-model="inviteForm.storeId" type="store" :merchant-id="inviteForm.merchantId" :require-merchant="showMerchantFilter" auto-pick-single width="100%" placeholder="请选择门店" />
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="inviteForm.role" placeholder="请选择" style="width:100%">
@@ -255,6 +255,7 @@
 </template>
 
 <script>
+import { showMerchantField, currentMerchantId as identityMerchantId } from "@/utils/identity"
 import { listStaffInvite, addStaffInvite, delStaffInvite, listStaff, updateStaff, profileStaff, delStaff, qrcodeStaffInvite, unbindStaffWx, resetStaffPwd, listStaffAudit, auditStaff } from '@/api/biz/staffInvite'
 
 export default {
@@ -312,8 +313,11 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
+    },
+    // 商户账号自带商户上下文，弹窗里不给选商户，直接钉死自己的
+    currentMerchantId() {
+      return identityMerchantId()
     },
     copyText(text) {
       try {
@@ -353,7 +357,7 @@ export default {
       this.getInviteList()
     },
     handleAddInvite() {
-      this.inviteForm = { merchantId: null, storeId: null, role: 'STAFF', expireAt: null, remark: '' }
+      this.inviteForm = { merchantId: this.currentMerchantId(), storeId: null, role: 'STAFF', expireAt: null, remark: '' }
       this.inviteOpen = true
     },
     onInviteMerchantChange() {

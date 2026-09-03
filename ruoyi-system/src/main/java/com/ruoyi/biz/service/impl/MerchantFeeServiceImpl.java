@@ -53,7 +53,7 @@ public class MerchantFeeServiceImpl implements IMerchantFeeService
     @Override
     public MerchantFee selectMerchantFeeByFeeId(Long feeId)
     {
-        return merchantFeeMapper.selectMerchantFeeByFeeId(feeId);
+        return hideAgentForMerchant(merchantFeeMapper.selectMerchantFeeByFeeId(feeId));
     }
 
     /**
@@ -67,7 +67,37 @@ public class MerchantFeeServiceImpl implements IMerchantFeeService
         {
             merchantFee.getParams().put("agentIdEq", context.getAgentId());
         }
-        return merchantFeeMapper.selectMerchantFeeList(merchantFee);
+        List<MerchantFee> list = merchantFeeMapper.selectMerchantFeeList(merchantFee);
+        if (list != null)
+        {
+            for (MerchantFee fee : list)
+            {
+                hideAgentForMerchant(fee);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * 对商户账号抹掉代理商信息。
+     *
+     * <p>商户挂在哪个代理商名下是平台的渠道关系，属于商户不该知道的上游信息。
+     * 前端已经隐藏了「收费方」这一列，但接口照样把 agentId/agentName 发下去，
+     * 开个 F12 就能看到 —— UI 隐藏从来不是数据权限，必须在返回前抹掉。</p>
+     */
+    private MerchantFee hideAgentForMerchant(MerchantFee fee)
+    {
+        if (fee == null)
+        {
+            return null;
+        }
+        TenantContext context = TenantContextHolder.get();
+        if (context != null && context.isMerchant())
+        {
+            fee.setAgentId(null);
+            fee.setAgentName(null);
+        }
+        return fee;
     }
 
     /**

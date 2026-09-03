@@ -5,7 +5,7 @@
         <el-input v-model="queryParams.orderNo" placeholder="请输入订单编号" clearable style="width: 180px" @keyup.enter.native="handleQuery" />
       </el-form-item>
       <el-form-item label="门店" prop="storeIds">
-        <biz-select v-model="queryParams.storeIds" type="store" multiple width="220px" />
+        <biz-select v-model="queryParams.storeIds" type="store" :merchant-id="queryParams.merchantId" multiple width="220px" />
       </el-form-item>
       <el-form-item label="会员" prop="memberIds">
         <biz-select v-model="queryParams.memberIds" type="member" multiple width="220px" />

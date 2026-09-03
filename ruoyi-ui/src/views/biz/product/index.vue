@@ -2,7 +2,7 @@
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="80px">
       <el-form-item label="适用门店" prop="storeIds">
-        <biz-select v-model="queryParams.storeIds" type="store" multiple width="220px" />
+        <biz-select v-model="queryParams.storeIds" type="store" :merchant-id="queryParams.merchantId" multiple width="220px" />
       </el-form-item>
       <el-form-item label="商户" prop="merchantId" v-if="showMerchantFilter">
         <biz-select v-model="queryParams.merchantId" type="merchant" width="200px" placeholder="请选择商户" />

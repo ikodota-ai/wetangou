@@ -15,7 +15,7 @@
       </el-form-item>
 
       <el-form-item label="门店" prop="storeId">
-        <biz-select v-model="queryParams.storeId" type="store" width="200px" />
+        <biz-select v-model="queryParams.storeId" type="store" :merchant-id="queryParams.merchantId" width="200px" />
       </el-form-item>
       <el-form-item label="预约服务" prop="productId">
         <biz-select v-model="queryParams.productId" type="product" width="200px" />
@@ -106,8 +106,11 @@
     <!-- 新增/修改预约场次对话框 -->
     <el-dialog :title="title" :visible.sync="open" width="560px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="所属商户" prop="merchantId" v-if="showMerchantFilter">
+          <biz-select v-model="form.merchantId" type="merchant" @change="onFormMerchantChange" />
+        </el-form-item>
         <el-form-item label="门店" prop="storeId">
-          <biz-select v-model="form.storeId" type="store" />
+          <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" :require-merchant="showMerchantFilter" auto-pick-single />
         </el-form-item>
         <el-form-item label="预约服务" prop="productId">
           <biz-select v-model="form.productId" type="product" @change="onProductChange" />
@@ -179,6 +182,7 @@
 </template>
 
 <script>
+import { showMerchantField, currentMerchantId as identityMerchantId } from "@/utils/identity"
 import { listBooking, getBooking, delBooking, addBooking, updateBooking, listBookingMembers } from "@/api/biz/booking"
 
 export default {
@@ -230,8 +234,16 @@ export default {
   },
   methods: {
     isShowMerchantFilter() {
-      const userType = (this.$store && this.$store.state && this.$store.state.user && this.$store.state.user.userType) || ''
-      return userType !== '2'
+      return showMerchantField()
+    },
+    // 商户账号自带 merchantId 上下文，表单直接落自己的商户，不给选
+    currentMerchantId() {
+      return identityMerchantId()
+    },
+    // 换商户必须清空已选门店：否则会留下上一个商户的 storeId，
+    // 提交时门店与商户不属于同一家，后端归属校验直接拒
+    onFormMerchantChange() {
+      this.form.storeId = null
     },
     statusText(status) {
       return { '0': '开放中', '1': '已确认', '2': '已完成', '3': '已关闭' }[status] || status
@@ -254,6 +266,7 @@ export default {
     },
     reset() {
       this.form = {
+        merchantId: this.currentMerchantId() || null,
         bookingId: null,
         bookingNo: null,
         storeId: null,

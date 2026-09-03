@@ -76,7 +76,7 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="收费单号" align="center" prop="feeNo" width="170" />
       <el-table-column label="商户" align="left" prop="merchantName" min-width="150" show-overflow-tooltip />
-      <el-table-column label="收费方" align="center" prop="agentName" width="130" show-overflow-tooltip>
+      <el-table-column v-if="showAgent" label="收费方" align="center" prop="agentName" width="130" show-overflow-tooltip>
         <template slot-scope="scope">
           <span>{{ scope.row.agentName || '平台直收' }}</span>
         </template>
@@ -217,6 +217,7 @@
 <script>
 import { listMerchantFee, getMerchantFee, delMerchantFee, addMerchantFee, updateMerchantFee, confirmMerchantFee } from "@/api/biz/merchantfee"
 import { listMerchant } from "@/api/biz/merchant"
+import { showAgentField } from "@/utils/identity"
 
 export default {
   name: "MerchantFee",
@@ -230,6 +231,9 @@ export default {
       total: 0,
       feeList: [],
       merchantOptions: [],
+      // 「收费方」显示的是代理商名。商户只该知道自己交了多少钱，
+      // 不该知道这笔钱是被哪个代理商收走的（渠道关系属平台内部信息）。
+      showAgent: showAgentField(),
       title: "",
       open: false,
       feeTypeOptions: [

@@ -38,8 +38,12 @@ public class TenantTableRegistry
             "biz_merchant_fee",
             "biz_merchant",
             "biz_merchant_staff",
-            "biz_merchant_staff_invite",
-            "biz_agent")));
+            "biz_merchant_staff_invite")));
+    // 注意：biz_agent 不在此列 —— 它压根没有 merchant_id 列（主键 agent_id）。
+    // 曾被批量登记进来，于是任何 join biz_agent 的语句都会被追加 "a.merchant_id = ?"，
+    // 商户账号打开「商户收费」直接 500 Unknown column 'a.merchant_id'。
+    // 代理商表是平台级数据，隔离靠的是「商户角色根本没有 biz:agent:* 权限」，
+    // 不该也无法靠 merchant_id 过滤。biz_agent_fee 同理（无 merchant_id 列）。
 
     /** 平台共享表（merchant_id=0 表示全平台通用） */
     private static final Set<String> SHARED_TABLES = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(

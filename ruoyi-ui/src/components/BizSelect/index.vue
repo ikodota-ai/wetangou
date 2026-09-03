@@ -8,7 +8,8 @@
     :collapse-tags="multiple"
     :remote-method="remoteSearch"
     :loading="loading"
-    :placeholder="placeholder || defaultPlaceholder"
+    :disabled="blockedByMerchant"
+    :placeholder="blockedByMerchant ? '请先选择商户' : (placeholder || defaultPlaceholder)"
     :style="{ width: width }"
     @change="handleChange"
     @visible-change="onVisible"
@@ -43,7 +44,11 @@ export default {
     // 所属商户 ID（非空时，列表只返回该商户下的数据）。后端 Store/Product/Member 等已全部支持 merchantId 过滤。
     merchantId: { type: [Number, String], default: null },
     // 单选且下拉只剩 1 个选项时自动选中（如：某商户下只有 1 个门店）。多选不生效。
-    autoPickSingle: { type: Boolean, default: false }
+    autoPickSingle: { type: Boolean, default: false },
+    // 必须先有 merchantId 才允许选择。给平台/代理商账号用：
+    // 不设这个约束，他们能在「全部门店」里挑一个别家的，提交时才被后端
+    // 以「门店不属于该商家」打回。商户账号的 merchantId 由 token 钉住，不受影响。
+    requireMerchant: { type: Boolean, default: false }
   },
   data() {
     return {
@@ -59,6 +64,9 @@ export default {
     },
     defaultPlaceholder() {
       return this.cfg.placeholder
+    },
+    blockedByMerchant() {
+      return this.requireMerchant && (this.merchantId == null || this.merchantId === '')
     }
   },
   watch: {
@@ -70,20 +78,25 @@ export default {
       }
     },
     // 切换商户时清空选项重新拉取；多选同步清空已选值
-    merchantId() {
+    merchantId(val, oldVal) {
+      const wasEmpty = (oldVal == null || oldVal === '')
       this.options = []
       this.loadedOnce = false
-      if (this.multiple) {
-        this.innerValue = []
-        this.handleChange([])
-      } else {
-        this.innerValue = null
-        this.handleChange(null)
+      // 只有「从一个商户换到另一个商户」才清空已选，
+      // 从空变成有值不清 —— 编辑回显时 form.merchantId 和 form.storeId 是同一次赋值，
+      // 两个 watch 排在同一个刷新队列里，value 先跑填好门店，
+      // merchantId 后跑要是无脑清空，编辑框里的门店就永远是空的。
+      if (!wasEmpty) {
+        if (this.multiple) {
+          this.innerValue = []
+          this.handleChange([])
+        } else {
+          this.innerValue = null
+          this.handleChange(null)
+        }
       }
       // 触发一次空查询（用户点开下拉时 onVisible 也会拉）
-      if (this.innerValue == null) {
-        this.fetch('')
-      }
+      this.fetch('')
     }
   },
   methods: {
@@ -106,6 +119,11 @@ export default {
       }
     },
     fetch(keyword) {
+      // 未选商户就不该去拉全平台的数据 —— 既没意义也会把别家数据带到前端
+      if (this.blockedByMerchant) {
+        this.options = []
+        return
+      }
       this.loading = true
       // pageSize=100 一次性拉完，避免商户/门店量超过 20 时下拉被截断
       const query = { pageNum: 1, pageSize: 100 }
