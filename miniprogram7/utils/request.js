@@ -351,6 +351,7 @@ const api = {
   joinPromoter: () => request('/api/distributor/join', { method: 'POST' }),
   commissionList: (params) => request('/api/distributor/commission/list', { data: params }),
   withdrawList: () => request('/api/distributor/withdraw/list'),
+  withdrawRules: () => request('/api/distributor/withdraw/rules'),
   applyWithdraw: (data) => request('/api/distributor/withdraw', { method: 'POST', data }),
   // 推客邀请：太阳码 + 粉丝列表（后端生成 wxacode，图片保存到 /upload/distributor/）
   promoterQrcode: () => request('/api/distributor/qrcode'),

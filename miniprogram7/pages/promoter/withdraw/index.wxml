@@ -15,8 +15,12 @@
     </view>
     <view class="f-row">
       <text class="f-lab required">提现金额</text>
-      <input class="f-in" type="digit" value="{{amount}}" bindinput="onAmount" placeholder="请输入提现金额" />
+      <input class="f-in" type="digit" value="{{amount}}" bindinput="onAmount" placeholder="{{amountPlaceholder}}" />
       <text class="all-btn" bindtap="fillAll">全部提现</text>
+    </view>
+    <view class="f-row" wx:if="{{feeText}}">
+      <text class="f-lab">手续费</text>
+      <text class="f-in">{{feeText}}</text>
     </view>
     <view class="f-row">
       <text class="f-lab required">{{type.accountLabel}}</text>
@@ -28,7 +32,47 @@
     </view>
   </view>
 
-  <view class="tip">提现申请提交后对应金额将被冻结，等待平台审核打款；若被驳回，冻结金额会退回可提现余额。</view>
+  <!-- 提现规则：微信审核要求在提现页面清晰展示，故常驻在页面上而非折叠/弹窗 -->
+  <view class="rule-card card">
+    <view class="rule-head">
+      <text class="rule-title">提现规则</text>
+      <text class="rule-state {{rule.withinServiceHours ? 'on' : 'off'}}">{{rule.withinServiceHours ? '当前可申请' : '当前非受理时段'}}</text>
+    </view>
+
+    <view class="rule-grid">
+      <view class="rg-item">
+        <text class="rg-num">¥{{available}}</text>
+        <text class="rg-lab">可提现额度</text>
+      </view>
+      <view class="rg-item">
+        <text class="rg-num">{{minAmountText}}</text>
+        <text class="rg-lab">单笔最低</text>
+      </view>
+      <view class="rg-item">
+        <text class="rg-num">{{maxAmountText}}</text>
+        <text class="rg-lab">单笔最高</text>
+      </view>
+      <view class="rg-item">
+        <text class="rg-num">{{dailyTimesText}}</text>
+        <text class="rg-lab">每日次数</text>
+      </view>
+      <view class="rg-item">
+        <text class="rg-num">{{rule.serviceHours}}</text>
+        <text class="rg-lab">提现时间</text>
+      </view>
+      <view class="rg-item">
+        <text class="rg-num">{{rule.arrivalDesc}}</text>
+        <text class="rg-lab">到账时间</text>
+      </view>
+    </view>
+
+    <view class="rule-list">
+      <view class="rule-li" wx:for="{{rule.rules}}" wx:key="*this">
+        <text class="rule-dot"></text>
+        <text class="rule-txt">{{item}}</text>
+      </view>
+    </view>
+  </view>
 
   <view class="bottom-bar">
     <view class="next-btn {{submitting?'disabled':''}}" bindtap="onSubmit">{{submitting ? '提交中…' : '提交申请'}}</view>

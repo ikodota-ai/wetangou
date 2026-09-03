@@ -25,3 +25,20 @@
 .all-btn { font-size: 26rpx; color: var(--color-primary); margin-left: 16rpx; }
 .tip { margin-top: 24rpx; font-size: 24rpx; color: #999; line-height: 1.6; }
 .next-btn.disabled { opacity: 0.6; }
+
+/* 提现规则展示区（微信审核要求：提现页面须清晰展示提现规则） */
+.rule-card { margin-top: 24rpx; padding: 28rpx 32rpx; }
+.rule-head { display: flex; align-items: center; justify-content: space-between; }
+.rule-title { font-size: 30rpx; font-weight: 600; color: #1A1A1A; }
+.rule-state { font-size: 22rpx; padding: 6rpx 16rpx; border-radius: 24rpx; }
+.rule-state.on { color: var(--color-primary); background: rgba(255, 90, 95, 0.1); }
+.rule-state.off { color: #FF8F1F; background: rgba(255, 143, 31, 0.12); }
+.rule-grid { display: flex; flex-wrap: wrap; margin-top: 24rpx; }
+.rg-item { width: 33.33%; padding: 12rpx 0; box-sizing: border-box; }
+.rg-num { display: block; font-size: 26rpx; font-weight: 600; color: #1A1A1A; line-height: 1.4; }
+.rg-lab { display: block; font-size: 22rpx; color: #999; margin-top: 6rpx; }
+.rule-list { margin-top: 20rpx; padding-top: 20rpx; border-top: 1rpx solid #F0F0F0; }
+.rule-li { display: flex; align-items: flex-start; margin-bottom: 14rpx; }
+.rule-li:last-child { margin-bottom: 0; }
+.rule-dot { width: 8rpx; height: 8rpx; border-radius: 50%; background: #CCC; margin: 14rpx 14rpx 0 0; flex-shrink: 0; }
+.rule-txt { flex: 1; font-size: 24rpx; color: #666; line-height: 1.6; }

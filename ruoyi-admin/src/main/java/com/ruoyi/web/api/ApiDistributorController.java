@@ -31,6 +31,7 @@ import com.ruoyi.biz.service.ITenantService;
 import com.ruoyi.biz.service.ICommissionService;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IWithdrawService;
+import com.ruoyi.biz.api.service.WithdrawRuleService;
 import com.ruoyi.framework.config.ServerConfig;
 
 /**
@@ -64,6 +65,9 @@ public class ApiDistributorController
 
     @Autowired
     private ServerConfig serverConfig;
+
+    @Autowired
+    private WithdrawRuleService withdrawRuleService;
 
     /**
      * 当前请求关联的推客档案（业务方法内部用，推客身份校验由 DistributorAuthInterceptor 完成）
@@ -249,6 +253,25 @@ public class ApiDistributorController
     }
 
     /**
+     * 提现规则（含今日剩余次数）
+     *
+     * <p>微信审核要求提现页面必须清晰展示提现规则，前端进页面就拉这个接口渲染。
+     * 与 POST /withdraw 的校验读同一个 WithdrawRuleService，展示与实际拦截
+     * 不可能出现「页面写最低 10 元、实际提 1 元也能过」这种不一致。</p>
+     *
+     * <p>不加 @Anonymous：提现页本来就只有推客能进，和 /withdraw/list 一致，
+     * 由拦截器统一挡未登录/非推客。</p>
+     */
+    @GetMapping("/withdraw/rules")
+    public AjaxResult withdrawRules()
+    {
+        Distributor distributor = currentDistributor();
+        Long distributorId = distributor == null ? null : distributor.getDistributorId();
+        BigDecimal available = distributor == null ? BigDecimal.ZERO : distributor.getAvailableAmount();
+        return AjaxResult.success(withdrawRuleService.describe(distributorId, available));
+    }
+
+    /**
      * 提现记录
      */
     @GetMapping("/withdraw/list")
@@ -277,15 +300,9 @@ public class ApiDistributorController
             throw new ServiceException("您还不是推客");
         }
         BigDecimal amount = body.getBigDecimal("amount");
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0)
-        {
-            throw new ServiceException("提现金额不合法");
-        }
         BigDecimal available = distributor.getAvailableAmount() == null ? BigDecimal.ZERO : distributor.getAvailableAmount();
-        if (amount.compareTo(available) > 0)
-        {
-            throw new ServiceException("可提现余额不足");
-        }
+        // 规则校验：起提金额 / 单笔上限 / 每日次数 / 受理时段 / 余额
+        withdrawRuleService.validate(distributor.getDistributorId(), amount, available);
 
         Withdraw withdraw = new Withdraw();
         withdraw.setWithdrawNo("W" + System.currentTimeMillis() + (int) (Math.random() * 900 + 100));

@@ -133,6 +133,7 @@ run biz_staff_tenant_backfill_v13    # 回填扫码入职员工的租户归属�
 run biz_staff_pc_role_backfill_v14   # 回填老板/店长缺失的 PC 角色（无角色 = 后台全 403，重置不了员工密码）
 run biz_merchant_promoter_enabled_20260903  # 商户级推客总开关（关掉后小程序不显示「推客中心」入口）
 run wx_miniapp_env_version_20260903        # 小程序码指向版本（未发布必须 trial，否则邀请码报 40066 invalid url）
+run biz_withdraw_rule_20260903       # 提现规则（起提额/每日次数/受理时段/到账时效，微信审核要求提现页展示）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix
