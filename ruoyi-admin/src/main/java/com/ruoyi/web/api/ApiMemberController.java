@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
-import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.utils.file.FileUploadUtils;
+import com.ruoyi.common.utils.file.MimeTypeUtils;
 import com.ruoyi.framework.config.ServerConfig;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.utils.StringUtils;
@@ -143,25 +143,37 @@ public class ApiMemberController
         {
             return AjaxResult.error("上传头像不能为空");
         }
-        // upload() 返回的已经是 /profile/avatar/2026/08/31/xxx.jpg 这种相对路径。
+        // 必须走 uploadByStorage（对象存储适配器），不能用 FileUploadUtils.upload（本地磁盘）。
         //
-        // 入库必须存相对路径，不能存 serverConfig.getUrl() 拼出来的绝对地址：
-        // getUrl() 取的是当前请求的 host，本地跑就写进 http://127.0.0.1:8080/...、
-        // 内网调试写进 http://172.31.26.216:8080/...（库里存量数据就是这样），
-        // 换个环境或换台手机全部打不开；而且 <image> 不支持 http，
-        // 生产 https 域名下这些 http 绝对地址会被微信直接拦掉。
-        // 昵称是纯文本所以没事 —— 这就是「昵称能读出来、头像读不出来」的原因。
+        // 原来用的 upload() 把文件写进本机 uploadPath/avatar/，入库 /profile/avatar/...。
+        // 生产环境这条路是断的：nginx 只配了 location / { try_files $uri $uri/ /index.html; }，
+        // 没有 /profile/ 的 alias，于是 GET /profile/avatar/xxx.jpg 被兜底成了首页 —
+        // 实测返回 200 + Content-Type: text/html + 6897 字节的 <!DOCTYPE html>。
+        // <image> 拿到一段 HTML 自然什么都画不出来，而且因为是 200 不是 404，
+        // 看响应码根本发现不了。昵称是纯文本走 JSON，所以「昵称能读、头像读不出来」。
         //
-        // 前端 toFullUrl() 会用当前接口 baseUrl 补全相对路径，跨环境都对。
-        String avatar = FileUploadUtils.upload(RuoYiConfig.getAvatarPath(), avatarfile);
+        // 商品图早就走 uploadByStorage 落 OSS 了（CommonController.uploadFile），
+        // 只有头像这三处漏改，属于同一个 bug 的三个入口。
+        //
+        // keyPrefix 传 avatar 保持与旧布局同形（avatar/2026/09/04/xxx.jpg），
+        // 这样 local 模式返回的 /profile/avatar/... 与历史入库数据一致，不产生第二种形态。
+        //
+        // 返回值形态由 ruoyi.storage.type 决定：
+        //   oss   → https://wetuango.oss-cn-shenzhen.aliyuncs.com/avatar/...（绝对地址，直接入库）
+        //   local → /profile/avatar/...（相对路径，前端 toFullUrl 补全）
+        // 两种都不再经过 serverConfig.getUrl()。原先拼 getUrl() 的做法会把当前请求 host
+        // 写进库（http://127.0.0.1:8080、http://172.31.26.216:8080，库里存量脏数据就是这么来的），
+        // 换环境/换设备全废，且 <image> 不支持 http。OSS 域名是固定的 https 公网域名，
+        // 不随请求变，所以可以安全入库。
+        String avatar = FileUploadUtils.uploadByStorage("avatar", avatarfile, MimeTypeUtils.IMAGE_EXTENSION, true);
 
         Member update = new Member();
         update.setMemberId(MemberContextHolder.getMemberId());
         update.setAvatar(avatar);
         memberService.updateMember(update);
 
-        // 响应仍给绝对地址：前端拿到就能直接预览，不用等下次 profile 刷新
-        String url = serverConfig.getUrl() + avatar;
+        // 响应给可直接预览的地址：OSS 已是绝对地址原样返回，local 相对路径才补 host
+        String url = avatar.startsWith("http") ? avatar : serverConfig.getUrl() + avatar;
         return AjaxResult.success().put("imgUrl", url).put("url", url);
     }
 

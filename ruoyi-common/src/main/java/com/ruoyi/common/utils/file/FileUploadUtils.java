@@ -23,6 +23,8 @@ import com.ruoyi.common.utils.uuid.Seq;
  */
 public class FileUploadUtils
 {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileUploadUtils.class);
+
     /**
      * 默认大小 50M
      */
@@ -271,18 +273,84 @@ public class FileUploadUtils
      */
     public static final String uploadByStorage(MultipartFile file)
     {
+        return uploadByStorage(null, file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION, false);
+    }
+
+    /**
+     * 走对象存储适配器上传（带 key 前缀 / 扩展名白名单 / 自定义命名）
+     *
+     * <p>头像等按业务分目录的场景用这个重载：keyPrefix 传 "avatar" 得到
+     * key = {@code avatar/2026/09/04/xxx.jpg}，与旧的本地磁盘布局
+     * （{@code RuoYiConfig.getAvatarPath()} = profile/avatar）保持一致，
+     * 这样 local 适配器返回的 {@code /profile/avatar/...} 与历史入库数据同形，
+     * 存量记录不会因为切换实现而失效。</p>
+     *
+     * @param keyPrefix        key 前缀（如 avatar），null / 空则不加前缀
+     * @param file             上传的文件
+     * @param allowedExtension 允许的扩展名
+     * @param useCustomNaming  true 用 UUID 命名（避免中文原名 / 重名），false 用「原名_序号」
+     * @return 公开访问 URL（OSS 返回 https 绝对地址，local 返回 /profile/... 相对路径）
+     */
+    public static final String uploadByStorage(String keyPrefix, MultipartFile file, String[] allowedExtension,
+            boolean useCustomNaming)
+    {
         try
         {
+            int fileNameLength = Objects.requireNonNull(file.getOriginalFilename()).length();
+            if (fileNameLength > FileUploadUtils.DEFAULT_FILE_NAME_LENGTH)
+            {
+                throw new FileNameLengthLimitExceededException(FileUploadUtils.DEFAULT_FILE_NAME_LENGTH);
+            }
             // 复用旧的 allow / size 校验
-            assertAllowed(file, MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION);
-            // key 形如 upload/2026/08/02/原文件名_序号.jpg
-            String key = extractFilename(file);
+            assertAllowed(file, allowedExtension);
+            // key 形如 2026/09/04/原文件名_序号.jpg（带前缀时为 avatar/2026/09/04/uuid.jpg）
+            String key = useCustomNaming ? uuidFilename(file) : extractFilename(file);
+            if (StringUtils.isNotEmpty(keyPrefix))
+            {
+                key = StringUtils.trim(keyPrefix).replaceAll("^/+|/+$", "") + "/" + key;
+            }
             return com.ruoyi.common.storage.StorageFactory.get().upload(
                     key, file.getInputStream(), file.getContentType(), file.getSize());
         }
         catch (Exception e)
         {
             throw new RuntimeException("对象存储上传失败", e);
+        }
+    }
+
+    /**
+     * 按公开 URL 反查 key 并删除（替代原先直接删本地磁盘文件的写法）
+     *
+     * <p>切到 OSS 后 {@code FileUtils.deleteFile(RuoYiConfig.getProfile() + url)} 必然删不到东西
+     * （文件根本不在本机磁盘上），所以旧头像清理必须走适配器。</p>
+     *
+     * <p>无法识别前缀的（例如库里遗留的 {@code http://127.0.0.1:8080/profile/...} 绝对地址，
+     * 而当前已切到 OSS）直接跳过：这类文件不在当前存储里，删不掉也不该报错。</p>
+     */
+    public static final void deleteByStorage(String url)
+    {
+        if (StringUtils.isEmpty(url))
+        {
+            return;
+        }
+        try
+        {
+            com.ruoyi.common.storage.StorageAdapter adapter = com.ruoyi.common.storage.StorageFactory.get();
+            // local → "/profile/"；s3 → "https://<domain>/"
+            String prefix = adapter.getPublicUrl("");
+            if (StringUtils.isNotEmpty(prefix) && url.startsWith(prefix))
+            {
+                adapter.delete(url.substring(prefix.length()));
+            }
+            else
+            {
+                log.debug("[deleteByStorage] 前缀不匹配当前存储，跳过删除: {}", url);
+            }
+        }
+        catch (Exception e)
+        {
+            // 删旧文件失败不能影响「换头像成功」这件事
+            log.warn("[deleteByStorage] 删除失败 {}", url, e);
         }
     }
 

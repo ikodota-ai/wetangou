@@ -110,19 +110,21 @@ public class CommonController
     {
         try
         {
-            // 上传文件路径
-            String filePath = RuoYiConfig.getUploadPath();
             List<String> urls = new ArrayList<String>();
             List<String> fileNames = new ArrayList<String>();
             List<String> newFileNames = new ArrayList<String>();
             List<String> originalFilenames = new ArrayList<String>();
             for (MultipartFile file : files)
             {
-                // 上传并返回新文件名称
-                String fileName = FileUploadUtils.upload(filePath, file);
-                String url = serverConfig.getUrl() + fileName;
+                // 与 /upload 单文件端点保持一致走对象存储适配器。
+                // 原先这里是 FileUploadUtils.upload(RuoYiConfig.getUploadPath(), file)，
+                // 落本机磁盘 → 生产 nginx 没有 /profile/ 的 alias，返回的地址被
+                // location / 的 try_files 兜底成首页（200 + text/html），图片打不开。
+                String fileName = FileUploadUtils.uploadByStorage(file);
+                // OSS / 七牛返回的已是 https 绝对地址，只有 local 的 /profile/... 才需要拼 host
+                String url = fileName.startsWith("/") ? serverConfig.getUrl() + fileName : fileName;
                 urls.add(url);
-                fileNames.add(fileName);
+                fileNames.add(url);
                 newFileNames.add(FileUtils.getName(fileName));
                 originalFilenames.add(file.getOriginalFilename());
             }

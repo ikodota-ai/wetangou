@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.ruoyi.common.annotation.Log;
-import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.entity.SysUser;
@@ -21,7 +20,6 @@ import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUploadUtils;
-import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.common.utils.file.MimeTypeUtils;
 import com.ruoyi.framework.web.service.TokenService;
 import com.ruoyi.system.service.ISysUserService;
@@ -128,13 +126,20 @@ public class SysProfileController extends BaseController
         if (!file.isEmpty())
         {
             LoginUser loginUser = getLoginUser();
-            String avatar = FileUploadUtils.upload(RuoYiConfig.getAvatarPath(), file, MimeTypeUtils.IMAGE_EXTENSION, true);
+            // 与小程序会员头像同一个 bug：原先用 FileUploadUtils.upload 落本机磁盘，
+            // 生产 nginx 没配 /profile/ 的 alias，GET /profile/avatar/xxx.jpg 被
+            // location / 的 try_files 兜底成首页（200 + text/html），图片永远打不开。
+            // 统一改走对象存储适配器，type=oss 时落 OSS 返回 https 绝对地址。
+            String avatar = FileUploadUtils.uploadByStorage("avatar", file, MimeTypeUtils.IMAGE_EXTENSION, true);
             if (userService.updateUserAvatar(loginUser.getUserId(), avatar))
             {
                 String oldAvatar = loginUser.getUser().getAvatar();
                 if (StringUtils.isNotEmpty(oldAvatar))
                 {
-                    FileUtils.deleteFile(RuoYiConfig.getProfile() + FileUtils.stripPrefix(oldAvatar));
+                    // 不能再用 FileUtils.deleteFile(RuoYiConfig.getProfile() + ...)：
+                    // 切 OSS 后文件不在本机磁盘上，那句话删的是一个不存在的路径（静默失效），
+                    // 且旧对象会永久留在 bucket 里。改走适配器按 URL 反查 key 删除。
+                    FileUploadUtils.deleteByStorage(oldAvatar);
                 }
                 AjaxResult ajax = AjaxResult.success();
                 ajax.put("imgUrl", avatar);

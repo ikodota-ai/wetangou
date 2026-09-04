@@ -55,6 +55,7 @@
 
 <script>
 import store from "@/store"
+import { isHttp } from "@/utils/validate"
 import { VueCropper } from "vue-cropper"
 import { uploadAvatar } from "@/api/system/user"
 import { debounce } from '@/utils'
@@ -137,7 +138,11 @@ export default {
         formData.append("avatarfile", data, this.options.filename)
         uploadAvatar(formData).then(response => {
           this.open = false
-          this.options.img = process.env.VUE_APP_BASE_API + response.imgUrl
+          // 后端切对象存储后 imgUrl 可能已是 OSS 的 https 绝对地址，
+          // 再拼 VUE_APP_BASE_API 会得到 /prod-api/https://... 这种废地址（预览空白）。
+          this.options.img = isHttp(response.imgUrl)
+            ? response.imgUrl
+            : process.env.VUE_APP_BASE_API + response.imgUrl
           store.commit('SET_AVATAR', this.options.img)
           this.$modal.msgSuccess("修改成功")
           this.visible = false
