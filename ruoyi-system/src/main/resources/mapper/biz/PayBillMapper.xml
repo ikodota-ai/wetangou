@@ -134,6 +134,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where bill_id = #{billId}
     </update>
 
+    <!-- 取消买单时把券引用清掉：updatePayBill 的 <if test="memberVoucherId != null">
+         会跳过 null，置空必须走这条显式 update（与 OrderMapper.clearVoucher 同理）。 -->
+    <update id="clearVoucher">
+        update biz_pay_bill set member_voucher_id = null, update_time = sysdate()
+        where bill_id = #{billId}
+    </update>
+
     <delete id="deletePayBillByBillId" parameterType="Long">
         delete from biz_pay_bill where bill_id = #{billId}
     </delete>

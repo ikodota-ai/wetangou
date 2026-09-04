@@ -114,6 +114,31 @@ Page({
     if (!o || o.status !== '0') return;
     payOrder(o.orderId, () => this.load());
   },
+  // 取消待支付订单。原先全端没有这个动作，于是用券下了单又不付的用户
+  // 会被卡死：那张券被后端 assertNotHeld 判为「已用于另一笔待支付订单」，
+  // 提示让他去取消，而取消入口根本不存在。
+  onCancel() {
+    const o = this.data.order;
+    if (!o || o.status !== '0') return;
+    wx.showModal({
+      title: '取消订单',
+      content: '取消后订单不可恢复，已抵扣的优惠券会退回。确定取消？',
+      confirmText: '取消订单',
+      cancelText: '再想想',
+      success: (r) => {
+        if (!r.confirm) return;
+        wx.showLoading({ title: '处理中', mask: true });
+        api.cancelOrder(o.orderId).then(() => {
+          wx.hideLoading();
+          wx.showToast({ title: '已取消', icon: 'success' });
+          this.load();
+        }).catch((e) => {
+          wx.hideLoading();
+          wx.showToast({ title: (e && e.msg) || '取消失败', icon: 'none' });
+        });
+      }
+    });
+  },
   // 我的未使用券。可用性按订单「商品总价」算 —— 和下单页、后端
   // VoucherUsageService 保持同一个基准（后端是拿 total_amount 比门槛的）
   loadVouchers() {

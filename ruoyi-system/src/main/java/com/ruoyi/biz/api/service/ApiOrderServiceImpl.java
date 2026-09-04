@@ -234,6 +234,57 @@ public class ApiOrderServiceImpl implements IApiOrderService
     }
 
     /**
+     * 取消待支付订单
+     *
+     * <p>为什么必须有这个能力：{@code VoucherUsageService.assertNotHeld} 判定
+     * 一张券是否被占用，看的是 {@code biz_order.status in ('0','1','2')} —— 待支付
+     * 也算占用（这是对的，否则同一张券能在 N 个待付单里各抵一次）。但小程序端
+     * 压根没有取消订单的入口，于是用户一旦下了个待付单又不付，那张券就被永久
+     * 锁死，之后每次用券都弹「该代金券已用于另一笔待支付订单，请先完成或取消
+     * 那笔订单」——而「取消那笔」这个动作在产品里根本不存在，属于死锁。</p>
+     *
+     * <p>状态置 '3'（已取消，与 order/list 的 tab 映射一致）并清掉
+     * member_voucher_id：清字段是关键，只改 status 的话 assertNotHeld 的
+     * status 条件虽然不再命中，但库里仍留着一条指向该券的脏引用，
+     * 日后若有人放宽那个 status 集合就会再次踩雷。</p>
+     *
+     * <p>只允许取消 status='0'：已支付（'1'）要走退款流程，不能简单置取消，
+     * 否则用户付了钱订单却变成已取消，钱和货都没了。</p>
+     */
+    @Transactional
+    public Order cancel(Long memberId, Long orderId)
+    {
+        Order order = orderService.selectOrderByOrderId(orderId);
+        if (order == null)
+        {
+            throw new ServiceException("订单不存在");
+        }
+        if (order.getMemberId() == null || !order.getMemberId().equals(memberId))
+        {
+            throw new ServiceException("无权取消他人订单");
+        }
+        if ("3".equals(order.getStatus()))
+        {
+            // 幂等：重复点「取消」不该报错（弱网下用户会连点）
+            return order;
+        }
+        if (!"0".equals(order.getStatus()))
+        {
+            throw new ServiceException("仅待支付订单可以取消");
+        }
+
+        Order patch = new Order();
+        patch.setOrderId(orderId);
+        patch.setStatus("3");
+        orderService.updateOrder(patch);
+        // 释放券占用：updateOrder 的 <if test="memberVoucherId != null"> 会跳过 null，
+        // 所以置空必须走这条显式 update（changeVoucher 里同样的处理）
+        orderMapper.clearVoucher(orderId);
+        log.info("[order] cancel orderId={} memberId={} 释放券占用", orderId, memberId);
+        return orderService.selectOrderByOrderId(orderId);
+    }
+
+    /**
      * 模拟支付成功回调：置为待使用，生成核销码、计算有效期，冻结代金券，触发佣金
      */
     @Transactional

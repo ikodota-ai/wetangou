@@ -92,7 +92,10 @@
       <text class="pb-lab">实付</text>
       <text class="pb-num">¥{{order.payAmount}}</text>
     </view>
-    <view class="pb-btn" bindtap="onPay">去支付</view>
+    <view class="pb-acts">
+      <view class="pb-cancel" bindtap="onCancel">取消订单</view>
+      <view class="pb-btn" bindtap="onPay">去支付</view>
+    </view>
   </view>
 </view>
 <view class="empty" wx:elif="{{!loading}}">

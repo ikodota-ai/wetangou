@@ -126,6 +126,15 @@
   background: #b4d4be;
   color: #fff;
 }
+/* 取消入口做成弱化文字链：既要让不想付的用户能退出（否则券被永久锁），
+   又不能抢「去支付」的视觉主次 */
+.cancel-link {
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #999;
+  padding: 8rpx 0;
+}
 
 
 /* 支付完成态 */

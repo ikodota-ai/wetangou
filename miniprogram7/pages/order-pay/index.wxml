@@ -65,11 +65,12 @@
   </view>
 
   <!-- 占位，避免底部按钮挡住内容 -->
-  <view style="height: 200rpx;"></view>
+  <view style="height: 280rpx;"></view>
 
   <!-- 底部固定去支付 -->
   <view class="footer">
     <button class="pay-btn" bindtap="onConfirmPay" loading="{{paying}}" disabled="{{paying}}">去支付</button>
+    <view class="cancel-link" bindtap="onCancelPay" wx:if="{{!paying}}">不想付了，取消本单</view>
   </view>
 
   <!-- 选券弹窗：与下单页 pages/order/submit、详情页 pages/order/detail 保持同一交互 -->

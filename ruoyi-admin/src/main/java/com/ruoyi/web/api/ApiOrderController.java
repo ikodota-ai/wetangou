@@ -93,6 +93,21 @@ public class ApiOrderController
     }
 
     /**
+     * 取消待支付订单。
+     *
+     * <p>这个端点原先不存在，导致一个死锁：用户下了待付单又不付，
+     * 那张代金券就被 {@code assertNotHeld} 永久判为占用，之后每次用券都提示
+     * 「请先完成或取消那笔订单」—— 而「取消」这个动作在产品里根本没有入口。</p>
+     */
+    @LoginRequired
+    @PostMapping("/{orderId}/cancel")
+    public AjaxResult cancel(@PathVariable Long orderId)
+    {
+        Order order = apiOrderService.cancel(MemberContextHolder.getMemberId(), orderId);
+        return AjaxResult.success(order);
+    }
+
+    /**
      * 发起支付：返回小程序 wx.requestPayment 参数。
      * mock模式（未配齐微信支付凭证）直接置为支付成功并返回 mock=true。
      */

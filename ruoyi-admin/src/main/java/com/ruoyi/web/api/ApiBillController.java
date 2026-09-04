@@ -3,6 +3,8 @@ package com.ruoyi.web.api;
 import java.math.BigDecimal;
 import java.util.Date;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +26,7 @@ import com.ruoyi.biz.domain.PayBill;
 import com.ruoyi.biz.domain.MemberVoucher;
 import com.ruoyi.biz.domain.Store;
 import com.ruoyi.biz.service.IPayBillService;
+import com.ruoyi.biz.mapper.PayBillMapper;
 import com.ruoyi.biz.service.IMemberService;
 import com.ruoyi.biz.service.IMemberVoucherService;
 import com.ruoyi.biz.service.IStoreService;
@@ -48,6 +51,8 @@ import com.ruoyi.biz.service.IStoreService;
 @RequestMapping("/api/bill")
 public class ApiBillController
 {
+    private static final Logger log = LoggerFactory.getLogger(ApiBillController.class);
+
     @Autowired
     private IPayBillService payBillService;
 
@@ -65,6 +70,9 @@ public class ApiBillController
 
     @Autowired
     private IStoreService storeService;
+
+    @Autowired
+    private PayBillMapper payBillMapper;
 
     /**
      * 会员发起买单：填写消费金额，可选代金券
@@ -154,6 +162,48 @@ public class ApiBillController
             throw new ServiceException("无权查看他人账单");
         }
         return AjaxResult.success(bill);
+    }
+
+    /**
+     * 取消待支付/待确认买单，释放券占用。
+     *
+     * <p>买单支持两种状态取消：{@code '0'}（待确认）和 {@code '1'}（待支付）。
+     * 已完成的买单（{@code '2'}）不可取消，退货走退款流程。</p>
+     *
+     * <p>清 member_voucher_id 是关键：不清的话 {@code assertNotHeld} 仍判该券被占用，
+     * 用户就算取消了买单，手里的券也还是废的。</p>
+     */
+    @LoginRequired
+    @PostMapping("/{billId}/cancel")
+    @Transactional
+    public AjaxResult cancel(@PathVariable Long billId)
+    {
+        Long memberId = MemberContextHolder.getMemberId();
+        PayBill bill = payBillService.selectPayBillByBillId(billId);
+        if (bill == null)
+        {
+            throw new ServiceException("买单不存在");
+        }
+        if (bill.getMemberId() == null || !bill.getMemberId().equals(memberId))
+        {
+            throw new ServiceException("无权取消他人买单");
+        }
+        if ("3".equals(bill.getStatus()))
+        {
+            // 幂等
+            return AjaxResult.success(bill);
+        }
+        if (!"0".equals(bill.getStatus()) && !"1".equals(bill.getStatus()))
+        {
+            throw new ServiceException("仅待确认或待支付的买单可以取消");
+        }
+        PayBill patch = new PayBill();
+        patch.setBillId(billId);
+        patch.setStatus("3");
+        payBillService.updatePayBill(patch);
+        payBillMapper.clearVoucher(billId);
+        log.info("[bill] cancel billId={} memberId={} 释放券占用", billId, memberId);
+        return AjaxResult.success(payBillService.selectPayBillByBillId(billId));
     }
 
     /**

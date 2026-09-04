@@ -223,6 +223,43 @@ Page({
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
   },
 
+  /**
+   * 取消本单（订单或买单），释放代金券占用。
+   *
+   * <p>本页是券被锁死的主要现场：买单建单后是 redirectTo 到这里的，
+   * 前一页已销毁，用户不想付时只能退到更早的页面，那笔待付单和它抵的券
+   * 就一直挂着 —— 后端 assertNotHeld 判 status in ('0','1','2') 为占用，
+   * 于是这张券再也用不了，提示「请先完成或取消那笔」而取消入口不存在。</p>
+   */
+  onCancelPay() {
+    const isBill = this.data.type === 'bill'
+    wx.showModal({
+      title: isBill ? '取消买单' : '取消订单',
+      content: '取消后不可恢复，已抵扣的优惠券会退回。确定取消？',
+      confirmText: '确定取消',
+      cancelText: '继续支付',
+      success: (r) => {
+        if (!r.confirm) return
+        wx.showLoading({ title: '处理中', mask: true })
+        const req = isBill ? api.cancelBill(this.data.orderId) : api.cancelOrder(this.data.orderId)
+        req.then(() => {
+          wx.hideLoading()
+          wx.showToast({ title: '已取消', icon: 'success' })
+          setTimeout(() => {
+            if (isBill) {
+              wx.switchTab({ url: '/pages/home/index' })
+            } else {
+              wx.redirectTo({ url: '/pages/order/list/index' })
+            }
+          }, 800)
+        }).catch((e) => {
+          wx.hideLoading()
+          wx.showToast({ title: (e && e.msg) || '取消失败', icon: 'none' })
+        })
+      }
+    })
+  },
+
   onPickWxPay() {
     // 当前仅支持微信支付，留作未来扩展
   },

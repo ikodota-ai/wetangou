@@ -39,8 +39,13 @@
 .pb-sum { display: flex; align-items: baseline; gap: 8rpx; }
 .pb-lab { font-size: 26rpx; color: #999; }
 .pb-num { font-size: 36rpx; font-weight: 700; color: var(--color-primary); }
+.pb-acts { display: flex; align-items: center; gap: 16rpx; }
+.pb-cancel {
+  padding: 16rpx 36rpx; border-radius: 999rpx; font-size: 28rpx;
+  border: 1rpx solid #DDD; color: #666; background: #FFF;
+}
 .pb-btn {
-  padding: 18rpx 64rpx; border-radius: 999rpx; font-size: 30rpx; font-weight: 600;
+  padding: 18rpx 56rpx; border-radius: 999rpx; font-size: 30rpx; font-weight: 600;
   background: var(--color-primary); color: #FFF;
 }
 

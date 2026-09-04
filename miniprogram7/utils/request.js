@@ -259,6 +259,7 @@ const api = {
   payOrder: (id) => request(`/api/order/pay/${id}`, { method: 'POST' }),
   orderList: (params) => request('/api/order/list', { data: params }),
   orderDetail: (id) => request(`/api/order/${id}`),
+  cancelOrder: (id) => request(`/api/order/${id}/cancel`, { method: 'POST' }),
   // 按商户订单号查（微信支付「商品订单详情path」跳回来时只有 order_no）
   orderDetailByNo: (no) => request(`/api/order/no/${no}`),
   // 待支付订单换券：memberVoucherId 传 null = 取消用券。
@@ -342,6 +343,7 @@ const api = {
   confirmBill: (id) => request(`/api/bill/confirm/${id}`, { method: 'POST' }),
   billPrepay: (id) => request(`/api/bill/prepay/${id}`, { method: 'POST' }),
   payBill: (id) => request(`/api/bill/pay/${id}`, { method: 'POST' }),
+  cancelBill: (id) => request(`/api/bill/${id}/cancel`, { method: 'POST' }),
   // 代金券
   voucherList: (params) => request('/api/voucher/list', { data: params }),
   receiveVoucher: (id) => request(`/api/voucher/receive/${id}`, { method: 'POST' }),

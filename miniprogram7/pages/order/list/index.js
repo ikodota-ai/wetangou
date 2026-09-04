@@ -89,5 +89,28 @@ Page({
   },
   continuePay(orderId) {
     payOrder(orderId, () => this.loadList());
+  },
+  // 同 onPay 用 catchtap。取消入口原先全端都没有，用券下的待付单会把券锁死
+  onCancel(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    wx.showModal({
+      title: '取消订单',
+      content: '取消后订单不可恢复，已抵扣的优惠券会退回。确定取消？',
+      confirmText: '取消订单',
+      cancelText: '再想想',
+      success: (r) => {
+        if (!r.confirm) return;
+        wx.showLoading({ title: '处理中', mask: true });
+        api.cancelOrder(id).then(() => {
+          wx.hideLoading();
+          wx.showToast({ title: '已取消', icon: 'success' });
+          this.loadList();
+        }).catch((err) => {
+          wx.hideLoading();
+          wx.showToast({ title: (err && err.msg) || '取消失败', icon: 'none' });
+        });
+      }
+    });
   }
 });

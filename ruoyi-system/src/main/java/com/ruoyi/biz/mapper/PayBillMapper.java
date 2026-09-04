@@ -69,6 +69,14 @@ public interface PayBillMapper
     public int updatePayBill(PayBill payBill);
 
     /**
+     * 清掉买单上的会员券引用（取消买单时释放券占用）。
+     *
+     * @param billId 买单主键
+     * @return 结果
+     */
+    public int clearVoucher(@Param("billId") Long billId);
+
+    /**
      * 删除买单流水
      * 
      * @param billId 买单流水主键
