@@ -387,7 +387,20 @@ public class ApiAuthController
      */
     private LoginMember buildStaffLoginMember(SysUser user, List<MerchantStaff> links)
     {
-        return StaffLoginMemberBuilder.build(user, links, "merchant", null, this::storeIdsOfMerchant);
+        return StaffLoginMemberBuilder.build(user, links, "merchant", null,
+                this::storeIdsOfMerchant, this::merchantIdOfStore);
+    }
+
+    /**
+     * 查门店当前所属商户（剔除「关联声明商户 A、门店已转给商户 B」的脏关联，
+     * 详见 StaffLoginMemberBuilder 里的说明）。
+     */
+    private Long merchantIdOfStore(Long storeId)
+    {
+        if (storeId == null) return null;
+        com.ruoyi.biz.domain.Store st = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> storeService.selectStoreByStoreId(storeId));
+        return st == null ? null : st.getMerchantId();
     }
 
     /** 查商户下全部门店 ID（把 biz_merchant_staff.store_id=0 展开成真实门店范围） */

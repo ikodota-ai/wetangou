@@ -153,6 +153,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <update id="updateStore" parameterType="Store">
         update biz_store
         <trim prefix="SET" suffixOverrides=",">
+            <!-- merchant_id 必须可更新：StoreController.edit 里那两道
+                 TenantFilterHelper.assertDataScope（「有没有权限动这家门店」+「改完的归属是否
+                 仍在权限范围内」）就是为门店转移归属写的，但这里漏了这一列，于是那段校验一直
+                 在空转 —— 平台账号在后台改「所属商户」返回「操作成功」，库里却纹丝不动，
+                 和 sys_user.merchant_id 是同一类「表单能填、update 语句没这列」的哑操作。
+                 转移前的完整性检查见 StoreServiceImpl.assertTransferable：
+                 门店身上还挂着在职员工或商品时会被拦下，不会因为放开这一列而产生跨商户脏数据。 -->
+            <if test="merchantId != null">merchant_id = #{merchantId},</if>
             <if test="storeName != null and storeName != ''">store_name = #{storeName},</if>
             <if test="logo != null">logo = #{logo},</if>
             <if test="province != null">province = #{province},</if>

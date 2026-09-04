@@ -700,7 +700,21 @@ public class ApiMerchantStaffController
         return StaffLoginMemberBuilder.build(user, links, userType, uid -> {
             Agent agent = agentService.selectAgentByUserId(uid);
             return agent == null ? null : agent.getAgentId();
-        }, this::storeIdsOfMerchant);
+        }, this::storeIdsOfMerchant, this::merchantIdOfStore);
+    }
+
+    /**
+     * 查门店当前所属商户（用于剔除「关联声明商户 A、门店已转给商户 B」的脏关联）。
+     *
+     * <p>同样要 ignoreTenant：这是身份解析阶段的归属核对，不能被 appid 兜底出来的
+     * 租户上下文限制成只看默认商户 1 —— 否则商户 200 的门店会被当成「不存在」而剔掉。</p>
+     */
+    private Long merchantIdOfStore(Long storeId)
+    {
+        if (storeId == null) return null;
+        Store st = com.ruoyi.common.utils.TenantContextHolder.ignoreTenant(
+                () -> storeService.selectStoreByStoreId(storeId));
+        return st == null ? null : st.getMerchantId();
     }
 
     /** 查商户下全部启用门店 ID（用于把 store_id=0 展开成真实门店范围） */
