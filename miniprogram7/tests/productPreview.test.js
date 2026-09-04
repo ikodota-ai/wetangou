@@ -234,3 +234,47 @@ describe('副标题', () => {
     expect(p.subtitle).toBe('')
   })
 })
+
+// 预览的全部价值就在「商家看到的 == 顾客将看到的」，
+// 所以任何会员端详情页读的字段，预览都必须摆成同构形状。
+// 组合券包明细就是一例：它不在子品表而在 ext.comboItemsJson，
+// 漏了就会 COMBO 预览没明细、顾客那边却有。
+describe('组合券包明细预览同构', () => {
+  const ITEMS = JSON.stringify([
+    { name: '火锅双人餐', subitemType: 'GROUPON', pickQuantity: 1, price: 99 },
+    { name: '50元代金券', subitemType: 'VOUCHER', pickQuantity: 2, price: 50 }
+  ])
+
+  it('草稿带了 comboItemsJson → 摆到 ext.comboItemsJson（会员端读的就是这个路径）', () => {
+    const p = draftToProduct(draft('COMBO', { productName: '券包' }, { comboItemsJson: ITEMS }))
+    expect(p.ext).toBeTruthy()
+    expect(p.ext.comboItemsJson).toBe(ITEMS)
+  })
+
+  it('没带也必须有 ext 对象（会员端 parseComboItems 读 p.ext.comboItemsJson，不能因为 undefined 报错）', () => {
+    const p = draftToProduct(draft('COMBO', { productName: '券包' }))
+    expect(p.ext).toBeTruthy()
+    expect(p.ext.comboItemsJson).toBe('')
+  })
+
+  it('预览路径与会员端真实路径算出完全相同的明细（同一个 parseComboItems）', () => {
+    const { parseComboItems } = require('../utils/comboItems.js')
+    const p = draftToProduct(draft('COMBO', { productName: '券包' }, { comboItemsJson: ITEMS }))
+    const fromPreview = parseComboItems(p)
+    // 会员端真实形状：后端 /api/product/{id} 的 data.ext.comboItemsJson
+    const fromServer = parseComboItems({ ext: { comboItemsJson: ITEMS } })
+    expect(fromPreview).toEqual(fromServer)
+    expect(fromPreview.length).toBe(2)
+    expect(fromPreview[1].typeText).toBe('代金券')
+    expect(fromPreview[1].subtotal).toBe('100.00')
+  })
+
+  it('子品组也要能透传（团购套餐的「几选几」预览靠它）', () => {
+    const groups = [{ groupId: 1, groupName: '主菜', pickRule: 'PICK_2', subitems: [{ subitemId: 1 }, { subitemId: 2 }, { subitemId: 3 }] }]
+    const p = draftToProduct(draft('GROUPON', { productName: '套餐' }, { subitemGroups: groups }))
+    expect(p.subitemGroups.length).toBe(1)
+    expect(p.subitemGroups[0].pickRule).toBe('PICK_2')
+    const { customerPickText } = require('../utils/pickRule.js')
+    expect(customerPickText(p.subitemGroups[0])).toBe('3选2')
+  })
+})
