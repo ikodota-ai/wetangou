@@ -13,6 +13,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,8 @@ import com.ruoyi.system.service.ISysConfigService;
 @Service
 public class BookingServiceImpl implements IBookingService
 {
+    private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
+
     @Autowired
     private BookingMapper bookingMapper;
 
@@ -675,5 +679,25 @@ public class BookingServiceImpl implements IBookingService
         {
             throw new com.ruoyi.common.exception.ServiceException("预约日期格式应为 yyyy-MM-dd");
         }
+    }
+
+    /**
+     * 关闭过期场次 + 取消其下报名。
+     *
+     * <p>顺序不能反：cancelOverdueBookingMembers 的 SQL 里带
+     * {@code b.status = '0'} 条件，一旦先把场次改成 '3'，那条 update
+     * 就一条也匹配不到，报名会被永久留在「已报名」。</p>
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int[] closeOverdueBookings()
+    {
+        int members = bookingMapper.cancelOverdueBookingMembers();
+        int bookings = bookingMapper.closeOverdueBookings();
+        if (bookings > 0 || members > 0)
+        {
+            log.info("[booking] 过期场次自动关闭 bookings={} members={}", bookings, members);
+        }
+        return new int[] { bookings, members };
     }
 }

@@ -117,6 +117,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where booking_id = #{bookingId}
     </update>
 
+    <!-- 过期场次关闭。比较用 booking_date（date 类型）< curdate()：当天的场次
+         不能关，晚上的时段白天还能约。 -->
+    <update id="closeOverdueBookings">
+        update biz_booking
+        set status = '3', update_time = sysdate()
+        where status = '0' and booking_date &lt; curdate()
+    </update>
+
+    <!-- 过期场次下的报名一并取消（biz_booking_member.status '1' = 已取消，
+         与后台 bookingmember 页 "已报名/已取消" 二值口径一致）。
+         必须在 closeOverdueBookings 之前调用，否则场次已被置 '3'，
+         这里的 b.status='0' 关联条件就一条都命中不了。 -->
+    <update id="cancelOverdueBookingMembers">
+        update biz_booking_member bm
+        join biz_booking b on b.booking_id = bm.booking_id
+        set bm.status = '1', bm.update_time = sysdate()
+        where bm.status = '0' and b.status = '0' and b.booking_date &lt; curdate()
+    </update>
+
     <delete id="deleteBookingByBookingId" parameterType="Long">
         delete from biz_booking where booking_id = #{bookingId}
     </delete>

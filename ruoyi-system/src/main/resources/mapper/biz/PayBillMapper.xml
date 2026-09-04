@@ -136,6 +136,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <!-- 取消买单时把券引用清掉：updatePayBill 的 <if test="memberVoucherId != null">
          会跳过 null，置空必须走这条显式 update（与 OrderMapper.clearVoucher 同理）。 -->
+    <select id="selectTimeoutPendingIds" resultType="java.lang.Long">
+        select bill_id from biz_pay_bill
+        where status in ('0', '1')
+          and create_time is not null
+          and create_time &lt; date_sub(now(), interval #{minutes} minute)
+        order by bill_id
+    </select>
+
     <update id="clearVoucher">
         update biz_pay_bill set member_voucher_id = null, update_time = sysdate()
         where bill_id = #{billId}

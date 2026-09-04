@@ -230,6 +230,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where order_id = #{orderId}
     </update>
 
+    <!-- 超时未支付订单。用 create_time 而不是 expire_time：expire_time 是
+         核销有效期（paySuccess 时才写入），待支付单那一列是 NULL。 -->
+    <select id="selectTimeoutUnpaidIds" resultType="java.lang.Long">
+        select order_id from biz_order
+        where status = '0'
+          and create_time is not null
+          and create_time &lt; date_sub(now(), interval #{minutes} minute)
+        order by order_id
+    </select>
+
     <delete id="deleteOrderByOrderId" parameterType="Long">
         delete from biz_order where order_id = #{orderId}
     </delete>

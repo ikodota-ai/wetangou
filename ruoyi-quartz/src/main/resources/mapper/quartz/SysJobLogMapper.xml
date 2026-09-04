@@ -70,6 +70,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  	<update id="cleanJobLog">
         truncate table sys_job_log
     </update>
+
+    <!-- 按保留天数删。create_time is null 的历史脏数据一并清掉，
+         否则它们永远不满足时间条件、会一直堆在表里。 -->
+    <delete id="deleteJobLogBeforeDays">
+        delete from sys_job_log
+        where create_time is null
+           or create_time &lt; date_sub(now(), interval #{days} day)
+    </delete>
  	
  	<insert id="insertJobLog" parameterType="SysJobLog">
  		insert into sys_job_log(

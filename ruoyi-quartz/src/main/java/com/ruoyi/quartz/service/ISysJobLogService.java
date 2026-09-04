@@ -53,4 +53,12 @@ public interface ISysJobLogService
      * 清空任务日志
      */
     public void cleanJobLog();
+
+    /**
+     * 删除若干天以前的调度日志（定时任务用，保留近期失败堆栈便于排查）
+     *
+     * @param days 保留天数
+     * @return 删除行数
+     */
+    public int deleteJobLogBeforeDays(int days);
 }

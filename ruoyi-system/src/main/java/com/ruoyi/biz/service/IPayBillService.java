@@ -66,4 +66,15 @@ public interface IPayBillService
      * @return 结果
      */
     public int deletePayBillByBillId(Long billId);
+
+    /**
+     * 取消所有超时未完成的买单（待确认 / 待支付），并释放它们占用的代金券。
+     *
+     * <p>与订单同源问题：{@code assertNotHeld} 判买单占用看
+     * status in ('0','1')，用户在店里发起买单又走掉，券就被这张废单锁死。</p>
+     *
+     * @param minutes 发起后多少分钟未完成算超时
+     * @return 取消的买单数
+     */
+    public int cancelTimeoutPending(int minutes);
 }

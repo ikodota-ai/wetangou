@@ -72,4 +72,19 @@ public interface IOrderService
      * @return 结果
      */
     public int deleteOrderByOrderId(Long orderId);
+
+    /**
+     * 取消所有超时未支付的订单，并释放它们占用的代金券。
+     *
+     * <p>为什么必须自动做：{@code VoucherUsageService.assertNotHeld} 把
+     * status='0'（待支付）也算券被占用 —— 这是对的，否则一张券能在 N 个
+     * 待付单里各抵一次。但用户下单不付时，那张券就一直锁着，会员端每次用券
+     * 都弹「已用于另一笔待支付订单」。现在虽然有手动取消入口（{@code POST
+     * /api/order/&#123;orderId&#125;/cancel}），但没人会为了解锁一张券去翻半年前的
+     * 待付单，只能靠定时任务兜。</p>
+     *
+     * @param minutes 下单后多少分钟未支付算超时
+     * @return 取消的订单数
+     */
+    public int cancelTimeoutUnpaid(int minutes);
 }

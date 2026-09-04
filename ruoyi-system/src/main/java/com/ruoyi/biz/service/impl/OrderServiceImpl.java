@@ -2,8 +2,11 @@ package com.ruoyi.biz.service.impl;
 
 import java.util.List;
 import com.ruoyi.common.utils.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.biz.mapper.OrderMapper;
 import com.ruoyi.biz.domain.Order;
 import com.ruoyi.biz.service.IOrderService;
@@ -17,6 +20,8 @@ import com.ruoyi.biz.service.IOrderService;
 @Service
 public class OrderServiceImpl implements IOrderService 
 {
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
+
     @Autowired
     private OrderMapper orderMapper;
 
@@ -104,5 +109,36 @@ public class OrderServiceImpl implements IOrderService
     public int deleteOrderByOrderId(Long orderId)
     {
         return orderMapper.deleteOrderByOrderId(orderId);
+    }
+
+    /**
+     * 取消超时未支付订单。与 {@code ApiOrderServiceImpl.cancel} 同一套动作
+     * （status 置 '3' + clearVoucher），差别只在这里没有 memberId 归属校验
+     * —— 定时任务不代表任何会员。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int cancelTimeoutUnpaid(int minutes)
+    {
+        List<Long> ids = orderMapper.selectTimeoutUnpaidIds(minutes);
+        int cancelled = 0;
+        for (Long orderId : ids)
+        {
+            Order patch = new Order();
+            patch.setOrderId(orderId);
+            patch.setStatus("3");
+            patch.setUpdateTime(DateUtils.getNowDate());
+            orderMapper.updateOrder(patch);
+            // updateOrder 的 <if test="memberVoucherId != null"> 会跳过 null，
+            // 置空必须走这条显式 update（与手动取消一致）
+            orderMapper.clearVoucher(orderId);
+            cancelled++;
+        }
+        if (cancelled > 0)
+        {
+            log.info("[order] 超时自动取消 count={} minutes={} ids={}", cancelled, minutes,
+                    ids.size() > 20 ? ids.subList(0, 20) + "...(共" + ids.size() + ")" : ids);
+        }
+        return cancelled;
     }
 }

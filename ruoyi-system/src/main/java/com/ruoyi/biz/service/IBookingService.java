@@ -97,4 +97,15 @@ public interface IBookingService
      * @param timeSlot 时段，"10:00" 或 "10:00-11:00"
      */
     public void assertSlotBookable(Long storeId, String date, String timeSlot);
+
+    /**
+     * 关闭预约日期已过去、状态却还停在「开放中」的场次，并把这些场次下
+     * 仍是「已报名」的报名记录一并置为已取消。
+     *
+     * <p>门店不会回头去手工关场次，于是后台预约列表筛「开放中」会混进一堆
+     * 历史日期的场次，会员「我的预约」里去年的那条也永远显示「待确认」。</p>
+     *
+     * @return 下标 0 = 关闭的场次数，下标 1 = 取消的报名数
+     */
+    public int[] closeOverdueBookings();
 }

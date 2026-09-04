@@ -100,6 +100,20 @@ public interface OrderMapper
     public int clearVoucher(@Param("orderId") Long orderId);
 
     /**
+     * 查出所有已超时未支付的订单主键（定时任务用）。
+     *
+     * <p>为什么要先查 id 再逐个改，而不是一条 update 批量置取消：取消动作有两步
+     * ——status 置 '3' 和 member_voucher_id 置 NULL —— 而后者必须逐单
+     * {@link #clearVoucher(Long)}，同时日志要能落到单号级别便于对账。
+     * 待处理量是分钟级增量（每 5 分钟一批），逐单开销可以忽略。</p>
+     *
+     * @param minutes 下单后多少分钟未支付算超时
+     * @return 待取消的订单主键集合
+     */
+    @IgnoreTenant
+    public List<Long> selectTimeoutUnpaidIds(@Param("minutes") int minutes);
+
+    /**
      * 删除订单
      * 
      * @param orderId 订单主键

@@ -84,4 +84,16 @@ public class SysJobLogServiceImpl implements ISysJobLogService
     {
         jobLogMapper.cleanJobLog();
     }
+
+    /**
+     * 删除若干天以前的调度日志
+     *
+     * @param days 保留天数
+     * @return 删除行数
+     */
+    @Override
+    public int deleteJobLogBeforeDays(int days)
+    {
+        return jobLogMapper.deleteJobLogBeforeDays(days);
+    }
 }

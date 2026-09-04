@@ -77,6 +77,7 @@ biz_merchant_promoter_enabled_20260903
 booking_remove_type_v11
 wx_miniapp_env_version_20260903
 biz_withdraw_rule_20260903
+biz_quartz_jobs_20260904
 """.split()
 
 DEMO = """

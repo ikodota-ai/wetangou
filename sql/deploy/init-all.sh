@@ -135,6 +135,7 @@ run biz_merchant_promoter_enabled_20260903  # 商户级推客总开关（关掉�
 run booking_remove_type_v11             # 移除 booking_type 列，预约模型统一到 BOOKING 商品
 run wx_miniapp_env_version_20260903        # 小程序码指向版本（未发布必须 trial，否则邀请码报 40066 invalid url）
 run biz_withdraw_rule_20260903       # 提现规则（起提额/每日次数/受理时段/到账时效，微信审核要求提现页展示）
+run biz_quartz_jobs_20260904         # 4 个业务定时任务（超时单取消/过期预约关闭/邀请码失效/日志清理）+ 修佣金结算 Cron 每30秒的调试值
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

@@ -2,8 +2,11 @@ package com.ruoyi.biz.service.impl;
 
 import java.util.List;
 import com.ruoyi.common.utils.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.biz.mapper.PayBillMapper;
 import com.ruoyi.biz.domain.PayBill;
 import com.ruoyi.biz.service.IPayBillService;
@@ -17,6 +20,8 @@ import com.ruoyi.biz.service.IPayBillService;
 @Service
 public class PayBillServiceImpl implements IPayBillService 
 {
+    private static final Logger log = LoggerFactory.getLogger(PayBillServiceImpl.class);
+
     @Autowired
     private PayBillMapper payBillMapper;
 
@@ -98,5 +103,33 @@ public class PayBillServiceImpl implements IPayBillService
     public int deletePayBillByBillId(Long billId)
     {
         return payBillMapper.deletePayBillByBillId(billId);
+    }
+
+    /**
+     * 取消超时未完成买单。动作与 {@code ApiBillController.cancel} 一致
+     * （status 置 '3' + clearVoucher），只是不校验 memberId 归属。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int cancelTimeoutPending(int minutes)
+    {
+        List<Long> ids = payBillMapper.selectTimeoutPendingIds(minutes);
+        int cancelled = 0;
+        for (Long billId : ids)
+        {
+            PayBill patch = new PayBill();
+            patch.setBillId(billId);
+            patch.setStatus("3");
+            patch.setUpdateTime(DateUtils.getNowDate());
+            payBillMapper.updatePayBill(patch);
+            payBillMapper.clearVoucher(billId);
+            cancelled++;
+        }
+        if (cancelled > 0)
+        {
+            log.info("[bill] 超时自动取消 count={} minutes={} ids={}", cancelled, minutes,
+                    ids.size() > 20 ? ids.subList(0, 20) + "...(共" + ids.size() + ")" : ids);
+        }
+        return cancelled;
     }
 }

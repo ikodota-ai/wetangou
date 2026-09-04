@@ -77,6 +77,18 @@ public interface PayBillMapper
     public int clearVoucher(@Param("billId") Long billId);
 
     /**
+     * 查出所有已超时的待确认/待支付买单主键（定时任务用）。
+     *
+     * <p>status '0'（待确认）和 '1'（待支付）都要收：门店开了自动确认时买单直接落
+     * '1'，没开时停在 '0'，两种都可能被用户放弃而把券锁死。</p>
+     *
+     * @param minutes 发起后多少分钟未完成算超时
+     * @return 待取消的买单主键集合
+     */
+    @IgnoreTenant
+    public List<Long> selectTimeoutPendingIds(@Param("minutes") int minutes);
+
+    /**
      * 删除买单流水
      * 
      * @param billId 买单流水主键

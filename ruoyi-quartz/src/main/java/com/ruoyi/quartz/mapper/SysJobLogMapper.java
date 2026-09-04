@@ -1,6 +1,7 @@
 package com.ruoyi.quartz.mapper;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.quartz.domain.SysJobLog;
 
 /**
@@ -61,4 +62,15 @@ public interface SysJobLogMapper
      * 清空任务日志
      */
     public void cleanJobLog();
+
+    /**
+     * 删除若干天以前的调度日志。
+     *
+     * <p>为什么不用现成的 {@link #cleanJobLog()}：那个是 truncate table，
+     * 一刀切光，出问题时连最近几天的失败堆栈都没了没法排查。</p>
+     *
+     * @param days 保留天数，只删 create_time 早于 now - days 的记录
+     * @return 删除行数
+     */
+    public int deleteJobLogBeforeDays(@Param("days") int days);
 }
