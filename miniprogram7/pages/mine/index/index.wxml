@@ -57,6 +57,7 @@
         <text class="f-t">会员资料</text>
         <view class="arr"></view>
       </view>
+      <!-- 过审期间摘除推客入口（恢复时删掉本行与尾行注释标记）：
       <view class="func-item" wx:if="{{logged && promoterEnabled}}" bindtap="goPromoter">
         <view class="f-ic f-promoter">
           <text class="f-p-y">¥</text>
@@ -64,6 +65,7 @@
         <text class="f-t">推客中心</text>
         <view class="arr"></view>
       </view>
+      -->
       <view class="func-item" bindtap="{{logged ? 'goBookingList' : 'goLogin'}}">
         <view class="f-ic f-cal"></view>
         <text class="f-t {{logged ? '' : 'disabled'}}">我的预约</text>

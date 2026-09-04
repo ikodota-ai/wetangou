@@ -14,7 +14,7 @@ Page({
     businessHours: '',
     // 员工身份标识：true=当前是员工 token
     staffActive: false,
-    promoterEnabled: true,
+    promoterEnabled: false,
     // 是否可一键切到商家版（本地已有商家会话，或该微信绑过员工账号）
     canSwitchStaff: false,
     switchHint: ''
@@ -33,7 +33,7 @@ Page({
     this.setData({ staffActive: !!(staff && staff.userType === 'store') })
     this.refreshSwitchEntry()
     this.syncUser()
-    this.syncPromoterSwitch()
+    // 过审期间去掉了 syncPromoterSwitch()——推客功能已整体摘除
 
     // 已登录 + 资料不完整 + 未弹过提示 → 弹完善资料
     if (this.data.logged && !this.data.hasShowTip && !this.isProfileComplete()) {
@@ -78,9 +78,11 @@ Page({
    * 所以既在 onShow 读一次（热切 tab 时已有缓存），
    * 又实现这个广播钩子接 bootMerchant 回来的那一次（冷启动首屏）。
    */
+  /* 过审期间不再调 syncPromoterSwitch（推客已摘除、init 值=false）
   onMerchantUpdate() {
     this.syncPromoterSwitch()
   },
+  */
 
   /**
    * 推客总开关：后台「商户管理 → 编辑 → 推客功能」关掉后
@@ -90,12 +92,13 @@ Page({
    * （点进去后端 /api/distributor/* 仍会按真实状态拦），
    * 也不要让已开通商户的推客看到入口凭空消失。
    */
+  /* 过审期间摘除 (推客功能已整体移除，恢复时取消注释即可)
   syncPromoterSwitch() {
     const m = (app.globalData && app.globalData.merchant) || {}
     if (m.promoterEnabled === undefined || m.promoterEnabled === null) return
     const enabled = String(m.promoterEnabled) !== '0'
     if (enabled !== this.data.promoterEnabled) this.setData({ promoterEnabled: enabled })
-  },
+  */
 
   /**
    * 商家员工登录入口（「我的」页没有商家身份时显示的那一个）。
@@ -204,22 +207,23 @@ Page({
     wx.navigateTo({ url: `/pages/order/list/index?type=${e.currentTarget.dataset.type}` })
   },
 
+  /* 过审期间摘除 (推客功能已整体移除，恢复时取消注释并改回 goPromoter)
   goPromoter() {
     if (!this.data.logged) {
       wx.navigateTo({ url: '/pages/login/login' })
       return
     }
-    // 商户推客功能开关（后台「商户管理 → 编辑 → 推客功能」）：
-    // 关时 wxml 的 wx:if 已经把入口隐藏了，这里是兜底 ——
-    // 开关值来自 app.js bootMerchant，那是异步的：它没回来/失败时
-    // promoterEnabled 保持默认 true，入口仍会渲染出来，靠这个判断挡住；
-    // 也防止 setData 后用户抢在下一帧点中。
     const merchant = (app.globalData && app.globalData.merchant) || {}
     if (String(merchant.promoterEnabled) === '0') {
       wx.showModal({ title: '未开通', content: '该商家暂未开通推客功能', showCancel: false })
       return
     }
     wx.navigateTo({ url: '/pages/promoter/index/index' })
+  },
+  */
+  goPromoter() {
+    // 过审期间推客功能已摘除，入口不可见，此方法不应被调用
+    console.warn('[mine] promoter disabled for review')
   },
 
   goBookingList() {

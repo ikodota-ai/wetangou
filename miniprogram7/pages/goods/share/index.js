@@ -11,8 +11,8 @@ const { api, toFullUrl } = require('../../../utils/request.js');
  *   [0,720] - [600,900]   白色背景：左侧文案"长按识别 / 扫码购买"、右侧小程序码
  *
  * 因为不一定所有商户都配了小程序 appid + 太阳码，所以小程序码区域做兼容：
- *   - 走推客邀请接口能拿到 → 用真太阳码
- *   - 拿不到 → 退化为右下角画一个简化的"二维码占位 + 文字"（不再兜底 mock，仍提示「太阳码生成失败」）
+ *   - 过审期间推客已摘除，不再请求太阳码 → 一律走占位分支
+ *   - 占位：右下角画一个简化的"二维码占位 + 文字"（不兜底 mock）
  */
 const POSTER_W = 600;
 const POSTER_H = 900;
@@ -73,6 +73,14 @@ Page({
    * 调推客接口拿太阳码；若非推客或接口失败，qrcode 留空（海报右下角会显示「太阳码生成失败」）
    */
   _loadQrcode() {
+    // 推客功能过审期间已整体摘除，/api/distributor/qrcode 会被拦截器 403。
+    // 海报本身不依赖太阳码（_render 拿不到时会画占位圆 + “太阳码”字样），
+    // 所以直接跳过请求，避免每次开海报页都发一个必然 403 的请求。
+    // 恢复推客时取消下方注释即可。
+    this.qrcodeUrl = '';
+    this._render();
+    return Promise.resolve();
+    /*
     return api.promoterQrcode()
       .then((res) => {
         const url = (res && (res.url || (res.data && res.data.url))) || '';
@@ -83,6 +91,7 @@ Page({
         this.qrcodeUrl = '';
       })
       .finally(() => this._render());
+    */
   },
 
   /**

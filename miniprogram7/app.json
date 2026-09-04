@@ -19,10 +19,6 @@
     "pages/voucher/index/index",
     "pages/pay/index",
     "pages/order-pay/index",
-    "pages/promoter/index/index",
-    "pages/promoter/withdraw/index",
-    "pages/promoter/records/index",
-    "pages/promoter/poster/index",
     "pages/agreement/user/index",
     "pages/agreement/privacy/index",
     "pages/staff/login/index",
@@ -91,5 +87,6 @@
   ],
   "usingComponents": {},
   "sitemapLocation": "sitemap.json",
-  "style": "v2"
+  "style": "v2",
+  "_promoterRemoved": "过审后恢复：见 doc/推客功能恢复清单-2026-09-04.md"
 }
