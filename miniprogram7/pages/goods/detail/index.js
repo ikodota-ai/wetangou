@@ -147,6 +147,11 @@ Page({
       detail: fixRichText(p.detail)
     };
   },
+  // 顶部大图原先是单张静态 image，可 hero-page 已经在显示「1/3」这种页码 ——
+  // 页码存在但翻不动，用户以为图挂了。改 swiper 后 imgIdx 才真跟得上
+  onSwiperChange(e) {
+    this.setData({ imgIdx: e.detail.current });
+  },
   onRetry() { this.loadProduct(this.data.id); },
   onBack() { wx.switchTab({ url: '/pages/home/index', fail: () => wx.navigateBack({ delta: 1 }) }); },
   goDetail(e) { wx.redirectTo({ url: '/pages/goods/detail/index?id=' + e.currentTarget.dataset.id }); },

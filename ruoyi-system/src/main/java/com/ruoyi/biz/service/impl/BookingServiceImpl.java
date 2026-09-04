@@ -45,8 +45,14 @@ public class BookingServiceImpl implements IBookingService
     private StoreMapper storeMapper;
 
     @Autowired
+    private com.ruoyi.biz.mapper.ProductMapper productMapper;
+
+    @Autowired
     @Lazy
     private ISysConfigService sysConfigService;
+
+    /** 未挂商品时的预约项目名兜底 */
+    private static final String DEFAULT_ITEM_NAME = "在线预约";
 
     /** 参数key：单个时段可接受的预约人数上限 */
     private static final String KEY_SLOT_LIMIT = "biz.booking.slotLimit";
@@ -92,6 +98,7 @@ public class BookingServiceImpl implements IBookingService
     public int insertBooking(Booking booking)
     {
         booking.setCreateTime(DateUtils.getNowDate());
+        applyItemName(booking);
         return bookingMapper.insertBooking(booking);
     }
 
@@ -99,7 +106,41 @@ public class BookingServiceImpl implements IBookingService
     public int updateBooking(Booking booking)
     {
         booking.setUpdateTime(DateUtils.getNowDate());
+        applyItemName(booking);
         return bookingMapper.updateBooking(booking);
+    }
+
+    /**
+     * 预约项目名收口：一律按 product_id 查商品名写 service_name。
+     *
+     * <p>放在 Service 而不是 controller，是因为写入有两条路：后台
+     * BookingController.add/edit 和小程序 ApiBookingController.create。
+     * 只在小程序侧派生的话，后台新建的场次 service_name 会是空字符串 ——
+     * 列表「预约项目」那一列什么都不显示（实测过）。</p>
+     *
+     * <p>原先 service_name 是自由文本，存的是字典 biz_booking_type 的类型名
+     * （「堂食预约」），和真正上架的预约商品是两回事：商家在后台上架了
+     * 「SPA理疗60分钟」，预约单上却只写着「堂食预约」，product_id 是 NULL。</p>
+     *
+     * <p>updateBooking 里也要跑：编辑时把项目换成另一个商品，项目名必须跟着换，
+     * 否则库里会留下「product_id 指向 A、service_name 写着 B」的错位数据。
+     * 但 productId 为 null 时不动 service_name —— 后台改状态/备注这类
+     * 局部更新不传 productId，无脑覆盖会把项目名冲成「在线预约」。</p>
+     */
+    private void applyItemName(Booking booking)
+    {
+        if (booking == null || booking.getProductId() == null)
+        {
+            return;
+        }
+        com.ruoyi.biz.domain.Product product =
+                productMapper.selectProductByProductId(booking.getProductId());
+        if (product == null)
+        {
+            throw new com.ruoyi.common.exception.ServiceException("预约项目不存在或已下架");
+        }
+        booking.setServiceName(StringUtils.isEmpty(product.getProductName())
+                ? DEFAULT_ITEM_NAME : product.getProductName());
     }
 
     @Override

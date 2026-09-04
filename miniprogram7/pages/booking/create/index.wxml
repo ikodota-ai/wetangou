@@ -24,7 +24,7 @@
     <text class="block-title">预约信息</text>
     <text class="sub">预约项目</text>
     <view class="pickup-box on">
-      <text class="pk-t">{{typeName}}</text>
+      <text class="pk-t">{{itemName}}</text>
     </view>
   </view>
 

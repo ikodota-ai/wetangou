@@ -1,9 +1,12 @@
 <view class="page" wx:if="{{state === 'loaded' && product && product.productId}}">
-  <!-- 顶部大图 -->
-  <view class="hero">
-    <image class="hero-img" src="{{product.images[0] || product.cover}}" mode="aspectFill"></image>
+  <!-- 顶部大图 swiper -->
+  <swiper class="hero" circular="{{product.images.length > 1}}"
+          current="{{imgIdx}}" bindchange="onSwiperChange">
+    <swiper-item wx:for="{{product.images.length ? product.images : [product.cover]}}" wx:key="*this">
+      <image class="hero-img" src="{{item}}" mode="aspectFill"></image>
+    </swiper-item>
     <view class="hero-page" wx:if="{{product.images.length > 1}}">{{imgIdx + 1}}/{{product.images.length}}</view>
-  </view>
+  </swiper>
 
   <!-- 价格条 -->
   <view class="price-bar">
@@ -168,8 +171,8 @@
   <!-- 适用门店 -->
   <view class="card">
     <view class="store-head">
-      <text class="block-title">适用门店（{{storeCountText}}）</text>
-      <text class="more" wx:if="{{storeCount > 1}}">{{storeCountText}}店通用 ></text>
+      <text class="block-title">适用门店 {{storeCountText}}</text>
+      <text class="more" wx:if="{{storeCount > 1}}">{{storeCount}}店通用 ></text>
     </view>
     <view class="store-row">
       <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>

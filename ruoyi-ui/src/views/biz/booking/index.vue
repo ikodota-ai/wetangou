@@ -17,17 +17,9 @@
       <el-form-item label="门店" prop="storeId">
         <biz-select v-model="queryParams.storeId" type="store" :merchant-id="queryParams.merchantId" width="200px" />
       </el-form-item>
-      <el-form-item label="预约服务" prop="productId">
-        <biz-select v-model="queryParams.productId" type="product" width="200px" />
-      </el-form-item>
-      <el-form-item label="服务名称" prop="serviceName">
-        <el-input
-          v-model="queryParams.serviceName"
-          placeholder="请输入服务名称"
-          clearable
-          style="width: 180px"
-          @keyup.enter.native="handleQuery"
-        />
+      <el-form-item label="预约项目" prop="productId">
+        <biz-select v-model="queryParams.productId" type="product"
+                    :merchant-id="queryParams.merchantId" width="200px" placeholder="请选择预约项目" />
       </el-form-item>
       <el-form-item label="预约日期" prop="bookingDate">
         <el-date-picker clearable
@@ -71,12 +63,7 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="预约编号" align="center" prop="bookingNo" width="180" />
       <el-table-column label="门店" align="center" prop="storeName" min-width="140" show-overflow-tooltip />
-      <el-table-column label="服务名称" align="center" prop="serviceName" min-width="120" show-overflow-tooltip />
-      <el-table-column label="类型" align="center" prop="bookingType" width="100">
-        <template slot-scope="scope">
-          <dict-tag :options="dict.type.biz_booking_type" :value="scope.row.bookingType" />
-        </template>
-      </el-table-column>
+      <el-table-column label="预约项目" align="center" prop="serviceName" min-width="140" show-overflow-tooltip />
       <el-table-column label="预约日期" align="center" prop="bookingDate" width="110" />
       <el-table-column label="时段" align="center" prop="timeSlot" width="100" />
       <el-table-column label="报名人次" align="center" prop="signupCount" width="90" />
@@ -112,21 +99,12 @@
         <el-form-item label="门店" prop="storeId">
           <biz-select v-model="form.storeId" type="store" :merchant-id="form.merchantId" :require-merchant="showMerchantFilter" auto-pick-single />
         </el-form-item>
-        <el-form-item label="预约服务" prop="productId">
-          <biz-select v-model="form.productId" type="product" @change="onProductChange" />
-        </el-form-item>
-        <el-form-item label="服务名称" prop="serviceName">
-          <el-input v-model="form.serviceName" placeholder="请输入服务名称" />
-        </el-form-item>
-        <el-form-item label="预约类型" prop="bookingType">
-          <el-select v-model="form.bookingType" placeholder="请选择预约类型" clearable style="width: 100%">
-            <el-option
-              v-for="d in dict.type.biz_booking_type"
-              :key="d.value"
-              :label="d.label"
-              :value="d.value"
-            />
-          </el-select>
+        <!-- 预约项目 = 上架的预约商品。原先这个选择器漏了 :merchant-id，
+             平台账号能给 A 商户的门店挂 B 商户的商品，场次就跨商家了；
+             门店选择器早已按商户过滤，商品这一处是漏的。 -->
+        <el-form-item label="预约项目" prop="productId">
+          <biz-select v-model="form.productId" type="product" :merchant-id="form.merchantId"
+                      :require-merchant="showMerchantFilter" placeholder="请选择预约项目" />
         </el-form-item>
         <el-form-item label="预约日期" prop="bookingDate">
           <el-date-picker clearable
@@ -187,10 +165,6 @@ import { listBooking, getBooking, delBooking, addBooking, updateBooking, listBoo
 
 export default {
   name: "Booking",
-  // 预约类型走字典（sql/upgrade/biz_store_rating_booking_type_v8.sql 建的
-  // biz_booking_type），商家可在「系统管理 → 字典管理」自行增删类型，
-  // 不用改代码。
-  dicts: ['biz_booking_type'],
   data() {
     return {
       loading: true,
@@ -212,8 +186,6 @@ export default {
         bookingNo: null,
         storeId: null,
         productId: null,
-        serviceName: null,
-        bookingType: null,
         bookingDate: null,
         status: null
       },
@@ -259,7 +231,6 @@ export default {
         this.loading = false
       })
     },
-    onProductChange() {},
     cancel() {
       this.open = false
       this.reset()
@@ -271,8 +242,6 @@ export default {
         bookingNo: null,
         storeId: null,
         productId: null,
-        serviceName: null,
-        bookingType: null,
         bookingDate: null,
         timeSlot: null,
         status: '0',

@@ -41,13 +41,16 @@ public class Booking extends BaseEntity
     /** 预约服务/商品ID */
     private Long productId;
 
-    /** 服务名称 */
-    @Excel(name = "服务名称")
+    /**
+     * 预约项目名（= 关联 BOOKING 商品的商品名）。
+     *
+     * <p>列名还是 service_name，但语义已收口：不再是任人填的自由文本，
+     * 由 ApiBookingController.resolveItemName 按 product_id 查商品名写入。
+     * 原先它存的是字典 biz_booking_type 的类型名（「堂食预约」），
+     * 和真正上架的预约商品是两回事。</p>
+     */
+    @Excel(name = "预约项目")
     private String serviceName;
-
-    /** 预约类型（字典 biz_booking_type 的 value，如 dine_in / in_store / other） */
-    @Excel(name = "预约类型")
-    private String bookingType;
 
     /** 预约日期 */
     // 库里 booking_date 是 DATE 类型（无时分秒），前端日期选择器发的也是 "2026-08-31"。
@@ -124,16 +127,6 @@ public class Booking extends BaseEntity
     public Long getProductId()
     {
         return productId;
-    }
-
-    public void setBookingType(String bookingType)
-    {
-        this.bookingType = bookingType;
-    }
-
-    public String getBookingType()
-    {
-        return bookingType;
     }
 
     public void setServiceName(String serviceName)
@@ -224,7 +217,6 @@ public class Booking extends BaseEntity
             .append("storeId", getStoreId())
             .append("productId", getProductId())
             .append("serviceName", getServiceName())
-            .append("bookingType", getBookingType())
             .append("bookingDate", getBookingDate())
             .append("timeSlot", getTimeSlot())
             .append("status", getStatus())

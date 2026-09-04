@@ -28,10 +28,12 @@ Page({
     phone: '',
     people: 1,
     remark: '',
-    // 预约类型：由上一页（预约首页）按后台字典传进来。
-    // 后台一条都没配时走「在线预约」兜底，bookingType 留空 —— 后端对空值不校验。
-    bookingType: '',
-    typeName: '在线预约',
+    // 预约项目：由上一页（预约首页）按后台上架的 BOOKING 商品传进来。
+    // 原先传的是字典类型 code（bookingType），项目名写死「堂食预约」这种类型名 ——
+    // 商家上架的预约商品在这一页体现不出来，落库 product_id 也一直是 NULL。
+    // 后台一个预约商品都没上架时走「在线预约」兜底，productId 留空。
+    productId: null,
+    itemName: '在线预约',
     loadingSlots: false,
     submitting: false,
     showSuccess: false
@@ -46,8 +48,8 @@ Page({
       days,
       contact: app.globalData.user.nickname || '',
       phone: app.globalData.user.phone || '',
-      bookingType: o.bookingType ? decodeURIComponent(o.bookingType) : '',
-      typeName: o.typeName ? decodeURIComponent(o.typeName) : '在线预约'
+      productId: o.productId ? Number(o.productId) : null,
+      itemName: o.itemName ? decodeURIComponent(o.itemName) : '在线预约'
     });
 
     if (opts && opts.storeId) {
@@ -286,10 +288,10 @@ Page({
     wx.showLoading({ title: '提交中', mask: true });
     api.createBooking({
       storeId: this.data.store.storeId,
-      // serviceName 和 bookingType 都跟着后台配的类型走，
-      // 原先写死「堂食预约」，后台配了「到店消费」也会被存成堂食
-      serviceName: this.data.typeName,
-      bookingType: this.data.bookingType || undefined,
+      // 预约项目落 productId。原先传的是 serviceName + bookingType 两个
+      // 冗余文本字段（值是字典里的类型名），商品维度一直丢着 ——
+      // 后台看不出顾客约的是哪个上架项目，只能看到「堂食预约」这种类型名。
+      productId: this.data.productId || undefined,
       bookingDate: date,
       timeSlot: this.data.slot,
       contact: this.data.contact,

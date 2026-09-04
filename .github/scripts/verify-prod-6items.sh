@@ -44,15 +44,16 @@ echo
 # 前置：jar 是否已更新
 # ============================================================
 echo "【前置】后端 jar 版本"
-TYPES=$(curl -s "${H[@]}" "$BASE/api/booking/types")
-# 判据必须看 body 里有没有 data 数组 —— 旧 jar 返的是
-# HTTP 200 + {"code":401,...}，只看 HTTP 码会误判成「端点已上线」
-TYPES_CODE=$(echo "$TYPES" | jq_get code)
-if [ "$TYPES_CODE" = "200" ]; then
-  ok "jar 已更新（/api/booking/types 返 200，第 4 项的字典端点存在）"
+# 探针换成「旧的预约类型端点是否已下线」：/api/booking/types 是上一版把字典
+# 开放给小程序时加的，本轮「预约统一到 BOOKING 商品」后它已被移除。
+# 所以 404 = 新 jar，200/401 = 旧 jar。原先拿它的 200 当「新 jar」判据，
+# 语义正好反过来了，不改的话换了新 jar 反而报「仍是旧版」。
+OLD_TYPES=$(curl -s -o /dev/null -w "%{http_code}" "${H[@]}" "$BASE/api/booking/types")
+if [ "$OLD_TYPES" = "404" ]; then
+  ok "jar 已更新（旧端点 /api/booking/types 已下线，返 404）"
   JAR_NEW=1
 else
-  bad "jar 仍是旧版：/api/booking/types 返 code=$TYPES_CODE（旧 jar 里 /api/booking/** 整体要登录，没有这个匿名端点）"
+  bad "jar 仍是旧版：/api/booking/types 还在（HTTP $OLD_TYPES）"
   echo "       → 传新 jar 到 /data/wwwroot/daodian/ 后跑 ./start.sh"
   JAR_NEW=0
 fi
@@ -202,21 +203,25 @@ fi
 echo
 
 # ============================================================
-# 4. 预约类型来自后台字典
+# 4. 预约项目来自后台上架的 BOOKING 商品
 # ============================================================
-echo "【4】预约首页的预约项目来自后台字典"
+echo "【4】预约页的预约项目来自后台上架的 BOOKING 商品"
+# 首页「预约服务」tab 和底部预约 tab 现在读的是同一个接口，
+# 所以这一条同时验了两个入口列表一致（原先首页读商品、tab 读字典，两套模型）
 if [ "$JAR_NEW" = "1" ]; then
-  N=$(echo "$TYPES" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('data') or []))")
+  ITEMS=$(curl -s "${H[@]}" "$BASE/api/product/list?typeCode=BOOKING")
+  N=$(echo "$ITEMS" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('data') or []))")
   if [ "${N:-0}" -gt 0 ]; then
-    ok "返 $N 条预约类型：$(echo "$TYPES" | python3 -c "
+    ok "返 $N 个预约商品：$(echo "$ITEMS" | python3 -c "
 import sys,json
-print(', '.join([t.get('name','') for t in (json.load(sys.stdin).get('data') or [])]))")"
-    echo "       小程序按这个列表渲染卡片，不再写死「堂食预约」"
+rows=json.load(sys.stdin).get('data') or []
+print(', '.join([(r.get('productName') or r.get('name') or '') for r in rows[:5]]))")"
+    echo "       首页「预约服务」与底部预约 tab 同读这个接口，两处列表一致"
   else
-    todo "字典一条都没有 → 后台【字典管理】找 biz_booking_type 加项（小程序会显示「在线预约」兜底）"
+    todo "没有上架的预约商品 → 后台【商品管理】新建商品时把商品类型选「BOOKING 预约」（小程序会显示「在线预约」兜底入口）"
   fi
 else
-  skip "第 4 项需要新 jar 才能验（当前 /api/booking/types 不可用）"
+  skip "第 4 项需要新 jar 才能验"
 fi
 echo
 

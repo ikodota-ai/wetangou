@@ -74,6 +74,7 @@ biz_merchant_staff_perms_v12
 biz_staff_tenant_backfill_v13
 biz_staff_pc_role_backfill_v14
 biz_merchant_promoter_enabled_20260903
+booking_remove_type_v11
 wx_miniapp_env_version_20260903
 biz_withdraw_rule_20260903
 """.split()

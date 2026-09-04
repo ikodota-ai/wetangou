@@ -35,3 +35,10 @@
 .my-booking { margin-top: 24rpx; background: #FFFFFF; border-radius: 20rpx; padding: 32rpx; display: flex; align-items: center; justify-content: space-between; }
 .my-booking text { font-size: 30rpx; color: #1A1A1A; }
 .mb-arrow { color: #999; }
+
+/* 预约项目现在是真实商品，价格要露出来 —— 顾客得先知道多少钱才决定约不约 */
+.bc-price {
+  position: absolute; right: 24rpx; bottom: 24rpx;
+  font-size: 32rpx; font-weight: 700; color: #FFFFFF;
+  text-shadow: 0 2rpx 8rpx rgba(0,0,0,0.5);
+}

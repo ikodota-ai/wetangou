@@ -21,7 +21,6 @@ import com.ruoyi.biz.api.annotation.LoginRequired;
 import com.ruoyi.biz.api.util.MemberContextHolder;
 import com.ruoyi.biz.domain.Booking;
 import com.ruoyi.biz.domain.BookingMember;
-import com.ruoyi.biz.domain.Booking;
 import com.ruoyi.biz.service.IBookingService;
 
 /**
@@ -40,41 +39,7 @@ public class ApiBookingController
     @Autowired
     private IBookingService bookingService;
 
-    @Autowired
-    private com.ruoyi.system.service.ISysDictDataService dictDataService;
-
-    /** 预约类型字典（后台「字典管理 → 预约类型」维护，商家可自行增删） */
-    private static final String DICT_BOOKING_TYPE = "biz_booking_type";
-
-    /**
-     * 可选的预约类型
-     *
-     * <p>小程序预约首页原先写死一张「堂食预约」卡片，后台在字典里加了
-     * 「到店消费」「其他预约」也不显示 —— 等于配置项没有出口。
-     * 这里把字典开放给小程序，前端按返回条数渲染卡片。</p>
-     *
-     * <p>只返 status='0'（正常）的项：字典里停用的类型不该出现在顾客端。
-     * dictDataService.selectDictDataList 已按 dict_sort 排序，顺序即后台配的顺序。</p>
-     */
-    @GetMapping("/types")
-    public AjaxResult types()
-    {
-        com.ruoyi.common.core.domain.entity.SysDictData query = new com.ruoyi.common.core.domain.entity.SysDictData();
-        query.setDictType(DICT_BOOKING_TYPE);
-        query.setStatus("0");
-        List<com.ruoyi.common.core.domain.entity.SysDictData> list = dictDataService.selectDictDataList(query);
-        List<java.util.Map<String, Object>> rows = new ArrayList<java.util.Map<String, Object>>();
-        for (com.ruoyi.common.core.domain.entity.SysDictData d : list)
-        {
-            java.util.Map<String, Object> vo = new java.util.LinkedHashMap<String, Object>();
-            vo.put("code", d.getDictValue());
-            vo.put("name", d.getDictLabel());
-            vo.put("sort", d.getDictSort());
-            rows.add(vo);
-        }
-        return AjaxResult.success(rows);
-    }
-
+    /** 项目名派生已下沉到 BookingServiceImpl，这里不再独立写一份 */
     /**
      * 门店某天的可预约时段
      *
@@ -131,14 +96,12 @@ public class ApiBookingController
             {
                 throw new ServiceException("预约日期与时段必填");
             }
-            // 预约类型（堂食预约 / 到店消费 / ...）。必须在字典里，
-            // 否则前端随便传个值就会落进库里，后台列表按类型筛选时对不上。
-            String bookingType = body.getString("bookingType");
-            if (StringUtils.isNotEmpty(bookingType)
-                    && StringUtils.isEmpty(dictDataService.selectDictLabel(DICT_BOOKING_TYPE, bookingType)))
-            {
-                throw new ServiceException("预约类型不存在或已停用");
-            }
+            // 预约项目 = 后台上架的 BOOKING 商品。原先这里收的是
+            // serviceName（自由文本）+ bookingType（字典 code）两个字段，
+            // 前端传什么就落什么 —— 商家上架的预约商品在预约单上体现不出来，
+            // product_id 一直是 NULL，后台只能看到「堂食预约」这种类型名。
+            // 现在项目名一律从商品派生，前端传的文本不再采信。
+            Long productId = body.getLong("productId");
 
             // 可约范围必须在后端再判一次：日期条置灰、时段标 closed 都只是界面效果，
             // 实测直接 POST 过来时歇业日 / 超出可提前天数 / 已过去的时段 / 非营业时间
@@ -151,9 +114,7 @@ public class ApiBookingController
             query.setStoreId(storeId);
             query.setBookingDate(bookingDate);
             query.setTimeSlot(timeSlot);
-            // 类型也要参与复用判断：同门店同时段的「堂食预约」和「到店消费」
-            // 是两个不同场次，不加这个条件会把后来者并进先建的那个类型里。
-            query.setBookingType(bookingType);
+            query.setProductId(productId);
             List<Booking> exists = bookingService.selectBookingList(query);
             Booking reuse = null;
             for (Booking item : exists)
@@ -172,9 +133,7 @@ public class ApiBookingController
             {
                 Booking booking = new Booking();
                 booking.setStoreId(storeId);
-                booking.setProductId(body.getLong("productId"));
-                booking.setServiceName(body.getString("serviceName"));
-                booking.setBookingType(bookingType);
+                booking.setProductId(productId);
                 booking.setBookingDate(bookingDate);
                 booking.setTimeSlot(timeSlot);
                 booking.setBookingNo("B" + System.currentTimeMillis() + (int) (Math.random() * 900 + 100));
@@ -349,7 +308,6 @@ public class ApiBookingController
         vo.put("storeName", booking.getStoreName());
         vo.put("productId", booking.getProductId());
         vo.put("serviceName", booking.getServiceName());
-        vo.put("bookingType", booking.getBookingType());
         vo.put("bookingDate", booking.getBookingDate());
         vo.put("timeSlot", booking.getTimeSlot());
         vo.put("status", booking.getStatus());

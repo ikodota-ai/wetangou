@@ -11,10 +11,10 @@
       <el-form-item label="报名会员" prop="memberIds">
         <biz-select v-model="queryParams.memberIds" type="member" multiple width="220px" />
       </el-form-item>
-      <el-form-item label="服务名称" prop="serviceName">
+      <el-form-item label="预约项目" prop="serviceName">
         <el-input
           v-model="queryParams.serviceName"
-          placeholder="请输入服务名称"
+          placeholder="请输入预约项目"
           clearable
           style="width: 180px"
           @keyup.enter.native="handleQuery"
@@ -68,7 +68,7 @@
     <el-table v-loading="loading" :data="memberList" style="width: 100%">
       <el-table-column label="明细ID" align="center" prop="id" width="80" />
       <el-table-column label="门店" align="center" prop="storeName" min-width="140" show-overflow-tooltip />
-      <el-table-column label="服务名称" align="center" prop="serviceName" min-width="140" show-overflow-tooltip />
+      <el-table-column label="预约项目" align="center" prop="serviceName" min-width="140" show-overflow-tooltip />
       <el-table-column label="预约日期" align="center" prop="bookingDate" width="110" />
       <el-table-column label="时段" align="center" prop="timeSlot" width="120" />
       <el-table-column label="报名会员" align="center" prop="memberName" min-width="120" show-overflow-tooltip />
