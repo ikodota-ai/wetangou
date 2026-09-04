@@ -236,19 +236,26 @@
           <text class="share-sub">给你分享了商品</text>
         </view>
       </view>
-      <image class="share-cover" src="/assets/img/RestaurantImg.png" mode="aspectFill"></image>
+      <image class="share-cover" src="{{product.cover}}" mode="aspectFill"></image>
       <text class="share-name2">{{product.name}}</text>
-      <view class="share-price"><text class="sp-now">¥{{product.price}}</text><text class="sp-old">¥{{product.price}}</text></view>
-      <view class="qr"><view class="qr-circle"></view><text class="qr-tip">扫码或长按小程序码</text></view>
+      <view class="share-price">
+        <text class="sp-now">¥{{product.price}}</text>
+        <text class="sp-old" wx:if="{{showSharePriceOld}}">¥{{product.marketPrice}}</text>
+      </view>
+      <view class="qr">
+        <image class="qr-img" wx:if="{{shareQr}}" src="{{shareQr}}" mode="aspectFit"></image>
+        <view class="qr-ph" wx:else><text class="qr-ph-t">{{shareQrTip}}</text></view>
+        <text class="qr-tip">扫码或长按小程序码</text>
+      </view>
       <view class="share-ops">
         <button class="so" open-type="share" data-id="{{product.productId}}" hover-class="none">
-          <view class="so-ic so-friend">💬</view><text>发送给朋友</text>
+          <view class="so-ic so-friend">💬</view><text class="so-t">发送给朋友</text>
         </button>
-        <button class="so" open-type="favorite" hover-class="none">
-          <view class="so-ic so-fav">★</view><text>收藏</text>
+        <button class="so" open-type="favorite" hover-class="none" bindtap="onFavTap">
+          <view class="so-ic so-fav">★</view><text class="so-t">收藏</text>
         </button>
         <view class="so" bindtap="onSavePoster">
-          <view class="so-ic so-save">⤓</view><text>保存图片</text>
+          <view class="so-ic so-save">⤓</view><text class="so-t">保存图片</text>
         </view>
       </view>
     </view>

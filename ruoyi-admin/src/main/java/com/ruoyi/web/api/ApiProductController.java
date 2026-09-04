@@ -62,6 +62,12 @@ public class ApiProductController
     @Autowired
     private com.ruoyi.biz.service.ISaleChannelService channelService;
 
+    @Autowired
+    private com.ruoyi.biz.api.service.WxMaService wxMaService;
+
+    @Autowired
+    private com.ruoyi.framework.config.ServerConfig serverConfig;
+
     /**
      * 商品列表（按商户 / 门店 / 分类 / 类型筛选，仅上架）
      *   - merchantId 不传：按 storeId 查单店商品
@@ -194,6 +200,77 @@ public class ApiProductController
             result.put("subitemGroups", groups);
         }
         return result;
+    }
+
+    /**
+     * 商品小程序码（用于分享面板 / 海报）
+     *
+     * <p>为什么要新开一个端点：分享面板和海报页原先都拿不到真的小程序码 ——
+     * 面板里画的是一个 CSS 渐变拼出来的「假二维码」（.qr-circle 用
+     * radial-gradient + conic-gradient 模拟纹理，扫不出任何东西），
+     * 海报页则调 {@code /api/distributor/qrcode}，那个端点要求调用者
+     * 是推客（{@code currentDistributor() == null} 直接抛「您还不是推客」），
+     * 普通会员分享商品必然失败。分享商品跟推客身份无关，应该人人可用。</p>
+     *
+     * <p>scene 里带 p:productId，扫码进来直落商品详情页。不带推客信息，
+     * 推客返佣的归因码仍走 /api/distributor/qrcode 那条路。</p>
+     *
+     * <p>文件层缓存（同 E10 模式）：wxacodeUnlimited 有日调用上限，
+     * 一个商品的码是固定内容，没必要每次打开分享面板都去换一张。</p>
+     *
+     * <p>返回 dataUrl 而不是文件 URL：小程序 canvas 画图要先 downloadFile，
+     * 而 downloadFile 受 request 合法域名限制，本地/未备案域名会失败；
+     * dataUrl 可以直接 &lt;image src&gt; 渲染，也能被 canvas 的 createImage 吃下。
+     * 同时也返 url，方便调试时直接在浏览器打开确认。</p>
+     */
+    @GetMapping("/{productId}/qrcode")
+    public AjaxResult productQrcode(@PathVariable Long productId) throws Exception
+    {
+        Product p = productService.selectProductByProductId(productId);
+        if (p == null || !isVisibleToCaller(p))
+        {
+            return AjaxResult.error("商品不存在或已下架");
+        }
+        Long merchantId = p.getMerchantId() == null ? 1L : p.getMerchantId();
+        // scene 上限 32 字符，只放商品 id
+        String scene = "p:" + productId;
+
+        String dir = com.ruoyi.common.config.RuoYiConfig.getProfile() + "/product_qr";
+        java.io.File dirFile = new java.io.File(dir);
+        if (!dirFile.exists() && !dirFile.mkdirs())
+        {
+            return AjaxResult.error("无法创建小程序码目录");
+        }
+        // 文件名带 merchantId：同一个 productId 在不同商户的小程序里
+        // 要用各自 appid 生成，不能互相复用
+        String fileName = "pq_" + merchantId + "_" + productId + ".png";
+        java.io.File target = new java.io.File(dirFile, fileName);
+        byte[] bytes;
+        boolean cached = target.exists() && target.length() > 0;
+        if (cached)
+        {
+            bytes = java.nio.file.Files.readAllBytes(target.toPath());
+        }
+        else
+        {
+            bytes = wxMaService.getWxaCodeUnlimited(scene, "pages/goods/detail/index", merchantId);
+            if (bytes == null || bytes.length == 0)
+            {
+                return AjaxResult.error("生成小程序码失败");
+            }
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(target))
+            {
+                fos.write(bytes);
+            }
+        }
+        String dataUrl = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(bytes);
+        String url = serverConfig.getUrl() + com.ruoyi.common.constant.Constants.RESOURCE_PREFIX
+                + "/product_qr/" + fileName;
+        return AjaxResult.success()
+                .put("dataUrl", dataUrl)
+                .put("url", url)
+                .put("scene", scene)
+                .put("cached", cached);
     }
 
     /**

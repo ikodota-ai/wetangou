@@ -36,5 +36,6 @@
   "projectname": "dytuangou-miniprogram7",
   "condition": {},
   "simulatorPluginLibVersion": {},
-  "editorSetting": {}
+  "editorSetting": {},
+  "isGameTourist": false
 }

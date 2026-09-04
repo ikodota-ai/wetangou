@@ -14,7 +14,11 @@ Page({
     // 任何时刻只有一个为 true，便于 WXML 用单一 wx:if 判断
     state: 'loading',
     errorMsg: '',
-    user: { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' }
+    user: { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' },
+    // 分享面板：小程序码 dataUrl（空则显示占位文案），以及原价是否该显示
+    shareQr: '',
+    shareQrTip: '小程序码加载中',
+    showSharePriceOld: false
   },
   onLoad(opts) {
     // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
@@ -22,12 +26,25 @@ Page({
     const m = (appInst.globalData && appInst.globalData.merchant) || {}
     this.setData({
       id: opts.id,
-      user: (appInst.globalData && appInst.globalData.user) || { nickName: '好吃嘴', avatarUrl: '/assets/avatar/default.png' },
+      user: this._normalizeUser(appInst.globalData && appInst.globalData.user),
       merchantName: m.merchantName || '当前商家'
     });
     this.loadProduct(opts.id);
   },
-  onUserUpdate(user) { this.setData({ user }); },
+  onUserUpdate(user) { this.setData({ user: this._normalizeUser(user) }); },
+  /**
+   * 头像必须过 toFullUrl：后端存的是 /profile/avatar/xxx.png 这种相对路径，
+   * 直接塞给 <image src> 会当成小程序包内路径去找，必然裂图 ——
+   * 分享面板里显示的就是默认头像而不是用户自己的。
+   * pages/mine/index 早就这么处理了，这里漏了。
+   */
+  _normalizeUser(u) {
+    const src = u || {};
+    return Object.assign({}, src, {
+      nickName: src.nickName || '好吃嘴',
+      avatarUrl: src.avatarUrl ? toFullUrl(src.avatarUrl) : '/assets/avatar/default.png'
+    });
+  },
   // 完全走后端，不做 mock 兜底；接口报错直接把错暴露给用户，便于排查
   loadProduct(id) {
     console.log('[goods/detail] loadProduct start, id=', id);
@@ -157,8 +174,55 @@ Page({
   goDetail(e) { wx.redirectTo({ url: '/pages/goods/detail/index?id=' + e.currentTarget.dataset.id }); },
   goStore() { wx.switchTab({ url: '/pages/home/index' }); },
   goOrderList() { wx.navigateTo({ url: '/pages/order/list/index' }); },
-  openShare() { this.setData({ showShare: true }); },
+  openShare() {
+    const p = this.data.product || {};
+    // 原价只在真的比现价高时才显示。原先写死成 sp-old 也绑 product.price，
+    // 于是「¥50 ¥50」两个一样的数字并排、还带删除线，看着像 bug。
+    const now = Number(p.price), old = Number(p.marketPrice);
+    this.setData({
+      showShare: true,
+      showSharePriceOld: !!(old && now && old > now)
+    });
+    this._loadShareQr();
+  },
   closeShare() { this.setData({ showShare: false }); },
+  /**
+   * 拉商品小程序码。原先面板里那个「码」是 CSS 渐变拼的假纹理（.qr-circle
+   * 用 radial-gradient + conic-gradient 模拟），扫不出任何东西；海报页则调
+   * /api/distributor/qrcode，那个端点要求调用者是推客，普通会员必然 403。
+   * 现在走 /api/product/{id}/qrcode，与推客身份无关，人人可用。
+   */
+  _loadShareQr() {
+    if (this.data.shareQr) return;          // 同一个商品只拉一次
+    if (this._qrLoading) return;
+    const id = this.data.id || (this.data.product && this.data.product.productId);
+    if (!id) return;
+    this._qrLoading = true;
+    api.productQrcode(id)
+      .then((res) => {
+        const d = (res && (res.data || res)) || {};
+        const url = d.dataUrl || d.url || '';
+        this.setData({ shareQr: url, shareQrTip: url ? '' : '小程序码暂不可用' });
+      })
+      .catch((err) => {
+        console.warn('[goods/detail] productQrcode FAIL', err);
+        // 不弹 toast：分享面板已经打开了，这里失败只降级成占位文案，
+        // 用户仍可用「发送给朋友」这条不依赖码的路径
+        this.setData({ shareQr: '', shareQrTip: '小程序码暂不可用' });
+      })
+      .finally(() => { this._qrLoading = false; });
+  },
+  /**
+   * 「收藏」点了没反应的根因：<button open-type="favorite"> 只有在页面
+   * 实现了 onAddToFavorites 且**当前小程序版本支持收藏**时才有效，
+   * 而开发者工具/未发布版本上这个 open-type 是静默失效的 —— 按钮能点、
+   * 什么都不发生，用户以为坏了。这里补一个 bindtap 给出明确反馈。
+   * 真机已发布版本上 open-type 生效时，微信会直接弹收藏浮层，
+   * bindtap 的 toast 也不影响（两者都会走，浮层盖在上面）。
+   */
+  onFavTap() {
+    wx.showToast({ title: '点击右上角「···」可收藏', icon: 'none', duration: 2000 });
+  },
   closeAuthPhone() { this.setData({ showAuthPhone: false }); },
   onBuy() {
     if (!this.canBuy()) {
@@ -280,7 +344,10 @@ Page({
     const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
     const shareImg = rawImg ? toFullUrl(rawImg) : '';
     return {
-      title: name + (price ? ' ¥' + price : '') + ' | ' + (m.merchantName || '洞天团购'),
+      // 商家名拿不到时就只发商品名，不能写死「洞天团购」——
+      // 这是多商户平台，每个商户有自己的品牌名，硬编码等于把别家商品
+      // 挂上我们的名字发出去
+      title: name + (price ? ' ¥' + price : '') + (m.merchantName ? ' | ' + m.merchantName : ''),
       path: '/pages/goods/detail/index?id=' + id,
       imageUrl: shareImg
     };
@@ -297,7 +364,10 @@ Page({
     const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
     const shareImg = rawImg ? toFullUrl(rawImg) : '';
     return {
-      title: name + (price ? ' ¥' + price : '') + ' | ' + (m.merchantName || '洞天团购'),
+      // 商家名拿不到时就只发商品名，不能写死「洞天团购」——
+      // 这是多商户平台，每个商户有自己的品牌名，硬编码等于把别家商品
+      // 挂上我们的名字发出去
+      title: name + (price ? ' ¥' + price : '') + (m.merchantName ? ' | ' + m.merchantName : ''),
       query: 'id=' + ((p && (p.productId || p.id)) || this.data.id || ''),
       imageUrl: shareImg
     };

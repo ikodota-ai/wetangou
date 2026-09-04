@@ -230,6 +230,9 @@ const api = {
   // 且不分页，商家端拿它做列表看不到自己的草稿、也拿不到 total 做 tab 角标。
   merchantProductList: (params) => request('/api/product/merchant/list', { data: params }),
   productDetail: (id) => request(`/api/product/${id}`),
+  // 商品小程序码（分享面板 / 海报用）。与推客身份无关，普通会员也能拿 ——
+  // 原先海报页借用 /api/distributor/qrcode，那个要求调用者是推客
+  productQrcode: (id) => request(`/api/product/${id}/qrcode`),
   categoryList: (params) => request('/api/product/category/list', { data: params }),
   // 商家端-创建商品（P1-2）
   productTypeAppCreatable: () => request('/biz/productType/appCreatable'),
