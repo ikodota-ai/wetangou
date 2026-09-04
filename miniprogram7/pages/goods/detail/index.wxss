@@ -23,6 +23,11 @@
 .pkg-row { display: flex; justify-content: space-between; align-items: center; padding: 12rpx 0; }
 .pkg-name { font-size: 28rpx; color: #1A1A1A; }
 .pkg-right { display: flex; align-items: center; gap: 32rpx; }
+.pkg-left { display: flex; align-items: center; gap: 12rpx; flex: 1; }
+/* 类型小标（代金券 / 满减券）：券包里各张券类型不同，
+   不标出来顾客以为买的是同一种东西。 */
+.pkg-type { font-size: 20rpx; color: #666; background: #F5F5F5; padding: 2rpx 8rpx; border-radius: 4rpx; }
+.combo-total { margin-top: 12rpx; padding-top: 12rpx; border-top: 1rpx solid #F0F0F0; font-size: 26rpx; color: #B26A00; text-align: right; }
 .pkg-qty { font-size: 26rpx; color: #999; }
 .pkg-price { font-size: 28rpx; color: #1A1A1A; }
 

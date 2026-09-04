@@ -6,57 +6,12 @@ const COMBO_RULE_LABELS = ['全部可享', '1选1', '2选2']
 const COMBO_RULE_VALUES = ['ALL', 'PICK_1', 'PICK_2']
 
 // ===== 「几选几」口径 =====
-// 全系统统一用 'ALL'（全部可选）或 'PICK_N'（可选 N 个），与 PC 端
-// views/biz/product/create.vue 的 groupPickCount / pickRuleOptions 完全一致。
-// 这个页面原来往库里写的是中文 '1选1' / '3选2'，后端新的 PUT 校验只认
-// ALL / PICK_N，中文值会被判成「选择规则格式不正确」。而且同一个组在手机上
-// 存成 '3选2'、在 PC 上读出来要靠正则兜底才认得 —— 一份数据两种写法。
+// 已抽到 utils/pickRule.js，与会员端商品详情页共用同一份。
 //
-// 「个数」按单品品种数算，不看 quantity：一组里「红烧肉 ×2」「可乐 ×1」
-// 是 2 个单品而不是 3 个，quantity 是这道菜给几份，跟顾客能挑几样是两回事。
-
-function groupSize(g) {
-  return ((g && g.subitems) || []).length
-}
-
-/** 解析 pickRule 得到「可选几个」；无规则 / ALL / 超出范围都按全选 */
-function groupPickCount(g) {
-  const size = groupSize(g)
-  const rule = g && g.pickRule
-  if (!rule || rule === 'ALL') return size
-  const m = String(rule).match(/^PICK_(\d+)$/)
-  let n = m ? Number(m[1]) : null
-  if (n == null) {
-    // 兼容本页历史写进去的中文 'N选M'，取「选」后面那个数
-    const cn = String(rule).match(/选\s*(\d+)$/)
-    if (cn) n = Number(cn[1])
-  }
-  if (n == null || n <= 0 || n >= size) return size
-  return n
-}
-
-/** 标签文案：3 个单品全选 → 「共3个单品：3选3」 */
-function pickRuleText(g) {
-  const size = groupSize(g)
-  if (size === 0) return '未添加单品'
-  return '共' + size + '个单品：' + size + '选' + groupPickCount(g)
-}
-
-/**
- * 可选规则按本组实际单品数动态生成：3 个单品 → 全部可选(3选3) / 3选2 / 3选1。
- * 原来是硬编码「1选1 / 2选2 / 3选2」，跟本组单品数完全脱节 ——
- * 2 个单品的组也能设成「3选2」，存进去就是永远履约不了的脏数据。
- */
-function pickRuleOptions(g) {
-  const size = groupSize(g)
-  const labels = ['全部可选（' + size + '选' + size + '）']
-  const values = ['ALL']
-  for (let n = size - 1; n >= 1; n--) {
-    labels.push(size + '选' + n)
-    values.push('PICK_' + n)
-  }
-  return { labels, values }
-}
+// 为什么不各写一份：会员端详情页原先把库里的枚举码（PICK_2）
+// 直接渲染给顾客，而这里早就有一套成熟的中文口径。两边各写一份早晚
+// 会漂移，到时商家设的是「3选2」、顾客看到的是「3选3」，那是履约纠纷。
+const { groupSize, groupPickCount, pickRuleText, pickRuleOptions } = require('../../../../utils/pickRule.js')
 
 /**
  * 给每个组挂上渲染要用的派生字段。

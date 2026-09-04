@@ -773,7 +773,7 @@ Page({
     //
     // 新建态还没有 productId，自然也还没法配搭子品（子品要先存草稿再去 combo 页维护）。
     // 拉失败不能卡住预览（预览只是看排版），失败当空数组继续。
-    if (!this.data.productId) { this._gotoPreview([]); return }
+    if (!this.data.productId) { this._gotoPreview([], ''); return }
     wx.showLoading({ title: '加载中...', mask: true })
     api.productDetail(this.data.productId)
       .then((res) => {
@@ -781,12 +781,16 @@ Page({
         const d = (res && res.data) || res || {}
         const p = d.data || d
         const groups = (d.subitemGroups || p.subitemGroups) || []
-        this._gotoPreview(Array.isArray(groups) ? groups : [])
+        // 组合券包的搭配明细不在子品表，存 ext.comboItemsJson。
+        // 不带的话 COMBO 商品预览出来是没明细的，而顾客那边能看到 ——
+        // 那就又变成「预览和顾客看到的不一样」。
+        const comboJson = (p.ext && p.ext.comboItemsJson) || (d.ext && d.ext.comboItemsJson) || ''
+        this._gotoPreview(Array.isArray(groups) ? groups : [], comboJson)
       })
-      .catch(() => { wx.hideLoading(); this._gotoPreview([]) })
+      .catch(() => { wx.hideLoading(); this._gotoPreview([], '') })
   },
 
-  _gotoPreview(groups) {
+  _gotoPreview(groups, comboItemsJson) {
     // 服务设施和销量/库存开关都不在这张表单里，但顾客的详情页上有。
     // 不拉的话，商家预览到的是一个没服务设施、却无条件显销量的页面，
     // 而那不是顾客会看到的 —— 预览就失去意义了。
@@ -798,11 +802,11 @@ Page({
       : Promise.resolve([])
     const mchP = api.merchantInfo().then(d => d || {}).catch(() => ({}))
     Promise.all([svcP, mchP]).then(([svc, mch]) => {
-      this._writeDraftAndGo(groups, svc, mch)
+      this._writeDraftAndGo(groups, svc, mch, comboItemsJson)
     })
   },
 
-  _writeDraftAndGo(groups, storeServices, merchant) {
+  _writeDraftAndGo(groups, storeServices, merchant, comboItemsJson) {
     const appInst = getApp() || {}
     appInst.globalData = appInst.globalData || {}
     const dict = (this._typeDict || {})[this.data.pickedType] || {}
@@ -818,7 +822,8 @@ Page({
       showSales: merchant && merchant.showSales !== undefined ? merchant.showSales : '1',
       showStock: merchant && merchant.showStock !== undefined ? merchant.showStock : '1',
       productId: this.data.productId,
-      subitemGroups: Array.isArray(groups) ? groups : []
+      subitemGroups: Array.isArray(groups) ? groups : [],
+      comboItemsJson: comboItemsJson || ''
     }
     wx.navigateTo({
       url: '/pages/goods/detail/index?preview=1',

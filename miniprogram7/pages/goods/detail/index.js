@@ -1,6 +1,8 @@
 const app = getApp();
 const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
 const { draftToProduct } = require('../../../utils/productPreview.js');
+const { customerPickText } = require('../../../utils/pickRule.js');
+const { parseComboItems } = require('../../../utils/comboItems.js');
 
 Page({
   data: {
@@ -190,18 +192,37 @@ Page({
       ? (Array.isArray(p.images) ? p.images : String(p.images).split(','))
       : (p.cover ? [p.cover] : []);
     const typeCode = p.typeCode || (p.productType === '1' ? 'BILL' : p.productType === '2' ? 'BOOKING' : 'GROUPON');
-    const subitemGroups = Array.isArray(groups) ? groups.map(g => ({
-      groupId: g.groupId,
-      groupName: g.groupName,
-      pickRule: g.pickRule || 'ALL',
-      sort: g.sort || 0,
-      subitems: Array.isArray(g.subitems) ? g.subitems.map(s => ({
+    // 套餐详情的「几选几」必须在这里算成中文再 setData。
+    //
+    // 原先 WXML 直接写 {{g.pickRule}}，顾客看到的是库里的枚举码 `PICK_2`，
+    // 根本不知道自己到店能挑几样 —— 而这是他判断这个套餐值不值的前提。
+    // （这张卡因为 subitemGroups 被 request() 解包吃掉而从未真正显示过，
+    //   所以它自身这个 bug 也一直没被发现。）
+    //
+    // 用 utils/pickRule.js 而不是在这里再写一份：商家端编辑页用的是同一份，
+    // 两边各算一遍早晚会漂移成履约纠纷。WXML 里一律不写函数调用。
+    const subitemGroups = Array.isArray(groups) ? groups.map(g => {
+      const subitems = Array.isArray(g.subitems) ? g.subitems.map(s => ({
         subitemId: s.subitemId,
         subitemName: s.subitemName,
         quantity: s.quantity || 1,
         price: s.price != null ? String(s.price) : '0.00'
-      })) : []
-    })) : [];
+      })) : [];
+      return {
+        groupId: g.groupId,
+        groupName: g.groupName,
+        pickRule: g.pickRule || 'ALL',
+        sort: g.sort || 0,
+        subitems: subitems,
+        pickText: customerPickText({ pickRule: g.pickRule || 'ALL', subitems: subitems })
+      };
+    }) : [];
+    // 组合券包（COMBO）的搭配明细存在 biz_product_ext.combo_items_json，
+    // 不走 biz_product_subitem 那张表。原先详情页的 wx:elif 读的是
+    // product.packages —— 全库只有 utils/mock.js 造过这个字段，后端零命中，
+    // 所以真机上 COMBO 的「套餐详情」永远是空的：顾客买一个券包，
+    // 看不到里面到底包了哪几张券。
+    const comboItems = parseComboItems(p);
     return {
       ...p,
       name: p.productName || p.name,
@@ -246,6 +267,7 @@ Page({
       storeCountText: (p.storeIds ? String(p.storeIds).split(',').filter(x=>x).length : (p.storeId ? 1 : 0)) + '家',
       storeScopeText: p.storeNames || (p.storeId ? '当前门店适用' : '全部门店适用'),
       subitemGroups: subitemGroups,
+      comboItems: comboItems,
       sold: p.sales || p.sold || 0,
       cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',
       images: images.filter((u) => !!u).map((u) => toFullUrl(u)),

@@ -30,6 +30,7 @@ PASS=0; FAIL=0
 MID=991
 STORE=991001
 PROD=991002
+COMBO_PROD=991003
 
 ok(){ PASS=$((PASS+1)); echo "  ✅ $1"; }
 no(){ FAIL=$((FAIL+1)); echo "  ❌ $1"; }
@@ -40,6 +41,8 @@ q(){ $MYSQL -e "$1" 2>/dev/null | grep -v Warning; }
 cleanup(){
   echo "--- cleanup ---"
   q "delete from biz_product_subitem where group_id in (select group_id from biz_product_subitem_group where product_id=$PROD);
+     delete from biz_product_ext where product_id = $COMBO_PROD;
+     delete from biz_product where product_id = $COMBO_PROD;
      delete from biz_product_subitem_group where product_id = $PROD;
      delete from biz_product_ext where product_id = $PROD;
      delete from biz_product where product_id = $PROD;
@@ -53,7 +56,8 @@ cleanup(){
 trap cleanup EXIT
 
 echo "=== A. 造数据：独立商户 + 带服务设施的门店 + 带子品组的团购 ==="
-q "delete from biz_product where product_id=$PROD;
+q "delete from biz_product_ext where product_id=$COMBO_PROD;
+   delete from biz_product where product_id in ($PROD,$COMBO_PROD);
    delete from biz_store where store_id=$STORE;
    delete from biz_merchant where merchant_id=$MID;"
 # merchant_no NOT NULL 无默认值，必填
@@ -143,3 +147,49 @@ echo "=== J. 跨租户：别家 appid 拿不到这个商品（新增字段不能
 chk "别家 appid 访问" \
   "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: $APPID" | python3 -c "import sys,json;print(json.load(sys.stdin).get('code'))")" \
   "500"
+
+echo "=== K. 套餐「几选几」与组合券包明细（这张卡之前从未真正显示过，所以它自身的 bug 一直无人发现） ==="
+# K1 pickRule 必须原值下发。前端靠它 + 子品数算出「3选2」这种中文；
+# 原先 WXML 直接 {{g.pickRule}}，顾客看到的是大写的 PICK_2。
+G2=$(q "insert into biz_product_subitem_group (product_id, group_name, pick_rule, sort) values ($PROD,'任选菜','PICK_2',1); select last_insert_id();")
+q "insert into biz_product_subitem (group_id, product_id, subitem_name, quantity, price)
+   values ($G2, $PROD, '土豆', 1, 8), ($G2, $PROD, '宽粉', 1, 10), ($G2, $PROD, '海带', 2, 6);"
+DK=$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991")
+chk "PICK_2 组的 pickRule 原值下发" \
+  "$(echo "$DK" | python3 -c "
+import sys,json
+g=[x for x in (json.load(sys.stdin).get('subitemGroups') or []) if x.get('groupName')=='任选菜']
+print(g[0].get('pickRule') if g else '')")" "PICK_2"
+# 子品数按品种算（3 行）而不是按 quantity 总和（4）——
+# 否则前端会算出「4选2」，而顾客只看得到 3 行菜名。
+chk "PICK_2 组子品行数" \
+  "$(echo "$DK" | python3 -c "
+import sys,json
+g=[x for x in (json.load(sys.stdin).get('subitemGroups') or []) if x.get('groupName')=='任选菜']
+print(len(g[0].get('subitems') or []) if g else 0)")" "3"
+
+# K2 组合券包（COMBO）的明细存 biz_product_ext.combo_items_json，不走子品表。
+# 会员端原先读的是 product.packages —— 全库只有 utils/mock.js 造过这个字段，
+# 后端零命中，所以真机上 COMBO 的套餐详情永远是空的。
+q "insert into biz_product (product_id, merchant_id, store_id, store_ids, product_name,
+     product_type, type_code, price, market_price, stock, sales, total_value, status, del_flag)
+   values ($COMBO_PROD, $MID, $STORE, '$STORE', 'SMOKE券包991',
+     '0', 'COMBO', 188, 300, 20, 0, 300, '0', '0');"
+q "insert into biz_product_ext (product_id, combo_items_json)
+   values ($COMBO_PROD, '[{\"name\":\"火锅双人餐\",\"subitemType\":\"GROUPON\",\"pickQuantity\":1,\"price\":99},{\"name\":\"50元代金券\",\"subitemType\":\"VOUCHER\",\"pickQuantity\":2,\"price\":50}]');"
+DC=$(curl -s "$BASE/api/product/$COMBO_PROD" -H "X-App-Id: wx-smoke-detail-991")
+CJ=$(echo "$DC" | python3 -c "
+import sys,json
+d=json.load(sys.stdin).get('data') or {}
+print(((d.get('ext') or {}).get('comboItemsJson') or ''))")
+has "COMBO 明细随详情下发" "$CJ" "火锅双人餐"
+has "COMBO 明细包含代金券行" "$CJ" "50元代金券"
+# 前端 parseComboItems 要拿 pickQuantity 算小计（与商家端 sumCombo 同口径）
+chk "COMBO 明细条数" \
+  "$(python3 -c "
+import json,sys
+print(len(json.loads(sys.argv[1])))" "$CJ")" "2"
+chk "COMBO 类型码原值下发（翻译在前端）" \
+  "$(python3 -c "
+import json,sys
+print(json.loads(sys.argv[1])[1]['subitemType'])" "$CJ")" "VOUCHER"

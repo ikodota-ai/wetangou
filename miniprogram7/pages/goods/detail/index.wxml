@@ -70,7 +70,7 @@
     <view class="subitem-block" wx:for="{{product.subitemGroups}}" wx:key="groupId" wx:for-item="g">
       <view class="subitem-group-name">
         <text class="dot">·</text>{{ g.groupName }}
-        <text class="subitem-rule" wx:if="{{g.pickRule && g.pickRule !== 'ALL'}}">{{ g.pickRule }}</text>
+        <text class="subitem-rule" wx:if="{{g.pickText}}">{{ g.pickText }}</text>
       </view>
       <view class="subitem-row" wx:for="{{g.subitems}}" wx:key="subitemId" wx:for-item="s">
         <text class="subitem-name">{{ s.subitemName }}</text>
@@ -81,16 +81,23 @@
       </view>
     </view>
   </view>
-  <view class="card" wx:elif="{{product.packages && product.packages.length}}">
-    <text class="block-title">套餐详情</text>
-    <view class="pkg-line"><text class="dot">·</text><text class="pkg-name">{{product.name}}</text></view>
-    <view class="pkg-row" wx:for="{{product.packages}}" wx:key="name">
-      <text class="pkg-name">{{item.name}}</text>
+  <!-- 组合券包（COMBO）的搭配明细：存 biz_product_ext.combo_items_json，
+       不走子品表。原先这里读的是 product.packages —— 那个字段全库只有
+       utils/mock.js 造过，后端零命中，所以真机上这张卡永远不可能出现：
+       顾客买券包看不到里面到底包了哪几张券。 -->
+  <view class="card" wx:elif="{{product.comboItems && product.comboItems.length}}">
+    <text class="block-title">{{product.typeName}}明细</text>
+    <view class="pkg-row" wx:for="{{product.comboItems}}" wx:key="name">
+      <view class="pkg-left">
+        <text class="pkg-name">{{item.name}}</text>
+        <text class="pkg-type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
+      </view>
       <view class="pkg-right">
-        <text class="pkg-qty">({{item.qty}}份)</text>
-        <text class="pkg-price">¥{{item.price}}</text>
+        <text class="pkg-qty" wx:if="{{item.quantity > 1}}">×{{item.quantity}}</text>
+        <text class="pkg-price">¥{{item.subtotal}}</text>
       </view>
     </view>
+    <view class="combo-total" wx:if="{{product.totalValue}}">总价值 ¥{{product.totalValue}}</view>
   </view>
 
 

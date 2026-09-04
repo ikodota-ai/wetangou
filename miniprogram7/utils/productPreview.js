@@ -103,7 +103,10 @@ function draftToProduct(draft) {
     // 商家端预览时那个兑底会显示成「当前商家」，没法确认绑对了店，
     // 所以这里直接给上主门店名。
     storeName: storeIds.length ? (nameOf[storeIds[0]] || ('门店' + storeIds[0])) : '',
-    subitemGroups: d.subitemGroups || []
+    subitemGroups: d.subitemGroups || [],
+    // 组合券包的搭配明细：会员端详情页从 ext.comboItemsJson 读（同一个源）。
+    // 预览必须摆成同构形状，否则 COMBO 商品预览出来没明细、顾客那边却有。
+    ext: { comboItemsJson: d.comboItemsJson || '' }
   }
 }
 
