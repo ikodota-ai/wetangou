@@ -81,6 +81,7 @@ biz_quartz_jobs_20260904
 sys_job_cn_name_20260904
 biz_pay_bill_paid_20260904
 biz_merchant_staff_tenant_align_20260904
+biz_product_type_tips_20260905
 """.split()
 
 DEMO = """

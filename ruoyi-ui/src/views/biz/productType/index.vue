@@ -37,6 +37,7 @@
       <el-table-column label="类型代码" align="center" prop="typeCode" width="160" />
       <el-table-column label="类型名称" align="center" prop="typeName" />
       <el-table-column label="业务说明" align="center" prop="typeDesc" show-overflow-tooltip />
+      <el-table-column label="顾客端说明" align="center" prop="typeTips" show-overflow-tooltip />
       <el-table-column label="App可创建" align="center" prop="appCanCreate" width="100">
         <template slot-scope="scope">
           <el-tag :type="scope.row.appCanCreate === 1 ? 'success' : 'info'">{{ scope.row.appCanCreate === 1 ? '是' : '否' }}</el-tag>
@@ -73,7 +74,11 @@
           <el-input v-model="form.typeName" placeholder="请输入类型名称" />
         </el-form-item>
         <el-form-item label="业务说明" prop="typeDesc">
-          <el-input v-model="form.typeDesc" type="textarea" :rows="2" placeholder="请输入业务说明" />
+          <el-input v-model="form.typeDesc" type="textarea" :rows="2" placeholder="写给运营/商家看的招商话术，不展示给顾客" />
+        </el-form-item>
+        <el-form-item label="顾客端说明" prop="typeTips">
+          <el-input v-model="form.typeTips" type="textarea" :rows="3" placeholder="小程序商品详情页「××说明」卡的正文，直接给顾客看" />
+          <div class="el-upload__tip">与「业务说明」分开：业务说明是「搭配自由，快速吸引顾客」这种内部话术，搬到顾客面前不知所云。留空则详情页不展说明卡。</div>
         </el-form-item>
         <el-form-item label="App可创建" prop="appCanCreate">
           <el-radio-group v-model="form.appCanCreate">
@@ -209,7 +214,7 @@ export default {
     },
     cancel() { this.open = false; this.reset() },
     reset() {
-      this.form = { typeCode: null, typeName: null, typeDesc: '', appCanCreate: 1, needLicense: 0, sort: 0, status: '0', isEdit: false }
+      this.form = { typeCode: null, typeName: null, typeDesc: '', typeTips: '', appCanCreate: 1, needLicense: 0, sort: 0, status: '0', isEdit: false }
       this.$nextTick(() => { if (this.$refs.form) this.$refs.form.clearValidate() })
     }
   }

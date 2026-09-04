@@ -139,6 +139,7 @@ run biz_quartz_jobs_20260904         # 4 个业务定时任务（超时单取消
 run sys_job_cn_name_20260904          # 定时任务名改中文（英文标识保留在括号里，运营看得懂才敢动 cron）
 run biz_pay_bill_paid_20260904        # 买单补 pay_time/pay_no（原先「已完成」却查不到何时付款、无 transaction_id 可对账）
 run biz_merchant_staff_tenant_align_20260904  # 员工关联的商户归属对齐门店真实归属（脏数据会让老板建品报「门店不属于该商家」）
+run biz_product_type_tips_20260905    # 类型说明改读字典 type_tips + 商户级销量/库存开关（原先类型名和说明写死在 WXML，后台改了顾客端不动）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

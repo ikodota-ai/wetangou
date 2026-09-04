@@ -241,7 +241,15 @@ const api = {
   // 商家端商品列表：分页 + 能查草稿。顾客端那个 /api/product/list 写死 status=0
   // 且不分页，商家端拿它做列表看不到自己的草稿、也拿不到 total 做 tab 角标。
   merchantProductList: (params) => request('/api/product/merchant/list', { data: params }),
-  productDetail: (id) => request(`/api/product/${id}`),
+  // 必须用 _raw：/api/product/{id} 的响应体是
+  // { code, msg, data:{商品}, subitemGroups:[...] } —— subitemGroups 是 data 的**兄弟键**
+  // （ApiProductController.detail 里 result.put("subitemGroups", groups)）。
+  // 而 request() 成功分支做 resolve(d.data || d)，解完只剩商品本体，
+  // subitemGroups 连同外层一起被丢。后果是会员端详情页那张
+  // 「套餐详情」卡的 wx:if 永远不成立 —— 团购套餐里到底有哪些菜，
+  // 顾客从来没看到过（而这正是他判断值不值的主要依据）。
+  // 改 _raw 后回传完整响应，各调用方原本就写的 (res.data || res) 兼容写法正好抿中。
+  productDetail: (id) => requestRaw(`/api/product/${id}`),
   // 商品小程序码（分享面板 / 海报用）。与推客身份无关，普通会员也能拿 ——
   // 原先海报页借用 /api/distributor/qrcode，那个要求调用者是推客
   productQrcode: (id) => request(`/api/product/${id}/qrcode`),
@@ -255,6 +263,10 @@ const api = {
   // defaultCodes 连同外层一起被丢掉，调用方再写 res.data / res.defaultCodes 全是
   // undefined，建品页于是渲染出「渠道字典暂不可用」，保存时只能由后端兜底成平台默认渠道。
   saleChannelEnabled: () => requestRaw('/biz/saleChannel/enabled'),
+  // 商品类型字典。建品页原先自己写了一份 TYPE_LIST 硬编码（GROUPON →「团购套餐」），
+  // 会员端详情页又写了一份 typeText()，而运营已在后台改成「到店自取」——
+  // 商家选的名字和顾客看的名字不一样。统一从字典拉。
+  productTypeList: (params) => request('/api/product/type/list', { data: params || {} }),
   productAdd: (data) => request('/api/product/add', { method: 'POST', data }),
   // 商品编辑（小程序建品后回填 totalValue / ext.comboItemsJson 等）
   productUpdate: (data) => request('/api/product', { method: 'PUT', data }),

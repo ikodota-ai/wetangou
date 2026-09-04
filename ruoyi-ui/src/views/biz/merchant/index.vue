@@ -263,6 +263,24 @@
               <div class="form-tip">关闭后该商户小程序「我的」页不再显示「推客中心」入口；已加入的推客数据保留，重新启用即恢复。</div>
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="展示销量" prop="showSales">
+              <el-radio-group v-model="form.showSales">
+                <el-radio label="1">展示</el-radio>
+                <el-radio label="0">隐藏</el-radio>
+              </el-radio-group>
+              <div class="form-tip">小程序商品详情页价格条右侧的「已售 N」。新品还没卖过就写着「已售 0」，对商家是负面信号，可先隐藏。</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="展示库存" prop="showStock">
+              <el-radio-group v-model="form.showStock">
+                <el-radio label="1">展示</el-radio>
+                <el-radio label="0">隐藏</el-radio>
+              </el-radio-group>
+              <div class="form-tip">商品详情页「购买须知 · 库存」那一行。不愿把余量透给顾客（剩得多会被读成“不好卖”）时关掉。</div>
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="备注" prop="remark">
               <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
@@ -471,6 +489,8 @@ export default {
         licenseImg: null,
         serviceExpire: null,
         promoterEnabled: "1",
+        showSales: "1",
+        showStock: "1",
         status: "0",
         remark: null
       };

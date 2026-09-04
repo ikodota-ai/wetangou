@@ -116,6 +116,18 @@ public class Merchant extends BaseEntity
     /** 推客功能是否启用（1=启用 0=关闭） */
     private String promoterEnabled;
 
+    /**
+     * 商品详情页是否展示销量（1=展示 0=隐藏）。
+     * 新品还没卖过就明晃晃写着「已售 0」，对商家是负面信号。
+     */
+    private String showSales;
+
+    /**
+     * 商品详情页是否展示库存（1=展示 0=隐藏）。
+     * 有的商家不愿把余量透给顾客（剩得多会被读成“不好卖”）。
+     */
+    private String showStock;
+
     /** 服务到期时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date serviceExpire;
@@ -400,6 +412,26 @@ public class Merchant extends BaseEntity
     public void setPromoterEnabled(String promoterEnabled)
     {
         this.promoterEnabled = promoterEnabled;
+    }
+
+    public String getShowSales()
+    {
+        return showSales;
+    }
+
+    public void setShowSales(String showSales)
+    {
+        this.showSales = showSales;
+    }
+
+    public String getShowStock()
+    {
+        return showStock;
+    }
+
+    public void setShowStock(String showStock)
+    {
+        this.showStock = showStock;
     }
 
     public Date getServiceExpire()

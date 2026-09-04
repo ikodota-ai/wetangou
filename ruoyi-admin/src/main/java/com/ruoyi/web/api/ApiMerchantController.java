@@ -98,6 +98,13 @@ public class ApiMerchantController
         // 所以这个兜底在生产上线那一刻就会生效，不能省。
         String promoterEnabled = merchant.getPromoterEnabled();
         data.put("promoterEnabled", StringUtils.isEmpty(promoterEnabled) ? "1" : promoterEnabled);
+        // 商品详情页销量 / 库存展示开关。同样必须兑底成 "1"：
+        // 商户缓存没 TTL，新增列之前写进去的快照里根本没这两个 key，
+        // 不兑底就会把所有老商户的销量和库存整体隐掉（promoter_enabled 上线时踩过）。
+        String showSales = merchant.getShowSales();
+        String showStock = merchant.getShowStock();
+        data.put("showSales", StringUtils.isEmpty(showSales) ? "1" : showSales);
+        data.put("showStock", StringUtils.isEmpty(showStock) ? "1" : showStock);
         return AjaxResult.success(data);
     }
 

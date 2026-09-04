@@ -24,6 +24,13 @@ import com.ruoyi.biz.domain.ProductSubitemGroup;
 import com.ruoyi.biz.service.IProductSubitemGroupService;
 import com.ruoyi.biz.service.IProductService;
 import com.ruoyi.biz.service.ICategoryService;
+import com.ruoyi.biz.domain.ProductType;
+import com.ruoyi.biz.service.IProductTypeService;
+import com.ruoyi.biz.domain.Store;
+import com.ruoyi.biz.service.IStoreService;
+import com.ruoyi.biz.domain.Merchant;
+import com.ruoyi.biz.service.IMerchantService;
+import java.util.ArrayList;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
@@ -55,6 +62,18 @@ public class ApiProductController
 
     @Autowired
     private IProductSubitemGroupService subitemGroupService;
+
+    @Autowired
+    private IProductTypeService productTypeService;
+
+    @Autowired
+    private IStoreService storeService;
+
+    @Autowired
+    private IMerchantService merchantService;
+
+    @Autowired
+    private com.ruoyi.system.service.ISysDictDataService dictDataService;
 
     @Autowired
     private com.ruoyi.biz.service.IProductSubitemService subitemService;
@@ -199,7 +218,96 @@ public class ApiProductController
             List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
             result.put("subitemGroups", groups);
         }
+
+        // 类型名与面向顾客的使用说明，从 biz_product_type 字典取。
+        //
+        // 原先小程序详情页自己维护了一张 typeText() 映射表（GROUPON 写死「团购套餐」），
+        // 而运营早就在后台把它改成了「到店自取」—— 字典表形同虚设，
+        // 改了名字顾客端半点不动。类型说明卡同理（5 段文案硬编码在 WXML）。
+        // 现在统一从字典下发，前端只负责渲染。
+        if (StringUtils.isNotEmpty(t))
+        {
+            ProductType pt = productTypeService.selectByCode(t);
+            if (pt != null)
+            {
+                result.put("typeName", pt.getTypeName());
+                result.put("typeTips", pt.getTypeTips());
+            }
+        }
+
+        // 适用门店的服务设施标签（已翻译成中文）。
+        //
+        // 原先详情页那一行「服务」写的是「免预约 / 到店核销」—— 那是预约方式，
+        // 不是服务设施。真正的服务设施（可堂食 / 提供独立空间 / 免费停车…）存在
+        // biz_store.services，顾客在商品页上从来看不到，而这是他判断能不能去的前提。
+        //
+        // 取主门店（store_id）的设施；多店商品各店设施可能不同，但商品页只能展一份，
+        // 以主门店为准比一个都不展强（具体到店设施在门店详情页看）。
+        Long mainStoreId = p.getStoreId();
+        if (mainStoreId == null && StringUtils.isNotEmpty(p.getStoreIds()))
+        {
+            String first = p.getStoreIds().split(",")[0].trim();
+            if (StringUtils.isNotEmpty(first))
+            {
+                try { mainStoreId = Long.valueOf(first); } catch (NumberFormatException ignore) {}
+            }
+        }
+        if (mainStoreId != null)
+        {
+            Store st = storeService.selectStoreByStoreId(mainStoreId);
+            if (st != null)
+            {
+                result.put("storeServices", translateServices(st.getServices()));
+                // 门店营业时间与评分：详情页「适用门店」卡里原先写死了
+                // 「周一至周日 09:00-22:30」和「暂无评分」五颗空星。
+                result.put("storeHours", st.getBusinessHours());
+                result.put("storeRating", st.getRating());
+                result.put("storeNameMain", st.getStoreName());
+            }
+        }
+
+        // 商户级展示开关（销量 / 库存）。
+        // 必须兑底成 "1"：商户缓存 merchant:* 没 TTL，新增列之前写进去的快照
+        // 反序列化回来这两个 key 是 null（promoter_enabled 上线时踩过同一个坑），
+        // 不兑底就会把所有老商户的销量和库存整体隐掉。
+        result.put("showSales", "1");
+        result.put("showStock", "1");
+        if (p.getMerchantId() != null)
+        {
+            Merchant mch = merchantService.selectMerchantByMerchantId(p.getMerchantId());
+            if (mch != null)
+            {
+                result.put("showSales", StringUtils.isEmpty(mch.getShowSales()) ? "1" : mch.getShowSales());
+                result.put("showStock", StringUtils.isEmpty(mch.getShowStock()) ? "1" : mch.getShowStock());
+            }
+        }
         return result;
+    }
+
+    /**
+     * 把 biz_store.services 的字典码值（dine_in,can_book）翻译成中文标签。
+     *
+     * 与 ApiStoreController.services 同口径：翻译在服务端做，前端不得自己维护映射表，
+     * 否则后台字典加了新码值前端就不显示。
+     */
+    private List<String> translateServices(String services)
+    {
+        List<String> labels = new ArrayList<String>();
+        if (StringUtils.isEmpty(services))
+        {
+            return labels;
+        }
+        for (String code : services.split(","))
+        {
+            String c = code.trim();
+            if (StringUtils.isEmpty(c))
+            {
+                continue;
+            }
+            String label = dictDataService.selectDictLabel("biz_store_service", c);
+            labels.add(StringUtils.isEmpty(label) ? c : label);
+        }
+        return labels;
     }
 
     /**
@@ -284,6 +392,26 @@ public class ApiProductController
         query.setStoreId(storeId);
         List<Category> list = categoryService.selectCategoryList(query);
         return AjaxResult.success(list);
+    }
+
+    /**
+     * 商品类型字典（biz_product_type）
+     *
+     * <p>为什么要开这个端点：小程序商家端建品页自己写了一份
+     * TYPE_LIST 硬编码（GROUPON →「团购套餐」），会员端详情页又写了一份 typeText()。
+     * 而运营已经在后台把它改成了「到店自取」——三处名字各说各话，
+     * 商家在建品页选的是「团购套餐」，顾客在详情页看到的却该是「到店自取」。
+     * 统一从字典下发，前端不再自己维护映射表。</p>
+     *
+     * <p>appCanCreate=1 时只返小程序允许创建的那几种（建品页用）；
+     * 不传则全返（详情页/列表页需要能翻译所有类型，包括已停用的）。</p>
+     */
+    @GetMapping("/type/list")
+    public AjaxResult typeList(@RequestParam(required = false) Integer appCanCreate)
+    {
+        ProductType query = new ProductType();
+        query.setAppCanCreate(appCanCreate);
+        return AjaxResult.success(productTypeService.selectList(query));
     }
 
     /**

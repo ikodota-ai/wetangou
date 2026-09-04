@@ -13,7 +13,8 @@
 .info { margin: 0 32rpx; }
 .info-name { font-size: 32rpx; font-weight: 600; color: #1A1A1A; line-height: 1.4; display: block; margin-bottom: 24rpx; }
 .info-row { display: flex; gap: 24rpx; padding: 8rpx 0; }
-.lab { font-size: 26rpx; color: #999; width: 80rpx; }
+/* 96rpx 不能再小：新增的「服务设施」是四个字，80rpx 会折行 */
+.lab { font-size: 26rpx; color: #999; width: 96rpx; flex-shrink: 0; }
 .val { font-size: 26rpx; color: #1A1A1A; flex: 1; }
 
 .card { background: #FFFFFF; border-radius: 20rpx; padding: 32rpx; margin: 24rpx 32rpx; }
@@ -147,3 +148,18 @@ button.so::after { border: none; }
 .subitem-rule { font-size: 22rpx; color: #B26A00; background: #FFF7E6; padding: 2rpx 10rpx; border-radius: 6rpx; margin-left: 8rpx; }
 .subitem-row { display: flex; align-items: center; justify-content: space-between; padding: 6rpx 0 6rpx 24rpx; font-size: 26rpx; color: #444; }
 .subitem-name { flex: 1; }
+
+/* 预览态底部条：替代购买栏，避免商家在预览里点到会跳出草稿的入口 */
+.preview-bar { justify-content: space-between; padding: 0 24rpx; }
+.preview-tip { font-size: 26rpx; color: #999; }
+
+/* 副标题：紧跟商品名，比正名小一号、颜色浅一级，不抢主标题的重量 */
+.info-sub { display: block; font-size: 26rpx; color: #888; line-height: 1.4; margin: -12rpx 0 20rpx; }
+
+/* 服务设施标签：可能一下子出 5 个（可堂食/可预约/独立空间/免费停车场/免费停车），
+   必须 wrap，否则横向撑破卡片 */
+.svc-wrap { display: flex; flex-wrap: wrap; gap: 8rpx; }
+.svc-tag { font-size: 22rpx; color: #1677FF; background: #F0F6FF; padding: 2rpx 12rpx; border-radius: 6rpx; }
+
+/* 评分：原先是五颗永远不亮的空星，改成直接把分数抬出来 */
+.rating-score { font-size: 26rpx; font-weight: 600; color: var(--color-primary); }

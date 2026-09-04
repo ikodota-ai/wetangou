@@ -8,6 +8,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="typeCode"     column="type_code"     />
         <result property="typeName"     column="type_name"     />
         <result property="typeDesc"     column="type_desc"     />
+        <result property="typeTips"     column="type_tips"     />
         <result property="fieldConfig"  column="field_config"  />
         <result property="icon"         column="icon"          />
         <result property="sort"         column="sort"          />
@@ -19,7 +20,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectVo">
-        select type_code, type_name, type_desc, field_config, icon, sort,
+        select type_code, type_name, type_desc, type_tips, field_config, icon, sort,
                app_can_create, need_license, status, create_time, update_time
         from biz_product_type
     </sql>
@@ -44,6 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="typeCode != null">type_code,</if>
             <if test="typeName != null">type_name,</if>
             <if test="typeDesc != null">type_desc,</if>
+            <if test="typeTips != null">type_tips,</if>
             <if test="fieldConfig != null">field_config,</if>
             <if test="icon != null">icon,</if>
             <if test="sort != null">sort,</if>
@@ -57,6 +59,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="typeCode != null">#{typeCode},</if>
             <if test="typeName != null">#{typeName},</if>
             <if test="typeDesc != null">#{typeDesc},</if>
+            <if test="typeTips != null">#{typeTips},</if>
             <if test="fieldConfig != null">#{fieldConfig},</if>
             <if test="icon != null">#{icon},</if>
             <if test="sort != null">#{sort},</if>
@@ -73,6 +76,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="typeName != null">type_name = #{typeName},</if>
             <if test="typeDesc != null">type_desc = #{typeDesc},</if>
+            <if test="typeTips != null">type_tips = #{typeTips},</if>
             <if test="fieldConfig != null">field_config = #{fieldConfig},</if>
             <if test="icon != null">icon = #{icon},</if>
             <if test="sort != null">sort = #{sort},</if>

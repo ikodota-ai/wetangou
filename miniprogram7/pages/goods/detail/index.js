@@ -1,5 +1,6 @@
 const app = getApp();
 const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
+const { draftToProduct } = require('../../../utils/productPreview.js');
 
 Page({
   data: {
@@ -18,7 +19,17 @@ Page({
     // 分享面板：小程序码 dataUrl（空则显示占位文案），以及原价是否该显示
     shareQr: '',
     shareQrTip: '小程序码加载中',
-    showSharePriceOld: false
+    showSharePriceOld: false,
+    // 预览态：商家端建品页「预览」跳进来，数据是内存里的草稿而不是后端商品。
+    // 复用本页而不是另抄一套详情 WXML —— 抄一套的话两边一改版就会漂移，
+    // 预览慢慢变成「和顾客看到的不一样」，那还不如没有。
+    isPreview: false,
+    // 门店服务设施（后端已按 biz_store_service 字典翻译成中文）
+    storeServices: [],
+    // 商户级展示开关。默认 true（与改造前行为一致）：
+    // 假如初值给 false，接口回来前的那一帧会先把销量闪掉再闪回来。
+    showSales: true,
+    showStock: true
   },
   onLoad(opts) {
     // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
@@ -29,7 +40,47 @@ Page({
       user: this._normalizeUser(appInst.globalData && appInst.globalData.user),
       merchantName: m.merchantName || '当前商家'
     });
+    // 预览态：草稿放在 globalData 里传递（URL 传不下整个表单，且含中文会被截断）
+    if (opts.preview === '1' || opts.preview === 1) {
+      this._loadPreview(appInst);
+      return;
+    }
     this.loadProduct(opts.id);
+  },
+
+  /**
+   * 以预览态渲染商家端建品页的草稿。
+   *
+   * 走的是和真实商品完全相同的 normalize + WXML，所以商家看到的排版、
+   * 类型专属说明、购买须知、套餐详情都与顾客将看到的一致 —— 这才是预览的意义。
+   * 差别只有两处：不请求后端，底部购买栏换成「预览中」提示条（见 WXML）。
+   */
+  _loadPreview(appInst) {
+    const draft = (appInst.globalData && appInst.globalData.productPreviewDraft) || null;
+    if (!draft) {
+      this.setData({ state: 'error', errorMsg: '预览数据丢失，请返回重新点击预览' });
+      return;
+    }
+    try {
+      const raw = draftToProduct(draft);
+      const normalized = this.normalize(raw, raw.subitemGroups || []);
+      this.setData({
+        isPreview: true,
+        product: normalized,
+        state: 'loaded',
+        // 预览必须跟会员端一模一样：服务设施和两个展示开关都是顶层字段，
+        // 不带的话商家会看到一个没服务设施、却无条件显销量的页面——那不是顾客看到的。
+        storeServices: draft.storeServices || [],
+        showSales: draft.showSales !== '0' && draft.showSales !== false,
+        showStock: draft.showStock !== '0' && draft.showStock !== false,
+        canBuyNow: false,
+        buyBtnLabel: '预览中，不可购买'
+      });
+      wx.setNavigationBarTitle({ title: '预览（顾客视角）' });
+    } catch (e) {
+      console.error('[goods/detail] preview normalize FAIL', e, draft);
+      this.setData({ state: 'error', errorMsg: '预览渲染失败：' + e.message });
+    }
   },
   onUserUpdate(user) { this.setData({ user: this._normalizeUser(user) }); },
   /**
@@ -64,13 +115,24 @@ Page({
       .then((res) => {
         clearTimeout(this._loadTimer);
         console.log('[goods/detail] productDetail response =>', JSON.stringify(res).slice(0, 500));
+        // 响应体是 { code, msg, data:{商品}, subitemGroups, typeName, typeTips, storeServices, showSales, showStock }
+        // —— data 以外都是兄弟键，所以 api.productDetail 必须用 requestRaw（不解包）。
+        const raw = res || {};
         const d = (res && res.data) || res || null;
         const p = (d && (d.data || d)) || null;
         const groups = d && d.subitemGroups ? d.subitemGroups : (p && p.subitemGroups) || []
         if (p && p.productId) {
           let normalized;
           try {
-            normalized = this.normalize(p, groups);
+            // 把顶层兄弟键并入商品对象：类型名/说明跟商品一起渲染，
+            // 这样 normalize 只面对一个完整对象，预览态也能造出同构数据。
+            normalized = this.normalize(Object.assign({}, p, {
+              typeName: raw.typeName || p.typeName,
+              typeTips: raw.typeTips || p.typeTips,
+              storeHours: raw.storeHours || p.storeHours,
+              storeRating: raw.storeRating != null ? raw.storeRating : p.storeRating,
+              storeNameMain: raw.storeNameMain || p.storeNameMain
+            }), groups);
           } catch (e) {
             console.error('[goods/detail] normalize FAIL', e, p);
             this.setData({ state: 'error', errorMsg: '数据规范化失败: ' + e.message });
@@ -84,6 +146,12 @@ Page({
           this.setData({
             product: normalized,
             state: 'loaded',
+            // 服务设施 / 展示开关都是顶层兄弟键，不属于商品字段。
+            // 开关后端回的是 '1'/'0' 字符串，WXML 里 '0' 是真值，必须在这里归一成 boolean，
+            // 否则商家关了开关依旧显示（开关彻底失效）。
+            storeServices: raw.storeServices || [],
+            showSales: raw.showSales !== '0',
+            showStock: raw.showStock !== '0',
             canBuyNow: this.canBuy(normalized),
             buyBtnLabel: this.buyBtnDisabledText(normalized)
           });
@@ -101,6 +169,21 @@ Page({
         console.error('[goods/detail] productDetail FAIL', id, err);
         this.setData({ state: 'error', errorMsg: msg });
       });
+  },
+  /**
+   * 退改政策枚举 → 中文。
+   *
+   * biz_product.refund_policy 库里两种形态共存：枚举码（ANYTIME）和商家手写的中文
+   * （「未核销随时退；已核销不退」）。原先 WXML 直接渲染原值，
+   * 枚举那两条商品的「退改政策」就写着一个大写 ANYTIME 给顾客看。
+   */
+  refundText(v) {
+    if (!v) return ''
+    return ({
+      ANYTIME: '未核销随时退',
+      EXPIRED: '过期自动退',
+      NEVER: '不支持退款'
+    })[v] || v
   },
   normalize(p, groups) {
     const images = p.images
@@ -124,7 +207,12 @@ Page({
       name: p.productName || p.name,
       price: p.price != null ? String(p.price) : '0.00',
       typeCode: typeCode,
-      typeName: this.typeText(typeCode),
+      // typeName 优先用后端从 biz_product_type 下发的值；typeText() 只作为字典缺行时的兑底。
+      // 原先无条件走 typeText()，GROUPON 永远显示「团购套餐」，
+      // 而运营早就在后台把它改成了「到店自取」。
+      typeName: p.typeName || this.typeText(typeCode),
+      typeTips: p.typeTips || '',
+      refundPolicyText: this.refundText(p.refundPolicy),
       faceValue: p.faceValue != null ? String(p.faceValue) : '',
       minConsume: p.minConsume != null ? String(p.minConsume) : '',
       totalTimes: p.totalTimes || 0,
@@ -170,7 +258,13 @@ Page({
     this.setData({ imgIdx: e.detail.current });
   },
   onRetry() { this.loadProduct(this.data.id); },
-  onBack() { wx.switchTab({ url: '/pages/home/index', fail: () => wx.navigateBack({ delta: 1 }) }); },
+  onBack() {
+    // 预览态是从建品页 navigateTo 过来的，必须回到那个还留着草稿的页面。
+    // 切到首页会让商家丢掉整张已填的表单。
+    if (this.data.isPreview) { wx.navigateBack({ delta: 1 }); return; }
+    wx.switchTab({ url: '/pages/home/index', fail: () => wx.navigateBack({ delta: 1 }) });
+  },
+  onExitPreview() { wx.navigateBack({ delta: 1 }); },
   goDetail(e) { wx.redirectTo({ url: '/pages/goods/detail/index?id=' + e.currentTarget.dataset.id }); },
   goStore() { wx.switchTab({ url: '/pages/home/index' }); },
   goOrderList() { wx.navigateTo({ url: '/pages/order/list/index' }); },
@@ -225,6 +319,10 @@ Page({
   },
   closeAuthPhone() { this.setData({ showAuthPhone: false }); },
   onBuy() {
+    if (this.data.isPreview) {
+      wx.showToast({ title: '预览中，返回后可保存草稿', icon: 'none' });
+      return;
+    }
     if (!this.canBuy()) {
       wx.showToast({ title: this.limitText() || '当前不可购买', icon: 'none' });
       return;

@@ -14,13 +14,17 @@
       <text class="now">¥{{product.price}}</text>
       <text class="old" wx:if="{{product.marketPrice && product.marketPrice > product.price}}">¥{{product.marketPrice}}</text>
     </view>
-    <view class="price-tag" wx:if="{{discountText}}">{{discountText}}</view>
-    <view class="price-sold">已售 {{product.sold || 0}}</view>
+    <view class="price-tag" wx:if="{{product.discountText}}">{{product.discountText}}</view>
+    <!-- 销量走商户级开关：新品还没卖过就明晃晃写着「已售 0」，对商家是负面信号 -->
+    <view class="price-sold" wx:if="{{showSales}}">已售 {{product.sold || 0}}</view>
   </view>
 
   <!-- 标题 + 须知 -->
   <view class="info card">
     <text class="info-name">{{product.name}}</text>
+    <!-- 副标题紧跟商品名：它就是商品名的补充说明（如「含 2 人份锅底」），
+         原先在整个详情页上压根没渲染——商家认真填了却从没有顾客看到过 -->
+    <text class="info-sub" wx:if="{{product.subtitle}}">{{product.subtitle}}</text>
     <view class="info-row"><text class="lab">类型</text><text class="val type-tag">{{product.typeName}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'VOUCHER' && product.faceValue}}"><text class="lab">面值</text><text class="val">¥{{product.faceValue}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'VOUCHER' && product.minConsume && product.minConsume !== '0.00'}}"><text class="lab">最低消费</text><text class="val">¥{{product.minConsume}}</text></view>
@@ -28,33 +32,36 @@
     <view class="info-row" wx:if="{{product.typeCode === 'PERIOD_CARD' && product.periodType}}"><text class="lab">周期</text><text class="val">{{product.periodType === 'MONTH' ? '月卡' : product.periodType === 'QUARTER' ? '季卡' : product.periodType === 'YEAR' ? '年卡' : product.periodType}} {{product.periodCount ? '× ' + product.periodCount : ''}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'COMBO' && product.totalValue}}"><text class="lab">总价值</text><text class="val">¥{{product.totalValue}}</text></view>
     <view class="info-row" wx:if="{{product.requireXiaoxin}}"><text class="lab">冷静期</text><text class="val">购买后 {{product.consumeStartDays || 1}} 天起 {{product.consumeValidDays || 360}} 天内有效</text></view>
-    <view class="info-row"><text class="lab">门店</text><text class="val">{{storeScopeText}}</text></view>
-    <view class="info-row" wx:if="{{product.bookingRequired == 1}}"><text class="lab">服务</text><text class="val">需提前预约</text></view>
-    <view class="info-row" wx:elif="{{product.typeCode === 'VOUCHER'}}"><text class="lab">服务</text><text class="val">免预约</text></view>
-    <view class="info-row" wx:elif="{{product.typeCode === 'GROUPON' || product.typeCode === 'COMBO'}}"><text class="lab">服务</text><text class="val">免预约 / 到店核销</text></view>
+    <!-- 原先这里还有一行「门店」（storeScopeText），已删：
+         页面底部「适用门店」卡已经把可用门店完整列出来了，同一信息说两遍。 -->
+    <!-- 服务设施：读门店 biz_store.services（后端已按字典翻译成中文）。
+         原先这一行写的是「免预约 / 到店核销」——那是预约方式，不是服务设施，
+         而真正的设施（可堂食 / 独立空间 / 免费停车）顾客在商品页上从来看不到。 -->
+    <view class="info-row" wx:if="{{storeServices.length}}">
+      <text class="lab">服务设施</text>
+      <view class="val svc-wrap">
+        <text class="svc-tag" wx:for="{{storeServices}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+    <!-- 预约方式单独一行（原先占用了「服务」这个 label） -->
+    <view class="info-row" wx:if="{{product.bookingRequired == 1}}"><text class="lab">预约</text><text class="val">需提前预约</text></view>
+    <view class="info-row" wx:elif="{{product.typeCode === 'VOUCHER'}}"><text class="lab">预约</text><text class="val">免预约</text></view>
+    <view class="info-row" wx:elif="{{product.typeCode === 'GROUPON' || product.typeCode === 'COMBO'}}"><text class="lab">预约</text><text class="val">免预约 / 到店核销</text></view>
   </view>
 
-  <!-- 类型说明（V2.6 P1：每种 typeCode 一段简短说明） -->
-  <view class="card type-intro" wx:if="{{product.typeCode === 'GROUPON'}}">
-    <text class="block-title">团购套餐说明</text>
-    <text class="intro-text">下单后凭核销码到店使用，可选择套餐内不同子品搭配</text>
-  </view>
-  <view class="card type-intro" wx:if="{{product.typeCode === 'VOUCHER'}}">
-    <text class="block-title">代金券说明</text>
-    <text class="intro-text">现金抵扣券，到店买单时出示核销，符合门槛时直接抵扣</text>
+  <!-- 类型说明：标题和正文全部读 biz_product_type（type_name / type_tips）。
+       原先这里是 5 个 wx:if 并列的卡，标题写死成「团购套餐说明」这种、
+       正文也写死在 WXML，且只覆盖 4 种类型（次卡/储值卡/周期卡… 一个都不命中，
+       顾客看不到任何解释）。运营在后台改了类型名（GROUPON 已改成「到店自取」）
+       顾客端半点不动——字典表形同虚设。 -->
+  <view class="card type-intro" wx:if="{{product.typeTips}}">
+    <text class="block-title">{{product.typeName}}说明</text>
+    <text class="intro-text">{{product.typeTips}}</text>
   </view>
   <view class="card" wx:if="{{product.typeCode === 'VOUCHER' && product.minConsume && product.minConsume !== '0.00' && product.minConsume !== '0'}}">
     <text class="block-title">使用示例</text>
     <view class="nl-line">本券面值 ¥{{product.faceValue}}，最低消费 ¥{{product.minConsume}} 可用</view>
     <view class="nl-sub">买单出示核销码，自动抵扣</view>
-  </view>
-  <view class="card type-intro" wx:if="{{product.typeCode === 'COMBO'}}">
-    <text class="block-title">组合券包说明</text>
-    <text class="intro-text">团购、代金券、实物自由组合，一次购买分次核销</text>
-  </view>
-  <view class="card type-intro" wx:if="{{product.typeCode === 'BOOKING'}}">
-    <text class="block-title">预约服务说明</text>
-    <text class="intro-text">下单后请到「我的订单」选择预约时段，凭预约凭证到店</text>
   </view>
 
   <!-- 套餐详情 (GROUPON / COMBO 显示) -->
@@ -104,9 +111,9 @@
         <text class="dot">·</text>售卖期
       </view>
       <view class="nl-sub" wx:if="{{product.saleStartDate || product.saleEndDate}}">
-        <text wx:if="{{product.saleStartDate}}">{{saleStartText}}</text>
+        <text wx:if="{{product.saleStartDate}}">{{product.saleStartText}}</text>
         <text wx:if="{{product.saleStartDate && product.saleEndDate}}"> 至 </text>
-        <text wx:if="{{product.saleEndDate}}">{{saleEndText}}</text>
+        <text wx:if="{{product.saleEndDate}}">{{product.saleEndText}}</text>
       </view>
 
       <!-- 限购 -->
@@ -127,11 +134,11 @@
         {{product.maxPersons}} 人使用
       </view>
 
-      <!-- 库存（明确告诉用户剩余多少） -->
-      <view class="nl-line" wx:if="{{product.stock !== null && product.stock !== undefined && product.stock > 0}}">
+      <!-- 库存。走商户级开关：有的商家不愿把余量透给顾客（剩得多会被读成“不好卖”） -->
+      <view class="nl-line" wx:if="{{showStock && product.stock > 0}}">
         <text class="dot">·</text>库存
       </view>
-      <view class="nl-sub" wx:if="{{product.stock !== null && product.stock !== undefined && product.stock > 0}}">
+      <view class="nl-sub" wx:if="{{showStock && product.stock > 0}}">
         剩余 {{product.stock}} 份
       </view>
 
@@ -139,8 +146,10 @@
       <view class="nl-line" wx:if="{{product.refundPolicy}}">
         <text class="dot">·</text>退改政策
       </view>
+      <!-- 库里既有枚举码（ANYTIME）也有商家手写的中文。
+           直接渲染会让顾客看到「ANYTIME」，normalize 里已把枚举翻成中文。 -->
       <view class="nl-sub" wx:if="{{product.refundPolicy}}">
-        {{product.refundPolicy}}
+        {{product.refundPolicyText}}
       </view>
 
       <!-- 附加费 -->
@@ -171,18 +180,22 @@
   <!-- 适用门店 -->
   <view class="card">
     <view class="store-head">
-      <text class="block-title">适用门店 {{storeCountText}}</text>
-      <text class="more" wx:if="{{storeCount > 1}}">{{storeCount}}店通用 ></text>
+      <text class="block-title">适用门店 {{product.storeCountText}}</text>
+      <text class="more" wx:if="{{product.storeCount > 1}}">{{product.storeCount}}店通用 ></text>
     </view>
     <view class="store-row">
       <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>
       <view class="store-info">
-        <text class="store-name">{{product.storeName || merchantName}}</text>
+        <text class="store-name">{{product.storeNameMain || product.storeName || merchantName}}</text>
+        <!-- 评分读 biz_store.rating（后台可维护）。原先五颗星永远是空的、
+             旁边永远写着「暂无评分」，就算商家填了 4.8 也不显示。 -->
         <view class="store-rating">
-          <view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view><view class="star s-off"></view>
-          <text class="rating-t">暂无评分</text>
+          <text class="rating-score" wx:if="{{product.storeRating}}">{{product.storeRating}}</text>
+          <text class="rating-t">{{product.storeRating ? '评分' : '暂无评分'}}</text>
         </view>
-        <text class="store-hours">营业时间：{{product.storeHours || '周一至周日 09:00-22:30'}}</text>
+        <!-- 营业时间原先兑底写死成「周一至周日 09:00-22:30」，
+             商家实际只开到 21:00 也照样显示 22:30，顾客跑空算谁的？没填就不展。 -->
+        <text class="store-hours" wx:if="{{product.storeHours}}">营业时间：{{product.storeHours}}</text>
       </view>
       <view class="store-call">
         <view class="call-ic"></view>
@@ -208,8 +221,13 @@
 
   <view class="bottom-pad"></view>
 
-  <!-- 底部操作 -->
-  <view class="bottom-bar">
+  <!-- 底部操作。预览态换成提示条：商家端跳进来是要看排版，
+       「商家/分享/订单」这几个入口在预览里点了会跳出草稿，反而丢数据。 -->
+  <view class="bottom-bar preview-bar" wx:if="{{isPreview}}">
+    <text class="preview-tip">顾客看到的就是这个页面</text>
+    <view class="buy-btn enabled" bindtap="onExitPreview">返回继续编辑</view>
+  </view>
+  <view class="bottom-bar" wx:else>
     <view class="bb-item" bindtap="goStore">
       <view class="bb-ic ic-shop"></view>
       <text>商家</text>

@@ -143,6 +143,10 @@ App({
     },
     shareDistributorId: null,
     inviteBy: null,
+    // 商家端建品页点「预览」时寄存的表单草稿，供会员端
+    // pages/goods/detail?preview=1 读取。走内存而不走 URL query：
+    // 整张表单装不进 query，且使用说明这种长中文会被截断。
+    productPreviewDraft: null,
     // 当前商家公开信息（名称/logo/客服兜底/营业时间）
     merchant: { merchantId: null, merchantName: '', logo: '', servicePhone: '', serviceQrcode: '', businessHours: '', intro: '' }
   },

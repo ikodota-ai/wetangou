@@ -21,8 +21,17 @@ public class ProductType extends BaseEntity
     /** 类型名称 */
     private String typeName;
 
-    /** 业务说明 */
+    /** 业务说明（给后台运营看的招商话术，不对顾客展示） */
     private String typeDesc;
+
+    /**
+     * 面向顾客的类型使用说明（商品详情页「……说明」卡的正文）。
+     *
+     * 与 typeDesc 分开：typeDesc 是「搭配自由，快速吸引顾客」这种写给商家看的招商话术，
+     * 直接搬到顾客面前不知所云。原先这段文案硬编码在小程序 WXML 里（且只覆盖 5 种类型），
+     * 运营想改一个字都得发版。
+     */
+    private String typeTips;
 
     /** 字段配置 JSON */
     private String fieldConfig;
@@ -51,6 +60,9 @@ public class ProductType extends BaseEntity
     public void setTypeName(String typeName) { this.typeName = typeName; }
     public String getTypeDesc() { return typeDesc; }
     public void setTypeDesc(String typeDesc) { this.typeDesc = typeDesc; }
+
+    public String getTypeTips() { return typeTips; }
+    public void setTypeTips(String typeTips) { this.typeTips = typeTips; }
     public String getFieldConfig() { return fieldConfig; }
     public void setFieldConfig(String fieldConfig) { this.fieldConfig = fieldConfig; }
     public String getIcon() { return icon; }

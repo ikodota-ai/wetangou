@@ -298,6 +298,7 @@ Page({
     this._initMerchantContext()
     this._loadCategories()
     this._loadChannels()
+    this._loadTypes()
     // 列表页「编辑」带过来的 productId。原先这里没读，导致编辑变新增。
     const pid = query && query.productId ? Number(query.productId) : null
     if (pid) {
@@ -322,6 +323,8 @@ Page({
       const ext = p.ext || {}
       const tc = p.typeCode || 'GROUPON'
       const item = TYPE_LIST.find(t => t.typeCode === tc)
+      // _loadTypes 是并行发的，这里可能还没回来；回来后 _loadTypes 会再修正一次
+      const dictType = (this._typeDict || {})[tc]
       const num = (v) => (v === null || v === undefined ? '' : String(v))
 
       const form = Object.assign({}, this.data.form, {
@@ -357,8 +360,8 @@ Page({
 
       this.setData({
         pickedType: tc,
-        pickedTypeName: (item && item.typeName) || tc,
-        pickedTypeDesc: TYPE_DESC[tc] || '',
+        pickedTypeName: (dictType && dictType.typeName) || (item && item.typeName) || tc,
+        pickedTypeDesc: (dictType && dictType.typeDesc) || TYPE_DESC[tc] || '',
         pickedCategory: p.categoryName || '（沿用原品类）',
         collectMethodLabel: form.collectMethod === 'STORE' ? '门店独立收款' : '总部统一收款',
         form,
@@ -498,6 +501,41 @@ Page({
    * label 优先 full_path（「美食·套餐」比单独一个「套餐」可读），叶子优先排前面
    * （level 大的更具体）。
    */
+  /**
+   * 拉商品类型字典，用库里的 type_name / type_desc / type_tips 覆盖 TYPE_LIST 的硬编码。
+   *
+   * 为什么不直接把 TYPE_LIST 删了全靠接口：它还携带了 disabled / disabledTip
+   * （预售券、提货券在手机上不让建）和展示顺序，那是前端产品规则；
+   * 而库里的 app_can_create 只能表达能/不能，说不出「请去网页端操作」这句提示。
+   * 所以保留本地结构，只把「叫什么名字」交给字典 —— 名字才是会与顾客端不一致的部分。
+   *
+   * 拉失败就继续用硬编码名（总比建品页打不开好）。
+   */
+  async _loadTypes() {
+    try {
+      const data = await api.productTypeList()
+      const rows = Array.isArray(data) ? data : []
+      if (!rows.length) return
+      const byCode = {}
+      rows.forEach(r => { if (r && r.typeCode) byCode[r.typeCode] = r })
+      const typeList = TYPE_LIST.map(t => {
+        const dict = byCode[t.typeCode]
+        return dict ? Object.assign({}, t, { typeName: dict.typeName || t.typeName }) : t
+      })
+      this._typeDict = byCode
+      const patch = { typeList }
+      // 已选好类型（编辑态回填比字典到达得早）时同步修正已展示的名字与说明
+      const cur = this.data.pickedType
+      if (cur && byCode[cur]) {
+        patch.pickedTypeName = byCode[cur].typeName || this.data.pickedTypeName
+        patch.pickedTypeDesc = byCode[cur].typeDesc || this.data.pickedTypeDesc
+      }
+      this.setData(patch)
+    } catch (e) {
+      console.warn('[create] _loadTypes FAIL, 沿用本地硬编码类型名', e)
+    }
+  },
+
   async _loadCategories() {
     try {
       const data = await api.categoryList()
@@ -564,12 +602,15 @@ Page({
 
   onPickTypeItem(e) {
     const code = e.currentTarget.dataset.code
-    const item = TYPE_LIST.find(t => t.typeCode === code)
+    // 从 this.data.typeList 取而不是常量 TYPE_LIST：_loadTypes 已用字典名覆盖过它，
+    // 读常量会把硬编码名（「团购套餐」）写回去，商家又和顾客端对不上。
+    const item = (this.data.typeList || TYPE_LIST).find(t => t.typeCode === code)
     if (!item || item.disabled) return
+    const dict = (this._typeDict || {})[code]
     this.setData({
       pickedType: code,
       pickedTypeName: item.typeName,
-      pickedTypeDesc: TYPE_DESC[code] || '',
+      pickedTypeDesc: (dict && dict.typeDesc) || TYPE_DESC[code] || '',
       typeSheet: false
     })
   },
@@ -705,17 +746,87 @@ Page({
     this.setData({ canSubmit: missing.length === 0 && !noStore })
   },
 
+  /**
+   * 预览：跳到会员端商品详情页（pages/goods/detail）的 preview 态。
+   *
+   * 原先这里弹一个 wx.showModal 文本摘要（类型/售价/库存/门店四行字），
+   * 商家看不到类型专属说明、购买须知、套餐详情这些真正影响成交的内容，
+   * 也就无法在上架前发现「有效期写错了」「须知没填」这类问题。
+   *
+   * 两个刻意的选择：
+   * 1) 复用会员端详情页本体而不另抄一套 WXML，否则两边任何一次改版都会漂移，
+   *    预览会慢慢变成「和顾客看到的不一样」，那就失去意义了。
+   * 2) 不再拦 canSubmit。预览的价值恰恰在于「必填项还没齐时先看看效果」，
+   *    原来填不齐就 toast 拦住，等于只能在快提交时才能预览，那时候发现问题已经晚了。
+   *    缺字段的展示由 utils/productPreview.js 兜底（如「（未填写商品名称）」）。
+   *
+   * 草稿走 globalData 传：URL query 装不下整张表单，且使用说明这种长中文会被截断。
+   */
   onPreview() {
-    if (!this.data.canSubmit) {
-      wx.showToast({ title: '请补全必填项', icon: 'none' }); return
+    // 套餐子品不在本页维护（在 pages/merchant/product/combo），而详情页的「套餐详情」
+    // 是顾客判断值不值的主要依据，漏了就预览不出来。
+    //
+    // 这里刻意调 productDetail 而不是 productSubitemGroups：
+    // 会员端详情页本身就是从 productDetail 的 subitemGroups 取数的，走同一个源
+    // 才能保证「商家预览到的就是顾客会看到的」；productSubitemGroups 只查子品组，
+    // 组合券包（COMBO）的明细存在 ext.comboItemsJson，用那个接口会永远拿到空。
+    //
+    // 新建态还没有 productId，自然也还没法配搭子品（子品要先存草稿再去 combo 页维护）。
+    // 拉失败不能卡住预览（预览只是看排版），失败当空数组继续。
+    if (!this.data.productId) { this._gotoPreview([]); return }
+    wx.showLoading({ title: '加载中...', mask: true })
+    api.productDetail(this.data.productId)
+      .then((res) => {
+        wx.hideLoading()
+        const d = (res && res.data) || res || {}
+        const p = d.data || d
+        const groups = (d.subitemGroups || p.subitemGroups) || []
+        this._gotoPreview(Array.isArray(groups) ? groups : [])
+      })
+      .catch(() => { wx.hideLoading(); this._gotoPreview([]) })
+  },
+
+  _gotoPreview(groups) {
+    // 服务设施和销量/库存开关都不在这张表单里，但顾客的详情页上有。
+    // 不拉的话，商家预览到的是一个没服务设施、却无条件显销量的页面，
+    // 而那不是顾客会看到的 —— 预览就失去意义了。
+    // 两个请求任何一个挂了都不能卡住预览（预览只是看排版），所以各自 catch 兑底。
+    const stores = this.data.form.storeIdList || []
+    const mainStore = stores.length ? stores[0] : this.data.form.storeId
+    const svcP = mainStore
+      ? api.storeServices(mainStore).then(d => (Array.isArray(d) ? d : [])).catch(() => [])
+      : Promise.resolve([])
+    const mchP = api.merchantInfo().then(d => d || {}).catch(() => ({}))
+    Promise.all([svcP, mchP]).then(([svc, mch]) => {
+      this._writeDraftAndGo(groups, svc, mch)
+    })
+  },
+
+  _writeDraftAndGo(groups, storeServices, merchant) {
+    const appInst = getApp() || {}
+    appInst.globalData = appInst.globalData || {}
+    const dict = (this._typeDict || {})[this.data.pickedType] || {}
+    appInst.globalData.productPreviewDraft = {
+      form: this.data.form,
+      pickedType: this.data.pickedType,
+      pickedTypeName: this.data.pickedTypeName,
+      // 类型说明卡靠它决定显不显。拉不到字典就不展，而不是自己编一个：
+      // 宁可少一张卡，也不能让商家看到和顾客不一样的文案。
+      pickedTypeTips: dict.typeTips || '',
+      storeOptions: this.data.storeOptions,
+      storeServices: storeServices || [],
+      showSales: merchant && merchant.showSales !== undefined ? merchant.showSales : '1',
+      showStock: merchant && merchant.showStock !== undefined ? merchant.showStock : '1',
+      productId: this.data.productId,
+      subitemGroups: Array.isArray(groups) ? groups : []
     }
-    // 简化版：弹 modal 显示摘要
-    const f = this.data.form
-    const summary = `【${this.data.pickedTypeName}】${f.productName}\n` +
-                    `售价 ¥${f.price}  库存 ${f.stock}  限购 ${f.limitPerUser}  有效期 ${f.validityDays}天\n` +
-                    `门店: ${this.data.storeName || f.storeId}\n` +
-                    (f.notice ? `\n说明: ${f.notice.slice(0, 50)}` : '')
-    wx.showModal({ title: '预览', content: summary, showCancel: false, confirmText: '关闭' })
+    wx.navigateTo({
+      url: '/pages/goods/detail/index?preview=1',
+      fail: (e) => {
+        console.error('[create] preview navigateTo FAIL', e)
+        wx.showToast({ title: '预览页打开失败', icon: 'none' })
+      }
+    })
   },
 
   onSubmit() {
