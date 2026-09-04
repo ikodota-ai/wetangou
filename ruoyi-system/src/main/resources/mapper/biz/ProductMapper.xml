@@ -337,6 +337,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where product_id = #{productId}
     </update>
 
+    <!-- 原子扣库存 + 加销量：stock 由数据库自己减，避免并发超卖；
+         stock >= #{num} 兜住不卖成负数（影响 0 行 = 库存不足）。
+         stock is null 视为不限库存，只加销量。 -->
+    <update id="deductStockAndAddSales">
+        update biz_product
+        set stock = case when stock is null then null else stock - #{num} end,
+            sales = ifnull(sales, 0) + #{num},
+            update_time = sysdate()
+        where product_id = #{productId}
+          and (stock is null or stock &gt;= #{num})
+    </update>
+
     <delete id="deleteProductByProductId" parameterType="Long">
         delete from biz_product where product_id = #{productId}
     </delete>

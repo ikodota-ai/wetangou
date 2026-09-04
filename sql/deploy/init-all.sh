@@ -136,6 +136,9 @@ run booking_remove_type_v11             # 移除 booking_type 列，预约模型
 run wx_miniapp_env_version_20260903        # 小程序码指向版本（未发布必须 trial，否则邀请码报 40066 invalid url）
 run biz_withdraw_rule_20260903       # 提现规则（起提额/每日次数/受理时段/到账时效，微信审核要求提现页展示）
 run biz_quartz_jobs_20260904         # 4 个业务定时任务（超时单取消/过期预约关闭/邀请码失效/日志清理）+ 修佣金结算 Cron 每30秒的调试值
+run sys_job_cn_name_20260904          # 定时任务名改中文（英文标识保留在括号里，运营看得懂才敢动 cron）
+run biz_pay_bill_paid_20260904        # 买单补 pay_time/pay_no（原先「已完成」却查不到何时付款、无 transaction_id 可对账）
+run biz_merchant_staff_tenant_align_20260904  # 员工关联的商户归属对齐门店真实归属（脏数据会让老板建品报「门店不属于该商家」）
 
 echo "--- 6/6 字典 / 种子 ---"
 run biz_product_dict_charset_fix

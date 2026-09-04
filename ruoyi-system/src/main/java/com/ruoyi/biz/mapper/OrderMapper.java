@@ -25,9 +25,18 @@ public interface OrderMapper
     /**
      * 按订单编号查询订单
      *
+     * <p>必须 @IgnoreTenant：唯一的调用方是微信支付回调
+     * （{@code ApiPayNotifyController}）。微信服务器发来的通知不带 X-App-Id，
+     * 拦截器会把租户上下文兜底成默认商户 1，此时租户改写会给这条 SQL 追加
+     * {@code merchant_id = 1} —— 商户 100 的订单于是查不出来，回调只留下一行
+     * 「订单不存在」的 warn 就返回 SUCCESS，微信不再重试，这笔已付款的单永远
+     * 停在待支付，五分钟后被超时任务取消。order_no 本身全库唯一，
+     * 按它精确查一条记录不需要也不能再叠加租户条件。</p>
+     *
      * @param orderNo 订单编号
      * @return 订单
      */
+    @IgnoreTenant
     public Order selectOrderByOrderNo(String orderNo);
 
     /**
@@ -81,9 +90,16 @@ public interface OrderMapper
     /**
      * 修改订单
      * 
+     * <p>@IgnoreTenant：支付回调、超时取消这类系统级流转没有登录身份，
+     * 租户上下文会兜底成默认商户，带上 {@code merchant_id = 1} 后
+     * update 影响 0 行 —— 状态没改成功却一路返回「成功」。
+     * 订单归属在业务层已由 memberId / 数据权限校验把住，
+     * 这里按主键改一条记录不该再被租户条件二次限制。</p>
+     *
      * @param order 订单
      * @return 结果
      */
+    @IgnoreTenant
     public int updateOrder(Order order);
 
     /**

@@ -78,6 +78,9 @@ booking_remove_type_v11
 wx_miniapp_env_version_20260903
 biz_withdraw_rule_20260903
 biz_quartz_jobs_20260904
+sys_job_cn_name_20260904
+biz_pay_bill_paid_20260904
+biz_merchant_staff_tenant_align_20260904
 """.split()
 
 DEMO = """

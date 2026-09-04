@@ -1,6 +1,7 @@
 package com.ruoyi.biz.service.impl;
 
 import java.util.List;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +91,7 @@ public class PayBillServiceImpl implements IPayBillService
     @Override
     public int deletePayBillByBillIds(Long[] billIds)
     {
+        assertDeletable(billIds);
         return payBillMapper.deletePayBillByBillIds(billIds);
     }
 
@@ -102,6 +104,7 @@ public class PayBillServiceImpl implements IPayBillService
     @Override
     public int deletePayBillByBillId(Long billId)
     {
+        assertDeletable(new Long[] { billId });
         return payBillMapper.deletePayBillByBillId(billId);
     }
 
@@ -131,5 +134,33 @@ public class PayBillServiceImpl implements IPayBillService
                     ids.size() > 20 ? ids.subList(0, 20) + "...(共" + ids.size() + ")" : ids);
         }
         return cancelled;
+    }
+
+    /**
+     * 已完成的买单不允许物理删除，理由同 {@code OrderServiceImpl.assertDeletable}：
+     * 钱已经进了商户账户，删掉这行就等于账上多一笔查不到来源的进账。
+     *
+     * <p>只放开待确认(0) / 待支付(1) / 已取消(3)，已完成(2) 一律拒绝。</p>
+     */
+    private void assertDeletable(Long[] billIds)
+    {
+        if (billIds == null || billIds.length == 0)
+        {
+            return;
+        }
+        for (Long billId : billIds)
+        {
+            if (billId == null)
+            {
+                continue;
+            }
+            PayBill bill = payBillMapper.selectPayBillByBillId(billId);
+            if (bill == null || !"2".equals(bill.getStatus()))
+            {
+                continue;
+            }
+            throw new ServiceException("买单「" + bill.getBillNo()
+                    + "」已支付完成，涉及真实资金往来，不允许删除");
+        }
     }
 }

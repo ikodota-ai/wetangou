@@ -25,9 +25,15 @@ public interface PayBillMapper
     /**
      * 按买单编号查询
      *
+     * <p>@IgnoreTenant 的理由同 {@code OrderMapper.selectOrderByOrderNo}：
+     * 调用方是微信支付回调，没有登录身份，租户上下文兜底成默认商户后
+     * 会给 SQL 追加 {@code merchant_id = 1}，商户 100 的买单查不出来，
+     * 支付成功的钱收了但买单状态不动。bill_no 全库唯一。</p>
+     *
      * @param billNo 买单编号
      * @return 买单流水
      */
+    @IgnoreTenant
     public PayBill selectPayBillByBillNo(String billNo);
 
     /**
@@ -63,9 +69,12 @@ public interface PayBillMapper
     /**
      * 修改买单流水
      * 
+     * <p>@IgnoreTenant：支付回调无登录身份，租户改写会让 update 影响 0 行。</p>
+     *
      * @param payBill 买单流水
      * @return 结果
      */
+    @IgnoreTenant
     public int updatePayBill(PayBill payBill);
 
     /**

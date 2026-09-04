@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.annotation.Anonymous;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.biz.api.service.ApiOrderServiceImpl;
 import com.ruoyi.biz.api.service.WxPayService;
 import com.ruoyi.biz.domain.MemberVoucher;
@@ -54,8 +55,8 @@ public class ApiPayNotifyController
      * - 旧版 /api/pay/notify 入站时根据 out_trade_no 查订单/买单得到 merchantId 再解密
      */
     @PostMapping("/notify/{merchantId}")
-    @Transactional
-    public JSONObject notifyWithMerchant(@org.springframework.web.bind.annotation.PathVariable Long merchantId, HttpServletRequest request)
+    public org.springframework.http.ResponseEntity<JSONObject> notifyWithMerchant(
+            @org.springframework.web.bind.annotation.PathVariable Long merchantId, HttpServletRequest request)
     {
         return doNotify(request, merchantId);
     }
@@ -64,13 +65,23 @@ public class ApiPayNotifyController
      * 旧版单一回调入口：按 out_trade_no 反查所属商户再解密
      */
     @PostMapping("/notify")
-    @Transactional
-    public JSONObject notify(HttpServletRequest request)
+    public org.springframework.http.ResponseEntity<JSONObject> notify(HttpServletRequest request)
     {
         return doNotify(request, null);
     }
 
-    private JSONObject doNotify(HttpServletRequest request, Long merchantIdHint)
+    /**
+     * 回调处理。
+     *
+     * <p><b>@Transactional 被刻意去掉了</b>：原先整个 doNotify 是一个事务，
+     * 里面任何一步抛异常（最典型的是扣库存时撞上 assertStoresBelongToMerchant 的
+     * 门店归属校验）都会把已经改好的订单状态一起回滚，而 catch 又照样返回
+     * HTTP 200 + code=SUCCESS —— 微信认为通知成功不再重试，这笔已付款的订单
+     * 就永远停在待支付，5 分钟后被超时任务取消。事务边界现在收在
+     * {@code paySuccess} / {@code handleBill} 内部，一笔失败不影响已完成的部分，
+     * 且失败时返回 500 让微信按 15s/15s/30s… 的节奏重试。</p>
+     */
+    private org.springframework.http.ResponseEntity<JSONObject> doNotify(HttpServletRequest request, Long merchantIdHint)
     {
         JSONObject result = new JSONObject();
         try
@@ -80,9 +91,10 @@ public class ApiPayNotifyController
             JSONObject resource = notifyJson == null ? null : notifyJson.getJSONObject("resource");
             if (resource == null)
             {
+                // 报文本身不合法，重试也不会变好，返回 200 让微信别再发
                 result.put("code", "FAIL");
                 result.put("message", "缺少resource");
-                return result;
+                return org.springframework.http.ResponseEntity.ok(result);
             }
             String plain;
             if (merchantIdHint != null)
@@ -114,12 +126,13 @@ public class ApiPayNotifyController
             {
                 log.warn("[WxPayNotify] 非成功状态：{} {}", outTradeNo, tradeState);
                 result.put("code", "SUCCESS");
-                return result;
+                return org.springframework.http.ResponseEntity.ok(result);
             }
 
+            log.info("[WxPayNotify] 收到支付成功通知 outTradeNo={} transactionId={}", outTradeNo, transactionId);
             if (outTradeNo != null && outTradeNo.startsWith("P"))
             {
-                handleBill(outTradeNo);
+                handleBill(outTradeNo, transactionId);
             }
             else
             {
@@ -127,14 +140,18 @@ public class ApiPayNotifyController
             }
 
             result.put("code", "SUCCESS");
-            return result;
+            return org.springframework.http.ResponseEntity.ok(result);
         }
         catch (Exception e)
         {
-            log.error("[WxPayNotify] 处理失败", e);
+            // 关键：必须返回非 2xx，微信才会重试。
+            // 原来这里返回 200 + code=FAIL，微信只看 HTTP 状态码，
+            // 收到 200 就认为通知已送达，永不重试 —— 钱收了单没了，且无从补偿。
+            log.error("[WxPayNotify] 处理失败，返回 500 让微信重试", e);
             result.put("code", "FAIL");
             result.put("message", e.getMessage());
-            return result;
+            return org.springframework.http.ResponseEntity
+                    .status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
     }
 
@@ -170,30 +187,56 @@ public class ApiPayNotifyController
         return 1L;
     }
 
+    /**
+     * 订单入账。
+     *
+     * <p>查不到订单时必须抛异常而不是静默 return —— 微信通知是可靠的，
+     * 「订单不存在」只可能是我们自己查错了（历史上就是租户过滤把
+     * merchant_id=1 加到了 where 里，商户 100 的单一律查不到）。
+     * 静默返回会让微信停止重试，从此无从补偿。</p>
+     */
     private void handleOrder(String orderNo, String transactionId)
     {
         Order order = orderService.selectOrderByOrderNo(orderNo);
         if (order == null)
         {
-            log.warn("[WxPayNotify] 订单不存在：{}", orderNo);
-            return;
+            throw new ServiceException("支付回调找不到订单：" + orderNo);
         }
         if (!"0".equals(order.getStatus()))
         {
+            // 幂等：微信会重复通知，已入账直接当成功
+            log.info("[WxPayNotify] 订单 {} 已是 status={}，跳过重复入账", orderNo, order.getStatus());
             return;
         }
-        apiOrderService.paySuccess(order.getOrderId());
+        apiOrderService.paySuccess(order.getOrderId(), transactionId);
+        log.info("[WxPayNotify] 订单入账成功 orderNo={} transactionId={}", orderNo, transactionId);
     }
 
-    private void handleBill(String billNo)
+    /**
+     * 买单入账：置为已完成，落支付时间与微信交易号。
+     *
+     * <p>原先只改了 status，{@code pay_time / pay_no} 压根没有这两列 ——
+     * 后台看一笔已完成的买单，既不知道什么时候付的，也拿不到微信流水号去对账，
+     * 更没法发起退款。本轮建表补上（{@code sql/upgrade/biz_pay_bill_paid_20260904.sql}）。</p>
+     */
+    @Transactional
+    public void handleBill(String billNo, String transactionId)
     {
         PayBill bill = payBillService.selectPayBillByBillNo(billNo);
-        if (bill == null || !"1".equals(bill.getStatus()))
+        if (bill == null)
         {
+            throw new ServiceException("支付回调找不到买单：" + billNo);
+        }
+        if (!"1".equals(bill.getStatus()))
+        {
+            log.info("[WxPayNotify] 买单 {} 已是 status={}，跳过重复入账", billNo, bill.getStatus());
             return;
         }
         bill.setStatus("2");
+        bill.setPayTime(new Date());
+        bill.setPayNo(transactionId);
         payBillService.updatePayBill(bill);
+        log.info("[WxPayNotify] 买单入账成功 billNo={} transactionId={}", billNo, transactionId);
         if (bill.getMemberVoucherId() != null)
         {
             MemberVoucher mv = memberVoucherService.selectMemberVoucherById(bill.getMemberVoucherId());

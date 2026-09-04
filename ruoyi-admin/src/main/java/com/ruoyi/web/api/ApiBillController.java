@@ -308,6 +308,12 @@ public class ApiBillController
     private void markPaid(PayBill bill)
     {
         bill.setStatus("2");
+        // 支付完成态必须带上时间与流水号，否则后台看到「已完成」却不知何时付、无从对账
+        bill.setPayTime(new Date());
+        if (com.ruoyi.common.utils.StringUtils.isEmpty(bill.getPayNo()))
+        {
+            bill.setPayNo("MOCKPAY" + System.currentTimeMillis());
+        }
         payBillService.updatePayBill(bill);
         if (bill.getMemberVoucherId() != null)
         {

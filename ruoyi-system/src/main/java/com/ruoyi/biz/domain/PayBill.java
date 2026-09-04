@@ -71,6 +71,13 @@ public class PayBill extends BaseEntity
     @Excel(name = "确认时间", width = 30, dateFormat = "yyyy-MM-dd")
     private Date confirmTime;
 
+    /** 支付完成时间（微信回调时间；为空表示尚未支付成功） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private Date payTime;
+
+    /** 微信支付订单号 transaction_id（对账/查单/退款都要靠它） */
+    private String payNo;
+
     /** 状态（0待确认 1待支付 2已完成 3已取消） */
     @Excel(name = "状态", readConverterExp = "0=待确认,1=待支付,2=已完成,3=已取消")
     private String status;
@@ -210,6 +217,26 @@ public class PayBill extends BaseEntity
         this.status = status;
     }
 
+    public Date getPayTime() 
+    {
+        return payTime;
+    }
+
+    public void setPayTime(Date payTime) 
+    {
+        this.payTime = payTime;
+    }
+
+    public String getPayNo() 
+    {
+        return payNo;
+    }
+
+    public void setPayNo(String payNo) 
+    {
+        this.payNo = payNo;
+    }
+
     public String getStatus() 
     {
         return status;
@@ -239,6 +266,8 @@ public class PayBill extends BaseEntity
             .append("payAmount", getPayAmount())
             .append("confirmUser", getConfirmUser())
             .append("confirmTime", getConfirmTime())
+            .append("payTime", getPayTime())
+            .append("payNo", getPayNo())
             .append("status", getStatus())
             .append("createTime", getCreateTime())
             .append("updateTime", getUpdateTime())

@@ -67,7 +67,7 @@ const FIELDS_BY_TYPE = {
     price: [
       { key: 'price', label: '售价', required: true, type: 'digit', prefix: '¥', placeholder: '0', section: 'product' },
       { key: 'marketPrice', label: '市场价', required: false, type: 'digit', prefix: '¥', section: 'product' },
-      { key: 'faceValue', label: '商品面值', required: false, type: 'digit', prefix: '¥', section: 'product' }
+      { key: 'faceValue', label: '划线价（原价）', required: false, type: 'digit', prefix: '¥', placeholder: '不填则不展示划线价', section: 'product' }
     ],
     sale: [
       { key: 'stock', label: '库存数量', required: true, type: 'number', default: 0, placeholder: '0', section: 'sale' },
@@ -106,7 +106,7 @@ const FIELDS_BY_TYPE = {
     ],
     price: [
       { key: 'price', label: '售价', required: true, type: 'digit', prefix: '¥', section: 'product' },
-      { key: 'faceValue', label: '卡片总价值', required: false, type: 'digit', prefix: '¥', section: 'product' },
+      { key: 'faceValue', label: '次卡总价值', required: false, type: 'digit', prefix: '¥', placeholder: '单次价 × 总次数', section: 'product' },
       { key: 'totalTimes', label: '总次数', required: true, type: 'number', placeholder: '可核销次数', section: 'product' }
     ],
     sale: [
@@ -126,7 +126,7 @@ const FIELDS_BY_TYPE = {
     ],
     price: [
       { key: 'price', label: '售价', required: true, type: 'digit', prefix: '¥', section: 'product' },
-      { key: 'faceValue', label: '面值', required: true, type: 'digit', prefix: '¥', section: 'product' }
+      { key: 'faceValue', label: '代金券面值', required: true, type: 'digit', prefix: '¥', placeholder: '可抵扣金额', section: 'product' }
     ],
     sale: [
       { key: 'stock', label: '库存数量', required: true, type: 'number', default: 0, section: 'sale' },
@@ -165,7 +165,7 @@ const FIELDS_BY_TYPE = {
     ],
     price: [
       { key: 'price', label: '售价', required: true, type: 'digit', prefix: '¥', section: 'product' },
-      { key: 'faceValue', label: '卡片总价值', required: true, type: 'digit', prefix: '¥', section: 'product' },
+      { key: 'faceValue', label: '次卡总价值', required: true, type: 'digit', prefix: '¥', placeholder: '单次价 × 总次数', section: 'product' },
       { key: 'totalTimes', label: '总次数', required: true, type: 'number', section: 'product' }
     ],
     sale: [
@@ -185,7 +185,7 @@ const FIELDS_BY_TYPE = {
     ],
     price: [
       { key: 'price', label: '售价', required: true, type: 'digit', prefix: '¥', section: 'product' },
-      { key: 'faceValue', label: '组合总价值', required: true, type: 'digit', prefix: '¥', section: 'product' }
+      { key: 'faceValue', label: '组合总价值', required: true, type: 'digit', prefix: '¥', placeholder: '各子项原价之和', section: 'product' }
     ],
     sale: [
       { key: 'stock', label: '库存数量', required: true, type: 'number', default: 0, section: 'sale' },

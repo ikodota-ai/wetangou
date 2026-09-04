@@ -2796,3 +2796,17 @@ init-all.sh 连跑两遍都 FAILED=0（幂等）
 
 ### 回归
 smoke 62/62 / lint-mybatis 0 err / lint-sql-seed 22 脚本 0 fail
+
+## 🔴 生产环境访问规则（永久，不可违反）
+
+生产 RDS **只读，永不写入**。任何 `INSERT/UPDATE/DELETE/DDL` 一律禁止，
+需要改生产数据时只输出 SQL 交给用户自己执行。
+
+```
+外网：rm-wz9n4ot89173fp840eo.mysql.rds.aliyuncs.com   （带 eo，本机可连）
+内网：rm-wz9n4ot89173fp840.mysql.rds.aliyuncs.com     （无 eo，仅服务器内可连）
+库名 bx_wetuangou / 用户 rds_root / 生产 Redis 用 db 3
+只读查询模板：
+  /usr/local/mysql/bin/mysql -h rm-wz9n4ot89173fp840eo.mysql.rds.aliyuncs.com \
+    -u rds_root -p'<pwd>' bx_wetuangou --default-character-set=utf8mb4 -t < /tmp/q.sql
+```

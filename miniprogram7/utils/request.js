@@ -146,7 +146,9 @@ function request(url, options = {}) {
           // 而 AjaxResult 那条链是数字。只用 === 比数字会漏掉字符串那一半。
           const bizCode = (d.code === undefined || d.code === null) ? null : Number(d.code)
           if (bizCode === 200 || bizCode === 0 || d.success) {
-            resolve(d.data || d);
+            // options._raw：不要解包。有些端点把并列信息放在 data 的兄弟键上
+            // （如 /biz/saleChannel/enabled 的 defaultCodes），解包会把它们丢掉。
+            resolve(options._raw ? d : (d.data || d));
           } else if (bizCode === 401) {
             const authScope = d.authScope || ''
             _clearAuth(authScope)
@@ -181,6 +183,16 @@ function request(url, options = {}) {
       }
     });
   });
+}
+
+/**
+ * 不解包的 request：拿到完整响应体 { code, msg, data, ...其他兄弟键 }。
+ *
+ * 给「data 之外还有并列字段」的端点用。默认的 request() 做 d.data || d 解包，
+ * 对这类响应会静默丢字段 —— 调用方拿到 undefined 却看不出哪里错了。
+ */
+function requestRaw(url, options = {}) {
+  return request(url, Object.assign({}, options, { _raw: true }));
 }
 
 function uploadFile(url, filePath, name = 'file', formData = {}) {
@@ -237,7 +249,12 @@ const api = {
   // 商家端-创建商品（P1-2）
   productTypeAppCreatable: () => request('/biz/productType/appCreatable'),
   // 投放渠道字典（商家端建品勾选用；平台级配置，商户只读）
-  saleChannelEnabled: () => request('/biz/saleChannel/enabled'),
+  // 注意这里刻意用 _raw：/biz/saleChannel/enabled 的响应体是
+  // { code, msg, data:[...], defaultCodes:"A,B" } —— data 和 defaultCodes 是兄弟键。
+  // 而 request() 成功分支统一做 resolve(d.data || d) 解包，解完只剩数组，
+  // defaultCodes 连同外层一起被丢掉，调用方再写 res.data / res.defaultCodes 全是
+  // undefined，建品页于是渲染出「渠道字典暂不可用」，保存时只能由后端兜底成平台默认渠道。
+  saleChannelEnabled: () => requestRaw('/biz/saleChannel/enabled'),
   productAdd: (data) => request('/api/product/add', { method: 'POST', data }),
   // 商品编辑（小程序建品后回填 totalValue / ext.comboItemsJson 等）
   productUpdate: (data) => request('/api/product', { method: 'PUT', data }),
@@ -372,6 +389,7 @@ const api = {
 
 module.exports = {
   request,
+  requestRaw,
   uploadFile,
   api,
   BASE_URL: BASE_URL_DEFAULT,

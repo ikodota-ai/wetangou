@@ -69,6 +69,9 @@ public class ApiOrderServiceImpl implements IApiOrderService
     @Autowired
     private OrderMapper orderMapper;
 
+    @Autowired
+    private com.ruoyi.biz.mapper.ProductMapper productMapper;
+
     /**
      * 会员下单（到店自取）：生成待付款订单，含核销码占位
      */
@@ -285,10 +288,23 @@ public class ApiOrderServiceImpl implements IApiOrderService
     }
 
     /**
-     * 模拟支付成功回调：置为待使用，生成核销码、计算有效期，冻结代金券，触发佣金
+     * 支付成功入账（微信回调 / mock 支付共用）：置为待使用，生成核销码、
+     * 计算有效期，核销代金券，扣库存加销量，触发佣金。
      */
     @Transactional
     public Order paySuccess(Long orderId)
+    {
+        return paySuccess(orderId, null);
+    }
+
+    /**
+     * 支付成功入账，并落微信侧真实交易号。
+     *
+     * @param transactionId 微信支付订单号（回调 {@code transaction_id}）；
+     *                      为 null 时按 mock 生成本地流水号
+     */
+    @Transactional
+    public Order paySuccess(Long orderId, String transactionId)
     {
         Order order = orderService.selectOrderByOrderId(orderId);
         if (order == null)
@@ -301,7 +317,10 @@ public class ApiOrderServiceImpl implements IApiOrderService
         }
         order.setStatus("1");
         order.setPayTime(new Date());
-        order.setPayNo("MOCKPAY" + System.currentTimeMillis());
+        // 真实回调带 transaction_id 时必须落它：对账、查单、发起退款都要靠这个号，
+        // 之前一律写 "MOCKPAY<时间戳>"，线上收到的钱在系统里找不到对应的微信流水。
+        order.setPayNo(StringUtils.isNotEmpty(transactionId)
+                ? transactionId : ("MOCKPAY" + System.currentTimeMillis()));
         order.setVerifyCode(genVerifyCode());
         // 核销有效期
         Product product = productService.selectProductByProductId(order.getProductId());
@@ -324,15 +343,24 @@ public class ApiOrderServiceImpl implements IApiOrderService
             }
         }
 
-        // 扣减库存、增加销量
-        if (product != null)
+        // 扣减库存、增加销量：走 mapper 的原子 update，不能走 productService.updateProduct。
+        //
+        // updateProduct 里第一行是 assertStoresBelongToMerchant —— 商品 store_ids 里
+        // 只要有一个门店的 merchant_id 与商品对不上（线上存量脏数据就有），
+        // 这里会抛「门店不属于该商家」，把整个支付回调事务连订单状态一起回滚：
+        // 用户付了钱，订单还停在待支付，5 分钟后被超时任务取消。扣库存不该关心门店归属。
+        //
+        // 另外原来是「读出来减一再写回」，并发下单会互相覆盖导致超卖；
+        // 且 updateProduct 会顺带 saveExt，用一个只有 stock/sales 的实体覆盖商品扩展字段。
+        if (product != null && order.getNum() != null)
         {
-            if (product.getStock() != null)
+            int affected = productMapper.deductStockAndAddSales(product.getProductId(), order.getNum());
+            if (affected == 0)
             {
-                product.setStock(Math.max(0, product.getStock() - order.getNum()));
+                // 钱已经收了，不能因为库存不足回滚订单，只告警等人工处理（超卖/补货）
+                log.warn("[order] paySuccess 扣库存影响 0 行，可能库存不足 orderId={} productId={} num={}",
+                        orderId, product.getProductId(), order.getNum());
             }
-            product.setSales((product.getSales() == null ? 0 : product.getSales()) + order.getNum());
-            productService.updateProduct(product);
         }
 
         // 触发分销佣金
