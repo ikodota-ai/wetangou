@@ -343,3 +343,71 @@ describe('预览的适用门店列表', () => {
     expect(p.applicableStores.length).toBe(0)
   })
 })
+
+// 交易规则那 5 组 ext 字段的预览透传。
+//
+// 背景：这 5 组（可消费日期 / 不可消费日期 / 每日时段 / 适用规则 /
+// 适用范围）原先只有 PC 能填，而商品创建主战场是商家端。
+// 顶客端详情页（utils/tradeRules.js）早就在渲染它们，但只读 ext 这个路径 ——
+// 预览不透传，商家刚填完去预览会发现那几行是空的，以为没生效。
+describe('预览必须透传交易规则的 ext 字段', () => {
+  const FORM = {
+    productName: 'x券',
+    consumeStartDate: '2026-09-10',
+    consumeEndDate: '2026-12-31',
+    excludeStartDate: '2026-10-01',
+    excludeEndDate: '2026-10-07',
+    dailyTimeStart: '09:00',
+    dailyTimeEnd: '22:30',
+    voucherRules: ['ALL_CATEGORY', 'ALL_BRAND'],
+    scopeType: 'STORE',
+    voucherType: 'CATEGORY',
+    codeType: 'PLATFORM'
+  }
+
+  it('日期 / 时段 / 适用规则 全部落在 ext 下（顾客端只读这个路径）', () => {
+    const p = draftToProduct(draft('VOUCHER', FORM))
+    expect(p.ext.consumeStartDate).toBe('2026-09-10')
+    expect(p.ext.consumeEndDate).toBe('2026-12-31')
+    expect(p.ext.dailyTimeStart).toBe('09:00')
+    expect(p.ext.dailyTimeEnd).toBe('22:30')
+    expect(p.ext.voucherRules).toBe('ALL_CATEGORY,ALL_BRAND')
+  })
+
+  it('excludeDates 必须包成 [[起,止]] 二级数组，否则顾客端 excludeDatesText 解不出', () => {
+    const p = draftToProduct(draft('VOUCHER', FORM))
+    expect(JSON.parse(p.ext.excludeDates)).toEqual([['2026-10-01', '2026-10-07']])
+  })
+
+  it('只填一端日期 → 不拼半截的区间（宁可不显，不能显一个残区间）', () => {
+    const p = draftToProduct(draft('VOUCHER', Object.assign({}, FORM, { excludeEndDate: '' })))
+    expect(p.ext.excludeDates).toBe('')
+  })
+
+  it('voucherScopeType 双语义：代金券取 scopeType，其余类型取 voucherType', () => {
+    // 同一列 ext.voucher_scope_type 两个控件共用（与 PC packFormToExt 一致）。
+    // CATEGORY 这个值两边都有，分流错了会把「单品类券」误写成「按品类适用」。
+    expect(draftToProduct(draft('VOUCHER', FORM)).ext.voucherScopeType).toBe('STORE')
+    expect(draftToProduct(draft('GROUPON', FORM)).ext.voucherScopeType).toBe('CATEGORY')
+  })
+
+  it('什么都不填时这几个键仍存在且为空串（undefined 会让 tradeRules 报错）', () => {
+    const p = draftToProduct(draft('GROUPON', { productName: 'x' }))
+    expect(p.ext.consumeStartDate).toBe('')
+    expect(p.ext.excludeDates).toBe('')
+    expect(p.ext.dailyTimeStart).toBe('')
+    expect(p.ext.voucherRules).toBe('')
+  })
+})
+
+// 商品图片：预览要和顾客端同口径（cover=头图、images=环境图）
+describe('预览的商品图片', () => {
+  it('cover / images 原串透传，由详情页 normalize 统一拆串', () => {
+    // 不在这里先拆：拆两遍早晚漂，预览就不再等于顾客看到的。
+    const p = draftToProduct(draft('GROUPON', {
+      productName: 'x', cover: '/a.jpg,/b.jpg', images: '/c.jpg'
+    }))
+    expect(p.cover).toBe('/a.jpg,/b.jpg')
+    expect(p.images).toBe('/c.jpg')
+  })
+})

@@ -293,3 +293,50 @@ chk "limit 超上限封顶 20"   "$(curl -s "$BASE/api/product/$PROD/more?limit=
 # 把别家商户的货推到本商户小程序里就是数据泄露。
 chk "别家 appid 拿不到 more"   "$(curl -s "$BASE/api/product/$PROD/more" -H "X-App-Id: $APPID" | python3 -c "import sys,json;print(json.load(sys.stdin).get('code'))")" "500"
 chk "不存在的商品 more"   "$(curl -s "$BASE/api/product/99999999/more" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(json.load(sys.stdin).get('code'))")" "500"
+
+echo "=== P. 详情页顶部「门店」行的数据源（店名 + 距离 + 星级）==="
+# 这一行读的不是商品接口，而是首页存到 globalData.store 的那家店（最近门店）。
+# 三条拿店的链路都得能支持距离+星级，否则详情页那行会时有时无：
+#   storeNearest  → 直接给 distance（单位米）
+#   storeList / storeDetail → 不给 distance，前端靠 latitude/longitude 自己 haversine
+# 距离文本的换算口径由 vitest 锁（tests/storeView.test.js），
+# 这里只保证后端真的把这几个字段下发了 —— 少任何一个，
+# 那一行就只剩店名，永久显「查看距离」或不出星星。
+q "update biz_store set rating=4.6, longitude=114.05, latitude=22.50 where store_id=$STORE;"
+SL=$(curl -s "$BASE/api/store/list?page=1&pageSize=20" -H "X-App-Id: wx-smoke-detail-991")
+pick(){ echo "$SL" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+rows=d.get('rows') or d.get('data') or []
+t=[r for r in rows if str(r.get('storeId'))=='$STORE']
+print('' if not t else (t[0].get('$1') if t[0].get('$1') is not None else ''))
+"; }
+chk "storeList 下发 rating（星级靠它）"      "$(pick rating)"    "4.6"
+chk "storeList 下发 latitude（无 distance 时靠它算）" "$(pick latitude)"  "22.5"
+chk "storeList 下发 longitude"                    "$(pick longitude)" "114.05"
+SD=$(curl -s "$BASE/api/store/$STORE" -H "X-App-Id: wx-smoke-detail-991")
+sd(){ echo "$SD" | python3 -c "import sys,json;d=json.load(sys.stdin);r=d.get('data') or d;v=r.get('$1');print('' if v is None else v)"; }
+chk "storeDetail 下发 rating"    "$(sd rating)"    "4.6"
+chk "storeDetail 下发 latitude"  "$(sd latitude)"  "22.5"
+chk "storeDetail 下发 storeName" "$(sd storeName)" "SMOKE门店991"
+# nearest 的 distance 单位必须是米：前端 toStoreView 会 /1000。
+# 假如后端哪天改成返公里，详情页会把 8.8km 显成 9m（看上去“就在隔壁”）。
+# 已知店坐标 (22.50,114.05)，从 (22.60,114.05) 查 → 约 11.1km = 11100 米量级。
+NR=$(curl -s "$BASE/api/store/nearest?latitude=22.60&longitude=114.05&limit=20" -H "X-App-Id: wx-smoke-detail-991")
+chk "nearest 的 distance 单位是米（万米量级而非个位公里）" "$(echo "$NR" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+rows=d.get('rows') or d.get('data') or []
+t=[r for r in rows if str(r.get('storeId'))=='$STORE']
+if not t: print('NO_ROW')
+else:
+    v=t[0].get('distance')
+    print('NULL' if v is None else ('METER' if 9000 < float(v) < 14000 else 'BAD:'+str(v)))
+")" "METER"
+chk "nearest 同时带 rating（否则升级成最近店后星星会消失）" "$(echo "$NR" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+rows=d.get('rows') or d.get('data') or []
+t=[r for r in rows if str(r.get('storeId'))=='$STORE']
+print('' if not t else str(t[0].get('rating')))
+")" "4.6"

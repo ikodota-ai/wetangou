@@ -1,6 +1,9 @@
 // pages/goods/share/index.js 商品分享海报页
 const app = getApp();
 const { api, toFullUrl } = require('../../../utils/request.js');
+// 海报只能画一张商品图，而 cover 是「商品头图」逗号串（PC 可传 5 张）：
+// 整串交给 wx.getImageInfo 下载必失败，海报上就是一块空白。口径见 utils/productMedia.js。
+const { firstCover, splitUrls } = require('../../../utils/productMedia.js');
 
 /**
  * 海报布局（单位 px, 600 宽 x 900 高, 适配 type="2d" canvas）：
@@ -55,9 +58,11 @@ Page({
           name: p.productName || p.name || '好物',
           price: p.price != null ? String(p.price) : '0.00',
           marketPrice: p.marketPrice != null ? String(p.marketPrice) : '',
-          cover: p.cover ? toFullUrl(p.cover) : '',
-          images: Array.isArray(p.images) ? p.images : (p.cover ? [p.cover] : []),
-          coverAbs: p.cover ? toFullUrl(p.cover) : ''
+          cover: firstCover(p) ? toFullUrl(firstCover(p)) : '',
+          // 顶部那组图 = 商品头图（cover），不是环境图（images）；
+          // 原先优先取 images 把两个字段的职责说反了。
+          images: splitUrls(p.cover).length ? splitUrls(p.cover) : splitUrls(p.images),
+          coverAbs: firstCover(p) ? toFullUrl(firstCover(p)) : ''
         };
         this.merchant = (app.globalData && app.globalData.merchant) || {};
         return this._loadQrcode();

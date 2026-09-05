@@ -106,9 +106,12 @@
           <el-link type="primary" :underline="false" @click="handleView(scope.row)">{{ scope.row.productName }}</el-link>
         </template>
       </el-table-column>
-      <el-table-column label="封面图" align="center" prop="cover" width="100">
+      <!-- 列名叫「商品图片」而不是「封面图」：cover 存的是建品页那个
+           「商品头图」（:limit=5）的逗号串，列表只能放一张，按约定取首张。
+           原先直接 :src="scope.row.cover"，商家传了第二张头图这一列就整列变白图。 -->
+      <el-table-column label="商品图片" align="center" prop="cover" width="100">
         <template slot-scope="scope">
-          <el-image v-if="scope.row.cover" :src="scope.row.cover" style="width: 60px; height: 60px; border-radius: 4px" fit="cover" :preview-src-list="[scope.row.cover]" />
+          <el-image v-if="firstCover(scope.row.cover)" :src="firstCover(scope.row.cover)" style="width: 60px; height: 60px; border-radius: 4px" fit="cover" :preview-src-list="splitUrls(scope.row.cover)" />
           <span v-else>-</span>
         </template>
       </el-table-column>
@@ -222,6 +225,16 @@ export default {
     this.getList();
   },
   methods: {
+    /** cover 是「商品头图」逗号串（与 detail.vue 的 splitUrls 同口径） */
+    splitUrls(raw) {
+      if (!raw) return []
+      return String(raw).split(',').map(v => v.trim()).filter(v => v)
+    },
+    /** 列表只能放一张图：取头图首张 */
+    firstCover(raw) {
+      const list = this.splitUrls(raw)
+      return list.length ? list[0] : ''
+    },
     /** v2 字典：拉取商品类型列表（v-for 下拉数据源） */
     loadTypeList() {
       selectProductTypeList().then(res => {

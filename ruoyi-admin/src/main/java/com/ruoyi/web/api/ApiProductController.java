@@ -208,16 +208,29 @@ public class ApiProductController
         {
             return AjaxResult.error("商品不存在或已下架");
         }
-        p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
-        p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+        // 同上：两者都是逗号串，必须逐张拼 base
+        p.setCover(ImageUrlUtils.toAbsoluteCsv(p.getCover()));
+        p.setImages(ImageUrlUtils.toAbsoluteCsv(p.getImages()));
         // E1 收口：统一 subitemGroups 放顶层。历史曾有 data 子对象冗余，
         // 现已确认无客户端依赖（admin 用 listGroups 端点，小程序 pages/goods/detail/index.js
         // 第 50 行读 d.subitemGroups 顶层），删 dataMap 冗余让 API 干净。
         AjaxResult result = AjaxResult.success(p);
         String t = p.getTypeCode() == null ? "" : p.getTypeCode();
-        if ("GROUPON".equals(t) || "COMBO".equals(t))
+        // 子品只看库里有没有，不按 typeCode 白名单。
+        //
+        // 原先这里写的是 {@code if ("GROUPON".equals(t) || "COMBO".equals(t))}，
+        // 理由是「PC 建品页只给这两类开了搜配入口」。但子品表里存不存在数据
+        // 跟商品类型并不挂钩：本地 biz_product_subitem_group 里 BOOKING 类型的
+        // 999534「云南野生菌双人火锅套餐」真有 4 组 17 个子品
+        // （锅底 2选1 / 荟菜 4选4 / 素菜 4选4 / 饮品 3选2），
+        // 却因为不在白名单而永远下发 null —— 顾客看不到自己到店能挑什么，
+        // 而“能挑几样”正是他判断这个套餐值不值的前提。
+        //
+        // 换成无条件查、有内容才下发：没子品的商品（代金券等）查出空列表，
+        // 不放进 result，前端那张卡的 wx:if 行为不变。
+        List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
+        if (groups != null && !groups.isEmpty())
         {
-            List<ProductSubitemGroup> groups = subitemGroupService.selectByProductId(productId);
             result.put("subitemGroups", groups);
         }
 
@@ -673,33 +686,48 @@ public class ApiProductController
      * 后台 admin 端走的是 ProductServiceImpl.saveExt（会用 body 的 ext），
      * 只有小程序这条链路漏了，属于「补了后台忘了小程序」的典型。</p>
      *
-     * <p>补默认值都用「原值为 null 才补」，避免把商家显式选的值覆盖成默认。</p>
+     * <p>补默认值都用「原值为 null 才补」，避免把商家显式选的值覆盖成默认。
+     * 但「原值」指的是「库里已有的那一行」，不是「本次请求体里的」：
+     * 小程序的编辑是局部提交（只传这次改的几个 ext 字段），
+     * 若拿请求体当基准判 null，每次局部保存都会把未提交的字段
+     * 覆写成默认值 —— 商家先选好的投放渠道（如只投首页+拼团）
+     * 会在下一次改日期时静默变回平台全量默认（实测已重现），
+     * 券码类型/自用限频同理。所以这里先读一次已有行作为基准。</p>
      */
     private void saveExtByTypeCode(Product body) {
         if (body == null || body.getProductId() == null) return;
         ProductExt ext = body.getExt() != null ? body.getExt() : new ProductExt();
         ext.setProductId(body.getProductId());
-        // 公共默认值：只在商家端没传时兜底
-        if (ext.getDailyUseLimit() == null) ext.setDailyUseLimit(0);
-        if (ext.getRefundRuleType() == null) ext.setRefundRuleType("ANYTIME");
-        if (ext.getCodeType() == null) ext.setCodeType("MERCHANT");
-        if (ext.getStaffPromote() == null) ext.setStaffPromote(0);
-        // 投放渠道：商家端没传就套平台字典的默认勾选，
+        // 库里已有的那一行：只用来判断“这个字段是不是真的从来没值”，
+        // 不把旧值回填进 ext —— mapper 的 update 本身就是 <if != null> 局部更新，
+        // 回填反而会把商家“清空某个值”的意图弄没。
+        ProductExt old = extService.selectById(body.getProductId());
+        // 公共默认值：只在「请求没传 && 库里也没有」时兜底
+        if (ext.getDailyUseLimit() == null && (old == null || old.getDailyUseLimit() == null)) ext.setDailyUseLimit(0);
+        if (ext.getRefundRuleType() == null && (old == null || old.getRefundRuleType() == null)) ext.setRefundRuleType("ANYTIME");
+        if (ext.getCodeType() == null && (old == null || old.getCodeType() == null)) ext.setCodeType("MERCHANT");
+        if (ext.getStaffPromote() == null && (old == null || old.getStaffPromote() == null)) ext.setStaffPromote(0);
+        // 投放渠道：商家端没传且库里也空时才套平台字典的默认勾选，
         // 否则这批商品的 sale_channels 是空的，等顾客端真按渠道过滤时会整批消失
-        if (ext.getSaleChannels() == null || ext.getSaleChannels().trim().isEmpty()) {
+        boolean reqNoChannel = ext.getSaleChannels() == null || ext.getSaleChannels().trim().isEmpty();
+        boolean dbNoChannel = old == null || old.getSaleChannels() == null || old.getSaleChannels().trim().isEmpty();
+        if (reqNoChannel && dbNoChannel) {
             ext.setSaleChannels(channelService.defaultChannelCodes());
         }
         String tc = body.getTypeCode();
         if (tc != null) {
+            // 同上：类型默认值也只在库里真的没值时才补。
+            // 否则商家把组合券包的“自动延期”从 30 改成 7，
+            // 下次只改个价格就又变回 30。
             if ("VOUCHER".equals(tc)) {
-                if (ext.getVoucherAutoName() == null) ext.setVoucherAutoName(1);
-                if (ext.getVoucherMinConsume() == null) ext.setVoucherMinConsume(body.getMinConsume());
+                if (ext.getVoucherAutoName() == null && (old == null || old.getVoucherAutoName() == null)) ext.setVoucherAutoName(1);
+                if (ext.getVoucherMinConsume() == null && (old == null || old.getVoucherMinConsume() == null)) ext.setVoucherMinConsume(body.getMinConsume());
             } else if ("COMBO".equals(tc)) {
-                if (ext.getComboTotalValue() == null) ext.setComboTotalValue(body.getTotalValue());
-                if (ext.getComboSaleType() == null) ext.setComboSaleType("LIMIT");
-                if (ext.getComboAutoExtendDays() == null) ext.setComboAutoExtendDays(30);
+                if (ext.getComboTotalValue() == null && (old == null || old.getComboTotalValue() == null)) ext.setComboTotalValue(body.getTotalValue());
+                if (ext.getComboSaleType() == null && (old == null || old.getComboSaleType() == null)) ext.setComboSaleType("LIMIT");
+                if (ext.getComboAutoExtendDays() == null && (old == null || old.getComboAutoExtendDays() == null)) ext.setComboAutoExtendDays(30);
             } else if ("GROUPON".equals(tc)) {
-                if (ext.getGrouponPickRule() == null) ext.setGrouponPickRule("ALL");
+                if (ext.getGrouponPickRule() == null && (old == null || old.getGrouponPickRule() == null)) ext.setGrouponPickRule("ALL");
             }
         }
         extService.save(ext);
@@ -1085,8 +1113,10 @@ public class ApiProductController
         }
         for (Product p : list)
         {
-            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
-            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+            // cover/images 都是逗号串（头图最多 5 张 / 环境图 10 张），
+            // 单值版 toAbsolute 只会给整串头部拼 base，第二张以后仍是相对路径。
+            p.setCover(ImageUrlUtils.toAbsoluteCsv(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsoluteCsv(p.getImages()));
         }
         return list;
     }

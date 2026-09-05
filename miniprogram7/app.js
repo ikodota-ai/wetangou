@@ -1,5 +1,8 @@
 // app.js 洞天团购小程序（miniprogram7）入口
 const { api, toFullUrl, mockEnabled } = require('./utils/request.js');
+// 商品列表只能放一张图，而 cover 是「商品头图」逗号串（PC 可传 5 张），
+// 直接当 src 会变白图。取首张，口径见 utils/productMedia.js。
+const { firstCover } = require('./utils/productMedia.js');
 const { decide: decideStorePick, decideLocation } = require('./utils/storePick.js');
 const { broadcast } = require('./utils/broadcast.js');
 const { APPID } = require('./utils/config.js');
@@ -441,7 +444,7 @@ App({
             validityDays: p.validityDays || null,
             desc: this.buildGoodsDesc(p),
             sold: p.sales || p.sold || 0,
-            cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png'
+            cover: firstCover(p) ? toFullUrl(firstCover(p)) : '/assets/img/RestaurantImg.png'
           }));
           // 刷新当前在场的 home 页 goods 列表（pickNearestStore 同步 callback 时 goods 还是空）
           this._refreshHomeGoods()
@@ -481,7 +484,7 @@ App({
           validityDays: p.validityDays || null,
           desc: this.buildGoodsDesc(p),
           sold: p.sales || p.sold || 0,
-          cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png'
+          cover: firstCover(p) ? toFullUrl(firstCover(p)) : '/assets/img/RestaurantImg.png'
         })) : []
         this.globalData.goods = list
         this._refreshHomeGoods()

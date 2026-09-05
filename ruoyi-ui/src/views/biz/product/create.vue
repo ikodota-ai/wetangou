@@ -213,9 +213,11 @@
               </el-form-item>
               <el-form-item label="商品头图" prop="cover">
                 <image-upload v-model="form.cover" :limit="isVoucher ? 1 : 5" />
+                <div class="dyl-tip">顾客详情页顶部可左右翻动的就是这组图；商品列表、订单、分享封面取第 1 张</div>
               </el-form-item>
               <el-form-item v-if="!isVoucher" label="环境图">
                 <image-upload v-model="form.images" :limit="10" />
+                <div class="dyl-tip">店内环境 / 菜品实拍，展示在顾客详情页的「图文详情」里（竖排大图，不上顶部轮播）</div>
               </el-form-item>
               <el-form-item label="项目补充说明">
                 <el-input v-model="form.detail" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="选填，对商品的补充说明" />

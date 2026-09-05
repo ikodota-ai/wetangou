@@ -282,13 +282,28 @@ Page({
       // wxml 显示「总部统一收款」而库里存 PLATFORM —— 显示与落库不一致。
       collectMethod: 'HEAD',
       mutexWithStorePromotion: 1,
-      extraFeeDesc: ''
+      extraFeeDesc: '',
+      // 下面这 5 组落 biz_product_ext，原先只有 PC 能填 —— 而商品创建
+      // 主战场是商家端。顾客端详情页那几行（可用时间 / 不可用日期 /
+      // 适用规则 / 适用范围）已经在渲染它们，商家却无处可填，
+      // 结果就是这几行对商家端建的商品永远不显示。
+      consumeStartDate: '', consumeEndDate: '',
+      excludeStartDate: '', excludeEndDate: '',
+      dailyTimeStart: '', dailyTimeEnd: '',
+      voucherRules: [],
+      // 同一列 ext.voucher_scope_type 双语义（与 PC create.vue 一致）：
+      // 代金券当「适用范围」用 scopeType，其余类型当「券类型」用 voucherType。
+      scopeType: 'ALL', voucherType: 'GENERAL'
     },
 
     fields: { base: [], price: [], sale: [], detail: [] },
     sectionProduct: [],
     sectionSale: [],
     sectionTrade: [],
+    // 适用规则的两个选中标记。为什么不在 WXML 里写 indexOf：
+    // 本仓约定 WXML 不写函数调用（lint-wxml-expr 会抦）。
+    voucherRuleAll: false,
+    voucherRuleBrand: false,
 
     canSubmit: false,
     submitting: false
@@ -353,12 +368,30 @@ Page({
         extraFeeDesc: p.extraFeeDesc || '',
         saleChannels: ext.saleChannels ? String(ext.saleChannels).split(',').filter(v => v) : [],
         staffPromote: ext.staffPromote ? 1 : 0,
-        codeType: ext.codeType || 'MERCHANT'
+        codeType: ext.codeType || 'MERCHANT',
+        // 库里存的是 datetime（后端下发 '2026-09-10 00:00:00'），
+        // 而 <picker mode="date"> 只认 yyyy-MM-dd：带时分秒直接传进去 picker 会显空，
+        // 商家编辑一个已设过日期的商品会看到占位符，以为没保存成功。实测过。
+        consumeStartDate: this._toDateOnly(ext.consumeStartDate),
+        consumeEndDate: this._toDateOnly(ext.consumeEndDate),
+        excludeStartDate: this._pickExclude(ext.excludeDates, 0),
+        excludeEndDate: this._pickExclude(ext.excludeDates, 1),
+        // 库里存 HH:mm:ss，picker 只认 HH:mm（带秒会让 picker 显空）
+        dailyTimeStart: this._hhmm(ext.dailyTimeStart),
+        dailyTimeEnd: this._hhmm(ext.dailyTimeEnd),
+        voucherRules: ext.voucherRules ? String(ext.voucherRules).split(',').filter(function (v) { return v }) : [],
+        scopeType: (tc === 'VOUCHER' ? (ext.voucherScopeType || 'ALL') : 'ALL'),
+        voucherType: (tc === 'VOUCHER' ? 'GENERAL' : (ext.voucherScopeType || 'GENERAL'))
       })
       // 字数计数器：WXML 用 form[key + '__len']，不补的话编辑态计数全是 0
       ;['productName', 'subtitle', 'notice'].forEach(k => { form[k + '__len'] = String(form[k] || '').length })
 
+      const vr = form.voucherRules || []
       this.setData({
+        // 编辑态也得同步这两个标记，不同步的话商家打开一个已勾选的商品
+        // 会看到两个格子都是灰的，以为没保存成功。
+        voucherRuleAll: vr.indexOf('ALL_CATEGORY') >= 0,
+        voucherRuleBrand: vr.indexOf('ALL_BRAND') >= 0,
         pickedType: tc,
         pickedTypeName: (dictType && dictType.typeName) || (item && item.typeName) || tc,
         pickedTypeDesc: (dictType && dictType.typeDesc) || TYPE_DESC[tc] || '',
@@ -727,6 +760,85 @@ Page({
     this.setData({ 'form.mutexWithStorePromotion': e.detail.value ? 0 : 1 })
   },
 
+  /**
+   * ext.excludeDates 存的是 [[start,end], ...]，表单只用第一段。
+   * 与 PC 的 parseExcludeDates 同口径：脏 JSON 当空处理，
+   * 不能因为一条坏数据就打不开编辑页。
+   */
+  _pickExclude(json, idx) {
+    if (!json) return ''
+    try {
+      const arr = JSON.parse(json)
+      if (Array.isArray(arr) && arr.length && Array.isArray(arr[0]) && arr[0].length === 2) {
+        return arr[0][idx] || ''
+      }
+    } catch (e) { /* 脏数据当空 */ }
+    return ''
+  },
+  /**
+   * yyyy-MM-dd → yyyy-MM-dd HH:mm:ss。
+   * 后端那两个字段是 java.util.Date 且无 @JsonFormat，只认带时分秒的格式。
+   * 已带时间的（编辑态从库里回填回来的）不重复拼。
+   */
+  _toDateTime(v, tail) {
+    if (!v) return ''
+    const d = String(v).trim()
+    if (d.length > 10) return d
+    return d + ' ' + tail
+  },
+  /** 'yyyy-MM-dd HH:mm:ss' → 'yyyy-MM-dd'（picker mode=date 只认后者） */
+  _toDateOnly(v) {
+    if (!v) return ''
+    const m = String(v).trim().match(/^(\d{4}-\d{2}-\d{2})/)
+    return m ? m[1] : ''
+  },
+  /** HH:mm → HH:mm:ss（库里是 time 类型，PC 也传到秒） */
+  _toTime(v) {
+    if (!v) return ''
+    const t = String(v).trim()
+    return t.length === 5 ? t + ':00' : t
+  },
+  /** 库里存 HH:mm:ss，<picker mode="time"> 只认 HH:mm */
+  _hhmm(v) {
+    if (!v) return ''
+    const m = String(v).match(/^(\d{1,2}):(\d{2})/)
+    if (!m) return ''
+    return (m[1].length === 1 ? '0' + m[1] : m[1]) + ':' + m[2]
+  },
+  /** 日期 / 时间 picker：data-key 直接写 form 字段名 */
+  onPickDate(e) {
+    const k = e.currentTarget.dataset.key
+    if (!k) return
+    this.setData({ ['form.' + k]: e.detail.value })
+  },
+  /** 清空一组日期/时间（不给清空入口，商家选错了就再也取消不掉） */
+  onClearRange(e) {
+    const ks = String(e.currentTarget.dataset.keys || '').split(',')
+    const patch = {}
+    ks.forEach(function (k) { if (k) patch['form.' + k] = '' })
+    this.setData(patch)
+  },
+  /** 适用规则（多选，与 PC 的 checkbox 组同口径） */
+  onToggleVoucherRule(e) {
+    const code = e.currentTarget.dataset.code
+    const cur = (this.data.form.voucherRules || []).slice()
+    const i = cur.indexOf(code)
+    if (i >= 0) { cur.splice(i, 1) } else { cur.push(code) }
+    this.setData({
+      'form.voucherRules': cur,
+      voucherRuleAll: cur.indexOf('ALL_CATEGORY') >= 0,
+      voucherRuleBrand: cur.indexOf('ALL_BRAND') >= 0
+    })
+  },
+  /** 适用范围（代金券） */
+  onPickScopeType(e) {
+    this.setData({ 'form.scopeType': e.currentTarget.dataset.code })
+  },
+  /** 券类型（非代金券） */
+  onPickVoucherType(e) {
+    this.setData({ 'form.voucherType': e.currentTarget.dataset.code })
+  },
+
   onPickPeriod(e) {
     const idx = Number(e.detail.value)
     const opt = PERIOD_OPTIONS[idx]
@@ -881,7 +993,28 @@ Page({
       ext: {
         saleChannels: (f.saleChannels || []).join(','),
         staffPromote: f.staffPromote ? 1 : 0,
-        codeType: f.codeType || 'MERCHANT'
+        codeType: f.codeType || 'MERCHANT',
+        // 下面 5 组与 PC packFormToExt 逐字同口径。
+        // 后端 ProductExt.consumeStartDate 是 java.util.Date 且没加 @JsonFormat，
+        // 只认全局的 yyyy-MM-dd HH:mm:ss（PC 的 el-date-picker 就是
+        // value-format="yyyy-MM-dd HH:mm:ss"）。小程序 <picker mode="date">
+        // 只给 yyyy-MM-dd，直接上传会被 Jackson 退回 500
+        // （Unparseable date）—— 实测过，所以这里必须补时分秒。
+        consumeStartDate: this._toDateTime(f.consumeStartDate, '00:00:00'),
+        consumeEndDate: this._toDateTime(f.consumeEndDate, '23:59:59'),
+        // 不可消费日期：库里存 JSON 二级数组，为将来多段排除留容器；
+        // 表单只收一段，但必须包成 [[start,end]]，否则顾客端
+        // excludeDatesText 解不出来（它按二级数组逐段展）。
+        // excludeDates 是 varchar（存 JSON），不过 Date 反序列化，按日期原样存即可。
+        excludeDates: (f.excludeStartDate && f.excludeEndDate)
+          ? JSON.stringify([[f.excludeStartDate, f.excludeEndDate]]) : '',
+        // 库里 daily_time_start 是 time 类型，PC 传 HH:mm:ss；picker 只给 HH:mm。
+        dailyTimeStart: this._toTime(f.dailyTimeStart),
+        dailyTimeEnd: this._toTime(f.dailyTimeEnd),
+        voucherRules: (f.voucherRules || []).join(','),
+        // 同一列双语义，与 PC 一致：代金券用 scopeType，其余用 voucherType。
+        voucherScopeType: this.data.pickedType === 'VOUCHER'
+          ? (f.scopeType || 'ALL') : (f.voucherType || 'GENERAL')
       }
     }
 

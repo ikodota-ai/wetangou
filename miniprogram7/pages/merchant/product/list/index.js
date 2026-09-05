@@ -3,17 +3,22 @@ const { api } = require('../../../../utils/request.js')
 // 类型中文名。必须在 js 里映射好塞进每条商品，不能在 WXML 里调 Page 方法 ——
 // 小程序模板只认 wxs 模块的函数，{{typeNameOf(item.typeCode)}} 恒渲染成空，
 // 于是列表里每条商品的类型标签一直是个空色块（同 merchant/bill 已修过的那条）。
+// 这张表只是字典拉失败时的兑底，不是事实源。
+// 原先它把 GROUPON 写成「团购」，而 biz_product_type.type_name 已被运营
+// 改成「到店自取」—— 商家在列表里看到的类型名和顾客端、后台三处不一致。
+// 现已改成优先拉 /api/product/type/list，同时把这里的名字与字典现值对齐。
 const TYPE_NAMES = {
-  GROUPON: '团购', VOUCHER: '代金券', TIMECARD: '次卡',
+  GROUPON: '到店自取', VOUCHER: '代金券', TIMECARD: '次卡',
   STORED_CARD: '储值卡', PERIOD_CARD: '周期卡', HUIXIANG_CARD: '惠享卡',
   PRESALE: '预售券', PICKUP_VOUCHER: '提货券',
   COMBO: '组合券包', BOOKING: '预约服务', BILL: '到店买单'
 }
 
 // 「筛选」用的类型清单：只列本系统真实支持的 11 种，顺序与后台字典一致
+// 同上：兑底用，字典拉到后会被整体替掉
 const FILTER_TYPES = [
   { code: '', name: '全部类型' },
-  { code: 'GROUPON', name: '团购' },
+  { code: 'GROUPON', name: '到店自取' },
   { code: 'VOUCHER', name: '代金券' },
   { code: 'TIMECARD', name: '次卡' },
   { code: 'STORED_CARD', name: '储值卡' },
@@ -26,7 +31,14 @@ const FILTER_TYPES = [
   { code: 'BILL', name: '到店买单' }
 ]
 
-function typeNameOf(code) { return TYPE_NAMES[code] || code || '其他' }
+// 运行时字典（拉到后覆盖兑底表）。放模块级而不是 data：
+// decorate 是纯函数且被单测直接调，不能依赖 Page 实例。
+let DICT_NAMES = null
+
+function typeNameOf(code) {
+  if (DICT_NAMES && DICT_NAMES[code]) return DICT_NAMES[code]
+  return TYPE_NAMES[code] || code || '其他'
+}
 
 /**
  * 给列表每条挂上模板要用的派生字段。
@@ -64,6 +76,9 @@ Page({
     filterTypes: FILTER_TYPES
   },
   onShow() {
+    // 类型名以 biz_product_type 字典为准（运营改过 GROUPON 的名字）。
+    // 失败不阻流：拉不到就继续用兑底表，商家至少能看到商品列表。
+    this._loadTypeDict()
     // 建品页存草稿后回来：默认停在「已上架」tab 会一条都看不到，
     // 商家会以为刚才没保存成功。所以由建品页留个标记，回来直接切到「未上架」。
     const flag = wx.getStorageSync('productDraftCreated')
@@ -74,6 +89,44 @@ Page({
     this.loadList()
   },
   onPullDownRefresh() { this.loadList().then(() => wx.stopPullDownRefresh()) },
+
+  /**
+   * 拉商品类型字典，同时修正列表标签与「筛选」清单。
+   *
+   * 为什么要拉：类型名本来就只有 biz_product_type 一个事实源，
+   * 前端写死一份就会和后台、顾客端各说一套（实测：字典已是「到店自取」，
+   * 而这里写的是「团购」）。只拿 app_can_create 那批作筛选项，
+   * 不能建的类型列在筛选里没意义（但标签映射要全要，
+   * 早年建的旧类型商品仍得正确显名）。
+   */
+  _loadTypeDict() {
+    return api.productTypeList().then((res) => {
+      const rows = (res && (res.rows || res.data || res)) || []
+      if (!Array.isArray(rows) || !rows.length) return
+      const names = {}
+      rows.forEach((t) => {
+        if (t && t.typeCode && t.typeName) names[t.typeCode] = t.typeName
+      })
+      if (!Object.keys(names).length) return
+      DICT_NAMES = names
+      const filters = [{ code: '', name: '全部类型' }].concat(
+        rows.filter((t) => Number(t.appCanCreate) === 1)
+          .map((t) => ({ code: t.typeCode, name: t.typeName }))
+      )
+      const patch = { filterTypes: filters.length > 1 ? filters : this.data.filterTypes }
+      // 已渲染的列表要重新上色，否则本次进页看到的还是兑底名
+      if ((this.data.list || []).length) {
+        patch.list = decorate(this.data.list, this.data.selectedIds)
+      }
+      // 已选中的筛选项文案也要跟着换
+      if (this.data.filterType) {
+        patch.filterTypeName = names[this.data.filterType] || this.data.filterTypeName
+      }
+      this.setData(patch)
+    }).catch((err) => {
+      console.warn('[merchant/product/list] 类型字典拉取失败，用兑底表', err)
+    })
+  },
   loadList() {
     const staff = wx.getStorageSync('staffUser') || {}
     if (!staff.merchantId) {

@@ -100,3 +100,8 @@
 .ch-group-title { font-size: 24rpx; color: #999; padding: 20rpx 0 4rpx; }
 .ch-text { display: flex; flex-direction: column; gap: 6rpx; flex: 1; }
 .ch-desc { font-size: 22rpx; color: #999; line-height: 1.4; }
+
+/* 日期/时间区间选择（交易规则里那 3 组）。
+   .placeholder 本页已有，这里只补分隔符和清空按钮。 */
+.range-sep { font-size: 26rpx; color: #999; padding: 0 4rpx; }
+.range-clear { font-size: 24rpx; color: #1677FF; padding: 4rpx 8rpx; }

@@ -87,6 +87,13 @@
     <update id="update" parameterType="ProductExt">
         update biz_product_ext
         <set>
+            <!-- update_time 必须无条件写：下面全是 <if != null>，假如调用方传了一个
+                 除 productId 外全空的 ProductExt，<set> 会是空的 → 生成
+                 "update biz_product_ext where product_id=?" 这种非法 SQL，直接 500。
+                 原先没暴露，是因为 ApiProductController.saveExtByTypeCode 无条件补 4 个
+                 默认值（那正是把商家选好的投放渠道覆回默认的另一个 bug），
+                 只要把那个覆盖修了，这个潜伏的非法 SQL 立刻显形。 -->
+            update_time = sysdate(),
             <if test="voucherAutoName != null">voucher_auto_name = #{voucherAutoName},</if>
             <if test="voucherMinConsume != null">voucher_min_consume = #{voucherMinConsume},</if>
             <if test="voucherScopeType != null">voucher_scope_type = #{voucherScopeType},</if>

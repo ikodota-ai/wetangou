@@ -1,8 +1,11 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
-const { haversineKm, formatDistance } = require('../../utils/util.js');
+// cover 是「商品头图」逗号串（PC 可传 5 张），只能放一张图的位置必须取首张，
+// 否则 src 变成 "urlA,urlB" 直接白图。口径见 utils/productMedia.js。
+const { firstCover } = require('../../utils/productMedia.js');
 const { resolveContact } = require('../../utils/contact.js');
-const { toRatingView } = require('../../utils/rating.js');
+// 门店视图（距离+星级）口径与商品详情页共用一份，防两边算法漂移
+const { toStoreView } = require('../../utils/storeView.js');
 
 Page({
   data: {
@@ -91,35 +94,17 @@ Page({
       this.getTabBar().setData({ selected: 0 });
     }
   },
-  // 把后端 store 字段转成 wxml 用的视图模型（name/hours/distanceText）
+  // 把后端 store 字段转成 wxml 用的视图模型（name/hours/distanceText/星级）
+  //
+  // 距离+星级的口径已抽到 utils/storeView.js：商品详情页顶部也要展
+  // 同一家门店的距离和星级，两边各算一遍早晚会漂移。
+  // 本页只额外补一个 logo（只有首页门店卡用得到）。
   _compatStoreView(s) {
     if (!s) return {}
     const loc = (app.globalData && app.globalData.location) || null
-    let _distKm = null
-    if (s.distance != null && s.distance !== '') {
-      // 后端字段单位约定为米；统一转成 km 传给 formatDistance
-      const d = Number(s.distance)
-      _distKm = d / 1000
-    } else if (loc && loc.lat != null && loc.lng != null && s.latitude != null && s.longitude != null) {
-      _distKm = haversineKm(loc.lat, loc.lng, s.latitude, s.longitude)
-    } else {
-      // 没有位置时不主动取位（懒加载策略：避免频繁弹系统授权框）
-    }
-    // 这里不能用 `formatDistance(_distKm) || '计算中…'`：
-    // 没授权定位时 _distKm 恒为 null、formatDistance 恒返 ''，
-    // 于是永久停在「计算中…」—— 而它根本不会再算，因为不主动取位。
-    // 区分两种状态：算出来了就显示，没位置就明说需要授权。
-    const _dist = formatDistance(_distKm)
-    // 评分：后台手工维护的 0.0-5.0。判空/取整/越界规则收口在 utils/rating.js
-    // （纯函数，被单测直接引用；内联在页面里单测就只能复制一份来测）。
-    const _r = toRatingView(s.rating)
-    return Object.assign({}, s, _r, {
-      name: s.storeName || s.name || '',
-      hours: s.businessHours || s.hours || '',
-      logo: s.logo ? toFullUrl(s.logo) : '',
-      distanceText: _dist,
-      // wxml 用它决定是显示「距您 x km」还是「查看距离」按钮
-      hasDistance: !!_dist
+    const view = toStoreView(s, loc)
+    return Object.assign(view, {
+      logo: s.logo ? toFullUrl(s.logo) : ''
     })
   },
 
@@ -281,7 +266,7 @@ Page({
         marketPrice: p.marketPrice != null ? String(p.marketPrice) : '',
         desc: p.subtitle || '在线选择时段，到店免排队',
         sold: p.sales || p.sold || 0,
-        cover: p.cover ? toFullUrl(p.cover) : '/assets/img/BookTypeImg.jpg'
+        cover: firstCover(p) ? toFullUrl(firstCover(p)) : '/assets/img/BookTypeImg.jpg'
       })) : []
       this.setData({ bookingGoods: list, bookingLoaded: true })
     }).catch((err) => {

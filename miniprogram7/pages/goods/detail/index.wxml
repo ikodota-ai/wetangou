@@ -32,8 +32,27 @@
     <view class="info-row" wx:if="{{product.typeCode === 'PERIOD_CARD' && product.periodType}}"><text class="lab">周期</text><text class="val">{{product.periodType === 'MONTH' ? '月卡' : product.periodType === 'QUARTER' ? '季卡' : product.periodType === 'YEAR' ? '年卡' : product.periodType}} {{product.periodCount ? '× ' + product.periodCount : ''}}</text></view>
     <view class="info-row" wx:if="{{product.typeCode === 'COMBO' && product.totalValue}}"><text class="lab">总价值</text><text class="val">¥{{product.totalValue}}</text></view>
     <view class="info-row" wx:if="{{product.requireXiaoxin}}"><text class="lab">冷静期</text><text class="val">购买后 {{product.consumeStartDays || 1}} 天起 {{product.consumeValidDays || 360}} 天内有效</text></view>
-    <!-- 原先这里还有一行「门店」（storeScopeText），已删：
-         页面底部「适用门店」卡已经把可用门店完整列出来了，同一信息说两遍。 -->
+    <!-- 门店：直接展首页已定位的当前门店（globalData.store）+ 距离 + 星级。
+         不用后端的 storeNameMain：那是商品的“主门店”（store_ids 的第一个），
+         多店商品下它往往不是顾客周边那家；而首页已按位置选好了店，
+         列表里这些商品就是那家店的。底部「适用门店」卡解决的是“还有哪几家能用”，
+         两者回答的不是同一个问题。 -->
+    <view class="info-row" wx:if="{{topStore.name}}">
+      <text class="lab">门店</text>
+      <view class="val top-store">
+        <text class="ts-name">{{topStore.name}}</text>
+        <!-- 没距离就给可点的「查看距离」（点了才取位）。
+             不能写成“计算中…”：未授权时它永远不会再算，就永久卡在那儿。 -->
+        <text class="ts-dist" wx:if="{{topStore.hasDistance}}">距您{{topStore.distanceText}}</text>
+        <text class="ts-dist ts-act" wx:else catchtap="requestDistance">查看距离 ></text>
+        <!-- 星级：rating 未填时整块不渲染 —— 显示五颗灰星会被当成差评 -->
+        <view class="ts-rating" wx:if="{{topStore.hasRating}}">
+          <view class="star {{index < topStore.ratingStars ? 'star-on' : ''}}"
+                wx:for="{{[0,1,2,3,4]}}" wx:key="*this"></view>
+          <text class="ts-score">{{topStore.ratingText}}</text>
+        </view>
+      </view>
+    </view>
     <!-- 服务设施：读门店 biz_store.services（后端已按字典翻译成中文）。
          原先这一行写的是「免预约 / 到店核销」——那是预约方式，不是服务设施，
          而真正的设施（可堂食 / 独立空间 / 免费停车）顾客在商品页上从来看不到。 -->
@@ -64,8 +83,12 @@
     <view class="nl-sub">买单出示核销码，自动抵扣</view>
   </view>
 
-  <!-- 套餐详情 (GROUPON / COMBO 显示) -->
-  <view class="card" wx:if="{{product.typeCode !== 'VOUCHER' && product.subitemGroups && product.subitemGroups.length}}">
+  <!-- 套餐详情：只看有没有子品，不再按商品类型卡。
+       原先这里多一个 typeCode !== 'VOUCHER'，后端又只给 GROUPON/COMBO 下发，
+       两道类型卡叠在一起：库里 BOOKING 类型的 999534 真有 4 组 17 个子品
+       （锅底2选1 / 荟菜4选4 / 素菜4选4 / 饮品3选2），顾客却一样都看不到。
+       子品存不存在跟类型无关，有就展 —— 没子品的商品后端根本不下发这个字段。 -->
+  <view class="card" wx:if="{{product.subitemGroups && product.subitemGroups.length}}">
     <text class="block-title">套餐详情</text>
     <view class="subitem-block" wx:for="{{product.subitemGroups}}" wx:key="groupId" wx:for-item="g">
       <view class="subitem-group-name">
@@ -253,9 +276,16 @@
        index.js 也一直在算 fixRichText(p.detail) —— 但 WXML 里从来没有过
        任何一处引用，算完就丢。对比抖音来客，这一块是“图片详情”，
        占了商品详情页整整 5 屏；在我们这里顾客一个字看不到。 -->
-  <view class="card" wx:if="{{product.detail}}">
+  <view class="card" wx:if="{{product.detail || product.contentImages.length}}">
     <text class="block-title">图文详情</text>
-    <rich-text class="rich-detail" nodes="{{product.detail}}"></rich-text>
+    <rich-text wx:if="{{product.detail}}" class="rich-detail" nodes="{{product.detail}}"></rich-text>
+    <!-- 环境图（biz_product.images，PC 建品页那个 10 张上传框）。
+         它是商品内容（店内环境 / 菜品实拍），所以就归在图文详情里竖排大图，
+         而不是去顶部当主图轮播（顶部那组是「商品头图」= cover）。
+         宽度固定、高度自适应：实拍图长宽比不一，写死高度会把竖图裁成一条。 -->
+    <image wx:for="{{product.contentImages}}" wx:key="*this"
+           class="detail-img" src="{{item}}" mode="widthFix"
+           data-src="{{item}}" bindtap="onPreviewContentImage"></image>
   </view>
 
   <!-- 商家手写的补充说明（notice 富文本）。

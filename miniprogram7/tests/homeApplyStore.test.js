@@ -71,6 +71,11 @@ function loadHomePage() {
     if (id.indexOf('util.js') >= 0) return require('../utils/util.js')
     if (id.indexOf('contact.js') >= 0) return require('../utils/contact.js')
     if (id.indexOf('rating.js') >= 0) return require('../utils/rating.js')
+    // 真实模块：距离+星级口径已与商品详情页共用，本测要验的就是它算出来的值
+    if (id.indexOf('storeView.js') >= 0) return require('../utils/storeView.js')
+    // 真实模块而不是桩：firstCover 是纯函数，且本测要验的就是
+    // 商品卡拿到的封面对不对（cover 是头图逗号串，得取首张）。
+    if (id.indexOf('productMedia.js') >= 0) return require('../utils/productMedia.js')
     throw new Error('unexpected require: ' + id)
   }
   // eslint-disable-next-line no-new-func

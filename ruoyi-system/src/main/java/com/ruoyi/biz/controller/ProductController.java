@@ -87,8 +87,10 @@ public class ProductController extends BaseController
         if (p != null)
         {
             TenantFilterHelper.assertDataScope(p.getMerchantId());
-            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
-            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+            // cover/images 都是逗号串（头图最多 5 张 / 环境图 10 张），
+            // 单值版 toAbsolute 只会给整串头部拼 base，第二张以后仍是相对路径。
+            p.setCover(ImageUrlUtils.toAbsoluteCsv(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsoluteCsv(p.getImages()));
         }
         return success(p);
     }
@@ -273,8 +275,10 @@ public class ProductController extends BaseController
         }
         for (Product p : list)
         {
-            p.setCover(ImageUrlUtils.toAbsolute(p.getCover()));
-            p.setImages(ImageUrlUtils.toAbsolute(p.getImages()));
+            // cover/images 都是逗号串（头图最多 5 张 / 环境图 10 张），
+            // 单值版 toAbsolute 只会给整串头部拼 base，第二张以后仍是相对路径。
+            p.setCover(ImageUrlUtils.toAbsoluteCsv(p.getCover()));
+            p.setImages(ImageUrlUtils.toAbsoluteCsv(p.getImages()));
         }
         return list;
     }

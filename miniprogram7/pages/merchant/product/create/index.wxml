@@ -207,6 +207,84 @@
             <text>自购买次日起 {{form.validityDays || 360}} 天，购买当天默认可用</text>
           </view>
         </view>
+        <!-- 下面 5 组落 biz_product_ext。原先只有 PC 能填，而顾客端详情页
+             的「购买须知」已经在渲染它们 —— 商家端建的商品那几行永远为空。
+             控件形式跟本页已有的 rule-row / opt-group 保持一致。 -->
+        <view class="rule-row">
+          <view class="row-label"><text>顾客可消费日期</text></view>
+          <view class="row-value">
+            <picker mode="date" value="{{form.consumeStartDate}}" data-key="consumeStartDate" bindchange="onPickDate">
+              <text class="{{form.consumeStartDate ? 'value' : 'placeholder'}}">{{form.consumeStartDate || '开始'}}</text>
+            </picker>
+            <text class="range-sep">至</text>
+            <picker mode="date" value="{{form.consumeEndDate}}" data-key="consumeEndDate" bindchange="onPickDate">
+              <text class="{{form.consumeEndDate ? 'value' : 'placeholder'}}">{{form.consumeEndDate || '结束'}}</text>
+            </picker>
+            <text wx:if="{{form.consumeStartDate || form.consumeEndDate}}" class="range-clear"
+                  data-keys="consumeStartDate,consumeEndDate" bindtap="onClearRange">清空</text>
+          </view>
+        </view>
+        <view class="row-tip">不填则沿用上面的有效期天数</view>
+        <view class="rule-row">
+          <view class="row-label"><text>不可消费日期</text></view>
+          <view class="row-value">
+            <picker mode="date" value="{{form.excludeStartDate}}" data-key="excludeStartDate" bindchange="onPickDate">
+              <text class="{{form.excludeStartDate ? 'value' : 'placeholder'}}">{{form.excludeStartDate || '开始'}}</text>
+            </picker>
+            <text class="range-sep">至</text>
+            <picker mode="date" value="{{form.excludeEndDate}}" data-key="excludeEndDate" bindchange="onPickDate">
+              <text class="{{form.excludeEndDate ? 'value' : 'placeholder'}}">{{form.excludeEndDate || '结束'}}</text>
+            </picker>
+            <text wx:if="{{form.excludeStartDate || form.excludeEndDate}}" class="range-clear"
+                  data-keys="excludeStartDate,excludeEndDate" bindtap="onClearRange">清空</text>
+          </view>
+        </view>
+        <view class="row-tip">如节假日不可用，在此排除；顾客详情页会列出来</view>
+        <view class="rule-row">
+          <view class="row-label"><text>每日可用时段</text></view>
+          <view class="row-value">
+            <picker mode="time" value="{{form.dailyTimeStart}}" data-key="dailyTimeStart" bindchange="onPickDate">
+              <text class="{{form.dailyTimeStart ? 'value' : 'placeholder'}}">{{form.dailyTimeStart || '开始'}}</text>
+            </picker>
+            <text class="range-sep">至</text>
+            <picker mode="time" value="{{form.dailyTimeEnd}}" data-key="dailyTimeEnd" bindchange="onPickDate">
+              <text class="{{form.dailyTimeEnd ? 'value' : 'placeholder'}}">{{form.dailyTimeEnd || '结束'}}</text>
+            </picker>
+            <text wx:if="{{form.dailyTimeStart || form.dailyTimeEnd}}" class="range-clear"
+                  data-keys="dailyTimeStart,dailyTimeEnd" bindtap="onClearRange">清空</text>
+          </view>
+        </view>
+        <view class="row-tip">不填则跟随门店营业时间</view>
+        <!-- 适用规则：与 PC 的 checkbox 组同口径（多选）。
+             只在组合券包显示 —— PC create.vue 把它放在 v-if="isCombo" 的「商品资质」里，
+             它描述的是子品代金券的适用范围，到店自取/次卡等类型根本没这个概念。
+             两边不一致的后果：商家在手机上给一个 GROUPON 勾了“全部品类适用”，
+             回 PC 编辑时这个控件整个不展，他无法改也无法删。 -->
+        <view class="row column" wx:if="{{pickedType === 'COMBO'}}">
+          <text class="row-label">适用规则</text>
+          <view class="opt-group">
+            <view class="opt {{voucherRuleAll ? 'on' : ''}}" data-code="ALL_CATEGORY" bindtap="onToggleVoucherRule">全部品类适用</view>
+            <view class="opt {{voucherRuleBrand ? 'on' : ''}}" data-code="ALL_BRAND" bindtap="onToggleVoucherRule">全部品牌适用</view>
+          </view>
+        </view>
+        <!-- 同一列 ext.voucher_scope_type 双语义，两者不会同屏（与 PC 一致） -->
+        <view class="row column" wx:if="{{pickedType === 'VOUCHER'}}">
+          <text class="row-label">适用范围</text>
+          <view class="opt-group">
+            <view class="opt {{form.scopeType === 'ALL' ? 'on' : ''}}" data-code="ALL" bindtap="onPickScopeType">全场通用</view>
+            <view class="opt {{form.scopeType === 'CATEGORY' ? 'on' : ''}}" data-code="CATEGORY" bindtap="onPickScopeType">按品类适用</view>
+            <view class="opt {{form.scopeType === 'STORE' ? 'on' : ''}}" data-code="STORE" bindtap="onPickScopeType">按门店适用</view>
+          </view>
+        </view>
+        <!-- 券类型同样只在组合券包（PC 放在 isCombo 的「商品资质」）。
+             原先写 wx:else，于是除代金券外的所有类型都会多出这一行。 -->
+        <view class="row column" wx:elif="{{pickedType === 'COMBO'}}">
+          <text class="row-label">券类型</text>
+          <view class="opt-group">
+            <view class="opt {{form.voucherType === 'GENERAL' ? 'on' : ''}}" data-code="GENERAL" bindtap="onPickVoucherType">通兑券</view>
+            <view class="opt {{form.voucherType === 'CATEGORY' ? 'on' : ''}}" data-code="CATEGORY" bindtap="onPickVoucherType">单品类券</view>
+          </view>
+        </view>
         <!-- 券码类型：与后台一致的 MERCHANT/PLATFORM（后台原先写的 DOUYIN 是照抄抖音来客的） -->
         <view class="row column">
           <text class="row-label">券码类型</text>

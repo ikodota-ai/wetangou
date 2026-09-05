@@ -16,6 +16,19 @@
 /* 96rpx 不能再小：新增的「服务设施」是四个字，80rpx 会折行 */
 .lab { font-size: 26rpx; color: #999; width: 96rpx; flex-shrink: 0; }
 .val { font-size: 26rpx; color: #1A1A1A; flex: 1; }
+/* 顶部「门店」行：店名 + 距离 + 星级横排，窗小时允许换行 */
+.top-store { display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx; }
+/* 店名可能很长（如“成都锦江区心依美服装店”），超一行省略，
+   不能把距离和星级挤出可视区。min-width:0 是 flex 子项省略号生效的前提。 */
+.ts-name { font-size: 26rpx; color: #1A1A1A; max-width: 320rpx; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ts-dist { font-size: 24rpx; color: #999; }
+/* 「查看距离」是可点的，给主色区分于纯展示的距离文本 */
+.ts-act { color: var(--color-primary); }
+.ts-rating { display: flex; align-items: center; gap: 2rpx; }
+.ts-score { font-size: 22rpx; color: #FFB400; margin-left: 4rpx; }
+/* 点亮态星星。本页原先只定义了灰态 .star（底部适用门店卡没用星星，
+   只写了数字评分），没有 .star-on 的话五颗星会全是灰的。 */
+.star-on { background: #FFB400; }
 
 .card { background: #FFFFFF; border-radius: 20rpx; padding: 32rpx; margin: 24rpx 32rpx; }
 .block-title { font-size: 32rpx; font-weight: 600; color: #1A1A1A; display: block; margin-bottom: 16rpx; }
@@ -195,3 +208,8 @@ button.so::after { border: none; }
   color: #333;
   word-break: break-all;
 }
+
+/* 图文详情里的环境图（biz_product.images）。
+   mode="widthFix" 配上不写高度：商家传的实拍图长宽比不统一，
+   写死高度会把竖构图裁成一条。 */
+.detail-img { display: block; width: 100%; border-radius: 12rpx; margin-top: 16rpx; }

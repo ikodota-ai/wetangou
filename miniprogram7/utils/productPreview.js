@@ -130,7 +130,23 @@ function draftToProduct(draft) {
     // codeType 也在 ext：顾客端读的就是 p.ext.codeType 这个路径（库表 biz_product_ext）。
     ext: {
       comboItemsJson: d.comboItemsJson || '',
-      codeType: f.codeType || ''
+      codeType: f.codeType || '',
+      // 下面 5 组同样在 ext，顾客端详情页读的就是这些路径
+      // （utils/tradeRules.js 的 dailyTimeText / excludeDatesText /
+      //   voucherRulesText / voucherScopeText 全部只接 ext）。
+      // 不透传的话，商家刚填完可用时段去预览，那几行是空的，
+      // 他会以为没生效 —— 而预览存在的意义就是看“顾客到底会看到什么”。
+      consumeStartDate: f.consumeStartDate || '',
+      consumeEndDate: f.consumeEndDate || '',
+      // 与提交时同口径：包成 [[start,end]]，否则顾客端解不出来。
+      excludeDates: (f.excludeStartDate && f.excludeEndDate)
+        ? JSON.stringify([[f.excludeStartDate, f.excludeEndDate]]) : '',
+      dailyTimeStart: f.dailyTimeStart || '',
+      dailyTimeEnd: f.dailyTimeEnd || '',
+      voucherRules: Array.isArray(f.voucherRules) ? f.voucherRules.join(',') : (f.voucherRules || ''),
+      // 同一列双语义，与 PC 和提交时一致：代金券用 scopeType，其余用 voucherType。
+      voucherScopeType: d.pickedType === 'VOUCHER'
+        ? (f.scopeType || 'ALL') : (f.voucherType || 'GENERAL')
     }
   }
 }

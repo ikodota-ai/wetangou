@@ -146,7 +146,10 @@ public class ApiOrderServiceImpl implements IApiOrderService
         order.setMemberId(memberId);
         order.setProductId(productId);
         order.setProductName(product.getProductName());
-        order.setProductCover(product.getCover());
+        // 只快照头图首张：cover 是逗号串（PC 建品页可传 5 张），
+        // 而 biz_order.product_cover 只有 varchar(255) —— 整串存进去不仅让订单列表
+        // 的 <image src> 变白图，超长时还会被截成半个 URL 永久写进历史订单。
+        order.setProductCover(com.ruoyi.common.utils.image.ImageUrlUtils.firstImage(product.getCover()));
         order.setOrderType("0");
         order.setPrice(price);
         order.setNum(quantity);

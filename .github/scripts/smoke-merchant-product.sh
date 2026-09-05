@@ -114,6 +114,44 @@ for kv in "refundPolicy:BEFORE_EXPIRE" "mutexWithStorePromotion:0" "extraFeeDesc
   [ "$got" = "$want" ] && ok "$k=$got" || bad "$k 期望 $want 实得 $got"
 done
 
+# ---------- 3b) 商家端新补的 5 组 ext 字段必须真落库 ----------
+# 背景：商家端建品页原先只传 saleChannels/staffPromote/codeType 三个 ext，
+# 而 PC 建品页能填的可消费日期 / 不可消费日期 / 每日时段 /
+# 适用规则 / 适用范围 一个也没传 —— 商家在手机上建的券因此永远没有使用期限
+# 和可用时段，顾客详情页那几行恒空。
+#
+# 两个格式坑必须锁住（否则 500 / 解不出来）：
+#   consumeStartDate/EndDate 是 java.util.Date 且未加 @JsonFormat，只认
+#     yyyy-MM-dd HH:mm:ss；小程序 <picker mode="date"> 只给 yyyy-MM-dd，必须补时分秒。
+#   excludeDates 存 JSON 二级数组 [[起,止]]，顾客端 excludeDatesText 按段展，
+#     平铺成 "起,止" 会直接解不出来。
+echo "[3b] 5 组日期/时段/适用规则 ext 落库"
+E_BODY=$(python3 -c "import json;print(json.dumps({
+  'productId':$PID,
+  'ext':{
+    'consumeStartDate':'2026-09-10 00:00:00','consumeEndDate':'2026-12-31 23:59:59',
+    'excludeDates':json.dumps([['2026-10-01','2026-10-07'],['2026-02-14','2026-02-14']]),
+    'dailyTimeStart':'11:00:00','dailyTimeEnd':'14:30:00',
+    'voucherRules':'ALL_CATEGORY,ALL_BRAND','voucherScopeType':'STORE'
+  }
+}))")
+EE=$(curl -s -X PUT "$H/api/product" -H "$AUTH" -H "$JSON" -d "$E_BODY")
+chk_code "5 组 ext 保存成功" 200 "$EE"
+DET2=$(curl -s "$H/api/product/$PID" -H "$AUTH" -H "X-App-Id: $APPID")
+ext(){ echo "$DET2" | python3 -c "import sys,json;v=(json.load(sys.stdin)['data'].get('ext') or {}).get('$1');print('' if v is None else v)"; }
+# 日期回流带 .0 结尾（Jackson 序列化 Date），只看前 10 位日期部分
+case "$(ext consumeStartDate)" in 2026-09-10*) ok "ext.consumeStartDate 落库 ($(ext consumeStartDate))";; *) bad "ext.consumeStartDate 实得 [$(ext consumeStartDate)]";; esac
+case "$(ext consumeEndDate)"   in 2026-12-31*) ok "ext.consumeEndDate 落库 ($(ext consumeEndDate))";;   *) bad "ext.consumeEndDate 实得 [$(ext consumeEndDate)]";; esac
+case "$(ext dailyTimeStart)"   in 11:00*)      ok "ext.dailyTimeStart 落库 ($(ext dailyTimeStart))";;    *) bad "ext.dailyTimeStart 实得 [$(ext dailyTimeStart)]";; esac
+case "$(ext dailyTimeEnd)"     in 14:30*)      ok "ext.dailyTimeEnd 落库 ($(ext dailyTimeEnd))";;      *) bad "ext.dailyTimeEnd 实得 [$(ext dailyTimeEnd)]";; esac
+[ "$(ext voucherRules)" = "ALL_CATEGORY,ALL_BRAND" ] && ok "ext.voucherRules 落库" || bad "ext.voucherRules 实得 [$(ext voucherRules)]"
+[ "$(ext voucherScopeType)" = "STORE" ] && ok "ext.voucherScopeType 落库" || bad "ext.voucherScopeType 实得 [$(ext voucherScopeType)]"
+# 二级数组的第二段不能被吞（顾客端逐段展，吞了就少一个排除区间）
+case "$(ext excludeDates)" in *2026-02-14*) ok "ext.excludeDates 保留第二段";; *) bad "ext.excludeDates 实得 [$(ext excludeDates)]";; esac
+# 上一次存的三个 ext 不能被这次局部更新抹掉 ——
+# saveExtByTypeCode 如果又回到 new ProductExt() 从零构造，渠道就丢了。
+[ "$(ext saleChannels)" = "MINI_HOME,GROUP_SHARE" ] && ok "局部更新不抹掉已有 ext.saleChannels" || bad "ext.saleChannels 被抹成 [$(ext saleChannels)]"
+
 # ---------- 4) 草稿必须是下架态 ----------
 # 商家端原先写死 status:'0' 直接上架，字段没齐就对顾客可见了。
 echo "[4] 草稿状态"

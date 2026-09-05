@@ -99,3 +99,138 @@ describe('适用门店逐行拨号必须取本行号码', () => {
     expect(body).not.toContain('this.data.product.storePhone')
   })
 })
+
+// cover / images 职责划分的渲染契约。
+//
+// 上一版顶部轮播写的是「images 优先，cover 兑底」，恰好把两个字段的
+// 职责说反了（cover=商品头图、images=环境图）；而本地 10 条商品两边
+// 首张恰好相同，胮眼和真机都看不出差别 —— 只有契约能盯住它。
+describe('头图 / 环境图 各归各位', () => {
+  it('顶部轮播读 product.images，而它必须由 heroImages（取 cover）算出来', () => {
+    expect(WXML).toMatch(/<swiper[^>]*class="hero"/)
+    expect(JS).toContain('heroImages(p)')
+    // 不能回到「优先 images」的旧写法
+    expect(JS).not.toMatch(/const images = p\.images/)
+  })
+
+  it('环境图走 product.contentImages，展在图文详情卡里（不上顶部）', () => {
+    expect(JS).toContain('contentImages:')
+    expect(WXML).toContain('product.contentImages')
+    // 必须在「图文详情」那张卡内，而不是自己另开一张无标题的卡
+    const i = WXML.indexOf('图文详情')
+    const j = WXML.indexOf('product.contentImages')
+    expect(i).toBeGreaterThan(-1)
+    expect(j).toBeGreaterThan(i)
+  })
+
+  it('图文详情卡的 wx:if 要把环境图算进去：只有图没富文时也得显示', () => {
+    // 否则商家只传了 10 张实拍、没写富文，那批图就永远不会出现。
+    expect(WXML).toMatch(/wx:if="\{\{product\.detail \|\| product\.contentImages\.length\}\}"/)
+  })
+
+  it('只能放一张图的 product.cover 必须过 firstCover（cover 是逗号串）', () => {
+    expect(JS).toContain('firstCover(p)')
+    // 旧写法：toFullUrl(p.cover) 直接把整串当 URL
+    expect(JS).not.toMatch(/cover: p\.cover \? toFullUrl\(p\.cover\)/)
+  })
+
+  it('分享 / 收藏 封面不能再取环境图首张', () => {
+    // 旧写法 p.images && p.images[0] || p.cover：发出去的封面是环境图，
+    // 不是商家选的主图。
+    expect(JS).not.toMatch(/p\.images && p\.images\[0\]/)
+  })
+
+  it('环境图可点大图，且 previewImage 传全部图（只传当前张等于废掉划动）', () => {
+    expect(WXML).toContain('bindtap="onPreviewContentImage"')
+    const i = JS.indexOf('onPreviewContentImage(e)')
+    expect(i).toBeGreaterThan(-1)
+    const body = JS.slice(i, i + 420)
+    expect(body).toContain('wx.previewImage')
+    expect(body).toContain('urls:')
+  })
+})
+
+// 套餐详情（子品分组）与类型名。
+//
+// 两个真实缺陷：
+// 1) 后端只给 GROUPON/COMBO 下发 subitemGroups，前端又多一道
+//    typeCode !== 'VOUCHER'。两道类型卡叠加 → 库里 BOOKING 类型的 999534
+//    真有 4 组 17 个子品，顾客一样看不到自己能挑什么。
+// 2) 类型名在前端写死一份（GROUPON →「团购套餐」），而
+//    biz_product_type.type_name 已被运营改成「到店自取」。
+describe('套餐详情只看数据、不看类型', () => {
+  it('那张卡的 wx:if 不能再带 typeCode 判断（后端已按「有数据才下发」把关）', () => {
+    const m = WXML.match(/<view class="card" wx:if="\{\{product\.subitemGroups[^"]*"/)
+    expect(m, '应有套餐详情卡').not.toBeNull()
+    expect(m[0]).not.toContain('typeCode')
+    expect(m[0]).toContain('product.subitemGroups.length')
+  })
+})
+
+describe('类型名只能来自 biz_product_type 字典', () => {
+  it('前端不再编造类型中文名（typeText 已清空兑底表）', () => {
+    // 两份事实必然漂，而漂了也不报错 —— 只会让顾客看到已废弃的旧名。
+    expect(JS).not.toMatch(/GROUPON:\s*'团购套餐'/)
+    expect(JS).not.toMatch(/GROUPON:\s*'团购'/)
+  })
+
+  it('typeName 优先用后端顶层下发的字典值', () => {
+    expect(JS).toContain('typeName: p.typeName')
+    // 后端顶层兄弟键必须并进商品对象，否则 normalize 拿不到
+    expect(JS).toContain('typeName: raw.typeName || p.typeName')
+  })
+})
+
+// 顶部「门店」行（类型下一行）。
+//
+// 业务背景：首页已按位置定位到最近门店，商品列表也是按那家店拉的，
+// 所以详情页顶部应直接展“当前门店 + 距离 + 星级”。
+// 上一轮我把旧的 storeScopeText（“N 店通用”）删了，并不等于这行不该存在：
+// 那行回答的是“还有哪几家能用”（已由底部「适用门店」卡接管），
+// 这行回答的是“我要去的那家叫什么、有多远、好不好”。
+describe('顶部门店行：读首页定位的当前门店', () => {
+  it('topStore 必须在 data 给初值（WXML 直读 topStore.name，undefined 会报错）', () => {
+    const dataBlock = JS.slice(JS.indexOf('data: {'), JS.indexOf('onLoad('))
+    expect(dataBlock).toContain('topStore:')
+    expect(WXML).toContain('topStore.name')
+  })
+
+  it('门店行插在「类型」之后、「服务设施」之前', () => {
+    const iType = WXML.indexOf('product.typeName')
+    const iStore = WXML.indexOf('class="val top-store"')
+    const iSvc = WXML.indexOf('storeServices.length')
+    expect(iType).toBeGreaterThan(-1)
+    expect(iStore).toBeGreaterThan(iType)
+    expect(iSvc).toBeGreaterThan(iStore)
+  })
+
+  it('距离+星级走 utils/storeView.js，不能在页面里再算一遍', () => {
+    // 首页与详情页各算一遍会漂移（1.2km vs 1200m），而漂了不报错
+    expect(JS).toContain('utils/storeView.js')
+    expect(JS).toContain('toStoreView(cur,')
+    expect(JS).not.toContain('haversineKm')
+  })
+
+  it('星级未填时整块不渲染（五颗灰星会被当成差评）', () => {
+    expect(WXML).toContain('wx:if="{{topStore.hasRating}}"')
+  })
+
+  it('没位置时给可点的「查看距离」，不能写“计算中…”', () => {
+    // 首页踩过的坑：未授权时 formatDistance 恒返 ''，
+    // 写 `|| '计算中…'` 就永久卡在那儿（因为它不会主动取位）
+    expect(WXML).toContain('catchtap="requestDistance"')
+    // 剔掉注释后再扫：注释里写的是“不能写成计算中…”的缘由，不是违规
+    const wxmlNoComment = WXML.replace(/<!--[\s\S]*?-->/g, '')
+    expect(wxmlNoComment).not.toContain('计算中…')
+    expect(JS).toContain('requestDistance()')
+    // 必须 gcj02：门店经纬度是腾讯地图选点存的，坐标系不一致同城会偏 300~600m
+    const i = JS.indexOf('requestDistance()')
+    expect(JS.slice(i, i + 900)).toContain('gcj02')
+  })
+
+  it('不用后端 storeNameMain 当顶部门店名（那是商品主门店，多店下不是顾客周边那家）', () => {
+    const i = WXML.indexOf('class="val top-store"')
+    const seg = WXML.slice(i, i + 900)
+    expect(seg).not.toContain('storeNameMain')
+  })
+})

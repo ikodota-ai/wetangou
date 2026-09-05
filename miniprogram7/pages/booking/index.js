@@ -1,5 +1,8 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../utils/request.js');
+// cover 是「商品头图」逗号串（PC 可传 5 张），只能放一张图的位置必须取首张，
+// 否则 src 变成 "urlA,urlB" 直接白图。口径见 utils/productMedia.js。
+const { firstCover } = require('../../utils/productMedia.js');
 const { haversineKm, formatDistance } = require('../../utils/util.js');
 const { resolveContact } = require('../../utils/contact.js');
 
@@ -64,7 +67,7 @@ Page({
         productId: p.productId || p.id,
         name: p.productName || p.name,
         price: p.price != null ? String(p.price) : '',
-        cover: p.cover ? toFullUrl(p.cover) : ''
+        cover: firstCover(p) ? toFullUrl(firstCover(p)) : ''
       })) : [];
       this.setData({ bookingItems: list, itemsLoaded: true });
     }).catch((err) => {

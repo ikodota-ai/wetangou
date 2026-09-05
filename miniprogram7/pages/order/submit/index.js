@@ -1,5 +1,8 @@
 const app = getApp();
 const { api, toFullUrl } = require('../../../utils/request.js');
+// cover 是「商品头图」逗号串（PC 可传 5 张），只能放一张图的位置必须取首张，
+// 否则 src 变成 "urlA,urlB" 直接白图。口径见 utils/productMedia.js。
+const { firstCover } = require('../../../utils/productMedia.js');
 const { formatMoney } = require('../../../utils/util.js');
 const voucherUtil = require('../../../utils/voucher.js');
 
@@ -94,7 +97,7 @@ Page({
         productId: p.productId,
         name: p.productName || p.name,
         price: p.price != null ? formatMoney(p.price) : '0.00',
-        cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',
+        cover: firstCover(p) ? toFullUrl(firstCover(p)) : '/assets/img/RestaurantImg.png',
         stock: p.stock,
         storeId: p.storeId
       };

@@ -11,6 +11,12 @@ const {
 const { draftToProduct } = require('../../../utils/productPreview.js');
 const { customerPickText } = require('../../../utils/pickRule.js');
 const { parseComboItems } = require('../../../utils/comboItems.js');
+// 商品图片口径：cover 是「商品头图」（逗号串，最多 5 张），
+// images 是「环境图」（属于商品内容）。两者职责不同，详见 utils/productMedia.js。
+const { heroImages, contentImages, firstCover } = require('../../../utils/productMedia.js');
+// 当前门店的距离+星级视图：与首页门店卡共用同一份口径（utils/storeView.js），
+// 两边各算一遍会出现首页 1.2km、详情页 1200m 这种不一致。
+const { toStoreView } = require('../../../utils/storeView.js');
 
 Page({
   data: {
@@ -47,7 +53,11 @@ Page({
     moreGoods: [],
     // 「适用门店 N 家」表头。放顶层而不是算在 product 里：
     // 它要数的是 applicableStores 真实列出的行数，而那个数组是顶层兄弟键。
-    storeCountLabel: ''
+    storeCountLabel: '',
+    // 顶部「门店」行（类型下一行）：首页已经定位到最近门店，
+    // 列表里这些商品就是那家店的，所以详情页置顶展当前门店 + 距离 + 星级。
+    // 空对象而不是 null：WXML 直读 topStore.name，null 会报错。
+    topStore: {}
   },
   onLoad(opts) {
     // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
@@ -59,6 +69,8 @@ Page({
       merchantName: m.merchantName || '当前商家'
     });
     // 预览态：草稿放在 globalData 里传递（URL 传不下整个表单，且含中文会被截断）
+    // 顶部门店行不依赖商品接口，先渲染（首页已把 store 存在 globalData）
+    this._applyTopStore();
     if (opts.preview === '1' || opts.preview === 1) {
       this._loadPreview(appInst);
       return;
@@ -106,6 +118,60 @@ Page({
       this.setData({ state: 'error', errorMsg: '预览渲染失败：' + e.message });
     }
   },
+  /**
+   * 顶部「门店」行：直接用首页定位到的当前门店（globalData.store）。
+   *
+   * 为何不用后端下发的 storeNameMain：那个是商品的“主门店”（store_id
+   * 或 store_ids 的第一个），多店商品下它往往并不是顾客周边那家；
+   * 而首页已经按位置选好了门店、商品列表也是按那家店拉的，
+   * 所以“当前门店”才是顾客真正要去的那家。
+   *
+   * 距离 / 星级的口径走 utils/storeView.js，与首页门店卡完全一致。
+   */
+  _applyTopStore() {
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {}
+    const g = appInst.globalData || {}
+    const cur = g.store || null
+    if (!cur) {
+      // 分享链接 / 扫码直接进详情页时没经过首页，globalData.store 可能还是空
+      // （onLaunch 的 bootDefaultStore 是异步的）。走 pickNearestStore 拿一家回来：
+      // 它先同步回占位店、再异步升级成最近店，与首页同一条链。
+      if (typeof appInst.pickNearestStore === 'function' && !this._pickingStore) {
+        this._pickingStore = true
+        try {
+          appInst.pickNearestStore((st) => {
+            if (st) { this.setData({ topStore: toStoreView(st, (appInst.globalData || {}).location || null) }) }
+          })
+        } catch (e) { /* 顶部门店行拿不到不能拖垮整页 */ }
+      }
+      return
+    }
+    this.setData({ topStore: toStoreView(cur, g.location || null) })
+  },
+
+  /**
+   * 没授权定位时顶部门店行只能给个可点的「查看距离」，
+   * 点了才取位 —— 和首页同一个策略（进页就弹授权框拒绝率很高）。
+   * type 必须 gcj02：门店经纬度是后台用腾讯地图选点存的，
+   * 坐标系不一致同城会偏 300~600m。
+   */
+  requestDistance() {
+    const appInst = (typeof getApp === 'function' ? getApp() : null) || {}
+    const done = (loc) => {
+      if (!loc) {
+        wx.showToast({ title: '未获取到位置，可在右上角「···」→ 设置里开启位置权限', icon: 'none', duration: 3000 })
+        return
+      }
+      if (!appInst.globalData) { appInst.globalData = {} }
+      appInst.globalData.location = { lat: loc.latitude, lng: loc.longitude }
+      try { wx.setStorageSync('lastUserLocation', { lat: loc.latitude, lng: loc.longitude, ts: Date.now() }) } catch (e) {}
+      this._applyTopStore()
+    }
+    try {
+      wx.getLocation({ type: 'gcj02', success: done, fail: () => done(null) })
+    } catch (e) { done(null) }
+  },
+
   onUserUpdate(user) { this.setData({ user: this._normalizeUser(user) }); },
   /**
    * 头像必须过 toFullUrl：后端存的是 /profile/avatar/xxx.png 这种相对路径，
@@ -213,9 +279,11 @@ Page({
     return refundPolicyText(v);
   },
   normalize(p, groups) {
-    const images = p.images
-      ? (Array.isArray(p.images) ? p.images : String(p.images).split(','))
-      : (p.cover ? [p.cover] : []);
+    // 顶部可翻动那组 = 商品头图（cover，PC 可传 5 张）。
+    // 原先这里优先用 images（环境图）、cover 只做兑底，把两个字段的
+    // 职责说反了；又因为本地 10 条商品两边首张恰好相同，胮眼看不出来。
+    // 另外 cover 本身就是逗号串，原先的 [p.cover] 兑底会把整串当一个 URL。
+    const images = heroImages(p);
     const typeCode = p.typeCode || (p.productType === '1' ? 'BILL' : p.productType === '2' ? 'BOOKING' : 'GROUPON');
     // 套餐详情的「几选几」必须在这里算成中文再 setData。
     //
@@ -253,9 +321,9 @@ Page({
       name: p.productName || p.name,
       price: p.price != null ? String(p.price) : '0.00',
       typeCode: typeCode,
-      // typeName 优先用后端从 biz_product_type 下发的值；typeText() 只作为字典缺行时的兑底。
-      // 原先无条件走 typeText()，GROUPON 永远显示「团购套餐」，
-      // 而运营早就在后台把它改成了「到店自取」。
+      // 类型名只认 biz_product_type.type_name（后端顶层下发）。
+      // 不再在前端兑中文名：上一版的兑底表把 GROUPON 写成「团购套餐」，
+      // 而库里早改成了「到店自取」，两份事实必然漂。
       typeName: p.typeName || this.typeText(typeCode),
       typeTips: p.typeTips || '',
       refundPolicyText: this.refundText(p.refundPolicy),
@@ -297,7 +365,14 @@ Page({
       subitemGroups: subitemGroups,
       comboItems: comboItems,
       sold: p.sales || p.sold || 0,
-      cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',
+      // 门店小图 / 分享弹窗那些只能放一张图的位置：取头图首张。
+      // 原先直接 toFullUrl(p.cover)，商家传了第二张头图就会把 "urlA,urlB"
+      // 整串当成 src，这些位置全部变白图。
+      cover: firstCover(p) ? toFullUrl(firstCover(p)) : '/assets/img/RestaurantImg.png',
+      // 环境图：属于商品内容，跟图文详情摆在一起（与头图重复的已剔）。
+      // PC 建品页那个 10 张上传框一直在，库里 10 条商品真填了，
+      // 而顾客端从未展过 —— 上一轮把它当顶部主图用掉了。
+      contentImages: contentImages(p).map((u) => toFullUrl(u)),
       images: images.filter((u) => !!u).map((u) => toFullUrl(u)),
       // 图文详情同样过一道空值判定：商家把富文本清空后库里存的是 <p><br></p>，
       // 直接当真会在详情页凭空多出一张只有标题的空卡。
@@ -357,6 +432,18 @@ Page({
     const tel = e.currentTarget.dataset.phone;
     if (!tel) return wx.showToast({ title: '暂无联系电话', icon: 'none' });
     wx.makePhoneCall({ phoneNumber: String(tel) });
+  },
+  /**
+   * 点环境图看大图。
+   * 店内环境 / 菜品实拍是顾客判断值不值的主要依据，列表里的宽度
+   * 看不清细节；wx.previewImage 传全部图才能左右划，只传当前一张
+   * 等于把划动手势废掉。
+   */
+  onPreviewContentImage(e) {
+    const list = (this.data.product && this.data.product.contentImages) || [];
+    const cur = e.currentTarget.dataset.src;
+    if (!cur) return;
+    wx.previewImage({ current: cur, urls: list.length ? list : [cur] });
   },
   onRetry() { this.loadProduct(this.data.id); },
   onBack() {
@@ -438,13 +525,20 @@ Page({
     }
     wx.navigateTo({ url: '/pages/order/submit/index?id=' + this.data.id });
   },
+  /**
+   * 类型名的兑底。
+   *
+   * 原先这里是一整张硬编码映射表（GROUPON →「团购套餐」），
+   * 而 biz_product_type.type_name 早已被运营改成「到店自取」——
+   * 两处各自一份事实，字典一旦缺行或查失败，顾客就会看到一个
+   * 已经废弃的旧名字，而这个错没任何报警 —— 比直接留空更难发现。
+   *
+   * 现在不再编造中文名：类型名只有字典一个来源。字典真缺行时
+   * 返空串，让那一行「类型」不显示，而不是显示一个可能已经改过的名字。
+   * （保留本方法而不直接删：normalize 在调它，保留单一入口便于以后改成拉字典缓存。）
+   */
   typeText(code) {
-    return ({
-      GROUPON: '团购套餐', VOUCHER: '代金券', TIMECARD: '次卡',
-      STORED_CARD: '储值卡', PERIOD_CARD: '周期卡', HUIXIANG_CARD: '惠享卡',
-      COMBO: '组合券包', BILL: '到店买单', BOOKING: '预约服务',
-      PRESALE: '预售券', PICKUP_VOUCHER: '提货券'
-    })[code] || (code || '团购')
+    return ''
   },
   /**
    * 限制条件展示文案（按优先级）
@@ -540,8 +634,9 @@ Page({
     const m = (getApp().globalData && getApp().globalData.merchant) || {};
     const name = (p && (p.name || p.productName)) || '好物';
     const price = (p && p.price) || '';
-    const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
-    const shareImg = rawImg ? toFullUrl(rawImg) : '';
+    // 分享封面用商品头图首张（normalize 已把 p.cover 算成首张绝对地址）。
+    // 原先优先取 p.images[0]，那是环境图首张 —— 发出去的封面不是商家选的主图。
+    const shareImg = (p && p.cover) || '';
     return {
       // 商家名拿不到时就只发商品名，不能写死「洞天团购」——
       // 这是多商户平台，每个商户有自己的品牌名，硬编码等于把别家商品
@@ -560,8 +655,9 @@ Page({
     const m = (getApp().globalData && getApp().globalData.merchant) || {};
     const name = (p && (p.name || p.productName)) || '好物';
     const price = (p && p.price) || '';
-    const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
-    const shareImg = rawImg ? toFullUrl(rawImg) : '';
+    // 分享封面用商品头图首张（normalize 已把 p.cover 算成首张绝对地址）。
+    // 原先优先取 p.images[0]，那是环境图首张 —— 发出去的封面不是商家选的主图。
+    const shareImg = (p && p.cover) || '';
     return {
       // 商家名拿不到时就只发商品名，不能写死「洞天团购」——
       // 这是多商户平台，每个商户有自己的品牌名，硬编码等于把别家商品
@@ -577,10 +673,10 @@ Page({
    */
   onAddToFavorites() {
     const p = this.data.product;
-    const rawImg = (p && (p.images && p.images[0] || p.cover)) || '';
     return {
       title: (p && (p.name || p.productName)) || '好物',
-      imageUrl: rawImg ? toFullUrl(rawImg) : '',
+      // 同上：收藏卡的图也该是头图首张，normalize 已给成绝对地址
+      imageUrl: (p && p.cover) || '',
       query: 'id=' + ((p && (p.productId || p.id)) || this.data.id || '')
     };
   },

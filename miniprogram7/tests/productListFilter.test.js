@@ -20,7 +20,15 @@ const { TYPE_NAMES, FILTER_TYPES, typeNameOf, decorate } =
   require('../pages/merchant/product/list/index.js').__test__
 
 describe('typeNameOf', () => {
-  it('GROUPON → 团购', () => expect(typeNameOf('GROUPON')).toBe('团购'))
+  // 兑底表必须跟 biz_product_type.type_name 的现值一致。
+  // 原先这里锁的是「团购」，而字典早被运营改成「到店自取」：
+  // 商家在小程序列表看到「团购」、后台和顾客端看到「到店自取」。
+  // 单测把错值锁住了，反而让这个不一致看起来「符合预期」。
+  it('GROUPON → 到店自取（与字典一致）', () => expect(typeNameOf('GROUPON')).toBe('到店自取'))
+  it('不能再回到写死的旧名「团购」/「团购套餐」', () => {
+    expect(typeNameOf('GROUPON')).not.toBe('团购')
+    expect(typeNameOf('GROUPON')).not.toBe('团购套餐')
+  })
   it('COMBO → 组合券包', () => expect(typeNameOf('COMBO')).toBe('组合券包'))
   it('BILL → 到店买单', () => expect(typeNameOf('BILL')).toBe('到店买单'))
   it('未知 code → 原样返回（不吞掉信息）', () => expect(typeNameOf('WHAT')).toBe('WHAT'))
@@ -52,7 +60,7 @@ describe('decorate', () => {
 
   it('挂上 typeName —— 模板 {{item.typeName}} 靠它，缺了类型标签就是空色块', () => {
     const out = decorate([{ productId: 1, typeCode: 'GROUPON' }], [])
-    expect(out[0].typeName).toBe('团购')
+    expect(out[0].typeName).toBe('到店自取')
   })
 
   it('stock=-1 → 不限库存', () => {
