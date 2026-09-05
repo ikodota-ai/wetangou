@@ -18,6 +18,39 @@ try {
   console.log('[miniprogram] APPID =>', APPID, '| BUILD_IN_APPID =>', BUILD_IN_APPID, '| BASE_URL =>', BASE_URL_DEFAULT);
 } catch (e) {}
 
+/**
+ * 内网 / 本机 host：这些地址就是开发期的后端，永远不能升 https。
+ * 本地联调跑的就是 http://localhost:8080，升了直接请不通。
+ */
+function _isLocalHost(host) {
+  var h = String(host || '').split(':')[0].toLowerCase();
+  if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0') return true;
+  if (/^10\./.test(h)) return true;                       // 10.0.0.0/8
+  if (/^192\.168\./.test(h)) return true;                 // 192.168.0.0/16
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;   // 172.16.0.0/12
+  return false;
+}
+
+/**
+ * 协议合规兜底：外部域名的 http:// 图片升为 https。
+ *
+ * 微信已硬性拦截：<image> 拿到 http 会报
+ * 「图片链接 <URL> 不再支持 HTTP 协议，请升级到 HTTPS」——
+ * 本项目真踩过（首页 banner 不显示就是这个）。图不出来时页面不报错、
+ * 不卡流程，只是一块空白，排查成本很高。
+ *
+ * 为何只升外部域名：内网/本机 host 没有 https 服务，升了开发期全挂；
+ * 而外部 CDN / OSS 域名（如 wetuango.oss-cn-shenzhen.aliyuncs.com）均支持 https，
+ * 升了能显、不升必不显。
+ */
+function toHttps(url) {
+  if (!url) return '';
+  var m = String(url).match(/^http:\/\/([^/]+)(\/.*)?$/i);
+  if (!m) return url;
+  if (_isLocalHost(m[1])) return url;
+  return 'https://' + m[1] + (m[2] || '');
+}
+
 // 把后端返回的相对地址补全
 function toFullUrl(url) {
   if (!url) return '';
@@ -29,7 +62,8 @@ function toFullUrl(url) {
     // 只要认得出 /profile/ 这个后端资源前缀，就丢掉原 host 用当前 baseUrl 重拼。
     const m = u.match(/^https?:\/\/[^/]+(\/profile\/.*)$/i);
     if (m) return _base() + m[1];
-    return u;
+    // 外部域名的 http 图片微信直接拒渲，升 https（内网/本机 不动）
+    return toHttps(u);
   }
   u = u.replace(/^\/dev-api/, '');
   if (u.charAt(0) !== '/') u = '/' + u;
@@ -444,6 +478,7 @@ module.exports = {
   api,
   BASE_URL: BASE_URL_DEFAULT,
   APPID,
+  toHttps: toHttps,
   toFullUrl,
   fixRichText,
   pickHasStaffAccount,

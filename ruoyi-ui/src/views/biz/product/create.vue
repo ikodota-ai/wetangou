@@ -107,6 +107,7 @@
               <el-form-item label="商品类型"><el-input :value="typeName" readonly /></el-form-item>
               <el-form-item label="副标题">
                 <el-input v-model="form.subtitle" maxlength="100" show-word-limit placeholder="副标题" />
+                <div class="dyl-tip">顾客详情页主标题下的那行灰字，写套餐构成或适用人数（如“双人份含锅底+6荟8素+饮品”）；全库 390 条只有 59 条填了</div>
               </el-form-item>
             </el-form>
           </section>
@@ -159,12 +160,14 @@
                   <el-radio label="GENERAL">通兑券</el-radio>
                   <el-radio label="CATEGORY">单品类券</el-radio>
                 </el-radio-group>
+                <div class="dyl-tip">通兑券店内任何消费都能抵；单品类券只能抵指定品类，需到店内确认具体可用项。落库到 ext.voucher_scope_type</div>
               </el-form-item>
               <el-form-item label="适用规则">
                 <el-checkbox-group v-model="form.voucherRules">
                   <el-checkbox label="ALL_CATEGORY">全部品类适用</el-checkbox>
                   <el-checkbox label="ALL_BRAND">全部品牌适用</el-checkbox>
                 </el-checkbox-group>
+                <div class="dyl-tip">不勾等于未限定，顾客详情页不会出现“适用范围”那一行；落库到 ext.voucher_rules</div>
               </el-form-item>
             </el-form>
           </section>
@@ -207,9 +210,11 @@
               </el-form-item>
               <el-form-item label="市场价">
                 <el-input-number v-model="form.marketPrice" :min="0" :precision="2" :step="1" controls-position="right" style="width: 100%" />
+                <div class="dyl-tip">顾客详情页的划线价（原价）。全库 390 条只有 61 条填了 —— 不填就没有划线对比，优惠力度完全看不出来</div>
               </el-form-item>
               <el-form-item label="库存" prop="stock">
                 <el-input-number v-model="form.stock" :min="0" controls-position="right" style="width: 100%" />
+                <div class="dyl-tip">可卖份数，下单即扣、退款回充；置 0 顾客侧会显“已售罄”而不是下架。是否展给顾客看由商户配置控制</div>
               </el-form-item>
               <el-form-item label="商品头图" prop="cover">
                 <image-upload v-model="form.cover" :limit="isVoucher ? 1 : 5" />
@@ -221,6 +226,7 @@
               </el-form-item>
               <el-form-item label="项目补充说明">
                 <el-input v-model="form.detail" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="选填，对商品的补充说明" />
+                <div class="dyl-tip">顾客详情页“图文详情”卡里展示，支持 HTML；上面上传的环境图也归在这张卡。全库 390 条只有 9 条填了</div>
               </el-form-item>
             </el-form>
           </section>
@@ -246,9 +252,12 @@
               </el-form-item>
               <el-form-item label="职人带货">
                 <el-switch v-model="form.staffPromote" :active-value="1" :inactive-value="0" />
+                <span class="dyl-tip-inline">允许店员带货并计算业绩</span>
+                <div class="dyl-tip">落库到 ext.staff_promote。目前店员带货分佬链路尚未实装，开了只作为标记保存（全库当前 0 条开启）</div>
               </el-form-item>
               <el-form-item label="商品售卖日期">
                 <el-date-picker v-model="form.saleDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+                <div class="dyl-tip">顾客能下单的时间窗（不是券的有效期），不填则上架后长期可买；顾客详情页“售卖期”展这一段</div>
               </el-form-item>
             </el-form>
           </section>
@@ -265,12 +274,15 @@
               </el-form-item>
               <el-form-item label="库存" prop="stock">
                 <el-input-number v-model="form.stock" :min="0" controls-position="right" style="width: 100%" />
+                <div class="dyl-tip">可卖份数，下单即扣、退款回充；置 0 顾客侧会显“已售罄”而不是下架。是否展给顾客看由商户配置控制</div>
               </el-form-item>
               <el-form-item label="商品售卖日期">
                 <el-date-picker v-model="form.saleDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+                <div class="dyl-tip">顾客能下单的时间窗（不是券的有效期），不填则上架后长期可买；顾客详情页“售卖期”展这一段</div>
               </el-form-item>
               <el-form-item label="商家平台子品ID">
                 <el-input v-model="form.outerSubitemId" placeholder="平台子品标识（可选）" />
+                <div class="dyl-tip">对接商家自有 ERP / 收银系统时用的外部标识，本系统只存不用；不对接就留空</div>
               </el-form-item>
             </el-form>
           </section>
@@ -333,12 +345,12 @@
                 <el-switch v-model="form.bookingRequired" :active-value="1" :inactive-value="0" active-text="需要预约" />
                 <div class="dyl-tip">开启后顾客详情页显「需提前预约」，否则显「免预约 / 到店核销」</div>
               </el-form-item>
-              <el-form-item label="券码类型">
-                <el-radio-group v-model="form.codeType">
-                  <el-radio label="MERCHANT">商家券（本商户自行核销）</el-radio>
-                  <el-radio label="PLATFORM">平台券（平台统一发码）</el-radio>
-                </el-radio-group>
-                <div class="dyl-tip">影响核销方式：商家券由本商户店员扫码核，平台券由平台统一发码</div>
+              <el-form-item label="使用平台统一发码">
+                <el-switch v-model="adv.codeType" @change="onToggleAdv('codeType', $event)" />
+                <span class="dyl-tip-inline">不开则为商家券：由本商户店员自行核销（全库 525 条商品全部选的这个）</span>
+                <template v-if="adv.codeType">
+                  <div class="dyl-tip" style="margin-top: 8px">已切为平台券：券码由平台统一发放与核销，商户店员扫不了这类码。除非平台已为你开通统一发码，否则不要开 —— 开了顾客到店核不了。</div>
+                </template>
               </el-form-item>
             </el-form>
           </section>
@@ -367,12 +379,12 @@
                 </el-select>
                 <div class="dyl-tip">券包没有“仅过期前可退”：子券会分次核销，部分核销后无法整单退</div>
               </el-form-item>
-              <el-form-item label="券码类型">
-                <el-radio-group v-model="form.codeType">
-                  <el-radio label="MERCHANT">商家券（本商户自行核销）</el-radio>
-                  <el-radio label="PLATFORM">平台券（平台统一发码）</el-radio>
-                </el-radio-group>
-                <div class="dyl-tip">影响核销方式：商家券由本商户店员扫码核，平台券由平台统一发码</div>
+              <el-form-item label="使用平台统一发码">
+                <el-switch v-model="adv.codeType" @change="onToggleAdv('codeType', $event)" />
+                <span class="dyl-tip-inline">不开则为商家券：券包内子券由本商户店员自行核销</span>
+                <template v-if="adv.codeType">
+                  <div class="dyl-tip" style="margin-top: 8px">已切为平台券：除非平台已为你开通统一发码，否则不要开。</div>
+                </template>
               </el-form-item>
             </el-form>
           </section>
@@ -624,7 +636,7 @@ export default {
       // ===== 交易规则高级项开关 =====
       // 这 4 项实测库里几乎全空（daily_time / exclude_dates 为空），
       // 常驻展开只会让运营分不清“没填”和“填了不生效”，所以默认收起。
-      adv: { consumeDate: false, excludeDate: false, dailyTime: false, comboConsumeDate: false },
+      adv: { consumeDate: false, excludeDate: false, dailyTime: false, comboConsumeDate: false, codeType: false },
       // ===== 投放渠道字典 =====
       channelList: [],
       channelDefaultCodes: '',
@@ -1033,6 +1045,7 @@ export default {
       this.$set(this.adv, 'comboConsumeDate', (this.form.consumeDateRange || []).length > 0)
       this.$set(this.adv, 'excludeDate', (this.form.excludeDateRange || []).length > 0)
       this.$set(this.adv, 'dailyTime', (this.form.dailyTimeRange || []).length > 0)
+      this.$set(this.adv, 'codeType', this.form.codeType === 'PLATFORM')
       this.$set(this.form, 'voucherRules', ext.voucherRules ? String(ext.voucherRules).split(',').filter(v => v) : [])
       const scope = ext.voucherScopeType || ''
       if (this.isVoucher) {
@@ -1049,6 +1062,13 @@ export default {
      * 但 form 里的日期还在，packFormToExt 仍会把它落进 ext，顾客详情页继续显限制。
      */
     onToggleAdv(key, val) {
+      // 券码类型不是数组而是枚举，开关就是它的两个取值。
+      // 全库 525 条 code_type 全是 MERCHANT，从没人用过平台券 —— 两个单选常驻并列
+      // 只会让运营误选“平台券”然后到店核不了，所以默认态收起为商家券。
+      if (key === 'codeType') {
+        this.$set(this.form, 'codeType', val ? 'PLATFORM' : 'MERCHANT')
+        return
+      }
       if (val) return
       const clearMap = {
         consumeDate: ['consumeDateRange'],

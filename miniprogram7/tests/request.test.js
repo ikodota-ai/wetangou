@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 
 // 关键：toFullUrl 内部 require './config.js'，config 里有 baseUrl
 // 测试运行时 baseUrl 是 http://192.168.1.136:8080（你刚改的）
-const { toFullUrl, fixRichText } = require('../utils/request.js')
+const { toFullUrl, fixRichText, toHttps } = require('../utils/request.js')
 
 describe('toFullUrl', () => {
   it('空 / null / undefined → 空字符串', () => {
@@ -15,7 +15,7 @@ describe('toFullUrl', () => {
 
   it('http(s):// 外部绝对地址 → 原样返回（不拼 baseUrl）', () => {
     expect(toFullUrl('https://example.com/a.jpg')).toBe('https://example.com/a.jpg')
-    expect(toFullUrl('http://cdn.example.com/b.png')).toBe('http://cdn.example.com/b.png')
+    // http 外链会被升成 https（见下方「外部域名的 http 图片」用例）
   })
 
   it('外部图床 / 微信 CDN 不能被改写', () => {
@@ -39,8 +39,34 @@ describe('toFullUrl', () => {
     expect(r2).toMatch(/\/profile\/avatar\/c\.jpeg$/)
   })
 
-  it('绝对地址里没有 /profile/ 的不动（无法判断归属）', () => {
-    expect(toFullUrl('http://x/a.png')).toBe('http://x/a.png')
+  // 原先这条锁的是「http 外链原样返回」—— 但微信已硬性拒渲 http 图片
+  // （「图片链接 <URL> 不再支持 HTTP 协议」，首页 banner 真踩过），
+  // 原样返回就等于肯定不显示。现在改为升 https。
+  it('外部域名的 http 图片 → 升 https（微信拒渲 http）', () => {
+    expect(toFullUrl('http://x/a.png')).toBe('https://x/a.png')
+    expect(toFullUrl('http://cdn.example.com/b.png')).toBe('https://cdn.example.com/b.png')
+    expect(toFullUrl('http://wetuango.oss-cn-shenzhen.aliyuncs.com/a/b.jpg'))
+      .toBe('https://wetuango.oss-cn-shenzhen.aliyuncs.com/a/b.jpg')
+  })
+
+  // 升协议必须避开内网/本机：本地联调跑的就是 http://localhost:8080，
+  // 也没有 https 服务，一升开发期全挂。
+  it('内网 / 本机 host 不升协议', () => {
+    expect(toFullUrl('http://localhost:8080/a.png')).toBe('http://localhost:8080/a.png')
+    expect(toFullUrl('http://127.0.0.1:8080/x/a.png')).toBe('http://127.0.0.1:8080/x/a.png')
+    expect(toFullUrl('http://192.168.1.5:8080/a.png')).toBe('http://192.168.1.5:8080/a.png')
+    expect(toFullUrl('http://10.0.0.7/a.png')).toBe('http://10.0.0.7/a.png')
+    expect(toFullUrl('http://172.31.26.216:8080/x/a.png')).toBe('http://172.31.26.216:8080/x/a.png')
+    // 172.15 / 172.32 不在 172.16/12 私有段里，属于公网 → 要升
+    expect(toFullUrl('http://172.15.0.1/a.png')).toBe('https://172.15.0.1/a.png')
+    expect(toFullUrl('http://172.32.0.1/a.png')).toBe('https://172.32.0.1/a.png')
+  })
+
+  it('已是 https 的不动，非 http(s) 开头的不误伤', () => {
+    expect(toHttps('https://a.com/x.png')).toBe('https://a.com/x.png')
+    expect(toHttps('/api/x')).toBe('/api/x')
+    expect(toHttps('')).toBe('')
+    expect(toHttps(null)).toBe('')
   })
 
   it('/path 相对地址 → 拼 baseUrl', () => {
