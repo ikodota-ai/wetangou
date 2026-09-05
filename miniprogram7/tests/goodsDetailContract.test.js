@@ -73,3 +73,29 @@ describe('详情页 WXML 引用的字段必须真有人给', () => {
     expect(JS).toContain('refundPolicyText')
   })
 })
+
+// 逐家拨号是履约级链路：多店商品下面列了 N 行门店，
+// 要是拨号取的不是本行那个号（比如图省事把号码放到 data 里共用一份），
+// 顾客会把电话打到另一家店 —— 那家店说「没这个套餐」，直接成纠纷。
+describe('适用门店逐行拨号必须取本行号码', () => {
+  it('bindtap 所在元素自己带 data-phone，不是从共享状态取', () => {
+    // 把带 onCallStore 的那一段拉出来，要求同一个标签上同时有 data-phone。
+    const m = WXML.match(/<view[^>]*bindtap="onCallStore"[^>]*>/)
+    expect(m, '应有绑 onCallStore 的元素').not.toBeNull()
+    expect(m[0]).toMatch(/data-phone="\{\{\s*st\.phone\s*\}\}"/)
+  })
+
+  it('它必须在 wx:for 的循环体里（st 是循环变量）', () => {
+    expect(WXML).toMatch(/wx:for="\{\{applicableStores\}\}"/)
+    expect(WXML).toMatch(/wx:for-item="st"/)
+  })
+
+  it('onCallStore 从 currentTarget.dataset 取号，不读 this.data', () => {
+    const i = JS.indexOf('onCallStore(e)')
+    expect(i).toBeGreaterThan(-1)
+    const body = JS.slice(i, i + 320)
+    expect(body).toContain('currentTarget.dataset.phone')
+    // 读 this.data.xxx 就意味着号码是共享的，多店必错
+    expect(body).not.toContain('this.data.product.storePhone')
+  })
+})
