@@ -183,11 +183,15 @@ button.so::after { border: none; }
    商家存进来的 HTML 里真的带 <table>（商品 2000），而 rich-text 的子节点
    不能用外部选择器上样式，只能靠容器自己把字号/行高/换行守住，
    否则长表会直接撑破卡片横向溢出。 */
+/* 注意：这里只能管到 <rich-text> 嬿主元素本身。
+   它内部的 img / table 拿不到这些 class（小程序官方限制），
+   宽度约束只能靠 utils/request.js 的 fixRichText 注入 inline style。
+   原先这里写的 overflow-x:auto 是无效代码：rich-text 不是 scroll-view，
+   不会出滚动条，内容超宽就直接把卡片撑破 —— 已改用上述方案，故移除。 */
 .rich-detail {
   display: block;
   font-size: 28rpx;
   line-height: 1.7;
   color: #333;
   word-break: break-all;
-  overflow-x: auto;
 }

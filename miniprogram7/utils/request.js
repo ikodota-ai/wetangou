@@ -36,10 +36,45 @@ function toFullUrl(url) {
   return _base() + u;
 }
 
-// 富文本图片补全
+/**
+ * 富文本适配：图片地址补全 + 给 img/table 注入宽度约束。
+ *
+ * 为什么必须写成 inline style：
+ * <rich-text> 内部节点拿不到外部 WXSS 的 class（小程序官方限制），
+ * 给嬿主元素加 .rich-detail{overflow-x:auto} 也没用 —— rich-text 不是
+ * scroll-view，它不会出滚动条，内容直接横向撑出卡片。
+ * 唯一能管到内部节点的手段就是把 style 写在标签上。
+ *
+ * 为什么不是假想风险：
+ * 后台富文本用 components/Editor（quill），工具条带 image 按钮，
+ * insertEmbed(length, 'image', ...) 吐出的 <img> 不带任何 width/style，
+ * 而手机拍的图动辄三四千像素宽：运营一插图，整页必然横向溢出。
+ * table 同理（商品 2000 的 detail 就是一个 12 行 34 格的无 width 表格）。
+ *
+ * 四个消费点全走本函数：商品详情的 detail / notice、用户协议、隐私协议。
+ * 已有 style 的标签不动（尊重运营自己调过的宽度），只补没写的。
+ */
+var RICH_IMG_STYLE = 'max-width:100%;height:auto;display:block;';
+var RICH_TABLE_STYLE = 'max-width:100%;width:100%;table-layout:fixed;word-break:break-all;';
+
+function _injectStyle(html, tag, style) {
+  // 已带 style= 的跳过；其余在标签名后面插一个 style 属性。
+  var re = new RegExp('<' + tag + '(\\s[^>]*)?>', 'gi');
+  return html.replace(re, function (m, attrs) {
+    attrs = attrs || '';
+    if (/\sstyle\s*=/i.test(attrs)) return m;
+    return '<' + tag + ' style=\"' + style + '\"' + attrs + '>';
+  });
+}
+
 function fixRichText(html) {
   if (!html) return '';
-  return String(html).replace(/(<img[^>]+src=["'])([^"']+)(["'])/gi, (m, p1, src, p3) => p1 + toFullUrl(src) + p3);
+  var out = String(html).replace(/(<img[^>]+src=["'])([^"']+)(["'])/gi, function (m, p1, src, p3) {
+    return p1 + toFullUrl(src) + p3;
+  });
+  out = _injectStyle(out, 'img', RICH_IMG_STYLE);
+  out = _injectStyle(out, 'table', RICH_TABLE_STYLE);
+  return out;
 }
 
 // === 401 双 token 精准清理 ===
