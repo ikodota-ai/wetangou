@@ -104,9 +104,34 @@ function draftToProduct(draft) {
     // 所以这里直接给上主门店名。
     storeName: storeIds.length ? (nameOf[storeIds[0]] || ('门店' + storeIds[0])) : '',
     subitemGroups: d.subitemGroups || [],
+
+    // 适用门店完整列表。真实态这个数组由后端 detail 端点下发（带地址/电话），
+    // 预览态只有建品页那份门店下拉（只有 id + 店名）。
+    // 仍然必须摆出来：不给的话详情页会走到“只画主门店一家”那个兜底分支，
+    // 老板把套餐勾了 3 家店、预览里只看到 1 家，而“适用门店到底绑对了没”
+    // 正是预览要帮他确认的事情之一。地址/电话这边拿不到就不给，
+    // 详情页那几行本身就是 wx:if 条件渲染，宁可少一行也不能编一个假地址。
+    applicableStores: storeIds.map((id) => ({
+      storeId: id,
+      storeName: nameOf[id] || ('门店' + id)
+    })),
+
+    // 交易规则：这三个字段建品表单真的在收（form.collectMethod /
+    // form.mutexWithStorePromotion / form.codeType，编辑态也会回填），而顾客端
+    // 详情页现在会把它们渲染到「购买须知」里。不透传的话，商家预览看不到
+    // “不与店内优惠同享”这一行、顾客却看得到 —— 预览又变回“和顾客看到的不一样”。
+    // 而 mutex 恰好是最容易到店吵架的一条，商家更应该在上架前先看一眼。
+    collectMethod: f.collectMethod || '',
+    // 建品表单默认 1（不同享），=== 0 才算同享；与编辑态回填同口径。
+    mutexWithStorePromotion: f.mutexWithStorePromotion === 0 ? 0 : 1,
+
     // 组合券包的搭配明细：会员端详情页从 ext.comboItemsJson 读（同一个源）。
     // 预览必须摆成同构形状，否则 COMBO 商品预览出来没明细、顾客那边却有。
-    ext: { comboItemsJson: d.comboItemsJson || '' }
+    // codeType 也在 ext：顾客端读的就是 p.ext.codeType 这个路径（库表 biz_product_ext）。
+    ext: {
+      comboItemsJson: d.comboItemsJson || '',
+      codeType: f.codeType || ''
+    }
   }
 }
 

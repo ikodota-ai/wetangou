@@ -278,3 +278,68 @@ describe('组合券包明细预览同构', () => {
     expect(customerPickText(p.subitemGroups[0])).toBe('3选2')
   })
 })
+
+// 交易规则 + 适用门店的预览同构。
+//
+// 为什么必须锁：这批字段刚在会员端详情页被补上（之前后台能填、顾客看不到）。
+// 预览走的是同一张详情页，如果这里不透传，就变成“顾客看得到、商家预览看不到”——
+// 同样是预览与现场不一致，只是方向相反。
+describe('交易规则预览同构', () => {
+  const { mutexText, collectMethodText, codeTypeText } = require('../utils/tradeRules.js')
+
+  it('collectMethod / mutex / ext.codeType 三个字段透传（建品表单真的在收这三个）', () => {
+    const p = draftToProduct(draft('GROUPON', {
+      productName: '套餐',
+      collectMethod: 'STORE',
+      mutexWithStorePromotion: 0,
+      codeType: 'PLATFORM'
+    }))
+    expect(p.collectMethod).toBe('STORE')
+    expect(p.mutexWithStorePromotion).toBe(0)
+    expect(p.ext.codeType).toBe('PLATFORM')
+  })
+
+  it('透传后经详情页同一批纯函数算出的文案，与真实态逐字一致', () => {
+    const p = draftToProduct(draft('VOUCHER', {
+      productName: '代金券',
+      collectMethod: 'HEAD',
+      mutexWithStorePromotion: 1,
+      codeType: 'MERCHANT'
+    }))
+    expect(collectMethodText(p.collectMethod)).toBe('总部统一收款')
+    expect(mutexText(p.mutexWithStorePromotion)).toBe('不与店内优惠同享')
+    expect(codeTypeText(p.ext)).toBe('商家券（门店自行核销）')
+  })
+
+  it('建品表单默认不同享：mutex 未填时不能算成“可同享”（会误导商家）', () => {
+    const p = draftToProduct(draft('GROUPON', { productName: 'x' }))
+    expect(p.mutexWithStorePromotion).toBe(1)
+    expect(mutexText(p.mutexWithStorePromotion)).toBe('不与店内优惠同享')
+  })
+
+  it('ext 必须始终存在（详情页读 p.ext.codeType，undefined 会报错）', () => {
+    const p = draftToProduct({})
+    expect(p.ext).toBeTruthy()
+    expect(codeTypeText(p.ext)).toBe('')
+  })
+})
+
+describe('预览的适用门店列表', () => {
+  it('多选几家就摆出几家（真实态由后端 applicableStores 下发）', () => {
+    const p = draftToProduct(draft('GROUPON', { productName: 'x', storeIdList: [100, 101, 200] }))
+    expect(p.applicableStores.length).toBe(3)
+    expect(p.applicableStores.map(s => s.storeName))
+      .toEqual(['旗舰店', '万象城店', '春熙路餐饮店'])
+  })
+
+  it('店名而不是 ID：多店老板看「门店101」分不清是哪家', () => {
+    const p = draftToProduct(draft('GROUPON', { productName: 'x', storeIdList: [999] }))
+    expect(p.applicableStores[0].storeName).toBe('门店999')
+  })
+
+  it('一家都没选 → 空数组（WXML 靠 .length 判空，undefined 会在渲染层报错）', () => {
+    const p = draftToProduct(draft('GROUPON', { productName: 'x', storeIdList: [], storeId: 0 }))
+    expect(Array.isArray(p.applicableStores)).toBe(true)
+    expect(p.applicableStores.length).toBe(0)
+  })
+})

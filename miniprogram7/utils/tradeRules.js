@@ -103,6 +103,19 @@ function hasRichContent(html) {
   return !!text;
 }
 
+// 「适用门店 N 家」的 N。
+//
+// 优先用真实列出的门店行数，而不是 store_ids 里的 id 个数：
+// 后端组 applicableStores 时会跳过已删除 / 查不到的门店，两个数不一定相等。
+// 表头写着「3家」而下面只列出 2 行时，顾客会以为页面没加载完、
+// 还有一家没显出来，于是一直等 —— 这比直接少写一家更让人困惑。
+// 拿不到列表时才回落到 store_ids 的个数（卡片那时走兜底分支，只画主门店）。
+function storeCountLabel(stores, product) {
+  const n = (stores && stores.length) ? stores.length
+    : ((product && product.storeCount) || 0);
+  return n ? n + '家' : '';
+}
+
 module.exports = {
   hhmm: hhmm,
   dailyTimeText: dailyTimeText,
@@ -112,5 +125,6 @@ module.exports = {
   codeTypeText: codeTypeText,
   mutexText: mutexText,
   hasRichContent: hasRichContent,
+  storeCountLabel: storeCountLabel,
   VOUCHER_RULE_TEXT: VOUCHER_RULE_TEXT
 };

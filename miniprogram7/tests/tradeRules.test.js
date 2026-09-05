@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest'
 
 const {
   hhmm, dailyTimeText, excludeDatesText, voucherRulesText,
-  collectMethodText, codeTypeText, mutexText, hasRichContent
+  collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel
 } = require('../utils/tradeRules.js')
 
 describe('hhmm / dailyTimeText 可用时段', () => {
@@ -150,5 +150,27 @@ describe('hasRichContent 富文本是不是真的有内容', () => {
     expect(hasRichContent('')).toBe(false)
     expect(hasRichContent(null)).toBe(false)
     expect(hasRichContent(undefined)).toBe(false)
+  })
+})
+
+describe('storeCountLabel 适用门店表头的 N', () => {
+  it('数真实列出的行数，而不是 store_ids 里的 id 个数', () => {
+    // 商家删过一家店：store_ids 还是 3 个 id，但后端只能查到 2 家。
+    // 表头写「3家」而下面只列 2 行时，顾客会以为还没加载完而一直等。
+    const stores = [{ storeId: 100 }, { storeId: 101 }]
+    expect(storeCountLabel(stores, { storeCount: 3 })).toBe('2家')
+  })
+  it('两边一致时自然相同', () => {
+    expect(storeCountLabel([{ storeId: 1 }, { storeId: 2 }, { storeId: 3 }], { storeCount: 3 })).toBe('3家')
+  })
+  it('拿不到列表时回落 store_ids 个数（卡片那时走兜底分支只画主门店）', () => {
+    expect(storeCountLabel([], { storeCount: 1 })).toBe('1家')
+    expect(storeCountLabel(null, { storeCount: 2 })).toBe('2家')
+    expect(storeCountLabel(undefined, { storeCount: 3 })).toBe('3家')
+  })
+  it('两边都没数 → 空串，表头不能出现孤零的「0家」', () => {
+    expect(storeCountLabel([], {})).toBe('')
+    expect(storeCountLabel([], { storeCount: 0 })).toBe('')
+    expect(storeCountLabel(null, null)).toBe('')
   })
 })

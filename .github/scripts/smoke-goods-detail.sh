@@ -242,6 +242,12 @@ has "第二家店名" "$(echo "$DN" | python3 -c "import sys,json;print(json.dum
 has "门店地址下发（详情页原先一个字都没有）"   "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "中心四路"
 has "门店电话下发（逐家拨号靠它）"   "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "0755-12345678"
 has "逐家服务设施已翻译"   "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "免费停车"
+# store_ids 里掘一个已删 / 不存在的门店 id：后端会跳过它，
+# 于是「id 个数」和「真能列出的行数」会不一致。表头那个 N 必须数后者：
+# 写着「3家」却只列 2 行，顾客会以为页面没加载完、还有一家没显出来而一直等。
+q "update biz_product set store_ids='$STORE,$STORE2,99999999' where product_id=$PROD;"
+chk "幽灵门店 id 不计入列表" \
+  "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('applicableStores') or []))")" "2"
 # 单店商品（store_ids 空）也得进这个列表，否则前端要维护两套渲染分支
 q "update biz_product set store_ids=null where product_id=$PROD;"
 chk "单店回落到 store_id"   "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('applicableStores') or []))")" "1"

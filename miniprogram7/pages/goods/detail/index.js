@@ -5,7 +5,7 @@ const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
 // 商家端预览走的也是本页，口径只能有一份。
 const {
   dailyTimeText, excludeDatesText, voucherRulesText,
-  collectMethodText, codeTypeText, mutexText, hasRichContent
+  collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel
 } = require('../../../utils/tradeRules.js');
 const { draftToProduct } = require('../../../utils/productPreview.js');
 const { customerPickText } = require('../../../utils/pickRule.js');
@@ -43,7 +43,10 @@ Page({
     // 必须在这里给空数组而不是等 setData：WXML 里用 .length 判空，
     // undefined.length 在渲染层会直接报错。
     applicableStores: [],
-    moreGoods: []
+    moreGoods: [],
+    // 「适用门店 N 家」表头。放顶层而不是算在 product 里：
+    // 它要数的是 applicableStores 真实列出的行数，而那个数组是顶层兄弟键。
+    storeCountLabel: ''
   },
   onLoad(opts) {
     // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
@@ -87,6 +90,12 @@ Page({
         storeServices: draft.storeServices || [],
         showSales: draft.showSales !== '0' && draft.showSales !== false,
         showStock: draft.showStock !== '0' && draft.showStock !== false,
+        // 适用门店列表也是顶层字段（不在 product 里）。不带的话商家勾了 3 家店、
+        // 预览里只会看到兜底的主门店一家 —— 而“适用门店绑对了没”正是预览要确认的事。
+        applicableStores: raw.applicableStores || [],
+        storeCountLabel: storeCountLabel(raw.applicableStores, normalized),
+        // 预览态不拉推荐位：草稿没 productId，且它不影响商家要校的排版。
+        moreGoods: [],
         canBuyNow: false,
         buyBtnLabel: '预览中，不可购买'
       });
@@ -171,7 +180,8 @@ Page({
             // 适用门店完整列表（后端新增的兄弟键）。
             // 原先这张卡只画主门店一家 + 一行不可点的「N店通用」，
             // 多店商品（实测 999534 三家）顾客根本不知道是哪三家。
-            applicableStores: raw.applicableStores || []
+            applicableStores: raw.applicableStores || [],
+            storeCountLabel: storeCountLabel(raw.applicableStores, normalized)
           });
           // 本店更多商品单独拉：它不影响主体渲染，失败也不能拖垮详情页，
           // 所以不放进主请求的 then 链里串行等。预览态不拉（草稿没 productId）。
@@ -281,9 +291,12 @@ Page({
         const d = (now / old * 10).toFixed(1);
         return d + ' 折热销中';
       })(),
-      // 适用门店信息
+      // 适用门店信息。
+      // storeCount 只做兜底：表头那个 N 优先数 applicableStores 的真实行数
+      // （见 utils/tradeRules.js 的 storeCountLabel），因为商家删过店后
+      // store_ids 里的 id 还在，两个数会不一致。
+      // （原有的 storeCountText 已删：WXML 改读顶层 storeCountLabel 后它成了死字段。）
       storeCount: (p.storeIds ? String(p.storeIds).split(',').filter(x=>x).length : (p.storeId ? 1 : 0)),
-      storeCountText: (p.storeIds ? String(p.storeIds).split(',').filter(x=>x).length : (p.storeId ? 1 : 0)) + '家',
       storeScopeText: p.storeNames || (p.storeId ? '当前门店适用' : '全部门店适用'),
       subitemGroups: subitemGroups,
       comboItems: comboItems,

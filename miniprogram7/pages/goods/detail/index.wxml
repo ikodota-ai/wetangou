@@ -265,7 +265,7 @@
          那个判断是错的 —— 底部卡当时并没有列出所有门店。） -->
   <view class="card">
     <view class="store-head">
-      <text class="block-title">适用门店 {{product.storeCountText}}</text>
+      <text class="block-title">适用门店 {{storeCountLabel}}</text>
     </view>
     <!-- 多店：逐家列出（名称 / 评分 / 营业时间 / 地址），支持拨号 -->
     <view class="store-row" wx:for="{{applicableStores}}" wx:key="storeId" wx:for-item="st">
