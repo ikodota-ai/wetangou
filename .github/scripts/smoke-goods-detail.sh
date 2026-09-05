@@ -229,6 +229,12 @@ chk "ext.dailyTimeStart 下发" "$(ge dailyTimeStart)" "09:00:00"
 chk "ext.dailyTimeEnd 下发" "$(ge dailyTimeEnd)" "22:30:00"
 chk "ext.voucherRules 下发" "$(ge voucherRules)" "ALL_CATEGORY,ALL_BRAND"
 has "ext.excludeDates 保留第二段" "$(ge excludeDates)" "2026-02-14"
+# ext.voucher_scope_type 同一列双语义：代金券=适用范围（ALL/CATEGORY/STORE）、
+# 组合券包=券类型（GENERAL/CATEGORY）。后端必须原值下发，分流翻译在前端做；
+# 不分流会把 CATEGORY 这个两边都有的值误写成另一边的文案。
+q "update biz_product_ext set voucher_scope_type='STORE' where product_id=$PROD;"
+chk "ext.voucherScopeType 下发" \
+  "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(((json.load(sys.stdin).get('data') or {}).get('ext') or {}).get('voucherScopeType'))")" "STORE"
 
 echo "=== N. 适用门店完整列表（多店商品原先只画主门店一家）==="
 # 原先旁边只有一行不可点的「N店通用 >」：顾客看到“3 店”却不知道到底是哪 3 家，

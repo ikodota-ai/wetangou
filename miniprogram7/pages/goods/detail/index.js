@@ -5,7 +5,8 @@ const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
 // 商家端预览走的也是本页，口径只能有一份。
 const {
   dailyTimeText, excludeDatesText, voucherRulesText,
-  collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel
+  collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel,
+  voucherScopeText
 } = require('../../../utils/tradeRules.js');
 const { draftToProduct } = require('../../../utils/productPreview.js');
 const { customerPickText } = require('../../../utils/pickRule.js');
@@ -318,7 +319,12 @@ Page({
       codeTypeText: codeTypeText(p.ext),
       dailyTimeText: dailyTimeText(p.ext),
       excludeDatesText: excludeDatesText(p.ext),
-      voucherRulesText: voucherRulesText(p.ext)
+      voucherRulesText: voucherRulesText(p.ext),
+      // 券类型 / 适用范围（ext.voucher_scope_type）。PC 那一列是两个控件共用的，
+      // 标题跟着 typeCode 变（代金券叫「适用范围」、其他类型叫「券类型」），
+      // 所以文案和标题一起算好再给 WXML。
+      voucherScopeLabel: voucherScopeText(p.ext, p.typeCode).label,
+      voucherScopeValue: voucherScopeText(p.ext, p.typeCode).text
     };
   },
   // 顶部大图原先是单张静态 image，可 hero-page 已经在显示「1/3」这种页码 ——

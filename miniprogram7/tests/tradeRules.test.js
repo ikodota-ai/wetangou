@@ -11,7 +11,8 @@ import { describe, it, expect } from 'vitest'
 
 const {
   hhmm, dailyTimeText, excludeDatesText, voucherRulesText,
-  collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel
+  collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel,
+  voucherScopeText
 } = require('../utils/tradeRules.js')
 
 describe('hhmm / dailyTimeText 可用时段', () => {
@@ -172,5 +173,34 @@ describe('storeCountLabel 适用门店表头的 N', () => {
     expect(storeCountLabel([], {})).toBe('')
     expect(storeCountLabel([], { storeCount: 0 })).toBe('')
     expect(storeCountLabel(null, null)).toBe('')
+  })
+})
+
+describe('voucherScopeText 券类型 / 适用范围（同一列双语义）', () => {
+  // PC create.vue:949 把两个控件塑到了同一列 ext.voucher_scope_type：
+  //   代金券 → form.scopeType（ALL/CATEGORY/STORE，标题「适用范围」）
+  //   其他   → form.voucherType（GENERAL/CATEGORY，标题「券类型」）
+  // 所以翻译必须拿 typeCode 分流。
+  it('代金券：标题「适用范围」，三个取值全认', () => {
+    expect(voucherScopeText({ voucherScopeType: 'ALL' }, 'VOUCHER'))
+      .toEqual({ label: '适用范围', text: '全场通用' })
+    expect(voucherScopeText({ voucherScopeType: 'CATEGORY' }, 'VOUCHER').text).toBe('按品类适用')
+    expect(voucherScopeText({ voucherScopeType: 'STORE' }, 'VOUCHER').text).toBe('按门店适用')
+  })
+  it('非代金券：标题「券类型」', () => {
+    expect(voucherScopeText({ voucherScopeType: 'GENERAL' }, 'GROUPON'))
+      .toEqual({ label: '券类型', text: '通兑券' })
+  })
+  it('CATEGORY 两边都有，不分流就会把「单品类券」误写成「按品类适用」', () => {
+    expect(voucherScopeText({ voucherScopeType: 'CATEGORY' }, 'VOUCHER').text).toBe('按品类适用')
+    expect(voucherScopeText({ voucherScopeType: 'CATEGORY' }, 'COMBO').text).toBe('单品类券')
+  })
+  it('未知值 → text 空（WXML 靠 text 判断显不显，不会出现只有标题的空行）', () => {
+    expect(voucherScopeText({ voucherScopeType: 'WHAT' }, 'VOUCHER').text).toBe('')
+    expect(voucherScopeText({ voucherScopeType: 'STORE' }, 'GROUPON').text).toBe('')
+  })
+  it('空值 → label 和 text 都空', () => {
+    expect(voucherScopeText({}, 'VOUCHER')).toEqual({ label: '', text: '' })
+    expect(voucherScopeText(null, 'VOUCHER')).toEqual({ label: '', text: '' })
   })
 })

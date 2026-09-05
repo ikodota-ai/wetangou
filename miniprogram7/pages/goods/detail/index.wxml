@@ -217,14 +217,25 @@
         {{product.collectMethodText}}
       </view>
 
-      <!-- 代金券适用范围（仅 VOUCHER 有值）。
-           PC 建品页有一组 checkbox（全部品类/全部品牌适用），
-           存成逗号串，详情页零露出。 -->
+      <!-- 适用规则（ext.voucher_rules，仅代金券有值）。
+           PC 建品页是一组 checkbox（全部品类/全部品牌适用）存成逗号串。
+           标题必须跟 PC 一样叫「适用规则」：「适用范围」在 PC 是另一个字段
+           （scopeType，就在下面一行），两个名字写反了比不写更害。 -->
       <view class="nl-line" wx:if="{{product.voucherRulesText}}">
-        <text class="dot">·</text>适用范围
+        <text class="dot">·</text>适用规则
       </view>
       <view class="nl-sub" wx:if="{{product.voucherRulesText}}">
         {{product.voucherRulesText}}
+      </view>
+
+      <!-- 券类型 / 适用范围（ext.voucher_scope_type）。
+           “全场通用”还是“只能买指定品类”直接决定顾客到店能不能用这张券，
+           标题跟着商品类型变，所以在 js 里连标题一起算好。 -->
+      <view class="nl-line" wx:if="{{product.voucherScopeValue}}">
+        <text class="dot">·</text>{{product.voucherScopeLabel}}
+      </view>
+      <view class="nl-sub" wx:if="{{product.voucherScopeValue}}">
+        {{product.voucherScopeValue}}
       </view>
 
       <!-- 其他说明 -->

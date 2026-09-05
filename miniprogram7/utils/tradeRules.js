@@ -103,6 +103,34 @@ function hasRichContent(html) {
   return !!text;
 }
 
+// 券类型 / 适用范围（ext.voucher_scope_type）。
+//
+// 这一列在 PC 建品页是两个不同控件共用的（create.vue:949）：
+//   代金券（VOUCHER）→ form.scopeType，选项 ALL/CATEGORY/STORE，标题「适用范围」
+//   其他类型     → form.voucherType，选项 GENERAL/CATEGORY，标题「券类型」
+// 两边共一列但不会同屏出现，所以翻译必须拿 typeCode 分流 ——
+// 否则 CATEGORY 这个值两边都有，会把「单品类券」误写成「按品类」。
+//
+// 为什么要露出：“全场通用”还是“只能买指定品类”直接决定顾客到店能不能用这张券，
+// 商家在后台选了、库里也存了，但详情页一直没读。
+const VOUCHER_SCOPE_TEXT = {
+  ALL: '全场通用',
+  CATEGORY: '按品类适用',
+  STORE: '按门店适用'
+};
+const VOUCHER_TYPE_TEXT = {
+  GENERAL: '通兑券',
+  CATEGORY: '单品类券'
+};
+function voucherScopeText(ext, typeCode) {
+  const v = (ext || {}).voucherScopeType;
+  if (!v) return { label: '', text: '' };
+  if (typeCode === 'VOUCHER') {
+    return { label: '适用范围', text: VOUCHER_SCOPE_TEXT[v] || '' };
+  }
+  return { label: '券类型', text: VOUCHER_TYPE_TEXT[v] || '' };
+}
+
 // 「适用门店 N 家」的 N。
 //
 // 优先用真实列出的门店行数，而不是 store_ids 里的 id 个数：
@@ -126,5 +154,8 @@ module.exports = {
   mutexText: mutexText,
   hasRichContent: hasRichContent,
   storeCountLabel: storeCountLabel,
+  voucherScopeText: voucherScopeText,
+  VOUCHER_SCOPE_TEXT: VOUCHER_SCOPE_TEXT,
+  VOUCHER_TYPE_TEXT: VOUCHER_TYPE_TEXT,
   VOUCHER_RULE_TEXT: VOUCHER_RULE_TEXT
 };
