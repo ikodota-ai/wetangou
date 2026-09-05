@@ -277,22 +277,49 @@
 
           
 
-          <!-- Tab: 交易规则（团购+代金）-->
+          <!-- Tab: 交易规则（团购+代金）
+               3 个日期/时段字段改为「开关渐进」：默认收起，开了才展细则。
+               绝大多数商品用不到这 3 项（实测库里 daily_time / exclude_dates 几乎全空），
+               常驻展开既加重填写负担，又让运营分不清“没填”和“填了没生效”。
+               开关关掉时同步清空已选值（见 onToggleAdv）—— 否则关了开关但值还在，
+               提交仍会落库，运营以为自己取消了限制。 -->
           <section v-if="isGroupon || isVoucher" class="dyl-sec" :ref="'sec_trade'" data-sec="trade">
             <div class="dyl-sec-title">交易规则</div>
             <el-form :model="form" label-width="120px" size="small">
-              <el-form-item label="顾客可消费日期">
-                <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              <el-form-item label="限定消费日期">
+                <el-switch v-model="adv.consumeDate" @change="onToggleAdv('consumeDate', $event)" />
+                <span class="dyl-tip-inline">开启后可指定顾客能到店消费的日期区间；不开则仅受有效期限制</span>
+                <template v-if="adv.consumeDate">
+                  <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%; margin-top: 8px" />
+                  <div class="dyl-tip">顾客详情页会列出这个区间；核销侧超出区间会拒收</div>
+                </template>
               </el-form-item>
-              <el-form-item label="顾客不可消费日期">
-                <el-date-picker v-model="form.excludeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              <el-form-item label="排除不可用日期">
+                <el-switch v-model="adv.excludeDate" @change="onToggleAdv('excludeDate', $event)" />
+                <span class="dyl-tip-inline">节假日 / 大促期不允许使用时开启</span>
+                <template v-if="adv.excludeDate">
+                  <el-date-picker v-model="form.excludeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%; margin-top: 8px" />
+                  <div class="dyl-tip">不写出来就是到店吵架；顾客详情页的「不可用日期」会逐段列出</div>
+                </template>
               </el-form-item>
-              <el-form-item label="每日消费时段">
-                <el-time-picker v-model="form.dailyTimeRange" is-range range-separator="至" start-placeholder="开始" end-placeholder="结束" placeholder="选择时段" value-format="HH:mm:ss" style="width: 100%" />
+              <el-form-item label="限定每日时段">
+                <el-switch v-model="adv.dailyTime" @change="onToggleAdv('dailyTime', $event)" />
+                <span class="dyl-tip-inline">只允许午市 / 晚市使用时开启；不开则跟随门店营业时间</span>
+                <template v-if="adv.dailyTime">
+                  <el-time-picker v-model="form.dailyTimeRange" is-range range-separator="至" start-placeholder="开始" end-placeholder="结束" placeholder="选择时段" value-format="HH:mm:ss" style="width: 100%; margin-top: 8px" />
+                  <div class="dyl-tip">顾客详情页显示「每日 xx:xx-xx:xx 可用」</div>
+                </template>
               </el-form-item>
               <el-form-item label="限购规则">
                 <el-input-number v-model="form.limitPerUser" :min="0" controls-position="right" />
                 <span class="dyl-tip-inline">每人限购（0=不限）</span>
+              </el-form-item>
+              <el-form-item label="购买当天可用">
+                <el-radio-group v-model="form.consumeStartToday">
+                  <el-radio :label="1">当天即可使用</el-radio>
+                  <el-radio :label="0">次日起可用</el-radio>
+                </el-radio-group>
+                <div class="dyl-tip">这一项原先库里有列（consume_start_today）但页面没有输入框，390 条商品全是 DEFAULT 灌的 1；选“次日起”时顾客详情页会明写出来</div>
               </el-form-item>
               <el-form-item label="售后政策" prop="refundPolicy">
                 <el-select v-model="form.refundPolicy" style="width: 100%">
@@ -300,15 +327,18 @@
                   <el-option label="仅过期前可退" value="BEFORE_EXPIRE" />
                   <el-option label="不可退" value="NONE" />
                 </el-select>
+                <div class="dyl-tip">顾客详情页「退改政策」直接展这个选项的文案</div>
               </el-form-item>
               <el-form-item label="预约规则">
                 <el-switch v-model="form.bookingRequired" :active-value="1" :inactive-value="0" active-text="需要预约" />
+                <div class="dyl-tip">开启后顾客详情页显「需提前预约」，否则显「免预约 / 到店核销」</div>
               </el-form-item>
               <el-form-item label="券码类型">
                 <el-radio-group v-model="form.codeType">
                   <el-radio label="MERCHANT">商家券（本商户自行核销）</el-radio>
                   <el-radio label="PLATFORM">平台券（平台统一发码）</el-radio>
                 </el-radio-group>
+                <div class="dyl-tip">影响核销方式：商家券由本商户店员扫码核，平台券由平台统一发码</div>
               </el-form-item>
             </el-form>
           </section>
@@ -317,24 +347,32 @@
           <section v-if="isCombo" class="dyl-sec" :ref="'sec_trade'" data-sec="trade">
             <div class="dyl-sec-title">交易规则</div>
             <el-form :model="form" label-width="120px" size="small">
-              <el-form-item label="顾客可消费日期">
-                <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%" />
+              <el-form-item label="限定消费日期">
+                <el-switch v-model="adv.comboConsumeDate" @change="onToggleAdv('comboConsumeDate', $event)" />
+                <span class="dyl-tip-inline">开启后可指定券包内子券能到店消费的日期区间；不开则仅受有效期限制</span>
+                <template v-if="adv.comboConsumeDate">
+                  <el-date-picker v-model="form.consumeDateRange" type="datetimerange" range-separator="至" start-placeholder="开始" end-placeholder="结束" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%; margin-top: 8px" />
+                  <div class="dyl-tip">券包不支持每日时段 / 不可用日期，所以只有这一项时间限制</div>
+                </template>
               </el-form-item>
               <el-form-item label="限购规则">
                 <el-input-number v-model="form.limitPerUser" :min="0" controls-position="right" />
                 <span class="dyl-tip-inline">每人限购（0=不限）</span>
+                <div class="dyl-tip">按下单人累计，不是单笔计算；券包建议填 1～2 避免被黄牛抄库</div>
               </el-form-item>
               <el-form-item label="售后政策" prop="refundPolicy">
                 <el-select v-model="form.refundPolicy" style="width: 100%">
                   <el-option label="支持随时退" value="ANYTIME" />
                   <el-option label="不可退" value="NONE" />
                 </el-select>
+                <div class="dyl-tip">券包没有“仅过期前可退”：子券会分次核销，部分核销后无法整单退</div>
               </el-form-item>
               <el-form-item label="券码类型">
                 <el-radio-group v-model="form.codeType">
                   <el-radio label="MERCHANT">商家券（本商户自行核销）</el-radio>
                   <el-radio label="PLATFORM">平台券（平台统一发码）</el-radio>
                 </el-radio-group>
+                <div class="dyl-tip">影响核销方式：商家券由本商户店员扫码核，平台券由平台统一发码</div>
               </el-form-item>
             </el-form>
           </section>
@@ -348,17 +386,21 @@
                   <el-radio label="SHARE">与店内优惠同享</el-radio>
                   <el-radio label="EXCLUSIVE">不与店内优惠同享</el-radio>
                 </el-radio-group>
+                <div class="dyl-tip">库里存的是“互斥”语义（mutex_with_store_promotion），页面上是反着问的；顾客详情页会明写能不能叠优惠</div>
               </el-form-item>
               <el-form-item label="额外费用">
                 <el-input v-model="form.extraFee" placeholder="如有额外费用请说明" />
+                <div class="dyl-tip">如“餐位费 / 纸巾费另付”、“节假日加收 10%”；不写到店收钱就容易投诉</div>
               </el-form-item>
               <el-form-item label="使用张数限制">
                 <el-input-number v-model="form.maxPerOrder" :min="1" :max="99" controls-position="right" />
                 <span class="dyl-tip-inline">单次最多使用张数</span>
+                <div class="dyl-tip">一次到店能叠几张券（不是限购）；设 1 则每次只能核一张</div>
               </el-form-item>
               <el-form-item v-if="isGroupon" label="使用人数限制">
                 <el-input-number v-model="form.maxPersons" :min="1" :max="99" controls-position="right" />
                 <span class="dyl-tip-inline">单次最多使用人数</span>
+                <div class="dyl-tip">套餐适用人数，顾客详情页显“xx 人适用”；与张数不同，不参与核销数量校验</div>
               </el-form-item>
               <el-form-item v-if="isVoucher" label="适用范围">
                 <el-radio-group v-model="form.scopeType">
@@ -366,9 +408,11 @@
                   <el-radio label="CATEGORY">按品类</el-radio>
                   <el-radio label="STORE">按门店</el-radio>
                 </el-radio-group>
+                <div class="dyl-tip">代金券能抵的范围，落库到 ext.voucher_scope_type；选“按品类/按门店”需到店内确认具体可用项</div>
               </el-form-item>
               <el-form-item label="其他说明信息">
                 <el-input v-model="form.notice" type="textarea" :rows="3" maxlength="300" show-word-limit />
+                <div class="dyl-tip">顾客详情页“购买须知”末尾逐行展示；只写上面选项盖不住的个性化规则</div>
               </el-form-item>
             </el-form>
           </section>
@@ -577,6 +621,10 @@ export default {
       nameOptions: [],
       nameLoading: false,
       subitemForm: { productId: null, groupId: null, _groupName: '', subitemName: '', quantity: 1, price: 0 },
+      // ===== 交易规则高级项开关 =====
+      // 这 4 项实测库里几乎全空（daily_time / exclude_dates 为空），
+      // 常驻展开只会让运营分不清“没填”和“填了不生效”，所以默认收起。
+      adv: { consumeDate: false, excludeDate: false, dailyTime: false, comboConsumeDate: false },
       // ===== 投放渠道字典 =====
       channelList: [],
       channelDefaultCodes: '',
@@ -620,6 +668,7 @@ export default {
         saleDateRange: [],
         codeType: 'MERCHANT',
         outerSubitemId: '',
+        consumeStartToday: 1,
         consumeDateRange: [],
         excludeDateRange: [],
         dailyTimeRange: [],
@@ -977,6 +1026,13 @@ export default {
       this.$set(this.form, 'consumeDateRange', range(ext.consumeStartDate, ext.consumeEndDate))
       this.$set(this.form, 'excludeDateRange', this.parseExcludeDates(ext.excludeDates))
       this.$set(this.form, 'dailyTimeRange', range(ext.dailyTimeStart, ext.dailyTimeEnd))
+      // 主表列，null 当 1（当天可用）—— 与建表 DEFAULT 1 保持一致
+      this.$set(this.form, 'consumeStartToday', p.consumeStartToday == null ? 1 : Number(p.consumeStartToday))
+      // 库里有值 → 开关自动打开，否则编辑者看不到已生效的限制，一保存又被清掉
+      this.$set(this.adv, 'consumeDate', (this.form.consumeDateRange || []).length > 0)
+      this.$set(this.adv, 'comboConsumeDate', (this.form.consumeDateRange || []).length > 0)
+      this.$set(this.adv, 'excludeDate', (this.form.excludeDateRange || []).length > 0)
+      this.$set(this.adv, 'dailyTime', (this.form.dailyTimeRange || []).length > 0)
       this.$set(this.form, 'voucherRules', ext.voucherRules ? String(ext.voucherRules).split(',').filter(v => v) : [])
       const scope = ext.voucherScopeType || ''
       if (this.isVoucher) {
@@ -984,6 +1040,23 @@ export default {
       } else {
         this.$set(this.form, 'voucherType', scope || 'GENERAL')
       }
+    },
+
+    /**
+     * 交易规则高级项开关。
+     *
+     * 关掉时必须同步清空已选值 —— 否则运营关了开关以为取消了限制，
+     * 但 form 里的日期还在，packFormToExt 仍会把它落进 ext，顾客详情页继续显限制。
+     */
+    onToggleAdv(key, val) {
+      if (val) return
+      const clearMap = {
+        consumeDate: ['consumeDateRange'],
+        comboConsumeDate: ['consumeDateRange'],
+        excludeDate: ['excludeDateRange'],
+        dailyTime: ['dailyTimeRange']
+      }
+      ;(clearMap[key] || []).forEach(f => this.$set(this.form, f, []))
     },
 
     /** ext.excludeDates 存的是 [[start,end], ...]，表单目前只用第一段 */

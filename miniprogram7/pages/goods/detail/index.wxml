@@ -102,7 +102,15 @@
           <text class="pkg-price">¥{{ s.price }}</text>
         </view>
       </view>
+      <!-- 本组原价合计（拖音来客套餐卡尾部都有这一行加重字）。
+           本组子品价格全未填时 totalPriceText 为空串，整行不展 ——
+           展“合计 ¥0.00”会让顾客以为这组不值钱。 -->
+      <view class="subitem-total" wx:if="{{g.totalPriceText}}">小计 ¥{{ g.totalPriceText }}</view>
     </view>
+    <!-- 全套餐总价值：与单组小计区分开。读主表 total_value（商家填的
+         “用户侧划线价”），而不是把各组小计相加：子品价格普遍未填，
+         相加得出的数比商家填的总价值小很多，反而误导。 -->
+    <view class="combo-total" wx:if="{{product.totalValue}}">总价值 ¥{{product.totalValue}}</view>
   </view>
   <!-- 组合券包（COMBO）的搭配明细：存 biz_product_ext.combo_items_json，
        不走子品表。原先这里读的是 product.packages —— 那个字段全库只有
@@ -144,6 +152,16 @@
         <text wx:if="{{product.saleStartDate}}">{{product.saleStartText}}</text>
         <text wx:if="{{product.saleStartDate && product.saleEndDate}}"> 至 </text>
         <text wx:if="{{product.saleEndDate}}">{{product.saleEndText}}</text>
+      </view>
+
+      <!-- 购买当天能不能用。主表 consume_start_today，=0 时必须写出来：
+           顾客当天买了当天到店核不了，不提前告知就是纠纷。=1（默认）不展，
+           避免给每个商品都多一行废话。 -->
+      <view class="nl-line" wx:if="{{product.consumeStartToday === 0}}">
+        <text class="dot">·</text>生效时间
+      </view>
+      <view class="nl-sub" wx:if="{{product.consumeStartToday === 0}}">
+        次日起可用（购买当天不可核销）
       </view>
 
       <!-- 可用时间（每日时段）。存 biz_product_ext.daily_time_start/end，

@@ -9,7 +9,7 @@ const {
   voucherScopeText, refundPolicyText
 } = require('../../../utils/tradeRules.js');
 const { draftToProduct } = require('../../../utils/productPreview.js');
-const { customerPickText } = require('../../../utils/pickRule.js');
+const { customerPickText, groupTotalPrice } = require('../../../utils/pickRule.js');
 const { parseComboItems } = require('../../../utils/comboItems.js');
 // 商品图片口径：cover 是「商品头图」（逗号串，最多 5 张），
 // images 是「环境图」（属于商品内容）。两者职责不同，详见 utils/productMedia.js。
@@ -307,7 +307,11 @@ Page({
         pickRule: g.pickRule || 'ALL',
         sort: g.sort || 0,
         subitems: subitems,
-        pickText: customerPickText({ pickRule: g.pickRule || 'ALL', subitems: subitems })
+        pickText: customerPickText({ pickRule: g.pickRule || 'ALL', subitems: subitems }),
+        // 本组原价合计。拖音来客的套餐明细卡尾部都有这么一行加重字，
+        // 而我们只逐行列价格 —— 顾客得自己把 17 行菜加起来才知道划不划算。
+        // 空串表示本组子品价格全未填（实测很普遍），WXML 据此不展这行。
+        totalPriceText: groupTotalPrice({ subitems: subitems })
       };
     }) : [];
     // 组合券包（COMBO）的搭配明细存在 biz_product_ext.combo_items_json，

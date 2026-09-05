@@ -20,7 +20,9 @@ const JS = fs.readFileSync(path.resolve(__dirname, '../pages/goods/detail/index.
 
 // 后端 detail 接口直接透传的字段（normalize 里的 ...p）。
 // 它们不会在 js 里出现同名 key，但 payload 里确实有 —— 实测商品 2000 逐个确认过。
-const PASSTHROUGH = ['consumeStartDays', 'consumeValidDays', 'subtitle']
+// consumeStartToday 是主表列（ProductMapper 的 selectProductVo 里有），normalize 的 ...p 带过来，
+// 页面直接读原值判 === 0，不需要再翻一份文案。
+const PASSTHROUGH = ['consumeStartDays', 'consumeValidDays', 'subtitle', 'consumeStartToday']
 
 function refs(re) {
   const out = new Set()
@@ -71,6 +73,35 @@ describe('详情页 WXML 引用的字段必须真有人给', () => {
     expect(JS).not.toMatch(/EXPIRED\s*:/)
     expect(JS).not.toMatch(/NEVER\s*:/)
     expect(JS).toContain('refundPolicyText')
+  })
+})
+
+// 套餐分组的价值感：子品列了一堆却不告诉顾客到底值多少钱，
+// 转化会差。但子品价格普遍未填（实测 999534 的锅底组、999742 两组全为 0），
+// 所以全 0 时必须不展——展“小计 ¥0.00”比不展更坏。
+describe('套餐分组小计 / 总价值', function () {
+  it('每组小计读 g.totalPriceText，由 groupTotalPrice 算出来', function () {
+    expect(WXML).toContain('g.totalPriceText')
+    expect(JS).toContain('groupTotalPrice')
+    expect(JS).toContain('totalPriceText:')
+  })
+
+  it('小计行必须带 wx:if，否则子品未填价时会展 ¥0.00', function () {
+    expect(WXML).toMatch(/wx:if="\{\{g\.totalPriceText\}\}"/)
+  })
+
+  it('卡尾总价值读主表 totalValue，不能拿各组小计相加凑', function () {
+    // 子品价格普遍未填，相加出来的数比商家自己填的总价值小很多，反而误导。
+    expect(WXML).toMatch(/wx:if="\{\{product\.totalValue\}\}"/)
+  })
+})
+
+// 购买当天能不能核：主表 consume_start_today 建表就有，但 PC 没输入框、
+// 详情页也从未展过，390 条商品全是 DEFAULT 灌的 1。现在两边都接上。
+describe('购买当天可用 / 次日起可用', function () {
+  it('只在 consumeStartToday === 0 时展，默认 1 不占位', function () {
+    expect(WXML).toMatch(/wx:if="\{\{product\.consumeStartToday === 0\}\}"/)
+    expect(WXML).toContain('次日起可用')
   })
 })
 

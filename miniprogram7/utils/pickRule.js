@@ -65,6 +65,37 @@ function customerPickText(g) {
 }
 
 /**
+ * 本组子品原价合计（元，保留两位小数的字符串）。
+ *
+ * 为何要它：拖音来客的套餐明细卡尾部都有一行加重的「合计 / 总价值」
+ * （doc 里 c1_341/342 + c2_350 交叉证实过），而我们的子品卡只逐行列价格。
+ * 顾客要自己把 17 行菜的价钱加起来才知道这个套餐到底便宜多少 ——
+ * 而“划算”正是他下单前唯一想算的那个数。
+ *
+ * quantity 必须乘进去：它是“这道菜给几份”（实测 999534 的荤菜组
+ * 8 个单品 = 264 元，含多份项），与 groupPickCount 只数品种不同 ——
+ * 后者算“能挑几样”，前者算“值多少钱”，两个口径不能混。
+ *
+ * 返空串而不是 "0.00"：库里子品价格大量未填（实测 999534 的锅底组、
+ * 999742 两组均为 0），展一行“合计 ¥0.00”会让顾客以为这组不值钱。
+ */
+function groupTotalPrice(g) {
+  var list = (g && g.subitems) || []
+  var sum = 0
+  var any = false
+  for (var i = 0; i < list.length; i++) {
+    var price = Number(list[i] && list[i].price)
+    if (!isFinite(price) || price <= 0) continue
+    var qty = Number(list[i].quantity)
+    if (!isFinite(qty) || qty <= 0) qty = 1
+    sum += price * qty
+    any = true
+  }
+  if (!any) return ''
+  return sum.toFixed(2)
+}
+
+/**
  * 可选规则按本组实际单品数动态生成：3 个单品 → 全部可选(3选3) / 3选2 / 3选1。
  * 不能硬编码：2 个单品的组也能设成「3选2」，存进去就是永远履约不了的脏数据。
  */
@@ -84,5 +115,6 @@ module.exports = {
   groupPickCount: groupPickCount,
   pickRuleText: pickRuleText,
   customerPickText: customerPickText,
+  groupTotalPrice: groupTotalPrice,
   pickRuleOptions: pickRuleOptions
 }
