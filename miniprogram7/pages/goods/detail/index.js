@@ -6,7 +6,7 @@ const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
 const {
   dailyTimeText, excludeDatesText, voucherRulesText,
   collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel,
-  voucherScopeText
+  voucherScopeText, refundPolicyText
 } = require('../../../utils/tradeRules.js');
 const { draftToProduct } = require('../../../utils/productPreview.js');
 const { customerPickText } = require('../../../utils/pickRule.js');
@@ -203,19 +203,14 @@ Page({
       });
   },
   /**
-   * 退改政策枚举 → 中文。
-   *
-   * biz_product.refund_policy 库里两种形态共存：枚举码（ANYTIME）和商家手写的中文
-   * （「未核销随时退；已核销不退」）。原先 WXML 直接渲染原值，
-   * 枚举那两条商品的「退改政策」就写着一个大写 ANYTIME 给顾客看。
+   * 退改政策枚举 → 中文。口径已抽到 utils/tradeRules.js：
+   * 这张表必须跟 PC 建品页的下拉逐字对齐，得能被单测锁住 ——
+   * 原先就是因为写在这里无人校对，凭空编了 EXPIRED / NEVER 两个
+   * 全库不存在的键，而真正落库的 BEFORE_EXPIRE / NONE 一个都没命中。
+   * 保留本方法做转发：它是 Page 实例方法，商家端预览也走 normalize()。
    */
   refundText(v) {
-    if (!v) return ''
-    return ({
-      ANYTIME: '未核销随时退',
-      EXPIRED: '过期自动退',
-      NEVER: '不支持退款'
-    })[v] || v
+    return refundPolicyText(v);
   },
   normalize(p, groups) {
     const images = p.images

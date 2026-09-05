@@ -236,6 +236,19 @@ q "update biz_product_ext set voucher_scope_type='STORE' where product_id=$PROD;
 chk "ext.voucherScopeType 下发" \
   "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(((json.load(sys.stdin).get('data') or {}).get('ext') or {}).get('voucherScopeType'))")" "STORE"
 
+# refund_policy 必须把 PC 下拉那三个值都原值下发。
+# 为什么单独验：会员端原先自己存了一张 ANYTIME/EXPIRED/NEVER 的翻译表，
+# 而 PC 真正落库的是 ANYTIME/BEFORE_EXPIRE/NONE —— 后两个键全库没人写入，
+# 被 || v 兜底成原值，顾客在「退改政策」一行看到的是大写的 BEFORE_EXPIRE。
+# 生产库当下就有 2 条商品是 BEFORE_EXPIRE。翻译口径由 vitest 锁（tradeRules.test.js），
+# 这里只保证后端不会把它吞掉或改写成另一个值。
+for RP in ANYTIME BEFORE_EXPIRE NONE; do
+  q "update biz_product set refund_policy='$RP' where product_id=$PROD;"
+  chk "refundPolicy 原值下发 $RP" \
+    "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print((json.load(sys.stdin).get('data') or {}).get('refundPolicy'))")" "$RP"
+done
+q "update biz_product set refund_policy='ANYTIME' where product_id=$PROD;"
+
 echo "=== N. 适用门店完整列表（多店商品原先只画主门店一家）==="
 # 原先旁边只有一行不可点的「N店通用 >」：顾客看到“3 店”却不知道到底是哪 3 家，
 # 也就无法判断离自己最近那家能不能用。地址/电话是选店的第一依据。

@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest'
 const {
   hhmm, dailyTimeText, excludeDatesText, voucherRulesText,
   collectMethodText, codeTypeText, mutexText, hasRichContent, storeCountLabel,
-  voucherScopeText
+  voucherScopeText, refundPolicyText
 } = require('../utils/tradeRules.js')
 
 describe('hhmm / dailyTimeText 可用时段', () => {
@@ -202,5 +202,35 @@ describe('voucherScopeText 券类型 / 适用范围（同一列双语义）', ()
   it('空值 → label 和 text 都空', () => {
     expect(voucherScopeText({}, 'VOUCHER')).toEqual({ label: '', text: '' })
     expect(voucherScopeText(null, 'VOUCHER')).toEqual({ label: '', text: '' })
+  })
+})
+
+// 为什么单独锁 refundPolicyText：
+// 详情页原来自己存了一张 ANYTIME / EXPIRED / NEVER 的表，而 PC 建品页
+// 真正落库的是 ANYTIME / BEFORE_EXPIRE / NONE（views/biz/product/create.vue 的
+// el-option，detail.vue 和商家端建品页也是这三个）。后两个键全库没人写入，
+// 所以商家选「仅过期前可退」「不可退」时两边都落不到表里，被 || v 兜底
+// 成原值 —— 顾客看到的是大写的 BEFORE_EXPIRE。生产库当下就有 2 条商品
+// 是这个值，而 smoke 只能证明后端下发了字段，证明不了翻译表命不命中。
+describe('refundPolicyText 退改政策（枚举必须跟 PC 下拉完全对应）', () => {
+  it('PC 三个选项全部命中，不能漏成大写枚举码', () => {
+    expect(refundPolicyText('ANYTIME')).toBe('未核销随时退')
+    expect(refundPolicyText('BEFORE_EXPIRE')).toBe('仅过期前可退')
+    expect(refundPolicyText('NONE')).toBe('不可退')
+  })
+  it('三个枚举码一个都不能原样泄到页面上', () => {
+    ;['ANYTIME', 'BEFORE_EXPIRE', 'NONE'].forEach(function (code) {
+      expect(refundPolicyText(code)).not.toBe(code)
+      expect(/^[A-Z_]+$/.test(refundPolicyText(code))).toBe(false)
+    })
+  })
+  it('商家手写的中文原文展出（库里两种形态共存）', () => {
+    const cn = '未核销随时退；已核销不退'
+    expect(refundPolicyText(cn)).toBe(cn)
+  })
+  it('没填返空串，详情页靠它隐掉整行', () => {
+    expect(refundPolicyText('')).toBe('')
+    expect(refundPolicyText(null)).toBe('')
+    expect(refundPolicyText(undefined)).toBe('')
   })
 })

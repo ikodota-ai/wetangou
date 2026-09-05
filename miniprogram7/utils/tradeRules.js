@@ -144,6 +144,30 @@ function storeCountLabel(stores, product) {
   return n ? n + '家' : '';
 }
 
+/**
+ * 售后政策枚举 → 顾客可读文案。
+ *
+ * 枚举值必须与 PC 建品页那个下拉逐字对齐（views/biz/product/create.vue
+ * 的 el-option：ANYTIME / BEFORE_EXPIRE / NONE）。原先详情页自己写了一张
+ * ANYTIME / EXPIRED / NEVER 的表 —— 后两个键全库没任何地方会写入，
+ * 而商家在后台真选的「仅过期前可退」「不可退」落库是 BEFORE_EXPIRE / NONE，
+ * 两个键都落不到表里，被 || v 兜底成原值：顾客在详情页「退改政策」一行
+ * 看到的就是一个大写的 BEFORE_EXPIRE。生产库当下就有 2 条商品是这个值。
+ *
+ * 库里还共存着商家手写的中文（如「未核销随时退；已核销不退」），
+ * 那种直接原文展出，所以兜底仍然返 v 而不是置空。
+ */
+var REFUND_POLICY_TEXT = {
+  ANYTIME: '未核销随时退',
+  BEFORE_EXPIRE: '仅过期前可退',
+  NONE: '不可退'
+};
+
+function refundPolicyText(v) {
+  if (!v) return '';
+  return REFUND_POLICY_TEXT[v] || v;
+}
+
 module.exports = {
   hhmm: hhmm,
   dailyTimeText: dailyTimeText,
@@ -155,6 +179,8 @@ module.exports = {
   hasRichContent: hasRichContent,
   storeCountLabel: storeCountLabel,
   voucherScopeText: voucherScopeText,
+  refundPolicyText: refundPolicyText,
+  REFUND_POLICY_TEXT: REFUND_POLICY_TEXT,
   VOUCHER_SCOPE_TEXT: VOUCHER_SCOPE_TEXT,
   VOUCHER_TYPE_TEXT: VOUCHER_TYPE_TEXT,
   VOUCHER_RULE_TEXT: VOUCHER_RULE_TEXT
