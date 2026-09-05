@@ -31,6 +31,8 @@ import com.ruoyi.biz.service.IStoreService;
 import com.ruoyi.biz.domain.Merchant;
 import com.ruoyi.biz.service.IMerchantService;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.exception.ServiceException;
@@ -266,6 +268,56 @@ public class ApiProductController
             }
         }
 
+        // 适用门店完整列表。
+        //
+        // 商品可以多店通用（store_ids 逗号串，实测 999534 = "100,101,200"），
+        // 但详情页那张「适用门店」卡只画了主门店一家，旁边一行「3店通用 >」
+        // 还是不可点的纯文本：顾客看到“3 店”却无法知道到底是哪 3 家，
+        // 也就无法判断离自己最近那家到底能不能用。
+        //
+        // 不复用 store_names 那个子查询（它只是 group_concat 出一串名字）：
+        // 顾客要的是地址、营业时间、电话这些能拿来决定去哪家的信息。
+        List<Map<String, Object>> applicableStores = new ArrayList<Map<String, Object>>();
+        java.util.LinkedHashSet<Long> storeIdSet = new java.util.LinkedHashSet<Long>();
+        if (StringUtils.isNotEmpty(p.getStoreIds()))
+        {
+            for (String one : p.getStoreIds().split(","))
+            {
+                String v = one.trim();
+                if (StringUtils.isEmpty(v))
+                {
+                    continue;
+                }
+                try { storeIdSet.add(Long.valueOf(v)); } catch (NumberFormatException ignore) {}
+            }
+        }
+        // 单店商品（store_ids 为空、只有 store_id）也要进这个列表，
+        // 否则前端得维护两套渲染分支。
+        if (storeIdSet.isEmpty() && p.getStoreId() != null && p.getStoreId() > 0L)
+        {
+            storeIdSet.add(p.getStoreId());
+        }
+        for (Long sid : storeIdSet)
+        {
+            Store one = storeService.selectStoreByStoreId(sid);
+            if (one == null)
+            {
+                continue;
+            }
+            Map<String, Object> m = new HashMap<String, Object>();
+            m.put("storeId", one.getStoreId());
+            m.put("storeName", one.getStoreName());
+            m.put("address", one.getAddress());
+            m.put("phone", one.getPhone());
+            m.put("businessHours", one.getBusinessHours());
+            m.put("rating", one.getRating());
+            m.put("longitude", one.getLongitude());
+            m.put("latitude", one.getLatitude());
+            m.put("services", translateServices(one.getServices()));
+            applicableStores.add(m);
+        }
+        result.put("applicableStores", applicableStores);
+
         // 商户级展示开关（销量 / 库存）。
         // 必须兑底成 "1"：商户缓存 merchant:* 没 TTL，新增列之前写进去的快照
         // 反序列化回来这两个 key 是 null（promoter_enabled 上线时踩过同一个坑），
@@ -308,6 +360,88 @@ public class ApiProductController
             labels.add(StringUtils.isEmpty(label) ? c : label);
         }
         return labels;
+    }
+
+    /**
+     * 本店更多商品（商品详情页底部推荐位）。
+     *
+     * <p>为什么新开而不复用 {@code /list}：那个端点不分页一次全返，
+     * 也不会把当前正在看的这个商品排除掉 —— 推荐位里摆一张
+     * 跟当前页一模一样的卡，点进去还是自己，看着就像坏了。
+     *
+     * <p>背景：详情页底部那张「本店更多商品（3）」卡的 WXML 分支一直存在，
+     * 读的是 {@code product.moreGoods} —— 而后端从未下发过这个字段，
+     * 所以真机上这张卡永远不可能出现；连标题里的「3」都是写死的。
+     * 对比抖音来客，推荐位是商家复购的主要入口（「更多本店团购(6)」、
+     * 「小伙伴们还喜欢」各占一屏）。
+     *
+     * <p>范围口径：优先同门店（顾客已经在看这家店了），同门店不够再补同商户。
+     * 跨商户一律不进：推荐位的点击会直接 redirectTo 到对方详情页，
+     * 而 appid 就是租户边界，把别家商户的货推到本商户小程序里是数据泄露。
+     */
+    @GetMapping("/{productId}/more")
+    public AjaxResult moreGoods(@PathVariable Long productId,
+                               @RequestParam(required = false) Integer limit)
+    {
+        Product cur = productService.selectProductByProductId(productId);
+        if (cur == null || !isVisibleToCaller(cur))
+        {
+            return AjaxResult.error("商品不存在或已下架");
+        }
+        int max = (limit == null || limit <= 0) ? 6 : Math.min(limit, 20);
+
+        java.util.LinkedHashMap<Long, Product> picked = new java.util.LinkedHashMap<Long, Product>();
+
+        // 第一轮：同门店。
+        if (cur.getStoreId() != null && cur.getStoreId() > 0L)
+        {
+            Product q = new Product();
+            q.setStatus("0");
+            q.setMerchantId(cur.getMerchantId());
+            q.setStoreId(cur.getStoreId());
+            collectMore(picked, productService.selectProductList(q), productId, max);
+        }
+        // 第二轮：同商户其他门店，补到 max。
+        if (picked.size() < max && cur.getMerchantId() != null)
+        {
+            Product q = new Product();
+            q.setStatus("0");
+            q.setMerchantId(cur.getMerchantId());
+            collectMore(picked, productService.selectProductList(q), productId, max);
+        }
+
+        List<Product> out = new ArrayList<Product>(picked.values());
+        return AjaxResult.success(fillImageUrls(out));
+    }
+
+    /**
+     * 把候选商品收进结果集，跳过当前商品、去重、封顶。
+     * 用 LinkedHashMap 而不是 List：两轮查询（同门店 / 同商户）会重叠，
+     * 不去重同一个商品会在推荐位里出现两次。
+     */
+    private void collectMore(java.util.LinkedHashMap<Long, Product> picked,
+                             List<Product> candidates, Long selfId, int max)
+    {
+        if (candidates == null)
+        {
+            return;
+        }
+        for (Product one : candidates)
+        {
+            if (picked.size() >= max)
+            {
+                return;
+            }
+            if (one == null || one.getProductId() == null)
+            {
+                continue;
+            }
+            if (one.getProductId().equals(selfId))
+            {
+                continue;
+            }
+            picked.put(one.getProductId(), one);
+        }
     }
 
     /**

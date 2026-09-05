@@ -31,6 +31,10 @@ MID=991
 STORE=991001
 PROD=991002
 COMBO_PROD=991003
+STORE2=991004
+MORE_A=991005
+MORE_B=991006
+MORE_C=991007
 
 ok(){ PASS=$((PASS+1)); echo "  ✅ $1"; }
 no(){ FAIL=$((FAIL+1)); echo "  ❌ $1"; }
@@ -46,7 +50,8 @@ cleanup(){
      delete from biz_product_subitem_group where product_id = $PROD;
      delete from biz_product_ext where product_id = $PROD;
      delete from biz_product where product_id = $PROD;
-     delete from biz_store where store_id = $STORE;
+     delete from biz_product where product_id in ($MORE_A,$MORE_B,$MORE_C);
+     delete from biz_store where store_id in ($STORE,$STORE2);
      delete from biz_merchant where merchant_id = $MID;
      update biz_merchant set show_sales='1', show_stock='1' where merchant_id = 1;"
   redis-cli -n 0 --scan --pattern 'merchant:*' 2>/dev/null | xargs -r redis-cli -n 0 DEL >/dev/null 2>&1
@@ -57,8 +62,8 @@ trap cleanup EXIT
 
 echo "=== A. 造数据：独立商户 + 带服务设施的门店 + 带子品组的团购 ==="
 q "delete from biz_product_ext where product_id=$COMBO_PROD;
-   delete from biz_product where product_id in ($PROD,$COMBO_PROD);
-   delete from biz_store where store_id=$STORE;
+   delete from biz_product where product_id in ($PROD,$COMBO_PROD,$MORE_A,$MORE_B,$MORE_C);
+   delete from biz_store where store_id in ($STORE,$STORE2);
    delete from biz_merchant where merchant_id=$MID;"
 # merchant_no NOT NULL 无默认值，必填
 q "insert into biz_merchant (merchant_id, merchant_no, merchant_name, appid, status, del_flag, show_sales, show_stock)
@@ -193,3 +198,73 @@ chk "COMBO 类型码原值下发（翻译在前端）" \
   "$(python3 -c "
 import json,sys
 print(json.loads(sys.argv[1])[1]['subitemType'])" "$CJ")" "VOUCHER"
+
+echo "=== L. 图文详情 / 商家补充说明（后台富文本编辑器填的两整块，详情页原先零渲染）==="
+# 改造前：detail 从没进过 WXML（只在分享面板用过），notice 则在“结构化购买须知”改造时被甲掉。
+# 商家把图文详情当商品卖点主阵地（抖音来客那边它独占 5 屏），零渲染 = 白填。
+q "update biz_product set detail='<p>图文详情正文</p><table><tr><td>规格</td></tr></table>',
+   notice='<p><strong>使用规则</strong></p><ol><li>到店出示券码</li></ol>' where product_id=$PROD;"
+DL=$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991")
+DTL=$(echo "$DL" | python3 -c "import sys,json;print(((json.load(sys.stdin).get('data') or {}).get('detail') or ''))")
+NTC=$(echo "$DL" | python3 -c "import sys,json;print(((json.load(sys.stdin).get('data') or {}).get('notice') or ''))")
+has "detail 随详情下发" "$DTL" "图文详情正文"
+has "detail 保留 table（.rich-detail 必须防横向撑破）" "$DTL" "<table"
+has "notice 随详情下发" "$NTC" "到店出示券码"
+q "update biz_product set detail=null, notice=null where product_id=$PROD;"
+
+echo "=== M. 交易规则 6 字段（后台能填、后端一直在下发、详情页从未读过）==="
+# 尤其 mutex_with_store_promotion：顾客以为能叠店内优惠、收银台说不行，而商家其实已经勾选过了。
+# exclude_dates 故意存两段：PC 表单只用第一段，但详情页必须把全部段列出来。
+q "update biz_product set collect_method='STORE', mutex_with_store_promotion=0 where product_id=$PROD;"
+q "delete from biz_product_ext where product_id=$PROD;"
+q "insert into biz_product_ext (product_id, daily_time_start, daily_time_end, exclude_dates, voucher_rules, code_type)
+   values ($PROD, '09:00:00', '22:30:00', '[[\"2026-01-01\",\"2026-01-03\"],[\"2026-02-14\",\"2026-02-14\"]]', 'ALL_CATEGORY,ALL_BRAND', 'MERCHANT');"
+DM=$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991")
+gm(){ echo "$DM" | python3 -c "import sys,json;print((json.load(sys.stdin).get('data') or {}).get('$1'))"; }
+ge(){ echo "$DM" | python3 -c "import sys,json;print(((json.load(sys.stdin).get('data') or {}).get('ext') or {}).get('$1'))"; }
+chk "collectMethod 下发" "$(gm collectMethod)" "STORE"
+chk "mutexWithStorePromotion 下发" "$(gm mutexWithStorePromotion)" "0"
+chk "ext.codeType 下发" "$(ge codeType)" "MERCHANT"
+chk "ext.dailyTimeStart 下发" "$(ge dailyTimeStart)" "09:00:00"
+chk "ext.dailyTimeEnd 下发" "$(ge dailyTimeEnd)" "22:30:00"
+chk "ext.voucherRules 下发" "$(ge voucherRules)" "ALL_CATEGORY,ALL_BRAND"
+has "ext.excludeDates 保留第二段" "$(ge excludeDates)" "2026-02-14"
+
+echo "=== N. 适用门店完整列表（多店商品原先只画主门店一家）==="
+# 原先旁边只有一行不可点的「N店通用 >」：顾客看到“3 店”却不知道到底是哪 3 家，
+# 也就无法判断离自己最近那家能不能用。地址/电话是选店的第一依据。
+q "insert into biz_store (store_id, merchant_id, store_name, address, phone, services, business_hours, rating, status, del_flag)
+   values ($STORE2, $MID, 'SMOKE二店991', '福田区中心四路 1 号', '0755-12345678', 'free_parking', '11:00-23:00', 4.2, '0', '0');"
+q "update biz_product set store_ids='$STORE,$STORE2' where product_id=$PROD;"
+DN=$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991")
+chk "applicableStores 两家全出"   "$(echo "$DN" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('applicableStores') or []))")" "2"
+has "第二家店名" "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "SMOKE二店991"
+has "门店地址下发（详情页原先一个字都没有）"   "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "中心四路"
+has "门店电话下发（逐家拨号靠它）"   "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "0755-12345678"
+has "逐家服务设施已翻译"   "$(echo "$DN" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin).get('applicableStores'),ensure_ascii=False))")" "免费停车"
+# 单店商品（store_ids 空）也得进这个列表，否则前端要维护两套渲染分支
+q "update biz_product set store_ids=null where product_id=$PROD;"
+chk "单店回落到 store_id"   "$(curl -s "$BASE/api/product/$PROD" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('applicableStores') or []))")" "1"
+
+echo "=== O. 本店更多商品（那张卡的 WXML 分支一直在，但后端从未下发过这个字段）==="
+# 原先读 product.moreGoods，全库无人下发 → 真机上永远不可能出现；
+# 连标题里的「（3）」都是写死的，就算真有 6 个也写着 3。
+q "insert into biz_product (product_id, merchant_id, store_id, store_ids, product_name,
+     product_type, type_code, price, market_price, stock, sales, status, del_flag)
+   values ($MORE_A, $MID, $STORE, '$STORE', 'SMOKE推荐A', '0', 'GROUPON', 66, 128, 10, 0, '0', '0'),
+          ($MORE_B, $MID, $STORE2, '$STORE2', 'SMOKE推荐B', '0', 'GROUPON', 88, 158, 10, 0, '0', '0'),
+          ($MORE_C, $MID, $STORE, '$STORE', 'SMOKE下架C', '0', 'GROUPON', 77, 148, 10, 0, '1', '0');"
+MR=$(curl -s "$BASE/api/product/$PROD/more" -H "X-App-Id: wx-smoke-detail-991")
+ids(){ echo "$MR" | python3 -c "import sys,json;print(','.join(str(x.get('productId')) for x in (json.load(sys.stdin).get('data') or [])))"; }
+has "同门店商品进推荐位" "$(ids)" "$MORE_A"
+# 推荐位里摆一张跟当前页一模一样的卡，点进去还是自己，看着就像坏了
+case "$(ids)" in *"$PROD"*) no "推荐位排除自身 —— 竟然包含自己";; *) ok "推荐位排除自身";; esac
+# 下架品不能进：点进去 detail 会直接报“商品不存在或已下架”
+case "$(ids)" in *"$MORE_C"*) no "下架商品不得进推荐位 —— 竟然包含";; *) ok "下架商品已排除";; esac
+has "同商户其他门店补齐" "$(ids)" "$MORE_B"
+chk "limit 生效"   "$(curl -s "$BASE/api/product/$PROD/more?limit=1" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('data') or []))")" "1"
+chk "limit 超上限封顶 20"   "$(curl -s "$BASE/api/product/$PROD/more?limit=999" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('data') or []) <= 20)")" "True"
+# 跟详情同一套租户边界：推荐位的点击会 redirectTo 到对方详情页，
+# 把别家商户的货推到本商户小程序里就是数据泄露。
+chk "别家 appid 拿不到 more"   "$(curl -s "$BASE/api/product/$PROD/more" -H "X-App-Id: $APPID" | python3 -c "import sys,json;print(json.load(sys.stdin).get('code'))")" "500"
+chk "不存在的商品 more"   "$(curl -s "$BASE/api/product/99999999/more" -H "X-App-Id: wx-smoke-detail-991" | python3 -c "import sys,json;print(json.load(sys.stdin).get('code'))")" "500"

@@ -1,5 +1,12 @@
 const app = getApp();
 const { api, toFullUrl, fixRichText } = require('../../../utils/request.js');
+// 交易规则文案 + 富文本空值判定：口径抽到 utils/tradeRules.js，
+// 因为这几个翻译表必须跟 PC 建品页的选项文案逐字对齐，得能被单测锁住；
+// 商家端预览走的也是本页，口径只能有一份。
+const {
+  dailyTimeText, excludeDatesText, voucherRulesText,
+  collectMethodText, codeTypeText, mutexText, hasRichContent
+} = require('../../../utils/tradeRules.js');
 const { draftToProduct } = require('../../../utils/productPreview.js');
 const { customerPickText } = require('../../../utils/pickRule.js');
 const { parseComboItems } = require('../../../utils/comboItems.js');
@@ -31,7 +38,12 @@ Page({
     // 商户级展示开关。默认 true（与改造前行为一致）：
     // 假如初值给 false，接口回来前的那一帧会先把销量闪掉再闪回来。
     showSales: true,
-    showStock: true
+    showStock: true,
+    // 适用门店完整列表、本店更多商品。
+    // 必须在这里给空数组而不是等 setData：WXML 里用 .length 判空，
+    // undefined.length 在渲染层会直接报错。
+    applicableStores: [],
+    moreGoods: []
   },
   onLoad(opts) {
     // 防御：app 异常时给个默认 user，避免 onLoad 内任意 getApp() 失败
@@ -155,8 +167,15 @@ Page({
             showSales: raw.showSales !== '0',
             showStock: raw.showStock !== '0',
             canBuyNow: this.canBuy(normalized),
-            buyBtnLabel: this.buyBtnDisabledText(normalized)
+            buyBtnLabel: this.buyBtnDisabledText(normalized),
+            // 适用门店完整列表（后端新增的兄弟键）。
+            // 原先这张卡只画主门店一家 + 一行不可点的「N店通用」，
+            // 多店商品（实测 999534 三家）顾客根本不知道是哪三家。
+            applicableStores: raw.applicableStores || []
           });
+          // 本店更多商品单独拉：它不影响主体渲染，失败也不能拖垮详情页，
+          // 所以不放进主请求的 then 链里串行等。预览态不拉（草稿没 productId）。
+          if (!this.data.isPreview) { this.loadMoreGoods(p.productId); }
         } else if (p && p.code && p.code !== 200) {
           // 后端返回非 200 的业务码
           this.setData({ state: 'error', errorMsg: p.msg || '后端返回业务错误' });
@@ -271,13 +290,59 @@ Page({
       sold: p.sales || p.sold || 0,
       cover: p.cover ? toFullUrl(p.cover) : '/assets/img/RestaurantImg.png',
       images: images.filter((u) => !!u).map((u) => toFullUrl(u)),
-      detail: fixRichText(p.detail)
+      // 图文详情同样过一道空值判定：商家把富文本清空后库里存的是 <p><br></p>，
+      // 直接当真会在详情页凭空多出一张只有标题的空卡。
+      detail: hasRichContent(p.detail) ? fixRichText(p.detail) : '',
+      // 商家手写的补充说明。notice 存的是富文本，得先剔掉“看着有值、
+      // 实际没字”的底卡（富文本编辑器清空后会留 <p><br></p>），
+      // 否则详情页会凭空多出一张只有标题的空卡。
+      noticeRich: hasRichContent(p.notice) ? fixRichText(p.notice) : '',
+      // 交易规则：全部在这里算成中文，WXML 只负责展。
+      // 这整批字段后端一直在下发（ext 走 association，collectMethod /
+      // mutexWithStorePromotion 在 selectProductVo 里），是前端从未读过。
+      mutexText: mutexText(p.mutexWithStorePromotion),
+      collectMethodText: collectMethodText(p.collectMethod),
+      codeTypeText: codeTypeText(p.ext),
+      dailyTimeText: dailyTimeText(p.ext),
+      excludeDatesText: excludeDatesText(p.ext),
+      voucherRulesText: voucherRulesText(p.ext)
     };
   },
   // 顶部大图原先是单张静态 image，可 hero-page 已经在显示「1/3」这种页码 ——
   // 页码存在但翻不动，用户以为图挂了。改 swiper 后 imgIdx 才真跟得上
   onSwiperChange(e) {
     this.setData({ imgIdx: e.detail.current });
+  },
+  // 本店更多商品。
+  //
+  // 详情页底部那张卡的 WXML 分支一直存在，读的是 product.moreGoods，
+  // 而后端从未下发过这个字段 —— 真机上它永远不可能出现，
+  // 连标题里的「3」都是写死的。现在走新端点 /api/product/{id}/more。
+  loadMoreGoods(id) {
+    if (!id) return;
+    api.productMore(id, 6)
+      .then((list) => {
+        const arr = Array.isArray(list) ? list : [];
+        this.setData({
+          moreGoods: arr.map((g) => ({
+            productId: g.productId,
+            name: g.productName || g.name || '',
+            price: g.price != null ? String(g.price) : '0.00',
+            // 市场价只在真的高于现价时才给前端，否则两个一模一样的数字
+            // 并排、后面那个还带删除线，看着像 bug（分享面板踩过同一个坑）。
+            marketPrice: (g.marketPrice && Number(g.marketPrice) > Number(g.price)) ? String(g.marketPrice) : '',
+            cover: g.cover ? toFullUrl(g.cover) : '/assets/img/RestaurantImg.png'
+          }))
+        });
+      })
+      .catch(() => { /* 推荐位拉不到就不展，不弹错 */ });
+  },
+  // 适用门店逐家的「联系门店」。多店商品下每行都带自己的 phone，
+  // 不能像首页那样只拿一个全局号码，否则顶着“万象城店”拨出去的是旗舰店。
+  onCallStore(e) {
+    const tel = e.currentTarget.dataset.phone;
+    if (!tel) return wx.showToast({ title: '暂无联系电话', icon: 'none' });
+    wx.makePhoneCall({ phoneNumber: String(tel) });
   },
   onRetry() { this.loadProduct(this.data.id); },
   onBack() {

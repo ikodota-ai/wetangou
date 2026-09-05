@@ -250,6 +250,9 @@ const api = {
   // 顾客从来没看到过（而这正是他判断值不值的主要依据）。
   // 改 _raw 后回传完整响应，各调用方原本就写的 (res.data || res) 兼容写法正好抿中。
   productDetail: (id) => requestRaw(`/api/product/${id}`),
+  // 本店更多商品（详情页底部推荐位）。走 request 而不是 requestRaw：
+  // 这个端点只有 data 一个数组，没兄弟键。
+  productMore: (id, limit) => request(`/api/product/${id}/more?limit=${limit || 6}`),
   // 商品小程序码（分享面板 / 海报用）。与推客身份无关，普通会员也能拿 ——
   // 原先海报页借用 /api/distributor/qrcode，那个要求调用者是推客
   productQrcode: (id) => request(`/api/product/${id}/qrcode`),

@@ -123,6 +123,25 @@
         <text wx:if="{{product.saleEndDate}}">{{product.saleEndText}}</text>
       </view>
 
+      <!-- 可用时间（每日时段）。存 biz_product_ext.daily_time_start/end，
+           PC 建品页有 dailyTimeRange 这个时间段选择器。商家只允许午市用的券，
+           顾客晚上拿着去了核不了，之前这个信息在详情页上完全不存在。 -->
+      <view class="nl-line" wx:if="{{product.dailyTimeText}}">
+        <text class="dot">·</text>可用时间
+      </view>
+      <view class="nl-sub" wx:if="{{product.dailyTimeText}}">
+        每日 {{product.dailyTimeText}} 可用
+      </view>
+
+      <!-- 不可用日期。商家把节假日排除掉的情况很常见，
+           不写出来就是到店吵架。 -->
+      <view class="nl-line" wx:if="{{product.excludeDatesText}}">
+        <text class="dot">·</text>不可用日期
+      </view>
+      <view class="nl-sub" wx:if="{{product.excludeDatesText}}">
+        {{product.excludeDatesText}}
+      </view>
+
       <!-- 限购 -->
       <view class="nl-line" wx:if="{{product.limitPerUser || product.maxPerOrder}}">
         <text class="dot">·</text>限购
@@ -175,6 +194,39 @@
         需提前预约，到店出示预约凭证
       </view>
 
+      <!-- 使用规则：是否与店内优惠同享。
+           字段 mutex_with_store_promotion（PC 表单名 storeOtherDiscount，
+           SHARE=0 / EXCLUSIVE=1），本地 390 条商品全部为 1 ——
+           也就是说所有商品都不允许叠优惠，而顾客从未被告知过。 -->
+      <view class="nl-line" wx:if="{{product.mutexText}}">
+        <text class="dot">·</text>使用规则
+      </view>
+      <view class="nl-sub" wx:if="{{product.mutexText}}">
+        {{product.mutexText}}
+      </view>
+
+      <!-- 使用方式：收款方式 + 券码类型。
+           顾客需要知道到店是找门店核还是平台发码。 -->
+      <view class="nl-line" wx:if="{{product.collectMethodText || product.codeTypeText}}">
+        <text class="dot">·</text>核销与收款
+      </view>
+      <view class="nl-sub" wx:if="{{product.codeTypeText}}">
+        {{product.codeTypeText}}
+      </view>
+      <view class="nl-sub" wx:if="{{product.collectMethodText}}">
+        {{product.collectMethodText}}
+      </view>
+
+      <!-- 代金券适用范围（仅 VOUCHER 有值）。
+           PC 建品页有一组 checkbox（全部品类/全部品牌适用），
+           存成逗号串，详情页零露出。 -->
+      <view class="nl-line" wx:if="{{product.voucherRulesText}}">
+        <text class="dot">·</text>适用范围
+      </view>
+      <view class="nl-sub" wx:if="{{product.voucherRulesText}}">
+        {{product.voucherRulesText}}
+      </view>
+
       <!-- 其他说明 -->
       <view class="nl-line" wx:if="{{product.otherNotice}}">
         <text class="dot">·</text>其他说明
@@ -184,44 +236,85 @@
       </view>
     </view>
 
-  <!-- 适用门店 -->
+  <!-- 图文详情。
+       后台建品页有一个 500 字的富文本框（create.vue 的 detail），
+       商家把套餐明细表、菜品图都往里存（商品 2000 存了 1557 字），
+       index.js 也一直在算 fixRichText(p.detail) —— 但 WXML 里从来没有过
+       任何一处引用，算完就丢。对比抖音来客，这一块是“图片详情”，
+       占了商品详情页整整 5 屏；在我们这里顾客一个字看不到。 -->
+  <view class="card" wx:if="{{product.detail}}">
+    <text class="block-title">图文详情</text>
+    <rich-text class="rich-detail" nodes="{{product.detail}}"></rich-text>
+  </view>
+
+  <!-- 商家手写的补充说明（notice 富文本）。
+       上面那张“购买须知”卡是按字段结构化拼的，当时以为可以完全取代
+       notice，于是把它从页面上抹掉了。但 PC 建品页那个 300 字的框还在（create.vue:369），
+       商家端 12 处引用也还在，库里 12 条商品真的填了值——写了但没人看得到。
+       结构化字段覆盖不了的东西（“不可与其他代金券叠加”这类）只能靠它。 -->
+  <view class="card" wx:if="{{product.noticeRich}}">
+    <text class="block-title">商家补充说明</text>
+    <rich-text class="rich-detail" nodes="{{product.noticeRich}}"></rich-text>
+  </view>
+
+  <!-- 适用门店。
+       原先这里只画主门店一家 + 旁边一行不可点的「N店通用 >」：
+       多店商品（实测 999534 = 100,101,200 三家）顾客看到「3店通用」
+       却无法知道到底是哪三家，也就无法判断离自己最近那家能不能用。
+       （上一轮我以「底部卡已完整列出」为理由删了 storeScopeText，
+         那个判断是错的 —— 底部卡当时并没有列出所有门店。） -->
   <view class="card">
     <view class="store-head">
       <text class="block-title">适用门店 {{product.storeCountText}}</text>
-      <text class="more" wx:if="{{product.storeCount > 1}}">{{product.storeCount}}店通用 ></text>
     </view>
-    <view class="store-row">
+    <!-- 多店：逐家列出（名称 / 评分 / 营业时间 / 地址），支持拨号 -->
+    <view class="store-row" wx:for="{{applicableStores}}" wx:key="storeId" wx:for-item="st">
+      <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>
+      <view class="store-info">
+        <text class="store-name">{{st.storeName}}</text>
+        <view class="store-rating">
+          <text class="rating-score" wx:if="{{st.rating}}">{{st.rating}}</text>
+          <text class="rating-t">{{st.rating ? '评分' : '暂无评分'}}</text>
+        </view>
+        <text class="store-hours" wx:if="{{st.businessHours}}">营业时间：{{st.businessHours}}</text>
+        <!-- 地址是顾客选店的第一依据，之前整个详情页上一个字都没有 -->
+        <text class="store-addr" wx:if="{{st.address}}">{{st.address}}</text>
+      </view>
+      <view class="store-call" wx:if="{{st.phone}}" data-phone="{{st.phone}}" bindtap="onCallStore">
+        <view class="call-ic"></view>
+        <text>联系门店</text>
+      </view>
+    </view>
+    <!-- 后端没回门店明细时的兜底（比如门店被删了），不能让这张卡整个变空白 -->
+    <view class="store-row" wx:if="{{!applicableStores.length}}">
       <image class="store-img" src="{{product.cover}}" mode="aspectFill"></image>
       <view class="store-info">
         <text class="store-name">{{product.storeNameMain || product.storeName || merchantName}}</text>
-        <!-- 评分读 biz_store.rating（后台可维护）。原先五颗星永远是空的、
-             旁边永远写着「暂无评分」，就算商家填了 4.8 也不显示。 -->
         <view class="store-rating">
           <text class="rating-score" wx:if="{{product.storeRating}}">{{product.storeRating}}</text>
           <text class="rating-t">{{product.storeRating ? '评分' : '暂无评分'}}</text>
         </view>
-        <!-- 营业时间原先兑底写死成「周一至周日 09:00-22:30」，
-             商家实际只开到 21:00 也照样显示 22:30，顾客跑空算谁的？没填就不展。 -->
         <text class="store-hours" wx:if="{{product.storeHours}}">营业时间：{{product.storeHours}}</text>
-      </view>
-      <view class="store-call">
-        <view class="call-ic"></view>
-        <text>联系商家</text>
       </view>
     </view>
   </view>
 
-  <!-- 更多商品 -->
-  <view class="card" wx:if="{{product.moreGoods && product.moreGoods.length}}">
+  <!-- 本店更多商品。
+       原先这张卡读 product.moreGoods，而后端从未下发过这个字段，
+       所以真机上永远不可能出现；标题里那个「（3）」也是写死的，
+       就算真有 6 个也写着 3。现在走 /api/product/{id}/more，数量用真值。 -->
+  <view class="card" wx:if="{{moreGoods.length}}">
     <view class="store-head">
-      <text class="block-title">本店更多商品（3）</text>
-      <text class="more">查看更多 ></text>
+      <text class="block-title">本店更多商品（{{moreGoods.length}}）</text>
     </view>
     <scroll-view scroll-x class="more-scroll" enhanced show-scrollbar="{{false}}">
-      <view class="more-cell" wx:for="{{product.moreGoods}}" wx:key="productId" data-id="{{item.productId}}" bindtap="goDetail">
+      <view class="more-cell" wx:for="{{moreGoods}}" wx:key="productId" data-id="{{item.productId}}" bindtap="goDetail">
         <image class="more-img" src="{{item.cover}}" mode="aspectFill"></image>
         <text class="more-name">{{item.name}}</text>
-        <view class="more-prices"><text class="mp-now">¥{{item.price}}</text><text class="mp-old">¥{{item.price}}</text></view>
+        <view class="more-prices">
+          <text class="mp-now">¥{{item.price}}</text>
+          <text class="mp-old" wx:if="{{item.marketPrice}}">¥{{item.marketPrice}}</text>
+        </view>
       </view>
     </scroll-view>
   </view>

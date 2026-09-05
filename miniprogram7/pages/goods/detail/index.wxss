@@ -45,6 +45,16 @@
 .star { width: 24rpx; height: 24rpx; background: #E8E8E8; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
 .rating-t { font-size: 22rpx; color: var(--color-primary); margin-left: 4rpx; }
 .store-hours { font-size: 24rpx; color: #999; }
+/* 门店地址：长地址很容易超两行，限两行省略，否则一家店就把整张卡拉长 */
+.store-addr {
+  font-size: 24rpx;
+  color: #999;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .store-call { display: flex; flex-direction: column; align-items: center; gap: 4rpx; }
 .call-ic { width: 40rpx; height: 40rpx; border: 4rpx solid var(--color-primary); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative; }
 .call-ic::after { content: ''; position: absolute; left: 8rpx; bottom: 4rpx; width: 8rpx; height: 8rpx; background: var(--color-primary); border-radius: 50%; }
@@ -168,3 +178,16 @@ button.so::after { border: none; }
 
 /* 评分：原先是五颗永远不亮的空星，改成直接把分数抬出来 */
 .rating-score { font-size: 26rpx; font-weight: 600; color: var(--color-primary); }
+
+/* 图文详情 / 商家补充说明的富文本容器。
+   商家存进来的 HTML 里真的带 <table>（商品 2000），而 rich-text 的子节点
+   不能用外部选择器上样式，只能靠容器自己把字号/行高/换行守住，
+   否则长表会直接撑破卡片横向溢出。 */
+.rich-detail {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #333;
+  word-break: break-all;
+  overflow-x: auto;
+}
